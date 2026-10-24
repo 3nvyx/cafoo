@@ -1,0 +1,2 @@
+# Policy: bank reconciliation
+Every bank transaction is matched to an invoice, a bill, or a journal entry within the close. Matches at or above 75% confidence may be proposed in bulk; between 50% and 75% each match needs its own ruling; below 50% the transaction is left unmatched and the counterparty is asked for remittance detail. A second outflow with the same vendor reference within 45 days is a duplicate payment: book it as due back from the vendor, not as expense.

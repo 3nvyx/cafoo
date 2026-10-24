@@ -1,0 +1,2 @@
+# Policy: revenue recognition
+Subscription contracts are recognized straight-line over the service term, starting in the invoice month, with any rounding remainder in the last month. Usage plans are recognized in the month of use at the invoiced amount. Nothing is recognized before the service month. Deferred revenue must roll forward: opening plus billings minus recognized equals closing, and the closing balance must equal the ledger.

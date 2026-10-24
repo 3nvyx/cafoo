@@ -1,0 +1,29 @@
+{
+  "name": "@cafoo/agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "orchestrator": "node --env-file-if-exists=../../.env --import tsx src/main.ts",
+    "redteam": "node --env-file-if-exists=../../.env --import tsx src/redteam.ts",
+    "close": "node --env-file-if-exists=../../.env --import tsx src/cli-close.ts",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "^2.0.83",
+    "@ai-sdk/xai": "^5.0.29",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.309",
+    "@cafoo/crs-mcp": "workspace:*",
+    "@cafoo/ledger-core": "workspace:*",
+    "@cafoo/stdb-bindings": "workspace:*",
+    "@moss-js/moss": "^1.21.0",
+    "ai": "^7.0.152",
+    "spacetimedb": "2.13.*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
