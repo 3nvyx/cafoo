@@ -10,3 +10,4 @@ build/
 seed/out/
 packages/eval-harness/reports/
 spacetimedb/.spacetime/
+.claude/settings.local.json
