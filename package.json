@@ -1,0 +1,22 @@
+{
+  "name": "cafoo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cafoo: the agentic finance ERP. Agents propose, an Advisor rules, the CFO confirms, every number drills down.",
+  "packageManager": "pnpm@10",
+  "scripts": {
+    "lint:refs": "bash scripts/lint-refs.sh",
+    "test": "pnpm -r --if-present test",
+    "check": "pnpm lint:refs && pnpm -r --if-present check",
+    "build": "pnpm -r --if-present build",
+    "dev:web": "pnpm -F @cafoo/web dev",
+    "dev:agents": "pnpm -F @cafoo/agents orchestrator",
+    "dev:redteam": "pnpm -F @cafoo/agents redteam",
+    "seed": "pnpm -F @cafoo/seed load",
+    "eval": "pnpm -F @cafoo/eval-harness eval",
+    "demo:reset": "pnpm -F @cafoo/seed generate && SEED_RESET=1 pnpm -F @cafoo/seed load",
+    "demo:close": "cd apps/agents && CLOSE_NO_WAIT=1 DEMO_STEP_MS=0 node --import tsx src/cli-close.ts",
+    "gen:bindings": "cd spacetimedb && spacetime generate --lang typescript --out-dir ../packages/stdb-bindings/src --module-path ./spacetimedb --yes && spacetime generate --lang typescript --out-dir ../apps/web/src/lib/module_bindings --module-path ./spacetimedb --yes",
+    "publish:local": "cd spacetimedb && spacetime publish cafoo --server local --yes"
+  }
+}

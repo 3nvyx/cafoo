@@ -1,0 +1,12 @@
+node_modules/
+.env
+.secrets/
+.research/
+dist/
+build/
+.svelte-kit/
+*.log
+.DS_Store
+seed/out/
+packages/eval-harness/reports/
+spacetimedb/.spacetime/
