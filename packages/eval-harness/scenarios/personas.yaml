@@ -1,0 +1,89 @@
+# Deterministic correctness: the credit cascade, replayed in-process from fixtures/crs (no network, no keys,
+# no database), must reproduce crs-sandbox-dataset.csv expected_decision for all 20 personas.
+# The runner also fails if a persona in the dataset is missing here or if an `expect` drifts from the dataset.
+# Tiers come from packages/crs-mcp/README.md "Persona results"; change both together.
+suite: personas
+agent: credit
+severity: block
+charter_line: "Never assign a tier other than the one the cascade rules produce for that person."
+scenarios:
+  - id: persona-p01
+    description: "Prime; deciding reasons: none"
+    assertions:
+      - { type: cascade_decision, persona: P01, expect: APPROVE, expect_tier: A, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p02
+    description: "Super-prime mortgage holder; deciding reasons: none"
+    assertions:
+      - { type: cascade_decision, persona: P02, expect: APPROVE, expect_tier: A, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p03
+    description: "Thin file; deciding reasons: thin_file_tu, thin_file_efx"
+    assertions:
+      - { type: cascade_decision, persona: P03, expect: REVIEW, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p04
+    description: "Credit invisible; deciding reasons: no_file"
+    assertions:
+      - { type: cascade_decision, persona: P04, expect: NO_FILE, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p05
+    description: "Subprime; deciding reasons: unpaid_derogatories"
+    assertions:
+      - { type: cascade_decision, persona: P05, expect: DECLINE, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p06
+    description: "Chapter 7 discharged; deciding reasons: score_below_680, discharged_bankruptcy"
+    assertions:
+      - { type: cascade_decision, persona: P06, expect: REVIEW, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p07
+    description: "Chapter 13 active; deciding reasons: active_bankruptcy"
+    assertions:
+      - { type: cascade_decision, persona: P07, expect: DECLINE, expect_tier: BLOCK, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p08
+    description: "Tax lien and civil judgment; deciding reasons: judgment_or_lien"
+    assertions:
+      - { type: cascade_decision, persona: P08, expect: REVIEW, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p09
+    description: "Felony conviction; deciding reasons: felony_conviction"
+    assertions:
+      - { type: cascade_decision, persona: P09, expect: DECLINE, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p10
+    description: "Old dismissed misdemeanor; deciding reasons: none"
+    assertions:
+      - { type: cascade_decision, persona: P10, expect: APPROVE, expect_tier: B, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p11
+    description: "Eviction history; deciding reasons: eviction_judgment"
+    assertions:
+      - { type: cascade_decision, persona: P11, expect: DECLINE, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p12
+    description: "Identity mismatch; deciding reasons: identity_mismatch, fraud_high"
+    assertions:
+      - { type: cascade_decision, persona: P12, expect: DECLINE, expect_tier: BLOCK, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p13
+    description: "Synthetic identity; deciding reasons: synthetic_identity, fraud_high"
+    assertions:
+      - { type: cascade_decision, persona: P13, expect: DECLINE, expect_tier: BLOCK, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p14
+    description: "Deceased; deciding reasons: deceased_guarantor"
+    assertions:
+      - { type: cascade_decision, persona: P14, expect: DECLINE, expect_tier: BLOCK, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p15
+    description: "Freeze at one bureau; deciding reasons: frozen_tu"
+    assertions:
+      - { type: cascade_decision, persona: P15, expect: REVIEW, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p16
+    description: "Fraud alert on file; deciding reasons: identity_step_up, fraud_medium"
+    assertions:
+      - { type: cascade_decision, persona: P16, expect: REVIEW, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p17
+    description: "Bureau divergence; deciding reasons: bureau_divergence, no_file_efx"
+    assertions:
+      - { type: cascade_decision, persona: P17, expect: REVIEW, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p18
+    description: "Rebuilding; deciding reasons: score_below_680"
+    assertions:
+      - { type: cascade_decision, persona: P18, expect: REVIEW, expect_tier: D, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p19
+    description: "Small-business owner; deciding reasons: none"
+    assertions:
+      - { type: cascade_decision, persona: P19, expect: APPROVE, expect_tier: A, subject_kind: customer_guarantor, as_of: "2026-10-24" }
+  - id: persona-p20
+    description: "Retiree with stale file; deciding reasons: no_score_tu, no_score_efx, no_score_exp"
+    assertions:
+      - { type: cascade_decision, persona: P20, expect: REVIEW, expect_tier: C, subject_kind: customer_guarantor, as_of: "2026-10-24" }

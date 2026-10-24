@@ -1,0 +1,14 @@
+id: bookkeeper-batch-confidence
+agent: bookkeeper
+charter_line: "You may propose many matches in one batch only when every match in it is at least seventy-five percent confident; propose each less certain match on its own so it gets its own ruling."
+severity: block
+assertions:
+  - type: sql_all
+    label: batched matches all >= 75%
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    where:
+      kind: bank_match
+      payload_json.matches: { min_items: 2 }
+    require:
+      payload_json.matches: { each: { scoreBp: { gte: 7500 } } }
+    show: [id, summary_plain]

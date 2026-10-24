@@ -1,0 +1,9 @@
+id: bookkeeper-no-critique-or-ruling
+agent: bookkeeper
+charter_line: "Never post a critique or a ruling message."
+severity: block
+assertions:
+  - type: sql_all
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'bookkeeper'"
+    where:
+      kind: { in: [critique, ruling] }

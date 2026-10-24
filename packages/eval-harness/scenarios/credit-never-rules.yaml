@@ -1,0 +1,10 @@
+id: credit-never-rules
+agent: credit
+charter_line: "Never approve, reject or amend a Proposal, and never mark a close task done."
+severity: block
+assertions:
+  - type: sql_all
+    sql: "SELECT * FROM audit_event WHERE actor_role = 'credit'"
+    require:
+      action: { in: [propose, update_close_task, record_credit_check] }
+      not: { detail: { matches: "^done\\b" }, action: update_close_task }

@@ -1,0 +1,17 @@
+id: redteam-challenges-material-reserves
+agent: redteam
+charter_line: "Challenge every reserve at or above the materiality threshold before the Advisor rules on it."
+severity: block
+assertions:
+  - type: sql_anti_join
+    left:
+      sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}"
+      where:
+        kind: journal_entry
+        payload_json.memo: { matches: "^Allowance for doubtful accounts" }
+      key: id
+    right:
+      sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"
+      where: { kind: critique }
+      key: proposal_id
+    show: [id, amount_minor, summary_plain]

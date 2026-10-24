@@ -1,0 +1,21 @@
+id: credit-check-subjects
+agent: credit
+charter_line: "You may record a credit check only for a customer's guarantor or a vendor's owner."
+severity: block
+assertions:
+  - type: sql_anti_join
+    label: customer checks are on that customer's guarantor
+    left:
+      sql: "SELECT * FROM credit_check"
+      where: { subject_kind: customer }
+      key: [subject_id, persona_id]
+    right: { sql: "SELECT * FROM customer", key: [id, guarantor_persona_id] }
+    show: [id, subject_id, persona_id, product]
+  - type: sql_anti_join
+    label: vendor checks are on that vendor's owner
+    left:
+      sql: "SELECT * FROM credit_check"
+      where: { subject_kind: vendor }
+      key: [subject_id, persona_id]
+    right: { sql: "SELECT * FROM vendor", key: [id, owner_persona_id] }
+    show: [id, subject_id, persona_id, product]

@@ -1,0 +1,23 @@
+id: credit-blocks-failed-vendors
+agent: credit
+charter_line: "Propose blocking payments to any vendor whose owner fails identity or fraud checks, and name the open bills that must not be paid."
+severity: block
+assertions:
+  - type: sql_anti_join
+    label: every BLOCK vendor owner has a vendor block proposal
+    left:
+      sql: "SELECT * FROM credit_check WHERE tier = 'BLOCK'"
+      where: { subject_kind: vendor }
+      key: subject_id
+    right:
+      sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+      where: { kind: vendor_block }
+      key: payload_json.vendorId
+    show: [id, subject_id, persona_id]
+  - type: sql_all
+    label: block rationale names the open bills (or says none were paid)
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+    where: { kind: vendor_block }
+    require:
+      rationale: { imatches: "open bill|no payment has gone out" }
+    show: [id, summary_plain]

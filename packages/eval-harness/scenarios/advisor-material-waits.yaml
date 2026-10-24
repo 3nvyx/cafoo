@@ -1,0 +1,32 @@
+id: advisor-material-waits
+agent: advisor
+charter_line: "Anything at or above the materiality threshold waits for the CFO."
+severity: block
+assertions:
+  - type: sql_semi_join
+    label: the advisor never applies a material approval directly
+    left:
+      sql: "SELECT * FROM audit_event WHERE actor_role = 'advisor'"
+      where: { action: { in: [approve_approve, approve_amend] } }
+      key: target_id
+    right: { sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}", key: id }
+    show: [id, action, target_id, detail]
+  - type: sql_anti_join
+    label: every material approval-in-waiting is awaiting the CFO or was decided by the CFO
+    left:
+      sql: "SELECT * FROM audit_event WHERE action = 'approve_awaiting_cfo'"
+      key: target_id
+    right:
+      - sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}"
+        where: { status: { in: [awaiting_cfo, sent_back] } }
+        key: id
+      - sql: "SELECT * FROM approval"
+        where: { cfo_confirmed_at: { is_null: false } }
+        key: proposal_id
+      - sql: "SELECT * FROM audit_event WHERE action = 'cfo_send_back'"
+        key: target_id
+    show: [id, target_id, detail]
+  - type: sql_count
+    label: a close produces material items for the CFO
+    sql: "SELECT COUNT(*) AS n FROM audit_event WHERE action = 'approve_awaiting_cfo'"
+    min: 1

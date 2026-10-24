@@ -1,0 +1,8 @@
+id: revenue-unscheduled-contracts
+agent: revenue
+charter_line: "A contract that was invoiced but has no schedule is proposed as a new schedule for the Advisor, never fixed silently inside a recognition entry."
+severity: block
+assertions:
+  - type: check
+    label: every annual subscription has a schedule or a schedule proposal
+    name: annual_contracts_scheduled

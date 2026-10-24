@@ -1,0 +1,20 @@
+id: advisor-plain-summary
+agent: advisor
+charter_line: "Write every ruling summary as one plain sentence a non-accountant understands, with no account codes and no bookkeeping jargon"
+severity: block
+assertions:
+  - type: check
+    label: approval summaries
+    name: plain_summary_clean
+    params:
+      sql: "SELECT * FROM approval"
+  - type: check
+    label: advisor message summaries
+    name: plain_summary_clean
+    params:
+      sql: "SELECT * FROM agent_message WHERE sender_role = 'advisor'"
+  - type: check
+    label: advisor proposal summaries
+    name: plain_summary_clean
+    params:
+      sql: "SELECT * FROM proposal WHERE proposer_role = 'advisor'"

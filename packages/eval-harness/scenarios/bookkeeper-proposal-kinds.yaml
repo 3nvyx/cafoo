@@ -1,0 +1,16 @@
+id: bookkeeper-proposal-kinds
+agent: bookkeeper
+charter_line: "You may propose bank matches, journal entries and accruals, and nothing else."
+severity: block
+description: The Bookkeeper only proposes its three kinds, and a close produces at least one of each.
+assertions:
+  - type: sql_all
+    label: only allowed kinds
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    require:
+      kind: { in: [bank_match, journal_entry, accrual] }
+  - type: sql_covers
+    label: each kind proposed after a close
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    column: kind
+    values: [bank_match, journal_entry, accrual]

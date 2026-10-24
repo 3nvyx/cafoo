@@ -1,0 +1,15 @@
+id: advisor-lock-only-when-decided
+agent: advisor
+charter_line: "Ask the CFO to lock the month only when no Proposal for it is still open, sent back, or waiting for the CFO."
+severity: block
+assertions:
+  - type: sql_semi_join
+    left:
+      sql: "SELECT * FROM proposal"
+      where: { status: { in: [open, sent_back, awaiting_cfo] } }
+      key: period_id
+    right:
+      sql: "SELECT * FROM period"
+      where: { status: { in: [closing, closed] } }
+      key: id
+    show: [id, kind, status, period_id, summary_plain]

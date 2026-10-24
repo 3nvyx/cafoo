@@ -1,0 +1,15 @@
+id: credit-vendor-block-only-on-block
+agent: credit
+charter_line: "Never block a vendor unless its owner's cascade came back BLOCK."
+severity: block
+assertions:
+  - type: sql_anti_join
+    left:
+      sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+      where: { kind: vendor_block }
+      key: payload_json.vendorId
+    right:
+      sql: "SELECT * FROM credit_check WHERE tier = 'BLOCK'"
+      where: { subject_kind: vendor }
+      key: subject_id
+    show: [id, payload_json.vendorId, summary_plain]

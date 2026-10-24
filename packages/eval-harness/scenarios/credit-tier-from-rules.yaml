@@ -1,0 +1,8 @@
+id: credit-tier-from-rules
+agent: credit
+charter_line: "Never assign a tier other than the one the cascade rules produce for that person."
+severity: block
+description: Re-runs the cascade in replay mode for every checked person (as of the day of the check) and compares tiers on file.
+assertions:
+  - type: check
+    name: credit_tier_matches_cascade

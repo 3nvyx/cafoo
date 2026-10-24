@@ -1,0 +1,23 @@
+id: revenue-proposal-kinds
+agent: revenue
+charter_line: "You may propose revenue schedules and revenue journal entries, and nothing else."
+severity: block
+assertions:
+  - type: sql_all
+    label: only allowed kinds
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'revenue'"
+    require:
+      kind: { in: [revenue_schedule, journal_entry] }
+  - type: sql_all
+    label: revenue entries touch a revenue account
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'revenue'"
+    where:
+      kind: journal_entry
+    require:
+      payload_json.lines.1.accountCode: { matches: "^4\\d{3}$" }
+    show: [id, summary_plain]
+  - type: sql_covers
+    label: each kind proposed after a close
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'revenue'"
+    column: kind
+    values: [revenue_schedule, journal_entry]

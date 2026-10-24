@@ -1,0 +1,25 @@
+id: bookkeeper-unexplained-inflows
+agent: bookkeeper
+charter_line: "Leave unexplained incoming money for a human; do not guess which customer paid."
+severity: block
+description: Incoming bank money is only ever matched to an invoice, never booked straight to an entry.
+assertions:
+  - type: sql_semi_join
+    left: { sql: "SELECT * FROM bank_transaction WHERE amount_minor > 0", key: id }
+    right:
+      sql: "SELECT * FROM bank_match"
+      where: { target_kind: je }
+      key: bank_tx_id
+    show: [id, amount_minor, counterparty, description]
+  - type: sql_all
+    label: no proposed entry books cash coming in
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    where:
+      payload_json.bankTxIds: { min_items: 1 }
+    require:
+      payload_json.lines:
+        each:
+          any_of:
+            - accountCode: { ne: "1000" }
+            - debitMinor: { in: ["0", 0] }
+    show: [id, summary_plain]

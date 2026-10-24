@@ -1,0 +1,28 @@
+id: advisor-only-approver
+agent: advisor
+charter_line: "You may approve, amend or reject any open Proposal; you are the only agent that approves."
+severity: block
+assertions:
+  - type: sql_all
+    label: every ruling in the audit trail is the advisor's
+    sql: "SELECT * FROM audit_event WHERE target_table = 'proposal'"
+    where:
+      action: { in: [approve_approve, approve_amend, approve_awaiting_cfo, reject] }
+    require:
+      actor_role: advisor
+    show: [id, actor_role, action, target_id]
+  - type: sql_all
+    label: every ruling message is the advisor's
+    sql: "SELECT * FROM agent_message"
+    where: { kind: ruling }
+    require:
+      sender_role: advisor
+    show: [id, sender_role, thread_id, summary_plain]
+  - type: sql_anti_join
+    label: every approval was decided by an advisor identity
+    left: { sql: "SELECT * FROM approval", key: decided_by }
+    right:
+      sql: "SELECT * FROM agent_identity"
+      where: { role: advisor }
+      key: identity
+    show: [id, proposal_id, decided_by]

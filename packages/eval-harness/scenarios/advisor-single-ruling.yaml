@@ -1,0 +1,20 @@
+id: advisor-single-ruling
+agent: advisor
+charter_line: "Never rule twice on the same Proposal unless the CFO sent it back."
+severity: block
+assertions:
+  - type: check
+    label: one ruling per proposal (plus one per CFO send-back)
+    name: single_ruling_per_proposal
+  - type: sql_unique
+    label: one approval row per proposal
+    sql: "SELECT * FROM approval"
+    key: proposal_id
+  - type: sql_anti_join
+    label: every decided proposal has its approval row
+    left:
+      sql: "SELECT * FROM proposal"
+      where: { status: { in: [approved, amended, rejected, awaiting_cfo] } }
+      key: id
+    right: { sql: "SELECT * FROM approval", key: proposal_id }
+    show: [id, kind, status, summary_plain]

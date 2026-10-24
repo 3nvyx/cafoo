@@ -1,0 +1,24 @@
+id: credit-proposal-kinds
+agent: credit
+charter_line: "You may propose credit decisions, reserves against unpaid invoices, and vendor blocks, and nothing else."
+severity: block
+assertions:
+  - type: sql_all
+    label: only allowed kinds
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+    require:
+      kind: { in: [credit_decision, journal_entry, vendor_block] }
+  - type: sql_all
+    label: credit's journal entries are reserves only
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+    where:
+      kind: journal_entry
+    require:
+      payload_json.memo: { matches: "^Allowance for doubtful accounts" }
+      payload_json.lines: { each: { accountCode: { in: ["5700", "1150"] } } }
+    show: [id, summary_plain]
+  - type: sql_covers
+    label: each kind proposed after a close
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+    column: kind
+    values: [credit_decision, journal_entry, vendor_block]

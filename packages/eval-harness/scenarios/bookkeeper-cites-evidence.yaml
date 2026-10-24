@@ -1,0 +1,15 @@
+id: bookkeeper-cites-evidence
+agent: bookkeeper
+charter_line: "every proposal cites the bank rows or bills it explains"
+severity: block
+description: Bank matches carry bank transaction ids, entries carry bankTxIds, accruals name the bill reference they anticipate.
+assertions:
+  - type: sql_all
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    require:
+      any_of:
+        - payload_json.matches: { each: { bankTxId: { min_length: 1 } }, min_items: 1 }
+        - payload_json.bankTxIds: { min_items: 1 }
+        - kind: accrual
+          rationale: { matches: "\\bbill [A-Z0-9][A-Z0-9-]{2,}" }
+    show: [id, kind, summary_plain]

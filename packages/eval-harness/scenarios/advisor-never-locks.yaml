@@ -1,0 +1,22 @@
+id: advisor-never-locks
+agent: advisor
+charter_line: "ask the CFO to lock, never lock"
+severity: block
+assertions:
+  - type: sql_all
+    label: every period lock is the CFO's (or the seed's opening history)
+    sql: "SELECT * FROM period_lock"
+    require:
+      locked_by_role: { in: [cfo, seed] }
+  - type: sql_all
+    label: lock and unlock actions are the CFO's
+    sql: "SELECT * FROM audit_event WHERE target_table = 'period'"
+    where:
+      action: { in: [lock_period, unlock_period] }
+    require:
+      actor_role: cfo
+  - type: sql_all
+    label: lock requests are the advisor's
+    sql: "SELECT * FROM audit_event WHERE action = 'request_period_lock'"
+    require:
+      actor_role: advisor

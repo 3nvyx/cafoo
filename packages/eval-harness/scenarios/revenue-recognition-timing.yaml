@@ -1,0 +1,11 @@
+id: revenue-recognition-timing
+agent: revenue
+charter_line: "Never recognize revenue before the service month; schedule lines sum to the contract total."
+severity: block
+assertions:
+  - type: check
+    label: nothing recognized before its month
+    name: no_early_recognition
+  - type: check
+    label: schedule lines sum to the contract total
+    name: revenue_schedule_sums

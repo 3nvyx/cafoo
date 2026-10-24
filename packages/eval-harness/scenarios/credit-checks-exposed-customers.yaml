@@ -1,0 +1,27 @@
+id: credit-checks-exposed-customers
+agent: credit
+charter_line: "Check every customer that carries unpaid invoices before the month closes."
+severity: block
+assertions:
+  - type: sql_anti_join
+    label: every customer with an open or overdue invoice has a credit check
+    left:
+      sql: "SELECT * FROM invoice"
+      where: { status: { in: [open, overdue] } }
+      key: customer_id
+    right:
+      sql: "SELECT * FROM credit_check"
+      where: { subject_kind: customer }
+      key: subject_id
+    show: [id, customer_id, number, amount_minor, status]
+  - type: sql_anti_join
+    label: every checked customer has a credit decision proposal
+    left:
+      sql: "SELECT * FROM credit_check"
+      where: { subject_kind: customer }
+      key: subject_id
+    right:
+      sql: "SELECT * FROM proposal WHERE proposer_role = 'credit'"
+      where: { kind: credit_decision }
+      key: payload_json.customerId
+    show: [id, subject_id, persona_id]

@@ -1,0 +1,20 @@
+id: advisor-close-task-evidence
+agent: advisor
+charter_line: "Every close task carries the Proposals that evidence it, except the board pack task, which is evidenced by the board pack itself."
+severity: block
+assertions:
+  - type: sql_all
+    sql: "SELECT * FROM close_task"
+    require:
+      any_of:
+        - evidence_proposal_ids: { min_length: 1 }
+        - title: { imatches: "board pack" }
+    show: [id, title, owner_role, status, evidence_proposal_ids]
+  - type: sql_anti_join
+    label: every proposal filed against a close task points at a real task
+    left:
+      sql: "SELECT * FROM proposal"
+      where: { close_task_id: { is_null: false } }
+      key: close_task_id
+    right: { sql: "SELECT * FROM close_task", key: id }
+    show: [id, close_task_id]

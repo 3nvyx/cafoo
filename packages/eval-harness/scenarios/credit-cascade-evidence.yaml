@@ -1,0 +1,22 @@
+id: credit-cascade-evidence
+agent: credit
+charter_line: "Runs the full cascade before a tier; only persona data is ever sent; records every request id."
+severity: block
+assertions:
+  - type: check
+    label: full cascade on file for every tier (BLOCK may stop after identity and fraud)
+    name: credit_full_cascade
+  - type: sql_all
+    label: only sandbox persona ids (P01..P20) are ever checked
+    sql: "SELECT * FROM credit_check"
+    require:
+      persona_id: { matches: "^P(0[1-9]|1[0-9]|20)$" }
+  - type: sql_all
+    label: every request id is a dataset persona response
+    sql: "SELECT * FROM credit_check"
+    require:
+      request_id: { min_length: 1 }
+      summary_json.requestId: { eq_column: request_id }
+  - type: check
+    label: credit decisions cite their own request ids
+    name: credit_request_ids_cited

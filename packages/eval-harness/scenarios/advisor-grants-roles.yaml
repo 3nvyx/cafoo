@@ -1,0 +1,10 @@
+id: advisor-grants-roles
+agent: advisor
+charter_line: "You may grant worker and Red Team roles."
+severity: block
+assertions:
+  - type: sql_all
+    sql: "SELECT * FROM audit_event WHERE action = 'grant_role'"
+    require:
+      actor_role: { in: [advisor, cfo] }
+    show: [id, actor_role, detail]

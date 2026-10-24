@@ -1,0 +1,28 @@
+id: bookkeeper-duplicate-payments
+agent: bookkeeper
+charter_line: "When two payments carry the same bill reference, propose recording the second as money the vendor owes back, and say so in the close thread."
+severity: warn
+description: Depends on the seed planting a duplicate payment (it does). Warns rather than blocks if a different dataset has none.
+assertions:
+  - type: sql_count
+    label: duplicate payment proposed
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    where:
+      kind: journal_entry
+      payload_json.memo: { imatches: "^duplicate payment" }
+    min: 1
+  - type: sql_count
+    label: announced in the close thread
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'bookkeeper'"
+    where:
+      thread_id: { matches: "^close:" }
+      summary_plain: { imatches: "duplicate payment" }
+    min: 1
+  - type: sql_all
+    label: second payment booked as money owed back (1200 due-back line, cash out), never as expense
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    where:
+      payload_json.memo: { imatches: "^duplicate payment" }
+    require:
+      payload_json.lines.0.accountCode: "1200"
+      payload_json.lines.1.accountCode: "1000"

@@ -1,0 +1,24 @@
+id: advisor-never-posts-material
+agent: advisor
+charter_line: "Never post anything at or above the materiality threshold yourself: it waits for the CFO."
+severity: block
+assertions:
+  - type: sql_semi_join
+    label: no advisor-posted entry comes from a material proposal
+    left:
+      sql: "SELECT * FROM journal_entry WHERE posted_by_role = 'advisor'"
+      where: { proposal_id: { is_null: false } }
+      key: proposal_id
+    right: { sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}", key: id }
+    show: [id, proposal_id, memo, total_minor]
+  - type: sql_anti_join
+    label: every applied material proposal carries the CFO's confirmation
+    left:
+      sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}"
+      where: { status: { in: [approved, amended] } }
+      key: id
+    right:
+      sql: "SELECT * FROM approval"
+      where: { cfo_confirmed_at: { is_null: false } }
+      key: proposal_id
+    show: [id, kind, amount_minor, status, summary_plain]

@@ -1,0 +1,23 @@
+{
+  "name": "@cafoo/eval-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Charter evals (one scenario per checkable charter line, run against the live ledger) and deterministic credit-cascade correctness. Runs with zero API keys.",
+  "type": "module",
+  "scripts": {
+    "run": "node --conditions=source --import tsx src/run.ts",
+    "eval": "node --conditions=source --import tsx src/run.ts",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cafoo/crs-mcp": "workspace:*",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,20 @@
+id: advisor-two-explanations
+agent: advisor
+charter_line: "write a plain summary and a technical rationale for every ruling"
+severity: block
+assertions:
+  - type: sql_all
+    label: every approval row has both explanations
+    sql: "SELECT * FROM approval"
+    require:
+      summary_plain: { min_length: 10 }
+      rationale: { min_length: 20, ne_column: summary_plain }
+    show: [id, proposal_id, summary_plain, rationale]
+  - type: sql_all
+    label: every ruling message has both explanations
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'advisor'"
+    where: { kind: ruling }
+    require:
+      summary_plain: { min_length: 10 }
+      body: { min_length: 20 }
+    show: [id, thread_id, summary_plain]

@@ -1,0 +1,7 @@
+id: redteam-no-late-critique
+agent: redteam
+charter_line: "Never critique a Proposal after the Advisor has ruled on it; a late critique cannot change the outcome and only muddies the record."
+severity: block
+assertions:
+  - type: check
+    name: critique_before_ruling

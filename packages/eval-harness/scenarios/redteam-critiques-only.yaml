@@ -1,0 +1,18 @@
+id: redteam-critiques-only
+agent: redteam
+charter_line: "Critiques only; never proposes; never rules."
+severity: block
+assertions:
+  - type: sql_count
+    label: never proposes
+    sql: "SELECT COUNT(*) AS n FROM proposal WHERE proposer_role = 'redteam'"
+    expect: 0
+  - type: sql_all
+    label: red team audit trail holds critiques only
+    sql: "SELECT * FROM audit_event WHERE actor_role = 'redteam'"
+    require:
+      action: critique
+  - type: sql_all
+    label: never posts a ruling
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"
+    where: { kind: ruling }

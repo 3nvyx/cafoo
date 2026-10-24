@@ -1,0 +1,19 @@
+id: redteam-critiques-open-proposals
+agent: redteam
+charter_line: "You may attach a critique to any open Proposal, and you may post questions and statements in a close thread."
+severity: block
+assertions:
+  - type: sql_all
+    label: every critique is attached to a proposal
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"
+    where: { kind: critique }
+    require:
+      proposal_id: { is_null: false }
+      thread_id: { matches: "^proposal:" }
+  - type: sql_all
+    label: every critique comes from the red team
+    sql: "SELECT * FROM agent_message"
+    where: { kind: critique }
+    require:
+      sender_role: redteam
+    show: [id, sender_role, proposal_id, summary_plain]

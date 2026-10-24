@@ -1,0 +1,7 @@
+id: revenue-schedule-within-term
+agent: revenue
+charter_line: "Never schedule revenue outside the contract's own start and end months."
+severity: block
+assertions:
+  - type: check
+    name: revenue_schedule_within_term

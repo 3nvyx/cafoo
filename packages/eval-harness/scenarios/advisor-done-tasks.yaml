@@ -1,0 +1,16 @@
+id: advisor-done-tasks
+agent: advisor
+charter_line: "You may mark a close task done once the Proposals that are its evidence have been ruled on."
+severity: block
+assertions:
+  - type: check
+    label: done tasks have no unruled evidence
+    name: done_tasks_ruled
+  - type: sql_all
+    label: only the advisor or the CFO marks a task done
+    sql: "SELECT * FROM audit_event WHERE action = 'update_close_task'"
+    where:
+      detail: { matches: "^done\\b" }
+    require:
+      actor_role: { in: [advisor, cfo] }
+    show: [id, actor_role, target_id, detail]

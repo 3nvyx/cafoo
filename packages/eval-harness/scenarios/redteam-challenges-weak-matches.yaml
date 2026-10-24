@@ -1,0 +1,18 @@
+id: redteam-challenges-weak-matches
+agent: redteam
+charter_line: "Challenge every bank match below seventy-five percent confidence before the Advisor rules on it."
+severity: block
+assertions:
+  - type: sql_anti_join
+    left:
+      sql: "SELECT * FROM proposal"
+      where:
+        kind: bank_match
+        payload_json.matches: { length: 1 }
+        payload_json.matches.0.scoreBp: { lt: 7500 }
+      key: id
+    right:
+      sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"
+      where: { kind: critique }
+      key: proposal_id
+    show: [id, summary_plain]
