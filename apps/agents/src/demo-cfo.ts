@@ -1,6 +1,6 @@
 /**
  * Demo-only CFO stand-in, for recording eval fixtures and rehearsing the waiting close without a browser. It claims the
- * CFO seat (or reuses its identity from .secrets/cfo.token) and confirms every Proposal of the month that waits for the
+ * CFO seat (or reuses its identity from .secrets/<db>/cfo.token) and confirms every Proposal of the month that waits for the
  * CFO, as a CFO clicking OK in the app would, until the Advisor has requested the lock or time runs out. It never
  * locks the month. It approves without reading, so never point it at books anyone relies on; and once it holds the CFO
  * seat, a browser can take the seat only by a grant from this identity or a database reset with delete-data.

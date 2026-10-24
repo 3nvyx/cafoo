@@ -15,11 +15,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 const URI = process.env.SPACETIMEDB_URI ?? 'ws://localhost:3000';
 const DB = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
-const TOKEN_FILE = join(root, '.secrets', 'advisor.token');
+// Kept per database, like the agents' identities (apps/agents/src/stdb.ts), so reseeding one database never
+// replaces the advisor another one registered. The default database still reads the older .secrets/advisor.token.
+const TOKEN_FILE = join(root, '.secrets', DB, 'advisor.token');
+const LEGACY_TOKEN_FILE = DB === 'cafoo' ? join(root, '.secrets', 'advisor.token') : undefined;
 
 function loadToken(): string | undefined {
   try {
-    return existsSync(TOKEN_FILE) ? readFileSync(TOKEN_FILE, 'utf8').trim() || undefined : undefined;
+    for (const p of [TOKEN_FILE, LEGACY_TOKEN_FILE]) {
+      if (p && existsSync(p)) return readFileSync(p, 'utf8').trim() || undefined;
+    }
+    return undefined;
   } catch {
     return undefined;
   }

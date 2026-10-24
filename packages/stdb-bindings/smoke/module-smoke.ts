@@ -110,7 +110,8 @@ function connect(db: string, name: string, token?: string, tables?: string[]): P
       .build();
   });
 }
-const advisorToken = () => readFileSync(join(repo, '.secrets', 'advisor.token'), 'utf8').trim();
+/** The advisor identity the seed loader saved for that database (.secrets/<db>/advisor.token). */
+const advisorToken = (db: string) => readFileSync(join(repo, '.secrets', db, 'advisor.token'), 'utf8').trim();
 
 // ---------- the main database ----------
 async function main() {
@@ -127,7 +128,7 @@ async function main() {
   const PREV = ymAdd(CLOSE, -1);
   const NEXT = ymAdd(CLOSE, 1);
 
-  const A = await connect(DB, 'advisor', advisorToken());
+  const A = await connect(DB, 'advisor', advisorToken(DB));
   const X = await connect(DB, 'cfo');
   await X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' });
   const workers: Record<string, Who> = {};
@@ -512,7 +513,7 @@ async function legacy() {
     seedDb(LEGACY_DB);
     // The old schema has no paymentJeId, so these connections do not subscribe to bank_match.
     const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'vendor', 'subsidiary', 'agent_roster'];
-    const A = await connect(LEGACY_DB, 'advisor', advisorToken(), tables);
+    const A = await connect(LEGACY_DB, 'advisor', advisorToken(LEGACY_DB), tables);
     const B = await connect(LEGACY_DB, 'bookkeeper', undefined, tables);
     await A.conn.reducers.grantRole({ identity: B.identity, role: { tag: 'Bookkeeper' }, displayName: 'Smoke bookkeeper', model: 'smoke' });
     const db = A.conn.db;

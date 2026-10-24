@@ -1,5 +1,5 @@
 /**
- * One SpacetimeDB connection per agent role. Each role has its own identity (token file under .secrets/),
+ * One SpacetimeDB connection per agent role. Each role has its own identity (token file under .secrets/<database>/),
  * so the module's reducers can enforce who may propose, critique, rule, or confirm.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -29,15 +29,22 @@ export const ROLE_DISPLAY: Record<AgentRole, string> = {
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, '..', '..', '..');
-const secretsDir = join(repoRoot, '.secrets');
+// Identities are kept per database, so reseeding one database never replaces the identities another one granted.
+const secretsDir = join(repoRoot, '.secrets', STDB_DB);
 
 function tokenPath(role: ConnRole) {
   return join(secretsDir, `${role}.token`);
 }
+/** Before tokens were kept per database they lived in .secrets/<role>.token; the default database still reads those. */
+function legacyTokenPath(role: ConnRole) {
+  return STDB_DB === 'cafoo' ? join(repoRoot, '.secrets', `${role}.token`) : undefined;
+}
 function loadToken(role: ConnRole) {
   try {
-    const p = tokenPath(role);
-    return existsSync(p) ? readFileSync(p, 'utf8').trim() || undefined : undefined;
+    for (const p of [tokenPath(role), legacyTokenPath(role)]) {
+      if (p && existsSync(p)) return readFileSync(p, 'utf8').trim() || undefined;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
