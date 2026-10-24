@@ -1,0 +1,10 @@
+[mcp_servers.crs-calhacks]
+command = "npx"
+args = [
+    "-y",
+    "@crscreditapi/crs-calhacks-mcp-server@latest",
+]
+
+[mcp_servers.crs-calhacks.env]
+CRS_USERNAME = "CalhacksDev46"
+CRS_PASSWORD = "$eTuKwHdmR*$WCekPK2I9SU2"

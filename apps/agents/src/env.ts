@@ -1,19 +1,82 @@
 /** Provider detection. Every external dependency has a demo mode that needs no key. */
 export type ProviderStatus = { name: string; mode: 'live' | 'demo'; detail: string };
 
-const has = (k: string) => Boolean(process.env[k] && process.env[k]!.trim());
-const forcedDemo = () => process.env.DEMO_MODE === '1';
+/**
+ * Which vendor the Claude Agent SDK calls. The SDK always speaks the Anthropic Messages API.
+ * `openai` points that API at a local bridge which forwards to OpenAI. `anthropic` calls Anthropic.
+ * Unset: OpenAI when only OPENAI_API_KEY is set, otherwise Anthropic (live only if its key is set).
+ */
+export type AgentProvider = 'openai' | 'anthropic';
 
-export function providers(): ProviderStatus[] {
-  const demo = forcedDemo();
+/** Model ids the SDK's opus / sonnet / haiku aliases resolve to when AGENT_PROVIDER=openai. */
+export const DEFAULT_OPENAI_MODELS = { opus: 'gpt-6.1-sol', sonnet: 'gpt-6-luna', haiku: 'gpt-6-luna' } as const;
+
+const has = (env: NodeJS.ProcessEnv, k: string) => Boolean(env[k] && env[k]!.trim());
+const forcedDemo = (env: NodeJS.ProcessEnv) => env.DEMO_MODE === '1';
+
+export function agentProvider(env: NodeJS.ProcessEnv = process.env): AgentProvider {
+  const set = env.AGENT_PROVIDER?.trim().toLowerCase();
+  if (set === 'openai' || set === 'anthropic') return set;
+  if (has(env, 'OPENAI_API_KEY') && !has(env, 'ANTHROPIC_API_KEY')) return 'openai';
+  return 'anthropic';
+}
+
+/** OpenAI model ids standing in for the Anthropic aliases. A set env var wins; otherwise the default. */
+export function aliasModels(env: NodeJS.ProcessEnv = process.env): { opus: string; sonnet: string; haiku: string } {
+  const pick = (key: string, fallback: string) => env[key]?.trim() || fallback;
+  return {
+    opus: pick('ANTHROPIC_DEFAULT_OPUS_MODEL', DEFAULT_OPENAI_MODELS.opus),
+    sonnet: pick('ANTHROPIC_DEFAULT_SONNET_MODEL', DEFAULT_OPENAI_MODELS.sonnet),
+    haiku: pick('ANTHROPIC_DEFAULT_HAIKU_MODEL', DEFAULT_OPENAI_MODELS.haiku),
+  };
+}
+
+/**
+ * Environment for the Claude Agent SDK subprocess when the vendor is OpenAI.
+ * The SDK still sees an Anthropic base URL, an API key, and opus/sonnet/haiku alias targets.
+ * The key is a local sentinel: the bridge ignores it and uses OPENAI_API_KEY upstream.
+ */
+export function anthropicLookingEnv(base: NodeJS.ProcessEnv, shimUrl: string): NodeJS.ProcessEnv {
+  const aliases = aliasModels(base);
+  const next: NodeJS.ProcessEnv = {
+    ...base,
+    ANTHROPIC_BASE_URL: shimUrl,
+    ANTHROPIC_API_KEY: 'cafoo-local',
+    ANTHROPIC_DEFAULT_OPUS_MODEL: aliases.opus,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: aliases.sonnet,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: aliases.haiku,
+    CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS: '1',
+    CLAUDE_CODE_DISABLE_THINKING: '1',
+    MAX_THINKING_TOKENS: '0',
+    DISABLE_TELEMETRY: '1',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+  };
+  delete next.ANTHROPIC_AUTH_TOKEN;
+  // The bridge reads these from this process. The SDK subprocess only needs the Anthropic-shaped vars.
+  delete next.OPENAI_API_KEY;
+  delete next.OPENAI_BASE_URL;
+  delete next.OPENAI_REASONING_EFFORT;
+  return next;
+}
+
+export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[] {
+  const demo = forcedDemo(env);
+  const provider = agentProvider(env);
+  const agentsOn = !demo && (provider === 'openai' ? has(env, 'OPENAI_API_KEY') : has(env, 'ANTHROPIC_API_KEY'));
+  const aliases = aliasModels(env);
+  const agentDetail = agentsOn
+    ? provider === 'openai'
+      ? `OpenAI ${aliases.opus} (Advisor) and ${aliases.sonnet} (workers) via the Anthropic Messages API`
+      : 'live agents'
+    : 'scripted close over the real accounting engines';
   return [
-    { name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: !demo && has('ANTHROPIC_API_KEY') ? 'live' : 'demo', detail: !demo && has('ANTHROPIC_API_KEY') ? 'live agents' : 'scripted close over the real accounting engines' },
-    { name: 'xAI Grok (Red Team)', mode: !demo && has('XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has('XAI_API_KEY') ? 'grok-4.7 critiques' : 'scripted critiques' },
-    { name: 'CRS Credit API', mode: !demo && has('CRS_USERNAME') && process.env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: 'sandbox persona fixtures' },
-    { name: 'Bright Data', mode: !demo && has('API_TOKEN') ? 'live' : 'demo', detail: 'recorded vendor lookups' },
-    { name: 'Apify', mode: !demo && has('APIFY_TOKEN') ? 'live' : 'demo', detail: 'crawl skipped' },
-    { name: 'Moss', mode: !demo && has('MOSS_PROJECT_ID') ? 'live' : 'demo', detail: 'local keyword search' },
-    { name: 'SpacetimeDB', mode: 'live', detail: process.env.SPACETIMEDB_URI ?? 'ws://localhost:3000' },
+    { name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: agentsOn ? 'live' : 'demo', detail: agentDetail },
+    { name: 'xAI Grok (Red Team)', mode: !demo && has(env, 'XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'XAI_API_KEY') ? 'grok-4.7 critiques' : 'scripted critiques' },
+    { name: 'CRS Credit API', mode: !demo && has(env, 'CRS_USERNAME') && env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: 'sandbox persona fixtures' },
+    { name: 'Bright Data', mode: !demo && has(env, 'API_TOKEN') ? 'live' : 'demo', detail: 'recorded vendor lookups' },
+    { name: 'Apify', mode: !demo && has(env, 'APIFY_TOKEN') ? 'live' : 'demo', detail: 'crawl skipped' },
+    { name: 'Moss', mode: !demo && has(env, 'MOSS_PROJECT_ID') ? 'live' : 'demo', detail: 'local keyword search' },
+    { name: 'SpacetimeDB', mode: 'live', detail: env.SPACETIMEDB_URI ?? 'ws://localhost:3000' },
   ];
 }
 

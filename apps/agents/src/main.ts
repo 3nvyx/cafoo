@@ -1,5 +1,6 @@
-import { agentsLive, FEED_DEBOUNCE_MS, FEED_INTERVAL_MS, providers } from './env';
+import { agentProvider, agentsLive, FEED_DEBOUNCE_MS, FEED_INTERVAL_MS, providers } from './env';
 import { startGateway, type CloseState } from './gateway';
+import { startOpenAiBridge } from './live/openai-bridge';
 import { Cast } from './stdb';
 import { activeCharter } from './charter/active';
 import { charterEvalStatus, charterRoutes } from './charter/routes';
@@ -10,6 +11,10 @@ import { feedRoutes, startFeeder } from './feed/feeder';
 async function main() {
   console.log('providers:');
   for (const p of providers()) console.log(`  ${p.mode.padEnd(4)} ${p.name}: ${p.detail}`);
+  if (agentsLive() && agentProvider() === 'openai') {
+    const url = await startOpenAiBridge();
+    console.log(`OpenAI bridge on ${url} (Anthropic Messages API for the Claude Agent SDK)`);
+  }
   const cast = await Cast.connectAll();
   console.log(`connected: advisor ${cast.advisor.hex}, bookkeeper ${cast.bookkeeper.hex}, revenue ${cast.revenue.hex}, credit ${cast.credit.hex}, redteam ${cast.redteam.hex}, consolidation ${cast.consolidation.hex}, feed ${cast.feed.hex}`);
   let liveClose: ((periodYm: string, onStep: (m: string) => void) => Promise<unknown>) | undefined;
