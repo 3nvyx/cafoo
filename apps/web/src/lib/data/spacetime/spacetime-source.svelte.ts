@@ -2,7 +2,7 @@
 // Every table is mirrored into `$state` arrays of UI rows; reducer calls are
 // the CFO's actions. Starting a close goes to the agent gateway over HTTP.
 import { DbConnection } from '../../module_bindings';
-import type { ChangeEvent, ConnectionState, DataSource } from '../source';
+import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
 import type * as U from '../types';
 import * as M from './map';
 
@@ -92,11 +92,13 @@ function readToken(): string | undefined {
 	}
 }
 
-function saveToken(token: string) {
+function saveToken(token: string): boolean {
 	try {
 		localStorage.setItem(TOKEN_KEY, token);
+		return localStorage.getItem(TOKEN_KEY) === token;
 	} catch {
-		/* storage blocked: a new identity next visit, which is fine for the CFO seat */
+		/* storage blocked: a new identity next visit, so a claimed CFO seat would not survive a reload */
+		return false;
 	}
 }
 
@@ -112,6 +114,8 @@ export class SpacetimeDataSource implements DataSource {
 
 	#t: Mirror = $state(empty());
 	#conn: ConnectionState = $state({ ledger: 'connecting', agents: 'unknown', closes: [] });
+	#seat: CfoSeat = $state({ status: 'checking' });
+	#tokenSaved = false;
 	#gatewayProviders: U.ProviderStatus[] = $state([]);
 	#poll: ReturnType<typeof setTimeout> | null = null;
 	#db: DbConnection | null = null;
@@ -151,6 +155,7 @@ export class SpacetimeDataSource implements DataSource {
 	liveActivity = () => null;
 	now = () => new Date().toISOString();
 	connection = () => this.#conn;
+	cfoSeat = () => this.#seat;
 	providers = (): U.ProviderStatus[] => [
 		{ id: 'ledger', name: 'Ledger database', purpose: 'Books, Proposals and the agent message bus', mode: 'live', detail: `${this.#cfg.uri} / ${this.#cfg.database} (${this.#conn.ledger})` },
 		{ id: 'agents', name: 'Agent gateway', purpose: 'Starts the close; runs the worker agents, Red Team and Advisor', mode: 'live', detail: `${this.#cfg.gateway} (${this.#conn.agents})` },
@@ -165,6 +170,22 @@ export class SpacetimeDataSource implements DataSource {
 	}
 
 	// Actions
+	async claimCfo(secret: string, displayName: string): Promise<void> {
+		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
+		// The seat belongs to this connection's identity, which lives in the saved token. If the token cannot be kept,
+		// the seat would be lost on the next reload and the one-time secret would be used up for nothing.
+		if (!this.#tokenSaved) {
+			throw new Error('This browser is blocking site storage, so it cannot keep the CFO seat after a reload. Allow storage for this site (or leave private browsing), then open the claim link again.');
+		}
+		try {
+			await this.#db.reducers.claimCfo({ secret: secret.trim(), displayName: displayName.trim() || 'CFO' });
+		} catch (err) {
+			throw plain(err, 'Could not claim the CFO seat.');
+		}
+		// my_agent_identity now shows this connection as the CFO; its update refreshes the seat as well.
+		this.#seatFrom(this.#db);
+	}
+
 	async startClose(periodId: string): Promise<void> {
 		let res: Response;
 		try {
@@ -249,7 +270,7 @@ export class SpacetimeDataSource implements DataSource {
 			.withDatabaseName(this.#cfg.database)
 			.withToken(readToken())
 			.onConnect((conn, _identity, token) => {
-				saveToken(token);
+				this.#tokenSaved = saveToken(token);
 				this.#wire(conn);
 				conn
 					.subscriptionBuilder()
@@ -257,11 +278,11 @@ export class SpacetimeDataSource implements DataSource {
 						for (const a of Object.keys(ACCESSORS) as Accessor[]) this.#dirty.add(a);
 						this.#flush();
 						this.#conn.ledger = 'live';
+						this.#seatFrom(conn);
 					})
 					.subscribeToAllTables();
-				// The browser is the CFO seat. A second browser reuses the token, so
-				// "role already held" is expected and harmless.
-				conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'CFO', model: 'human' }).catch(() => {});
+				// The browser never registers itself as CFO: the module refuses that. The seat is claimed once with the
+				// one-time Bootstrap secret on /claim, and stays with this identity through the saved token.
 			})
 			.onConnectError((_ctx, err) => {
 				this.#conn.ledger = 'offline';
@@ -289,6 +310,40 @@ export class SpacetimeDataSource implements DataSource {
 			table.onDelete?.(mark('delete'));
 			table.onUpdate?.(mark('update'));
 		}
+		// This connection's own role and the roster decide what the UI shows about the CFO seat.
+		const seat = () => this.#queueSeat();
+		for (const table of [conn.db.myAgentIdentity, conn.db.agentRoster]) {
+			table.onInsert(seat);
+			table.onDelete(seat);
+		}
+		conn.db.agentRoster.onUpdate(seat);
+	}
+
+	#seatQueued = false;
+	#queueSeat() {
+		if (this.#seatQueued) return;
+		this.#seatQueued = true;
+		queueMicrotask(() => {
+			this.#seatQueued = false;
+			if (this.#db) this.#seatFrom(this.#db);
+		});
+	}
+
+	/**
+	 * Who holds the CFO seat: my_agent_identity is this connection's own role (the module's per-caller view of the
+	 * private agent_identity table), and agent_roster has a 'cfo' row once anyone claimed the seat. The module still
+	 * checks every CFO action; this only decides the banner and the read-only message.
+	 */
+	#seatFrom(c: DbConnection) {
+		if (this.#conn.ledger !== 'live') {
+			this.#seat = { status: 'checking' };
+			return;
+		}
+		const holder = Array.from(c.db.agentRoster.iter()).find((r) => r.role === 'cfo');
+		const mine = Array.from(c.db.myAgentIdentity.iter()).some((r) => r.role.tag === 'Cfo');
+		if (mine) this.#seat = { status: 'you', holderName: holder?.displayName };
+		else if (holder) this.#seat = { status: 'other', holderName: holder.displayName };
+		else this.#seat = { status: 'unclaimed' };
 	}
 
 	#queue() {
@@ -339,8 +394,14 @@ export class SpacetimeDataSource implements DataSource {
 		}
 	}
 
+	/**
+	 * Run one of the CFO's reducers. The module decides who may act; a browser that does not hold the seat gets a plain
+	 * read-only message instead of the module's refusal.
+	 */
 	async #call(fallback: string, fn: (c: DbConnection) => Promise<unknown>) {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
+		if (this.#seat.status === 'unclaimed') throw new Error('This browser is read-only: nobody has claimed the CFO seat yet. Open your claim link to claim it.');
+		if (this.#seat.status === 'other') throw new Error('This browser is read-only: it does not hold the CFO seat. Use the browser that claimed it.');
 		try {
 			await fn(this.#db);
 		} catch (err) {

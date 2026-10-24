@@ -4,7 +4,7 @@
 // Period status follows the live module: 'open' while agents work, 'closing' once
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
 // CFO locks it.
-import type { ChangeEvent, ConnectionState, DataSource } from '../source';
+import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
 import type { AgentMessage, AgentRole, BankMatch, CloseTaskStatus, JournalLine, LiveActivity, Minor, Proposal, ProviderStatus, TableName } from '../types';
 import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
@@ -63,6 +63,8 @@ export class MockDataSource implements DataSource {
 	liveActivity = () => this.#activity;
 	now = () => this.#now();
 	connection = (): ConnectionState => ({ ledger: 'demo', agents: 'online', closes: this.#closes });
+	/** Demo mode has one viewer, and they are the CFO. */
+	cfoSeat = (): CfoSeat => ({ status: 'you', holderName: 'CFO' });
 
 	subscribe(table: TableName, cb: (e: ChangeEvent) => void): () => void {
 		let set = this.#subs.get(table);
@@ -72,6 +74,10 @@ export class MockDataSource implements DataSource {
 	}
 
 	// Actions
+	async claimCfo(): Promise<void> {
+		throw new Error('Demo mode has no seat to claim: you are already the CFO. Claim links are for the live ledger.');
+	}
+
 	async startClose(periodId: string): Promise<void> {
 		const period = this.#t.period.find((p) => p.id === periodId);
 		if (!period) throw new Error(`Unknown period ${periodId}`);

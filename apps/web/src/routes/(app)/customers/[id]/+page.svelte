@@ -48,7 +48,7 @@
 {:else}
 	<div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 		<div>
-			<h1 class="text-[32px]">{c.name}</h1>
+			<h1 class="text-[34px] sm:text-[42px]">{c.name}</h1>
 			<p class="mt-1 text-ink-2">{c.domain} · owner {c.guarantorName}{#if ui.expert}<span class="num text-ink-3"> · {c.id} · {c.guarantorPersonaId}</span>{/if}</p>
 		</div>
 		{#if c.creditTier}<Pill tone={TIER[c.creditTier].tone}>{TIER[c.creditTier].label} · {TIER[c.creditTier].plain}</Pill>{/if}

@@ -36,6 +36,20 @@ export interface ConnectionState {
 	message?: string;
 }
 
+/**
+ * Who holds the CFO seat, as this browser sees it. The ledger module is the authority: it refuses every CFO action
+ * from a connection that does not hold the seat. This only tells the UI what to show.
+ * - 'you': this browser holds the seat.
+ * - 'other': someone holds it, but not this browser, so it is read-only.
+ * - 'unclaimed': nobody holds it yet; the claim link seats whoever opens it.
+ * - 'checking': still connecting to the ledger.
+ */
+export interface CfoSeat {
+	status: 'you' | 'other' | 'unclaimed' | 'checking';
+	/** The display name the seat holder claimed it with, when someone holds it. */
+	holderName?: string;
+}
+
 export interface ChangeEvent<T = unknown> {
 	table: TableName;
 	kind: ChangeKind;
@@ -83,11 +97,19 @@ export interface DataSource {
 	now(): string;
 	/** Whether the ledger and the agents are reachable. */
 	connection(): ConnectionState;
+	/** Whether this browser holds the CFO seat. Demo mode: always 'you'. */
+	cfoSeat(): CfoSeat;
 
 	/** Called after every row change on `table`. Returns an unsubscribe function. */
 	subscribe(table: TableName, cb: (event: ChangeEvent) => void): () => void;
 
 	// Actions
+	/**
+	 * Claim the empty CFO seat for this browser with the one-time Bootstrap secret from the claim link. The module
+	 * refuses a wrong, expired or used secret, and any claim once the seat is held. Demo mode: the viewer is already
+	 * the CFO, so this refuses.
+	 */
+	claimCfo(secret: string, displayName: string): Promise<void>;
 	/** Kick off the month-end close: agents start proposing and debating. */
 	startClose(periodId: string): Promise<void>;
 	/** CFO confirms an Advisor ruling that is above the Materiality threshold. */

@@ -4,7 +4,7 @@
 export type Minor = string;
 export type Iso = string;
 
-export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'cfo';
+export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'consolidation' | 'redteam' | 'feed' | 'cfo';
 /** Who posted or acted. 'seed' is opening data loaded by the seed scripts. */
 export type PostedByRole = AgentRole | 'system' | 'seed';
 

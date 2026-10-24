@@ -66,9 +66,9 @@
 	bind:this={el}
 	onclose={() => (ui.paletteOpen = false)}
 	aria-label="Search customers, vendors and accounts"
-	class="mx-auto mt-[12vh] w-[min(560px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-ink"
+	class="mx-auto mt-[12vh] w-[min(580px,calc(100vw-32px))] overflow-hidden rounded-[var(--radius-dialog)] border-0 bg-surface-3 p-0 text-ink shadow-[var(--elevation-3)]"
 >
-	<div class="flex items-center gap-2 border-b border-line px-4">
+	<div class="flex items-center gap-2 border-b border-line px-5">
 		<Icon name="search" class="text-ink-3" />
 		<!-- svelte-ignore a11y_autofocus -->
 		<input
@@ -82,18 +82,18 @@
 			aria-controls="palette-list"
 			aria-activedescendant={hits[active] ? `hit-${active}` : undefined}
 		/>
-		<kbd class="hidden rounded border border-line px-1.5 font-mono text-xs text-ink-3 sm:inline">Esc</kbd>
+		<kbd class="kbd hidden sm:inline-block">Esc</kbd>
 	</div>
 	<ul id="palette-list" role="listbox" class="max-h-[50vh] overflow-y-auto p-2">
 		{#each hits as h, i (h.kind + h.href)}
 			<li role="option" id="hit-{i}" aria-selected={i === active}>
 				<button
 					type="button"
-					class="flex min-h-[44px] w-full items-center gap-3 rounded-btn px-3 text-left {i === active ? 'bg-subtle' : ''}"
+					class="flex min-h-[48px] w-full items-center gap-3 rounded-full px-4 text-left {i === active ? 'bg-secondary-container text-on-secondary-container' : ''}"
 					onmouseenter={() => (active = i)}
 					onclick={() => go(h)}
 				>
-					<span class="w-[72px] shrink-0 text-xs text-ink-3">{h.kind}</span>
+					<span class="eyebrow w-[76px] shrink-0 {i === active ? 'text-on-secondary-container' : ''}">{h.kind}</span>
 					<span class="flex-1 truncate">{h.label}</span>
 					<span class="truncate font-mono text-xs text-ink-3">{h.hint}</span>
 				</button>

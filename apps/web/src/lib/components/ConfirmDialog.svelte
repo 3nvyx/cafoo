@@ -53,10 +53,10 @@
 	onclose={() => (open = false)}
 	aria-labelledby="{id}-t"
 	aria-describedby="{id}-b"
-	class="m-auto w-[min(440px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-ink"
+	class="m-auto w-[min(460px,calc(100vw-32px))] rounded-[var(--radius-dialog)] border-0 bg-surface-3 p-0 text-ink shadow-[var(--elevation-3)]"
 >
-	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6">
-		<h2 id="{id}-t" class="text-xl">{title}</h2>
+	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6 sm:p-7">
+		<h2 id="{id}-t" class="text-2xl">{title}</h2>
 		<p id="{id}-b" class="text-ink-2">{body}</p>
 		{#if inputLabel}
 			<label class="flex flex-col gap-1.5 text-sm font-medium">
@@ -66,10 +66,10 @@
 			</label>
 		{/if}
 		<div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-			<button type="button" class="btn" onclick={() => (open = false)}>Cancel</button>
+			<button type="button" class="btn btn-text" onclick={() => (open = false)}>Cancel</button>
 			<button
 				type="submit"
-				class="btn {danger ? 'border-neg bg-neg text-white hover:!bg-neg' : 'btn-primary'}"
+				class="btn {danger ? 'btn-danger' : 'btn-primary'}"
 				disabled={busy || (inputRequired && !value.trim())}>{busy ? 'Working…' : confirmLabel}</button
 			>
 		</div>

@@ -3,6 +3,7 @@
 	import { fade } from 'svelte/transition';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import Icon from '#lib/components/Icon.svelte';
+	import Wordmark from '#lib/components/Wordmark.svelte';
 
 	interface Slide {
 		kicker: string;
@@ -76,10 +77,7 @@
 
 <div class="flex min-h-dvh flex-col bg-canvas">
 	<header class="flex h-16 items-center justify-between px-4 sm:px-8">
-		<a href="/" class="flex min-h-[44px] items-center gap-2.5" aria-label="Back to Cafoo">
-			<span class="grid size-7 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-			<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>
-		</a>
+		<Wordmark label="Back to Cafoo" />
 		<span class="num text-sm text-ink-3" aria-live="polite">{i + 1} / {slides.length}</span>
 	</header>
 
@@ -87,9 +85,9 @@
 		{#key i}
 			<section class="mx-auto w-full max-w-[1040px] py-10" in:fade={{ duration: prefersReducedMotion.current ? 0 : 180 }} aria-roledescription="slide" aria-label="{i + 1} of {slides.length}: {s.title}">
 				<p class="eyebrow mb-4 text-accent-ink">{s.kicker}</p>
-				<h1 class="max-w-[18ch] text-[40px] sm:text-[64px] {s.kind === 'title' ? 'sm:text-[80px]' : ''}" style="letter-spacing:-0.035em">{s.title}</h1>
+				<h1 class="max-w-[18ch] text-[42px] sm:text-[68px] {s.kind === 'title' ? 'sm:text-[88px]' : ''}" style="letter-spacing:-0.02em">{s.title}</h1>
 				{#if s.kind === 'stat'}
-					<p class="num mt-8 text-[72px] leading-none font-medium text-accent sm:text-[120px]">{s.stat}</p>
+					<p class="mt-8 font-display text-[80px] leading-none font-normal text-primary sm:text-[140px]">{s.stat}</p>
 				{/if}
 				{#if s.body}<p class="mt-6 max-w-[52ch] text-lg text-ink-2 sm:text-xl">{s.body}</p>{/if}
 				{#if s.kind === 'flow' && s.items}
@@ -97,7 +95,7 @@
 						{#each s.items as it, n (it.head)}
 							<li class="flex flex-col gap-2 border-t-2 pt-4" style="border-color: {n === 3 ? 'var(--accent)' : 'var(--line-strong)'}">
 								<span class="num text-sm text-ink-3">0{n + 1}</span>
-								<span class="font-display text-2xl font-medium">{it.head}</span>
+								<span class="font-display text-[28px] leading-tight">{it.head}</span>
 								<span class="text-ink-2">{it.text}</span>
 							</li>
 						{/each}
@@ -106,17 +104,17 @@
 				{#if s.kind === 'cols' && s.items}
 					<div class="mt-10 grid gap-8 sm:grid-cols-3">
 						{#each s.items as it (it.head)}
-							<div class="flex flex-col gap-2"><span class="font-display text-2xl font-medium">{it.head}</span><span class="text-ink-2">{it.text}</span></div>
+							<div class="flex flex-col gap-2"><span class="font-display text-[28px] leading-tight">{it.head}</span><span class="text-ink-2">{it.text}</span></div>
 						{/each}
 					</div>
 				{/if}
 				{#if s.kind === 'drill'}
 					<div class="num mt-10 flex flex-col gap-3 text-lg sm:flex-row sm:items-center sm:gap-4">
-						<span class="rounded-btn border border-line px-4 py-3">Revenue $70,950</span>
+						<span class="rounded-[12px] border border-line bg-surface-1 px-4 py-3">Revenue $70,950</span>
 						<Icon name="arrowRight" class="hidden text-ink-3 sm:block" />
-						<span class="rounded-btn border border-line px-4 py-3">5 Journal Entries</span>
+						<span class="rounded-[12px] border border-line bg-surface-1 px-4 py-3">5 Journal Entries</span>
 						<Icon name="arrowRight" class="hidden text-ink-3 sm:block" />
-						<span class="rounded-btn border border-accent bg-accent-soft px-4 py-3">10 Journal Lines</span>
+						<span class="rounded-[12px] bg-primary-container px-4 py-3 text-on-primary-container">10 Journal Lines</span>
 					</div>
 				{/if}
 				{#if s.kind === 'demo'}
@@ -133,8 +131,8 @@
 			{/each}
 		</div>
 		<div class="flex gap-2">
-			<button class="btn w-11 px-0" aria-label="Previous slide" disabled={i === 0} onclick={() => go(i - 1)}><Icon name="chevronLeft" /></button>
-			<button class="btn w-11 px-0" aria-label="Next slide" disabled={i === slides.length - 1} onclick={() => go(i + 1)}><Icon name="chevronRight" /></button>
+			<button class="btn btn-icon" aria-label="Previous slide" disabled={i === 0} onclick={() => go(i - 1)}><Icon name="chevronLeft" /></button>
+			<button class="btn btn-icon" aria-label="Next slide" disabled={i === slides.length - 1} onclick={() => go(i + 1)}><Icon name="chevronRight" /></button>
 		</div>
 	</footer>
 </div>

@@ -6,6 +6,8 @@ export const ROLE: Record<PostedByRole, { name: string; initials: string }> = {
 	bookkeeper: { name: 'Bookkeeper', initials: 'BK' },
 	revenue: { name: 'Revenue', initials: 'RV' },
 	credit: { name: 'Credit & Risk', initials: 'CR' },
+	consolidation: { name: 'Consolidation', initials: 'CO' },
+	feed: { name: 'Bank feed', initials: 'BF' },
 	redteam: { name: 'Red Team', initials: 'RT' },
 	cfo: { name: 'CFO', initials: 'You' },
 	system: { name: 'System', initials: 'SY' },

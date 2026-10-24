@@ -58,7 +58,7 @@
 	<div class="flex flex-col gap-3 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
 		<div>
 			<p class="eyebrow">Board Pack · Cafoo Inc</p>
-			<h1 class="text-[32px]">{periodLabel(period)}</h1>
+			<h1 class="text-[34px] sm:text-[42px]">{periodLabel(period)}</h1>
 			<p class="mt-1 text-sm text-ink-3">Rendered {dateTime(renderedAt)} from {db.journalEntries().length} Journal Entries</p>
 		</div>
 		{#if period.status === 'closed'}
@@ -101,7 +101,7 @@
 						<tr><th colspan="3" class="pt-4 pb-1 text-left text-sm font-medium text-ink-2">{g.title}</th></tr>
 						{#each g.rows as r (r.account.id)}
 							<tr class="border-b border-line">
-								<td class="py-2 pr-2">{#if ui.expert}<span class="num mr-2 text-ink-3">{r.account.code}</span>{/if}{r.account.name}</td>
+								<td class="py-2 pr-2">{#if ui.expert}<span class="num mr-2 whitespace-nowrap text-ink-3">{r.account.code}</span>{/if}{r.account.name}</td>
 								<td class="num py-2 pl-3 text-right"><a class="drill" href={drill({ account: r.account.code }, pid)}>{fmt(r.month)}</a></td>
 								<td class="num py-2 pl-3 text-right"><a class="drill" href={drill({ account: r.account.code }, qtd)}>{fmt(r.qtd)}</a></td>
 							</tr>
@@ -130,9 +130,9 @@
 				<tbody>
 					{#each [{ title: 'Assets', rows: bs.assets, total: bs.totalAssets }, { title: 'Liabilities', rows: bs.liabilities, total: bs.totalLiabilities }, { title: 'Equity', rows: bs.equity, total: bs.totalEquity }] as g (g.title)}
 						<tr><th colspan="2" class="pt-4 pb-1 text-left text-sm font-medium text-ink-2">{g.title}</th></tr>
-						{#each g.rows as r (r.label)}
+						{#each g.rows as r (r.account?.id ?? r.label)}
 							<tr class="border-b border-line">
-								<td class="py-2 pr-2">{#if ui.expert && r.account}<span class="num mr-2 text-ink-3">{r.account.code}</span>{/if}{r.label}</td>
+								<td class="py-2 pr-2">{#if ui.expert && r.account}<span class="num mr-2 whitespace-nowrap text-ink-3">{r.account.code}</span>{/if}{r.label}</td>
 								<td class="num w-[40%] py-2 text-right">
 									{#if r.account}<a class="drill" href={drill({ account: r.account.code }, through)}>{fmt(r.amount)}</a>{:else}<a class="drill" href={drill({ type: PL }, r.periods ?? through)}>{fmt(r.amount)}</a>{/if}
 								</td>

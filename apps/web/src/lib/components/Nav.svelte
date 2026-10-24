@@ -1,65 +1,81 @@
 <script lang="ts">
+	// Material 3 navigation in two shapes: a rail (icon in a pill indicator, label underneath) and a drawer (one row
+	// per destination, the active one in a pill). The bottom bar on phones is BottomNav.svelte.
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
+	import { MARKETING, NAV, isActive } from '#lib/nav.js';
 	import { ui } from '#lib/ui.svelte.js';
-	import Icon, { type IconName } from './Icon.svelte';
+	import Icon from './Icon.svelte';
+	import Wordmark from './Wordmark.svelte';
 
-	const items: { href: string; label: string; icon: IconName }[] = [
-		{ href: '/', label: 'Launchpad', icon: 'home' },
-		{ href: '/proposals', label: 'Proposals', icon: 'inbox' },
-		{ href: '/agents', label: 'Agents', icon: 'chat' },
-		{ href: '/close', label: 'Close', icon: 'checklist' },
-		{ href: '/ledger', label: 'Ledger', icon: 'book' },
-		{ href: '/reports', label: 'Board Pack', icon: 'chart' },
-		{ href: '/customers', label: 'Customers', icon: 'users' },
-		{ href: '/vendors', label: 'Vendors', icon: 'truck' },
-		{ href: '/settings', label: 'Settings', icon: 'sliders' }
-	];
+	let { variant = 'drawer' }: { variant?: 'drawer' | 'rail' } = $props();
 
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
-	const isActive = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
-	let { compact = false }: { compact?: boolean } = $props();
+	const active = (href: string) => isActive(page.url.pathname, href);
 </script>
 
-<nav aria-label="Main" class="flex h-full flex-col gap-1 p-3">
-	<a href="/" class="mb-4 flex min-h-[44px] items-center gap-2.5 px-2.5" aria-label="Cafoo home">
-		<span class="grid size-7 shrink-0 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-		{#if !compact}<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>{/if}
-	</a>
-	{#each items as it (it.href)}
-		<a
-			href={it.href}
-			onclick={() => (ui.navOpenMobile = false)}
-			aria-current={isActive(it.href) ? 'page' : undefined}
-			title={compact ? it.label : undefined}
-			class="relative flex min-h-[44px] items-center gap-3 rounded-btn px-2.5 text-[15px] transition-colors duration-150 {isActive(it.href)
-				? 'bg-subtle font-medium text-ink'
-				: 'text-ink-2 hover:bg-subtle hover:text-ink'}"
-		>
-			<Icon name={it.icon} />
-			{#if !compact}<span class="flex-1">{it.label}</span>{/if}
-			{#if it.href === '/proposals' && waiting > 0}
+{#if variant === 'rail'}
+	<nav aria-label="Main" class="flex h-full flex-col items-center gap-1 overflow-y-auto px-2 py-3">
+		<div class="mb-3"><Wordmark compact /></div>
+		{#each NAV as it (it.href)}
+			<a href={it.href} aria-current={active(it.href) ? 'page' : undefined} class="group flex w-full flex-col items-center gap-1 py-1 text-[12px] font-medium">
 				<span
-					class="num grid min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs leading-5 text-on-accent {compact ? 'absolute top-1 right-1' : ''}"
-					aria-label="{waiting} need your OK">{waiting}</span
+					class="state relative grid h-8 w-14 place-items-center rounded-full transition-colors duration-200 {active(it.href)
+						? 'bg-secondary-container text-on-secondary-container'
+						: 'text-ink-2 group-hover:text-ink'}"
 				>
-			{/if}
-		</a>
-	{/each}
-	<div class="mt-auto flex flex-col gap-1 border-t border-line pt-3">
-		<button
-			type="button"
-			class="flex min-h-[44px] items-center gap-3 rounded-btn px-2.5 text-left text-[15px] text-ink-2 hover:bg-subtle hover:text-ink sm:hidden"
-			onclick={() => {
-				ui.navOpenMobile = false;
-				ui.paletteOpen = true;
-			}}><Icon name="search" />Search</button
-		>
-		<a href="/pitch" class="flex min-h-[44px] items-center gap-3 rounded-btn px-2.5 text-[15px] text-ink-2 hover:bg-subtle hover:text-ink" title={compact ? 'Pitch' : undefined}>
-			<Icon name="slides" />{#if !compact}Pitch{/if}
-		</a>
-		<a href="/pricing" class="flex min-h-[44px] items-center gap-3 rounded-btn px-2.5 text-[15px] text-ink-2 hover:bg-subtle hover:text-ink" title={compact ? 'Pricing' : undefined}>
-			<Icon name="tag" />{#if !compact}Pricing{/if}
-		</a>
-	</div>
-</nav>
+					<Icon name={it.icon} />
+					{#if it.href === '/proposals' && waiting > 0}
+						<span class="num absolute -top-1 right-1.5 grid min-w-[18px] place-items-center rounded-full bg-error px-1 text-[11px] leading-[18px] text-on-error" aria-label="{waiting} need your OK"
+							>{waiting}</span
+						>
+					{/if}
+				</span>
+				<span class="text-center leading-tight {active(it.href) ? 'text-ink' : 'text-ink-2'}">{it.label}</span>
+			</a>
+		{/each}
+		<div class="mt-auto flex w-full flex-col gap-1 border-t border-line pt-3">
+			{#each MARKETING as it (it.href)}
+				<a href={it.href} class="group flex w-full flex-col items-center gap-1 py-1 text-[12px] font-medium text-ink-2">
+					<span class="state grid h-8 w-14 place-items-center rounded-full group-hover:text-ink"><Icon name={it.icon} /></span>
+					{it.label}
+				</a>
+			{/each}
+		</div>
+	</nav>
+{:else}
+	<nav aria-label="Main" class="flex h-full flex-col gap-0.5 overflow-y-auto px-3 py-3">
+		<div class="mb-4 px-2"><Wordmark /></div>
+		{#each NAV as it (it.href)}
+			<a
+				href={it.href}
+				onclick={() => (ui.navOpenMobile = false)}
+				aria-current={active(it.href) ? 'page' : undefined}
+				class="state flex min-h-[48px] items-center gap-3 rounded-full px-4 text-[15px] transition-colors duration-200 {active(it.href)
+					? 'bg-secondary-container font-semibold text-on-secondary-container'
+					: 'font-medium text-ink-2 hover:text-ink'}"
+			>
+				<Icon name={it.icon} />
+				<span class="flex-1">{it.label}</span>
+				{#if it.href === '/proposals' && waiting > 0}
+					<span class="num grid min-w-6 place-items-center rounded-full bg-error px-1.5 text-xs leading-6 text-on-error" aria-label="{waiting} need your OK">{waiting}</span>
+				{/if}
+			</a>
+		{/each}
+		<div class="mt-auto flex flex-col gap-0.5 border-t border-line pt-3">
+			<button
+				type="button"
+				class="state flex min-h-[48px] items-center gap-3 rounded-full px-4 text-left text-[15px] font-medium text-ink-2 hover:text-ink sm:hidden"
+				onclick={() => {
+					ui.navOpenMobile = false;
+					ui.paletteOpen = true;
+				}}><Icon name="search" />Search</button
+			>
+			{#each MARKETING as it (it.href)}
+				<a href={it.href} class="state flex min-h-[48px] items-center gap-3 rounded-full px-4 text-[15px] font-medium text-ink-2 hover:text-ink">
+					<Icon name={it.icon} />{it.label}
+				</a>
+			{/each}
+		</div>
+	</nav>
+{/if}

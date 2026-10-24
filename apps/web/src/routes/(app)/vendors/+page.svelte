@@ -25,7 +25,7 @@
 
 <svelte:head><title>Vendors · Cafoo</title></svelte:head>
 
-<h1 class="text-[32px]">Vendors</h1>
+<h1 class="text-[34px] sm:text-[42px]">Vendors</h1>
 <p class="mt-2 max-w-[60ch] text-ink-2">
 	Who we pay, and whether we trust their details. {blocked ? `${blocked} vendor${blocked === 1 ? ' is' : 's are'} blocked from payment.` : ''}
 </p>

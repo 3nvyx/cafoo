@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
+	import Wordmark from '#lib/components/Wordmark.svelte';
 
 	const tiers = [
 		{
@@ -41,28 +42,25 @@
 
 <div class="min-h-dvh bg-canvas">
 	<header class="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-4 sm:px-8">
-		<a href="/" class="flex min-h-[44px] items-center gap-2.5" aria-label="Cafoo home">
-			<span class="grid size-7 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-			<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>
-		</a>
+		<Wordmark label="Cafoo home" />
 		<a href="/" class="btn">Open the app</a>
 	</header>
 
 	<main class="mx-auto max-w-[1120px] px-4 pt-10 pb-20 sm:px-8 sm:pt-16">
-		<h1 class="max-w-[16ch] text-[40px] sm:text-[56px]" style="letter-spacing:-0.03em">Pricing that does not count seats</h1>
+		<h1 class="max-w-[16ch] text-[44px] sm:text-[68px]" style="letter-spacing:-0.02em">Pricing that does not count seats</h1>
 		<p class="mt-4 max-w-[56ch] text-lg text-ink-2">Every plan includes unlimited seats and the AI agents. You pay for the size of your books and the modules you turn on.</p>
 
 		<div class="mt-12 grid gap-4 md:grid-cols-3">
 			{#each tiers as t (t.name)}
-				<section class="card flex flex-col gap-6 p-6 {t.featured ? 'border-accent' : ''}" aria-labelledby="tier-{t.name}">
+				<section class="card flex flex-col gap-6 p-6 {t.featured ? 'border-primary shadow-[0_0_0_1px_var(--primary)]' : ''}" aria-labelledby="tier-{t.name}">
 					<div>
 						<div class="flex items-center justify-between">
 							<h2 id="tier-{t.name}" class="text-2xl">{t.name}</h2>
-							{#if t.featured}<span class="rounded-full bg-accent-soft px-2 text-[13px] leading-6 font-medium text-accent-ink">Most teams</span>{/if}
+							{#if t.featured}<span class="rounded-[6px] bg-primary-container px-2 text-[12.5px] leading-6 font-semibold text-on-primary-container">Most teams</span>{/if}
 						</div>
 						<p class="mt-1 text-sm text-ink-3">{t.for}</p>
 					</div>
-					<p><span class="num text-[40px] leading-none font-medium">{t.price}</span> <span class="text-ink-3">{t.per}</span></p>
+					<p><span class="font-display text-[44px] leading-none font-normal">{t.price}</span> <span class="text-ink-3">{t.per}</span></p>
 					<ul class="flex flex-1 flex-col gap-2.5">
 						<li class="flex gap-2"><Icon name="check" size={20} class="shrink-0 text-accent" />Unlimited seats</li>
 						<li class="flex gap-2"><Icon name="check" size={20} class="shrink-0 text-accent" />AI agents included</li>
@@ -70,7 +68,7 @@
 							<li class="flex gap-2 text-ink-2"><Icon name="check" size={20} class="shrink-0 text-ink-3" />{f}</li>
 						{/each}
 					</ul>
-					<a href="/" class="btn {t.featured ? 'btn-primary' : ''} w-full">{t.cta}</a>
+					<a href="/" class="btn {t.featured ? 'btn-primary' : 'btn-tonal'} w-full">{t.cta}</a>
 				</section>
 			{/each}
 		</div>

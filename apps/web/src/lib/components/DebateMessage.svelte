@@ -8,11 +8,11 @@
 
 	const style = $derived(
 		m.kind === 'critique'
-			? 'border-l-4 bg-neg-soft/60 py-1 pl-3'
+			? 'rounded-r-[12px] border-l-2 bg-error-container/45 py-1.5 pr-3 pl-3'
 			: m.kind === 'ruling' && !pinned
-				? 'rounded-btn bg-accent-soft px-3 py-2'
+				? 'rounded-[12px] bg-surface-container px-3 py-2'
 				: m.kind === 'question'
-					? 'border-l-4 border-dashed pl-3'
+					? 'border-l-2 border-dashed pl-3'
 					: ''
 	);
 </script>
@@ -23,7 +23,7 @@
 		<div class="flex flex-wrap items-baseline gap-x-2 text-sm">
 			<span class="font-medium">{roleName(m.senderRole)}</span>
 			{#if m.kind !== 'statement'}
-				<span class="text-[13px] font-semibold tracking-wider uppercase {m.kind === 'critique' ? 'text-neg' : m.kind === 'ruling' ? 'text-accent-ink' : 'text-ink-3'}"
+				<span class="text-[11px] font-semibold tracking-[0.08em] uppercase {m.kind === 'critique' ? 'text-neg' : m.kind === 'ruling' ? 'text-primary' : 'text-ink-3'}"
 					>{pinned ? 'Ruling, pinned' : MESSAGE_KIND[m.kind]}</span
 				>
 			{/if}

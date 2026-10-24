@@ -2,6 +2,7 @@
 	import { db } from '#lib/data/index.js';
 	import { formatMoney, toNumber } from '#lib/data/money.js';
 	import ModeToggle from '#lib/components/ModeToggle.svelte';
+	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { toasts } from '#lib/toast.svelte.js';
@@ -66,7 +67,7 @@
 
 <svelte:head><title>Settings · Cafoo</title></svelte:head>
 
-<h1 class="text-[32px]">Settings</h1>
+<h1 class="text-[34px] sm:text-[42px]">Settings</h1>
 
 <div class="mt-8 flex max-w-[720px] flex-col gap-10">
 	<section aria-labelledby="mat-h" class="flex flex-col gap-4">
@@ -105,9 +106,15 @@
 		<h2 id="mode-h" class="text-2xl">View</h2>
 		<p class="text-ink-2">
 			<strong class="font-medium text-ink">Simple</strong> shows plain summaries and two buttons. <strong class="font-medium text-ink">Expert</strong> adds journal lines with account
-			codes, Red Team critiques verbatim, raw payloads, agent transcripts and keyboard shortcuts. Press <kbd class="rounded border border-line px-1 font-mono text-xs">E</kbd> anywhere to switch.
+			codes, Red Team critiques verbatim, raw payloads, agent transcripts and keyboard shortcuts. Press <kbd class="kbd">E</kbd> anywhere to switch.
 		</p>
 		<div><ModeToggle /></div>
+	</section>
+
+	<section aria-labelledby="theme-h" class="flex flex-col gap-3">
+		<h2 id="theme-h" class="text-2xl">Appearance</h2>
+		<p class="text-ink-2">Cream paper by day, warm brown by night. System follows your device.</p>
+		<div><ThemeToggle /></div>
 	</section>
 
 	<section aria-labelledby="prov-h" class="flex flex-col gap-3">
@@ -133,7 +140,7 @@
 		<section aria-labelledby="reset-h" class="flex flex-col gap-3">
 			<h2 id="reset-h" class="text-2xl">Demo</h2>
 			<p class="text-ink-2">Put every table back to the starting data so you can run the September close again.</p>
-			<div><button class="btn" onclick={() => (resetOpen = true)}>Reset demo data</button></div>
+			<div><button class="btn btn-tonal" onclick={() => (resetOpen = true)}>Reset demo data</button></div>
 		</section>
 		<ConfirmDialog
 			bind:open={resetOpen}

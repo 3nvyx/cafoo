@@ -214,7 +214,7 @@
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 	<div>
-		<h1 class="text-[32px]">Ledger</h1>
+		<h1 class="text-[34px] sm:text-[42px]">Ledger</h1>
 		<p class="mt-2 text-ink-2">Every Journal Entry, line by line. Click any amount to see what is behind it.</p>
 	</div>
 	<div class="flex flex-col gap-2 sm:flex-row">
@@ -234,15 +234,15 @@
 </div>
 
 {#if drillKind}
-	<div class="mt-6 flex flex-col gap-3 rounded-card border border-accent/40 bg-accent-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+	<div class="mt-6 flex flex-col gap-3 rounded-card bg-secondary-container px-4 py-3 text-on-secondary-container sm:flex-row sm:items-center sm:justify-between">
 		<p class="text-[15px]">
 			{drillKind === 'je' ? 'Showing the entry' : 'Showing entries that touch'} <span class="font-medium">{drillLabel}</span>
-			{#if periodFilter.kind === 'range'}<span class="text-ink-2">· {periodFilterLabel(periodFilter)}</span>{/if}
+			{#if periodFilter.kind === 'range'}<span class="opacity-80">· {periodFilterLabel(periodFilter)}</span>{/if}
 			{#if drillTotal !== null}
-				<span class="text-ink-2">· {drillTotal.label}</span> <span class="num font-medium">{formatMoney(drillTotal.amount)}</span>
+				<span class="opacity-80">· {drillTotal.label}</span> <span class="num font-medium">{formatMoney(drillTotal.amount)}</span>
 			{/if}
 		</p>
-		<a href="/ledger?period={encodeURIComponent(periodValue)}" class="btn btn-quiet -my-2 self-start text-sm sm:self-auto"><Icon name="x" size={16} />Clear drill-down</a>
+		<a href="/ledger?period={encodeURIComponent(periodValue)}" class="btn btn-quiet -my-2 self-start text-sm text-on-secondary-container sm:self-auto"><Icon name="x" size={16} />Clear drill-down</a>
 	</div>
 {/if}
 
@@ -254,7 +254,7 @@
 		{#each entries as j (j.id)}
 			<li id="je-{j.id}" class="border-b border-line" in:arrive>
 				<button
-					class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 py-3 text-left hover:bg-subtle/60 md:grid-cols-[88px_minmax(0,1fr)_120px_160px] md:py-2.5"
+					class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 state py-3 text-left md:grid-cols-[88px_minmax(0,1fr)_120px_160px] md:py-2.5"
 					aria-expanded={!!open[j.id]}
 					aria-controls="je-lines-{j.id}"
 					onclick={() => (open[j.id] = !open[j.id])}

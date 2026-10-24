@@ -54,7 +54,7 @@
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 	<div>
-		<h1 class="text-[32px]">Agent Debate</h1>
+		<h1 class="text-[34px] sm:text-[42px]">Agent Debate</h1>
 		<p class="mt-2 max-w-[60ch] text-ink-2">Worker agents propose, the Red Team critiques, the Advisor rules. Each thread is one Proposal.</p>
 	</div>
 	{#if period?.status === 'open' && !started}
@@ -67,9 +67,9 @@
 <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label="Filter threads">
 	{#each FILTERS as f (f.id)}
 		<button
-			class="min-h-[44px] rounded-full border px-4 text-sm transition-colors duration-150 {filter === f.id ? 'border-ink bg-ink text-canvas' : 'border-line-strong text-ink-2 hover:text-ink'}"
+			class="chip"
 			aria-pressed={filter === f.id}
-			onclick={() => (filter = f.id)}>{f.label}</button
+			onclick={() => (filter = f.id)}>{#if filter === f.id}<Icon name="check" size={16} />{/if}{f.label}</button
 		>
 	{/each}
 </div>
@@ -77,16 +77,16 @@
 <ul class="mt-6 flex max-w-[820px] flex-col gap-5">
 	{#each threads as t (t.key)}
 		<li class="card overflow-hidden">
-			<header class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+			<header class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-4 sm:px-5">
 				<div class="min-w-0 flex-1">
 					{#if t.proposal}
 						<p class="text-sm text-ink-3">
 							{KIND[t.proposal.kind]} by {roleName(t.proposal.proposerRole)}{#if ui.expert}<span class="num"> · {t.proposal.id}</span>{/if}
 						</p>
-						<p class="mt-0.5 font-medium">{t.proposal.summaryPlain}</p>
+						<p class="mt-0.5 text-[17px] leading-snug font-medium">{t.proposal.summaryPlain}</p>
 					{:else}
 						<p class="text-sm text-ink-3">Close thread</p>
-						<p class="mt-0.5 font-medium">Advisor coordination</p>
+						<p class="mt-0.5 text-[17px] leading-snug font-medium">Advisor coordination</p>
 					{/if}
 				</div>
 				{#if t.proposal}
@@ -96,7 +96,7 @@
 				{/if}
 			</header>
 			{#if t.ruling}
-				<div class="border-b border-l-4 border-b-line border-l-accent bg-accent-soft/40 px-4 py-3 sm:px-5">
+				<div class="border-b border-l-2 border-b-line border-l-primary bg-surface-container-low px-4 py-3 sm:px-5">
 					<DebateMessage m={t.ruling} pinned />
 				</div>
 			{/if}

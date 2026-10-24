@@ -48,10 +48,10 @@
 
 {#if ui.expert && proposals.length}
 	<p class="mb-3 text-sm text-ink-3">
-		<kbd class="rounded border border-line px-1 font-mono text-xs">J</kbd>/<kbd class="rounded border border-line px-1 font-mono text-xs">K</kbd> move,
-		<kbd class="rounded border border-line px-1 font-mono text-xs">A</kbd> confirm,
-		<kbd class="rounded border border-line px-1 font-mono text-xs">S</kbd> send back,
-		<kbd class="rounded border border-line px-1 font-mono text-xs">E</kbd> Simple mode
+		<kbd class="kbd">J</kbd>/<kbd class="kbd">K</kbd> move,
+		<kbd class="kbd">A</kbd> confirm,
+		<kbd class="kbd">S</kbd> send back,
+		<kbd class="kbd">E</kbd> Simple mode
 	</p>
 {/if}
 
