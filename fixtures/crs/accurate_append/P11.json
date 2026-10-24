@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P11-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P11-aa-reverse",
+      "records": [
+        {
+          "firstName": "BRANDON",
+          "lastName": "SZABO",
+          "houseNo": "2640",
+          "streetName": "HIGHLAND AVE APT 7",
+          "address": "2640 HIGHLAND AVE APT 7",
+          "city": "NATIONAL CITY",
+          "state": "CA",
+          "postalCode": "91950"
+        }
+      ]
+    }
+  }
+}

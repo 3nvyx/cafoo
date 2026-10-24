@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P18-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P18-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "TERRENCE",
+            "last": "ABERNATHY"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "2102",
+            "name": "S HALSTED ST"
+          },
+          "location": {
+            "city": "CHICAGO",
+            "state": "IL",
+            "zipCode": "60608"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1018"
+      },
+      "dateOfBirth": "1980-02-29"
+    },
+    "originalInputs": {
+      "firstName": "TERRENCE",
+      "lastName": "ABERNATHY",
+      "ssn": "XXXXX1018",
+      "dob": "1980-02-29",
+      "street1": "2102 S HALSTED ST",
+      "city": "CHICAGO",
+      "state": "IL",
+      "zip": "60608"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

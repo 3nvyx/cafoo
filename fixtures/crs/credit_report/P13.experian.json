@@ -1,0 +1,245 @@
+{
+  "status": 200,
+  "requestId": "fx-P13-credit_report-exp",
+  "synthesized": true,
+  "endpoint": "/experian/credit-report/standard/exp-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 640, thin file",
+  "body": {
+    "requestData": {
+      "firstName": "KAYLA",
+      "lastName": "BRENNAN",
+      "ssn": "XXXXX1013",
+      "addresses": [
+        {
+          "addressLine1": "9021 KINGSTON PIKE",
+          "city": "KNOXVILLE",
+          "state": "TN",
+          "postalCode": "37923",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": true,
+      "experianConfig": "exp-prequal-vantage4"
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P13-exp",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Experian",
+          "creditFileInfileDate": "2026-05-02"
+        },
+        "aliases": [
+          {
+            "firstName": "KAYLA",
+            "lastName": "BRENNAN"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1013"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "9021 KINGSTON PIKE",
+            "city": "KNOXVILLE",
+            "state": "TN",
+            "postalCode": "37923",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "SYNCHRONY BANK",
+        "inquiryDate": "2026-10-12",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "CAPITAL ONE",
+        "inquiryDate": "2026-10-05",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "DISCOVER BANK",
+        "inquiryDate": "2026-10-01",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "CITI CARDS",
+        "inquiryDate": "2026-09-26",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "BARCLAYS BANK",
+        "inquiryDate": "2026-09-20",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "GOLDMAN SACHS BANK",
+        "inquiryDate": "2026-09-11",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "AMERICAN EXPRESS",
+        "inquiryDate": "2026-09-03",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "WELLS FARGO CARD",
+        "inquiryDate": "2026-08-28",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "US BANK",
+        "inquiryDate": "2026-08-24",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1065",
+        "accountOwnershipType": "AuthorizedUser",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL ONE (AUTHORIZED USER)",
+        "accountOpenedDate": "2026-05-02",
+        "creditLimitAmount": "8000",
+        "highBalanceAmount": "3200",
+        "currentBalanceAmount": "260",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1066",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "MERRICK BANK",
+        "accountOpenedDate": "2026-07-19",
+        "creditLimitAmount": "1000",
+        "highBalanceAmount": "940",
+        "currentBalanceAmount": "940",
+        "monthlyPaymentAmount": "28",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "ExperianVantageScore4.0",
+        "sourceType": "Experian",
+        "createdDate": "2026-10-20",
+        "scoreValue": "640",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "20",
+            "scoreFactorText": "Length of time accounts have been established"
+          },
+          {
+            "scoreFactorCode": "08",
+            "scoreFactorText": "Too many inquiries last 12 months"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "2",
+        "openTradesCount": "2",
+        "revolvingTradesCount": "2",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "0",
+        "balanceTotal": "1200",
+        "revolvingBalanceTotal": "1200",
+        "revolvingHighCreditTotal": "9000",
+        "revolvingCreditUtilization": "13",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2026-05-02"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "9",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

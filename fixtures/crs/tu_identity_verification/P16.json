@@ -1,0 +1,75 @@
+{
+  "status": 200,
+  "requestId": "fx-P16-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result KBA_REQUIRED. basic verification passes but fraud alert triggers step-up; KBA questions then OTP to phone on file (needs TUC3004 on the quote)",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P16-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "SAMUEL",
+            "last": "OYELARAN"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "1200",
+            "name": "BRICKELL BAY DR APT 2203"
+          },
+          "location": {
+            "city": "MIAMI",
+            "state": "FL",
+            "zipCode": "33131"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1016"
+      },
+      "dateOfBirth": "1977-06-12"
+    },
+    "originalInputs": {
+      "firstName": "SAMUEL",
+      "lastName": "OYELARAN",
+      "ssn": "XXXXX1016",
+      "dob": "1977-06-12",
+      "street1": "1200 BRICKELL BAY DR APT 2203",
+      "city": "MIAMI",
+      "state": "FL",
+      "zip": "33131"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": [
+            {
+              "code": "2401",
+              "text": "Fraud alert on file: basic verification passes but step-up is required (KBA questions, then OTP to phone on file)"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

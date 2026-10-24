@@ -1,0 +1,341 @@
+{
+  "status": 200,
+  "requestId": "fx-P01-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 790 / 790 / 790 clean. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "MARGARET",
+      "lastName": "OKAFOR",
+      "ssn": "XXXXX1001",
+      "addresses": [
+        {
+          "addressLine1": "1420 WILLOW CREEK DR",
+          "city": "SAN JOSE",
+          "state": "CA",
+          "postalCode": "95125",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P01-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Equifax",
+          "creditFileInfileDate": "2003-09-01"
+        },
+        "aliases": [],
+        "ssns": [
+          {
+            "ssn": "XXXXX1001"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "1420 WILLOW CREEK DR",
+            "city": "SAN JOSE",
+            "state": "CA",
+            "postalCode": "95125",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "CHASE CARD SERVICES",
+        "inquiryDate": "2025-02-10",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1001",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Mortgage",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "WELLS HOME LENDING",
+        "accountOpenedDate": "2012-06-15",
+        "highBalanceAmount": "410000",
+        "currentBalanceAmount": "238500",
+        "monthlyPaymentAmount": "2140",
+        "termsMonthsCount": "360",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1002",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL AUTO FINANCE",
+        "accountOpenedDate": "2023-04-02",
+        "highBalanceAmount": "32000",
+        "currentBalanceAmount": "14200",
+        "monthlyPaymentAmount": "610",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1003",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CHASE CARD SERVICES",
+        "accountOpenedDate": "2006-02-11",
+        "creditLimitAmount": "18000",
+        "highBalanceAmount": "7200",
+        "currentBalanceAmount": "640",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1004",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AMERICAN EXPRESS",
+        "accountOpenedDate": "2009-08-20",
+        "creditLimitAmount": "25000",
+        "highBalanceAmount": "10000",
+        "currentBalanceAmount": "1210",
+        "monthlyPaymentAmount": "36",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1005",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CITI CARDS",
+        "accountOpenedDate": "2011-03-05",
+        "creditLimitAmount": "12000",
+        "highBalanceAmount": "4800",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1006",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER BANK",
+        "accountOpenedDate": "2014-10-12",
+        "creditLimitAmount": "9000",
+        "highBalanceAmount": "3600",
+        "currentBalanceAmount": "310",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1007",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "NAVIENT",
+        "accountOpenedDate": "2003-09-01",
+        "highBalanceAmount": "28000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Educational",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "accountClosedDate": "2013-05-30",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1008",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "MACYS",
+        "accountOpenedDate": "2008-11-01",
+        "creditLimitAmount": "3000",
+        "highBalanceAmount": "1200",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "accountClosedDate": "2019-01-15",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1009",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "US BANK",
+        "accountOpenedDate": "2016-07-22",
+        "creditLimitAmount": "15000",
+        "highBalanceAmount": "6000",
+        "currentBalanceAmount": "420",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "EquifaxVantageScore4.0",
+        "sourceType": "Equifax",
+        "createdDate": "2026-10-20",
+        "scoreValue": "790",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "14",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "9",
+        "openTradesCount": "7",
+        "revolvingTradesCount": "6",
+        "mortgageTradesCount": "1",
+        "installmentTradesCount": "2",
+        "balanceTotal": "255280",
+        "revolvingBalanceTotal": "2580",
+        "revolvingHighCreditTotal": "79000",
+        "revolvingCreditUtilization": "3",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2003-09-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

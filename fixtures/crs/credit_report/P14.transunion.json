@@ -1,0 +1,51 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): errorMessages 'deceased' at all three bureaus, no creditFiles",
+  "body": {
+    "requestData": {
+      "firstName": "HAROLD",
+      "lastName": "PETTIGREW",
+      "ssn": "XXXXX1014",
+      "addresses": [
+        {
+          "addressLine1": "310 ELM ST",
+          "city": "DAYTON",
+          "state": "OH",
+          "postalCode": "45402",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P14-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": [
+      {
+        "creditErrorMessageCode": "DECEASED",
+        "creditErrorMessageSourceType": "TransUnion",
+        "creditErrorMessageText": "Subject is reported as deceased. No credit file returned."
+      }
+    ],
+    "creditFiles": null,
+    "inquiries": [],
+    "tradelines": [],
+    "publicRecords": [],
+    "scores": [],
+    "summaries": null
+  }
+}

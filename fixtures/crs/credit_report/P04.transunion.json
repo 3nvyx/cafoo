@@ -1,0 +1,53 @@
+{
+  "status": 200,
+  "requestId": "fx-P04-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): NoFileReturnedNoHit at all three bureaus",
+  "body": {
+    "requestData": {
+      "firstName": "TOMAS",
+      "lastName": "LINDQVIST",
+      "ssn": "XXXXX1004",
+      "addresses": [
+        {
+          "addressLine1": "415 PINE ST UNIT 12",
+          "city": "SEATTLE",
+          "state": "WA",
+          "postalCode": "98101",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P04-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "NoFileReturnedNoHit",
+          "sourceType": "TransUnion"
+        }
+      }
+    ],
+    "inquiries": [],
+    "tradelines": [],
+    "publicRecords": [],
+    "scores": [],
+    "summaries": null
+  }
+}

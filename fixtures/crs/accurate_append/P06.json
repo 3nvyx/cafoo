@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P06-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P06-aa-reverse",
+      "records": [
+        {
+          "firstName": "ANGELA",
+          "lastName": "MORRISSEY",
+          "houseNo": "960",
+          "streetName": "MAPLEWOOD AVE",
+          "address": "960 MAPLEWOOD AVE",
+          "city": "COLUMBUS",
+          "state": "OH",
+          "postalCode": "43209"
+        }
+      ]
+    }
+  }
+}

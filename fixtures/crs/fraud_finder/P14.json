@@ -1,0 +1,69 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-fraud_finder",
+  "synthesized": true,
+  "endpoint": "/fraud-finder/fraud-finder",
+  "expectedOutcome": "risk.score 80 (high), email invalid, phone dead. Send name, phone, email and address; ipAddress is free.",
+  "body": {
+    "eam": {
+      "date_first_seen": "2008-01-12",
+      "longevity": 3,
+      "velocity": 2,
+      "popularity": 6
+    },
+    "dam": {
+      "date_first_seen": "1995-08-13",
+      "longevity": 3,
+      "velocity": 10,
+      "popularity": 10
+    },
+    "risk": {
+      "score": 80,
+      "tumbling_risk": 0,
+      "query_id": "fx-P14-fraud_finder",
+      "domain": {
+        "domain_risk_score": 6
+      },
+      "ip": {
+        "routing_type": "fixed",
+        "organization": "RESIDENTIAL ISP",
+        "proxy_type": "",
+        "hosting_facility": false,
+        "latitude": "0",
+        "longitude": "0"
+      },
+      "postal": {
+        "first_name_match": "match",
+        "last_name_match": "match",
+        "street_match": "match",
+        "city_match": "match",
+        "zip_match": "match",
+        "address_type": "Street",
+        "deliverability": "deliverable",
+        "deliverability_substatus": "deliverable",
+        "ip_postal_distance": "< 5 miles"
+      },
+      "phone": {
+        "line_type": "mobile",
+        "carrier": "VERIZON WIRELESS",
+        "status": "dead",
+        "prepaid": false,
+        "owner": {
+          "first_name_match": "match",
+          "last_name_match": "match",
+          "street_match": "match",
+          "city_match": "match",
+          "zip_match": "match",
+          "type": "person"
+        }
+      }
+    },
+    "email_validation": {
+      "address": "harold.pettigrew@example.com",
+      "status": "invalid",
+      "status_code": 10,
+      "domain_type": "freeisp",
+      "role_account": false
+    }
+  }
+}

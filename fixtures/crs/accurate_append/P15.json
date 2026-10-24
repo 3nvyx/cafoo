@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P15-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P15-aa-reverse",
+      "records": [
+        {
+          "firstName": "NICOLE",
+          "lastName": "FARRAGUT",
+          "houseNo": "7700",
+          "streetName": "NE 72ND AVE",
+          "address": "7700 NE 72ND AVE",
+          "city": "PORTLAND",
+          "state": "OR",
+          "postalCode": "97218"
+        }
+      ]
+    }
+  }
+}

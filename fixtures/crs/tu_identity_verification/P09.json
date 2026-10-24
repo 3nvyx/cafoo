@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P09-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P09-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "DEREK",
+            "last": "HOLLOWAY"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "4875",
+            "name": "W COLFAX AVE"
+          },
+          "location": {
+            "city": "DENVER",
+            "state": "CO",
+            "zipCode": "80204"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1009"
+      },
+      "dateOfBirth": "1986-02-11"
+    },
+    "originalInputs": {
+      "firstName": "DEREK",
+      "lastName": "HOLLOWAY",
+      "ssn": "XXXXX1009",
+      "dob": "1986-02-11",
+      "street1": "4875 W COLFAX AVE",
+      "city": "DENVER",
+      "state": "CO",
+      "zip": "80204"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

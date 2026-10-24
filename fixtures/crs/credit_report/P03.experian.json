@@ -1,0 +1,246 @@
+{
+  "status": 200,
+  "requestId": "fx-P03-credit_report-exp",
+  "synthesized": true,
+  "endpoint": "/experian/credit-report/standard/exp-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 660, thin file (1 / 1 / 5 tradelines)",
+  "body": {
+    "requestData": {
+      "firstName": "JASMINE",
+      "lastName": "REYES",
+      "ssn": "XXXXX1003",
+      "addresses": [
+        {
+          "addressLine1": "2210 UNIVERSITY AVE APT 4B",
+          "city": "BERKELEY",
+          "state": "CA",
+          "postalCode": "94704",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": true,
+      "experianConfig": "exp-prequal-vantage4"
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P03-exp",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Experian",
+          "creditFileInfileDate": "2021-06-01"
+        },
+        "aliases": [
+          {
+            "firstName": "JASMINE",
+            "lastName": "REYES"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1003"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "2210 UNIVERSITY AVE APT 4B",
+            "city": "BERKELEY",
+            "state": "CA",
+            "postalCode": "94704",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "DISCOVER BANK",
+        "inquiryDate": "2026-01-28",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1018",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER STUDENT",
+        "accountOpenedDate": "2026-02-01",
+        "creditLimitAmount": "500",
+        "highBalanceAmount": "200",
+        "currentBalanceAmount": "140",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1019",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Open",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "T-MOBILE",
+        "accountOpenedDate": "2026-02-15",
+        "businessType": "Utilities",
+        "currentBalanceAmount": "65",
+        "monthlyPaymentAmount": "65",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1020",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AFFIRM INC",
+        "accountOpenedDate": "2026-05-03",
+        "highBalanceAmount": "420",
+        "currentBalanceAmount": "210",
+        "monthlyPaymentAmount": "35",
+        "loanType": "Unsecured",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1021",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AFFIRM INC",
+        "accountOpenedDate": "2026-08-11",
+        "highBalanceAmount": "300",
+        "currentBalanceAmount": "250",
+        "monthlyPaymentAmount": "25",
+        "loanType": "Unsecured",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1022",
+        "accountOwnershipType": "AuthorizedUser",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL ONE (AUTHORIZED USER)",
+        "accountOpenedDate": "2021-06-01",
+        "creditLimitAmount": "3000",
+        "highBalanceAmount": "1200",
+        "currentBalanceAmount": "220",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "ExperianVantageScore4.0",
+        "sourceType": "Experian",
+        "createdDate": "2026-10-20",
+        "scoreValue": "660",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "14",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "5",
+        "openTradesCount": "5",
+        "revolvingTradesCount": "2",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "2",
+        "balanceTotal": "885",
+        "revolvingBalanceTotal": "360",
+        "revolvingHighCreditTotal": "3500",
+        "revolvingCreditUtilization": "10",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2021-06-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

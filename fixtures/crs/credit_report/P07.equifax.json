@@ -1,0 +1,224 @@
+{
+  "status": 200,
+  "requestId": "fx-P07-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 560 x3, public record BankruptcyChapter13 Filed 2025. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "MARCUS",
+      "lastName": "BELLAMY",
+      "ssn": "XXXXX1007",
+      "addresses": [
+        {
+          "addressLine1": "1507 PEACHTREE INDUSTRIAL BLVD",
+          "city": "ATLANTA",
+          "state": "GA",
+          "postalCode": "30341",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P07-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Equifax",
+          "creditFileInfileDate": "2010-05-01"
+        },
+        "aliases": [],
+        "ssns": [
+          {
+            "ssn": "XXXXX1007"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "1507 PEACHTREE INDUSTRIAL BLVD",
+            "city": "ATLANTA",
+            "state": "GA",
+            "postalCode": "30341",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1034",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CITI CARDS",
+        "accountOpenedDate": "2010-05-01",
+        "creditLimitAmount": "9000",
+        "highBalanceAmount": "3600",
+        "currentBalanceAmount": "7420",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1035",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER BANK",
+        "accountOpenedDate": "2013-08-01",
+        "creditLimitAmount": "6000",
+        "highBalanceAmount": "2400",
+        "currentBalanceAmount": "5110",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1036",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "ALLY FINANCIAL",
+        "accountOpenedDate": "2021-09-15",
+        "highBalanceAmount": "26000",
+        "currentBalanceAmount": "11800",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1037",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Mortgage",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "ROCKET MORTGAGE",
+        "accountOpenedDate": "2016-04-01",
+        "highBalanceAmount": "210000",
+        "currentBalanceAmount": "171000",
+        "monthlyPaymentAmount": "1380",
+        "termsMonthsCount": "360",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      }
+    ],
+    "publicRecords": [
+      {
+        "publicRecordType": "BankruptcyChapter13",
+        "dispositionType": "Filed",
+        "filedDate": "2025-03-10",
+        "reportedDate": "2025-03-31",
+        "courtName": "US BANKRUPTCY COURT NORTHERN DISTRICT OF GEORGIA",
+        "docketIdentifier": "25-52187",
+        "bankruptcyType": "Personal",
+        "bankruptcyRepaymentPercent": "60",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "EquifaxVantageScore4.0",
+        "sourceType": "Equifax",
+        "createdDate": "2026-10-20",
+        "scoreValue": "560",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "84",
+            "scoreFactorText": "Public record or collection on file"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "4",
+        "openTradesCount": "1",
+        "revolvingTradesCount": "2",
+        "mortgageTradesCount": "1",
+        "installmentTradesCount": "1",
+        "balanceTotal": "195330",
+        "revolvingBalanceTotal": "0",
+        "revolvingHighCreditTotal": "0",
+        "revolvingCreditUtilization": "0",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2010-05-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "1",
+        "publicRecordsCount": "1",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "0",
+        "currentAdverseTradelineCount": "3",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

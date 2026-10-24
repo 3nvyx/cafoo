@@ -1,0 +1,51 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): errorMessages 'deceased' at all three bureaus, no creditFiles. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "HAROLD",
+      "lastName": "PETTIGREW",
+      "ssn": "XXXXX1014",
+      "addresses": [
+        {
+          "addressLine1": "310 ELM ST",
+          "city": "DAYTON",
+          "state": "OH",
+          "postalCode": "45402",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P14-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": [
+      {
+        "creditErrorMessageCode": "DECEASED",
+        "creditErrorMessageSourceType": "Equifax",
+        "creditErrorMessageText": "Subject is reported as deceased. No credit file returned."
+      }
+    ],
+    "creditFiles": null,
+    "inquiries": [],
+    "tradelines": [],
+    "publicRecords": [],
+    "scores": [],
+    "summaries": null
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P07-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P07-aa-reverse",
+      "records": [
+        {
+          "firstName": "MARCUS",
+          "lastName": "BELLAMY",
+          "houseNo": "1507",
+          "streetName": "PEACHTREE INDUSTRIAL BLVD",
+          "address": "1507 PEACHTREE INDUSTRIAL BLVD",
+          "city": "ATLANTA",
+          "state": "GA",
+          "postalCode": "30341"
+        }
+      ]
+    }
+  }
+}

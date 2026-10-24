@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P14-aa-reverse",
+      "records": [
+        {
+          "firstName": "HAROLD",
+          "lastName": "PETTIGREW",
+          "houseNo": "310",
+          "streetName": "ELM ST",
+          "address": "310 ELM ST",
+          "city": "DAYTON",
+          "state": "OH",
+          "postalCode": "45402"
+        }
+      ]
+    }
+  }
+}

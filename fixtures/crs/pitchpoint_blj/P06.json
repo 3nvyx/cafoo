@@ -1,0 +1,39 @@
+{
+  "status": 200,
+  "requestId": "fx-P06-pitchpoint_blj",
+  "synthesized": true,
+  "endpoint": "/pp/fcrablj/data",
+  "expectedOutcome": "BankruptciesFound/JudgmentsFound/LiensFound: 1 bankruptcy Ch.7 discharged",
+  "body": {
+    "TransactionID": "fx-P06-pitchpoint_blj",
+    "Status": {
+      "Code": "S000",
+      "Description": "Success"
+    },
+    "Report": {
+      "Subject": {
+        "FirstName": "ANGELA",
+        "LastName": "MORRISSEY",
+        "SSN": "XXXXX1006"
+      },
+      "Summary": {
+        "BankruptciesFound": "1",
+        "JudgmentsFound": "0",
+        "LiensFound": "0"
+      },
+      "Bankruptcies": {
+        "Bankruptcy": {
+          "Chapter": "7",
+          "CaseNumber": "2:23-bk-50411",
+          "CourtName": "US BANKRUPTCY COURT SOUTHERN DISTRICT OF OHIO",
+          "FilingDate": "2023-02-14",
+          "Status": "Discharged",
+          "StatusDate": "2024-01-22",
+          "DischargeDate": "2024-01-22"
+        }
+      },
+      "Judgments": null,
+      "Liens": null
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P19-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P19-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "GRACE",
+            "last": "NAKAMURA"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "1850",
+            "name": "SOLANO AVE"
+          },
+          "location": {
+            "city": "BERKELEY",
+            "state": "CA",
+            "zipCode": "94707"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1019"
+      },
+      "dateOfBirth": "1976-09-16"
+    },
+    "originalInputs": {
+      "firstName": "GRACE",
+      "lastName": "NAKAMURA",
+      "ssn": "XXXXX1019",
+      "dob": "1976-09-16",
+      "street1": "1850 SOLANO AVE",
+      "city": "BERKELEY",
+      "state": "CA",
+      "zip": "94707"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

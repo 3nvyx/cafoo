@@ -1,0 +1,258 @@
+{
+  "status": 200,
+  "requestId": "fx-P06-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 580 x3, public record BankruptcyChapter7 Discharged. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "ANGELA",
+      "lastName": "MORRISSEY",
+      "ssn": "XXXXX1006",
+      "addresses": [
+        {
+          "addressLine1": "960 MAPLEWOOD AVE",
+          "city": "COLUMBUS",
+          "state": "OH",
+          "postalCode": "43209",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P06-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Equifax",
+          "creditFileInfileDate": "2012-04-01"
+        },
+        "aliases": [],
+        "ssns": [
+          {
+            "ssn": "XXXXX1006"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "960 MAPLEWOOD AVE",
+            "city": "COLUMBUS",
+            "state": "OH",
+            "postalCode": "43209",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "OPENSKY SECURED",
+        "inquiryDate": "2024-05-02",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1029",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "OPENSKY SECURED VISA",
+        "accountOpenedDate": "2024-05-10",
+        "creditLimitAmount": "500",
+        "highBalanceAmount": "200",
+        "currentBalanceAmount": "90",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Secured",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1030",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL ONE",
+        "accountOpenedDate": "2012-04-01",
+        "creditLimitAmount": "6000",
+        "highBalanceAmount": "2400",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1031",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "BARCLAYS BANK",
+        "accountOpenedDate": "2015-09-12",
+        "creditLimitAmount": "8000",
+        "highBalanceAmount": "3200",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1032",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "LENDINGCLUB",
+        "accountOpenedDate": "2020-02-03",
+        "highBalanceAmount": "15000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Unsecured",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1033",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "BankruptcyOrWageEarnerPlan",
+        "currentRatingCode": "7",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SYNCHRONY BANK",
+        "accountOpenedDate": "2017-11-30",
+        "creditLimitAmount": "4000",
+        "highBalanceAmount": "1600",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      }
+    ],
+    "publicRecords": [
+      {
+        "publicRecordType": "BankruptcyChapter7",
+        "dispositionType": "Discharged",
+        "filedDate": "2023-02-14",
+        "dispositionDate": "2024-01-22",
+        "reportedDate": "2024-01-31",
+        "courtName": "US BANKRUPTCY COURT SOUTHERN DISTRICT OF OHIO",
+        "docketIdentifier": "2:23-bk-50411",
+        "bankruptcyType": "Personal",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "EquifaxVantageScore4.0",
+        "sourceType": "Equifax",
+        "createdDate": "2026-10-20",
+        "scoreValue": "580",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "84",
+            "scoreFactorText": "Public record or collection on file"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "5",
+        "openTradesCount": "1",
+        "revolvingTradesCount": "4",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "1",
+        "balanceTotal": "90",
+        "revolvingBalanceTotal": "90",
+        "revolvingHighCreditTotal": "500",
+        "revolvingCreditUtilization": "18",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2012-04-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "1",
+        "publicRecordsCount": "1",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "4"
+      }
+    }
+  }
+}

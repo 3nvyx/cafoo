@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P16-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P16-aa-reverse",
+      "records": [
+        {
+          "firstName": "SAMUEL",
+          "lastName": "OYELARAN",
+          "houseNo": "1200",
+          "streetName": "BRICKELL BAY DR APT 2203",
+          "address": "1200 BRICKELL BAY DR APT 2203",
+          "city": "MIAMI",
+          "state": "FL",
+          "postalCode": "33131"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P11-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P11-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "BRANDON",
+            "last": "SZABO"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "2640",
+            "name": "HIGHLAND AVE APT 7"
+          },
+          "location": {
+            "city": "NATIONAL CITY",
+            "state": "CA",
+            "zipCode": "91950"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1011"
+      },
+      "dateOfBirth": "1995-05-15"
+    },
+    "originalInputs": {
+      "firstName": "BRANDON",
+      "lastName": "SZABO",
+      "ssn": "XXXXX1011",
+      "dob": "1995-05-15",
+      "street1": "2640 HIGHLAND AVE APT 7",
+      "city": "NATIONAL CITY",
+      "state": "CA",
+      "zip": "91950"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

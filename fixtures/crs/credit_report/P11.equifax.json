@@ -1,0 +1,225 @@
+{
+  "status": 200,
+  "requestId": "fx-P11-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 610 / 610 / 610. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "BRANDON",
+      "lastName": "SZABO",
+      "ssn": "XXXXX1011",
+      "addresses": [
+        {
+          "addressLine1": "2640 HIGHLAND AVE APT 7",
+          "city": "NATIONAL CITY",
+          "state": "CA",
+          "postalCode": "91950",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P11-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Equifax",
+          "creditFileInfileDate": "2016-05-01"
+        },
+        "aliases": [],
+        "ssns": [
+          {
+            "ssn": "XXXXX1011"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "2640 HIGHLAND AVE APT 7",
+            "city": "NATIONAL CITY",
+            "state": "CA",
+            "postalCode": "91950",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "MISSION LANE",
+        "inquiryDate": "2026-06-14",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      },
+      {
+        "creditorName": "PETAL CARD",
+        "inquiryDate": "2026-02-02",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1061",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "2",
+        "_60DayLates": "1",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL ONE",
+        "accountOpenedDate": "2016-05-01",
+        "creditLimitAmount": "2000",
+        "highBalanceAmount": "1720",
+        "currentBalanceAmount": "1720",
+        "monthlyPaymentAmount": "52",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1062",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "1",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CREDIT ONE BANK",
+        "accountOpenedDate": "2018-03-11",
+        "creditLimitAmount": "1000",
+        "highBalanceAmount": "860",
+        "currentBalanceAmount": "860",
+        "monthlyPaymentAmount": "26",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1063",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "2",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SANTANDER CONSUMER USA",
+        "accountOpenedDate": "2021-10-05",
+        "highBalanceAmount": "16000",
+        "currentBalanceAmount": "9100",
+        "monthlyPaymentAmount": "389",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1064",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Open",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SDG&E",
+        "accountOpenedDate": "2022-01-01",
+        "businessType": "Utilities",
+        "currentBalanceAmount": "120",
+        "monthlyPaymentAmount": "120",
+        "sourceType": "Equifax"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "EquifaxVantageScore4.0",
+        "sourceType": "Equifax",
+        "createdDate": "2026-10-20",
+        "scoreValue": "610",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "18",
+            "scoreFactorText": "Number of accounts with delinquency"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "4",
+        "openTradesCount": "4",
+        "revolvingTradesCount": "2",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "1",
+        "balanceTotal": "11800",
+        "revolvingBalanceTotal": "2580",
+        "revolvingHighCreditTotal": "3000",
+        "revolvingCreditUtilization": "86",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2016-05-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "5",
+        "_60DayLates": "1",
+        "_90DayLates": "0",
+        "inquiriesCount": "2",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

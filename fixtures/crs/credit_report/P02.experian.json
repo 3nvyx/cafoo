@@ -1,0 +1,272 @@
+{
+  "status": 200,
+  "requestId": "fx-P02-credit_report-exp",
+  "synthesized": true,
+  "endpoint": "/experian/credit-report/standard/exp-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 815 / 815 / 815 clean",
+  "body": {
+    "requestData": {
+      "firstName": "DANIEL",
+      "lastName": "WHITFIELD",
+      "ssn": "XXXXX1002",
+      "addresses": [
+        {
+          "addressLine1": "88 LAKESHORE BLVD",
+          "city": "AUSTIN",
+          "state": "TX",
+          "postalCode": "78746",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": true,
+      "experianConfig": "exp-prequal-vantage4"
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P02-exp",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Experian",
+          "creditFileInfileDate": "1998-04-10"
+        },
+        "aliases": [
+          {
+            "firstName": "DANIEL",
+            "lastName": "WHITFIELD"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1002"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "88 LAKESHORE BLVD",
+            "city": "AUSTIN",
+            "state": "TX",
+            "postalCode": "78746",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "LEXUS FINANCIAL SERVICES",
+        "inquiryDate": "2026-09-02",
+        "businessType": "Automotive",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1010",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Mortgage",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "JPMORGAN CHASE MORTGAGE",
+        "accountOpenedDate": "2015-05-01",
+        "highBalanceAmount": "1250000",
+        "currentBalanceAmount": "1068000",
+        "monthlyPaymentAmount": "6420",
+        "termsMonthsCount": "360",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1011",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Mortgage",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "BANK OF THE HILLS HELOC",
+        "accountOpenedDate": "2019-02-14",
+        "highBalanceAmount": "150000",
+        "currentBalanceAmount": "40500",
+        "monthlyPaymentAmount": "380",
+        "termsMonthsCount": "360",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1012",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AMERICAN EXPRESS",
+        "accountOpenedDate": "1998-04-10",
+        "creditLimitAmount": "40000",
+        "highBalanceAmount": "16000",
+        "currentBalanceAmount": "820",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1013",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CHASE CARD SERVICES",
+        "accountOpenedDate": "2001-09-18",
+        "creditLimitAmount": "30000",
+        "highBalanceAmount": "12000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1014",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CITI CARDS",
+        "accountOpenedDate": "2005-01-25",
+        "creditLimitAmount": "22000",
+        "highBalanceAmount": "8800",
+        "currentBalanceAmount": "150",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1015",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "TOYOTA MOTOR CREDIT",
+        "accountOpenedDate": "2018-03-01",
+        "highBalanceAmount": "48000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "accountClosedDate": "2023-03-01",
+        "sourceType": "Experian"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "ExperianVantageScore4.0",
+        "sourceType": "Experian",
+        "createdDate": "2026-10-20",
+        "scoreValue": "815",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "14",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "6",
+        "openTradesCount": "5",
+        "revolvingTradesCount": "3",
+        "mortgageTradesCount": "2",
+        "installmentTradesCount": "1",
+        "balanceTotal": "1109470",
+        "revolvingBalanceTotal": "970",
+        "revolvingHighCreditTotal": "92000",
+        "revolvingCreditUtilization": "1",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "1998-04-10"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

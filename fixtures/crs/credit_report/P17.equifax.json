@@ -1,0 +1,53 @@
+{
+  "status": 200,
+  "requestId": "fx-P17-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): TU 760 / EFX NoFileReturnedNoHit / EXP 700 with 1 charge-off. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "ELENA",
+      "lastName": "CASTELLANOS",
+      "ssn": "XXXXX1017",
+      "addresses": [
+        {
+          "addressLine1": "4400 N CENTRAL EXPY STE 100",
+          "city": "DALLAS",
+          "state": "TX",
+          "postalCode": "75206",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P17-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "NoFileReturnedNoHit",
+          "sourceType": "Equifax"
+        }
+      }
+    ],
+    "inquiries": [],
+    "tradelines": [],
+    "publicRecords": [],
+    "scores": [],
+    "summaries": null
+  }
+}

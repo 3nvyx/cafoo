@@ -1,0 +1,39 @@
+{
+  "status": 200,
+  "requestId": "fx-P11-pitchpoint_blj",
+  "synthesized": true,
+  "endpoint": "/pp/fcrablj/data",
+  "expectedOutcome": "BankruptciesFound/JudgmentsFound/LiensFound: 1 judgment $4,850",
+  "body": {
+    "TransactionID": "fx-P11-pitchpoint_blj",
+    "Status": {
+      "Code": "S000",
+      "Description": "Success"
+    },
+    "Report": {
+      "Subject": {
+        "FirstName": "BRANDON",
+        "LastName": "SZABO",
+        "SSN": "XXXXX1011"
+      },
+      "Summary": {
+        "BankruptciesFound": "0",
+        "JudgmentsFound": "1",
+        "LiensFound": "0"
+      },
+      "Bankruptcies": null,
+      "Judgments": {
+        "Judgment": {
+          "CaseNumber": "37-2024-00006121-CL-UD-CTL",
+          "CourtName": "SUPERIOR COURT OF CALIFORNIA, COUNTY OF SAN DIEGO",
+          "FilingDate": "2024-02-12",
+          "JudgmentDate": "2024-04-19",
+          "Amount": "4850.00",
+          "Plaintiff": "HIGHLAND PARK APARTMENTS LLC",
+          "Status": "Unsatisfied"
+        }
+      },
+      "Liens": null
+    }
+  }
+}

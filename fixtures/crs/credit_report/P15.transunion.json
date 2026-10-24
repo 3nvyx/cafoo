@@ -1,0 +1,53 @@
+{
+  "status": 200,
+  "requestId": "fx-P15-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): TU NoFileReturnedCreditFreeze / EFX 740 / EXP 740",
+  "body": {
+    "requestData": {
+      "firstName": "NICOLE",
+      "lastName": "FARRAGUT",
+      "ssn": "XXXXX1015",
+      "addresses": [
+        {
+          "addressLine1": "7700 NE 72ND AVE",
+          "city": "PORTLAND",
+          "state": "OR",
+          "postalCode": "97218",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P15-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "NoFileReturnedCreditFreeze",
+          "sourceType": "TransUnion"
+        }
+      }
+    ],
+    "inquiries": [],
+    "tradelines": [],
+    "publicRecords": [],
+    "scores": [],
+    "summaries": null
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P07-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P07-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "MARCUS",
+            "last": "BELLAMY"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "1507",
+            "name": "PEACHTREE INDUSTRIAL BLVD"
+          },
+          "location": {
+            "city": "ATLANTA",
+            "state": "GA",
+            "zipCode": "30341"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1007"
+      },
+      "dateOfBirth": "1975-12-05"
+    },
+    "originalInputs": {
+      "firstName": "MARCUS",
+      "lastName": "BELLAMY",
+      "ssn": "XXXXX1007",
+      "dob": "1975-12-05",
+      "street1": "1507 PEACHTREE INDUSTRIAL BLVD",
+      "city": "ATLANTA",
+      "state": "GA",
+      "zip": "30341"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P02-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P02-aa-reverse",
+      "records": [
+        {
+          "firstName": "DANIEL",
+          "lastName": "WHITFIELD",
+          "houseNo": "88",
+          "streetName": "LAKESHORE BLVD",
+          "address": "88 LAKESHORE BLVD",
+          "city": "AUSTIN",
+          "state": "TX",
+          "postalCode": "78746"
+        }
+      ]
+    }
+  }
+}

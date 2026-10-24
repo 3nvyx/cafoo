@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P19-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P19-aa-reverse",
+      "records": [
+        {
+          "firstName": "GRACE",
+          "lastName": "NAKAMURA",
+          "houseNo": "1850",
+          "streetName": "SOLANO AVE",
+          "address": "1850 SOLANO AVE",
+          "city": "BERKELEY",
+          "state": "CA",
+          "postalCode": "94707"
+        }
+      ]
+    }
+  }
+}

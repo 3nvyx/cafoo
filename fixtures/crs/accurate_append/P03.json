@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P03-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P03-aa-reverse",
+      "records": [
+        {
+          "firstName": "JASMINE",
+          "lastName": "REYES",
+          "houseNo": "2210",
+          "streetName": "UNIVERSITY AVE APT 4B",
+          "address": "2210 UNIVERSITY AVE APT 4B",
+          "city": "BERKELEY",
+          "state": "CA",
+          "postalCode": "94704"
+        }
+      ]
+    }
+  }
+}

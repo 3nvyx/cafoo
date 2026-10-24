@@ -1,0 +1,69 @@
+{
+  "status": 200,
+  "requestId": "fx-P12-fraud_finder",
+  "synthesized": true,
+  "endpoint": "/fraud-finder/fraud-finder",
+  "expectedOutcome": "risk.score 85 (high), phone owner no_match, IP > 1000 miles. Send name, phone, email and address; ipAddress is free.",
+  "body": {
+    "eam": {
+      "date_first_seen": "2024-02-11",
+      "longevity": 1,
+      "velocity": 2,
+      "popularity": 6
+    },
+    "dam": {
+      "date_first_seen": "1995-08-13",
+      "longevity": 3,
+      "velocity": 10,
+      "popularity": 10
+    },
+    "risk": {
+      "score": 85,
+      "tumbling_risk": 0,
+      "query_id": "fx-P12-fraud_finder",
+      "domain": {
+        "domain_risk_score": 6
+      },
+      "ip": {
+        "routing_type": "international proxy",
+        "organization": "HOSTING PROVIDER",
+        "proxy_type": "web",
+        "hosting_facility": true,
+        "latitude": "0",
+        "longitude": "0"
+      },
+      "postal": {
+        "first_name_match": "no_match",
+        "last_name_match": "no_match",
+        "street_match": "no_match",
+        "city_match": "match",
+        "zip_match": "match",
+        "address_type": "Street",
+        "deliverability": "deliverable",
+        "deliverability_substatus": "deliverable",
+        "ip_postal_distance": "> 1000 miles"
+      },
+      "phone": {
+        "line_type": "mobile",
+        "carrier": "VERIZON WIRELESS",
+        "status": "live",
+        "prepaid": false,
+        "owner": {
+          "first_name_match": "no_match",
+          "last_name_match": "no_match",
+          "street_match": "no_match",
+          "city_match": "no_match",
+          "zip_match": "no_match",
+          "type": "person"
+        }
+      }
+    },
+    "email_validation": {
+      "address": "v.anand.1968@example.com",
+      "status": "valid",
+      "status_code": 50,
+      "domain_type": "freeisp",
+      "role_account": false
+    }
+  }
+}

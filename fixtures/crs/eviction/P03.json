@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "requestId": "fx-P03-eviction",
+  "synthesized": true,
+  "endpoint": "/eviction/new-request",
+  "expectedOutcome": "clean",
+  "body": {
+    "orderResponse": {
+      "message": "Request Processed Successfully",
+      "reference": null,
+      "responseID": "fx-P03-cic-evct",
+      "name": "JASMINE REYES",
+      "disclaimer": "Synthesized sandbox fixture.",
+      "status": null
+    },
+    "response": {
+      "notice": null,
+      "count": 0,
+      "countWest4": 0,
+      "countNational1": 0,
+      "candidate": []
+    }
+  }
+}

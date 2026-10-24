@@ -1,0 +1,274 @@
+{
+  "status": 200,
+  "requestId": "fx-P15-credit_report-exp",
+  "synthesized": true,
+  "endpoint": "/experian/credit-report/standard/exp-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): TU NoFileReturnedCreditFreeze / EFX 740 / EXP 740",
+  "body": {
+    "requestData": {
+      "firstName": "NICOLE",
+      "lastName": "FARRAGUT",
+      "ssn": "XXXXX1015",
+      "addresses": [
+        {
+          "addressLine1": "7700 NE 72ND AVE",
+          "city": "PORTLAND",
+          "state": "OR",
+          "postalCode": "97218",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": true,
+      "experianConfig": "exp-prequal-vantage4"
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P15-exp",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Experian",
+          "creditFileInfileDate": "2003-09-01"
+        },
+        "aliases": [
+          {
+            "firstName": "NICOLE",
+            "lastName": "FARRAGUT"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1015"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "7700 NE 72ND AVE",
+            "city": "PORTLAND",
+            "state": "OR",
+            "postalCode": "97218",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "US BANK",
+        "inquiryDate": "2025-12-01",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1077",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL AUTO FINANCE",
+        "accountOpenedDate": "2023-04-02",
+        "highBalanceAmount": "32000",
+        "currentBalanceAmount": "14200",
+        "monthlyPaymentAmount": "610",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1078",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CHASE CARD SERVICES",
+        "accountOpenedDate": "2006-02-11",
+        "creditLimitAmount": "18000",
+        "highBalanceAmount": "7200",
+        "currentBalanceAmount": "640",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1079",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AMERICAN EXPRESS",
+        "accountOpenedDate": "2009-08-20",
+        "creditLimitAmount": "25000",
+        "highBalanceAmount": "10000",
+        "currentBalanceAmount": "1210",
+        "monthlyPaymentAmount": "36",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1080",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CITI CARDS",
+        "accountOpenedDate": "2011-03-05",
+        "creditLimitAmount": "12000",
+        "highBalanceAmount": "4800",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1081",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER BANK",
+        "accountOpenedDate": "2014-10-12",
+        "creditLimitAmount": "9000",
+        "highBalanceAmount": "3600",
+        "currentBalanceAmount": "310",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1082",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "NAVIENT",
+        "accountOpenedDate": "2003-09-01",
+        "highBalanceAmount": "28000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Educational",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "accountClosedDate": "2013-05-30",
+        "sourceType": "Experian"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "ExperianVantageScore4.0",
+        "sourceType": "Experian",
+        "createdDate": "2026-10-20",
+        "scoreValue": "740",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "14",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "6",
+        "openTradesCount": "5",
+        "revolvingTradesCount": "4",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "2",
+        "balanceTotal": "16360",
+        "revolvingBalanceTotal": "2160",
+        "revolvingHighCreditTotal": "64000",
+        "revolvingCreditUtilization": "3",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2003-09-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P17-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P17-aa-reverse",
+      "records": [
+        {
+          "firstName": "ELENA",
+          "lastName": "CASTELLANOS",
+          "houseNo": "4400",
+          "streetName": "N CENTRAL EXPY STE 100",
+          "address": "4400 N CENTRAL EXPY STE 100",
+          "city": "DALLAS",
+          "state": "TX",
+          "postalCode": "75206"
+        }
+      ]
+    }
+  }
+}

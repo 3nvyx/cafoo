@@ -1,0 +1,244 @@
+{
+  "status": 200,
+  "requestId": "fx-P08-credit_report-efx",
+  "synthesized": true,
+  "endpoint": "/equifax/credit-report/standard/efx-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 690 / 690 / 690. Equifax output carries no subject name (sandbox files).",
+  "body": {
+    "requestData": {
+      "firstName": "PRIYA",
+      "lastName": "VENKATESAN",
+      "ssn": "XXXXX1008",
+      "addresses": [
+        {
+          "addressLine1": "3300 N LAKE SHORE DR APT 15C",
+          "city": "CHICAGO",
+          "state": "IL",
+          "postalCode": "60657",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": true,
+      "equifaxConfig": "efx-prequal-vantage4",
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P08-efx",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Equifax",
+          "creditFileInfileDate": "2010-01-04"
+        },
+        "aliases": [],
+        "ssns": [
+          {
+            "ssn": "XXXXX1008"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "3300 N LAKE SHORE DR APT 15C",
+            "city": "CHICAGO",
+            "state": "IL",
+            "postalCode": "60657",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "DISCOVER BANK",
+        "inquiryDate": "2026-03-12",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Equifax"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1038",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CHASE CARD SERVICES",
+        "accountOpenedDate": "2010-01-04",
+        "creditLimitAmount": "12000",
+        "highBalanceAmount": "5900",
+        "currentBalanceAmount": "5900",
+        "monthlyPaymentAmount": "177",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1039",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "BANK OF AMERICA",
+        "accountOpenedDate": "2013-06-19",
+        "creditLimitAmount": "8000",
+        "highBalanceAmount": "4100",
+        "currentBalanceAmount": "4100",
+        "monthlyPaymentAmount": "123",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1040",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "HONDA FINANCIAL SERVICES",
+        "accountOpenedDate": "2022-08-01",
+        "highBalanceAmount": "29000",
+        "currentBalanceAmount": "16400",
+        "monthlyPaymentAmount": "540",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1041",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "1",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SOFI LENDING",
+        "accountOpenedDate": "2023-11-15",
+        "highBalanceAmount": "20000",
+        "currentBalanceAmount": "13200",
+        "monthlyPaymentAmount": "470",
+        "loanType": "Unsecured",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Equifax"
+      },
+      {
+        "accountIdentifier": "XXXX1042",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "TARGET CARD SERVICES",
+        "accountOpenedDate": "2016-09-09",
+        "creditLimitAmount": "2000",
+        "highBalanceAmount": "800",
+        "currentBalanceAmount": "300",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Equifax"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "EquifaxVantageScore4.0",
+        "sourceType": "Equifax",
+        "createdDate": "2026-10-20",
+        "scoreValue": "690",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "18",
+            "scoreFactorText": "Number of accounts with delinquency"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "5",
+        "openTradesCount": "5",
+        "revolvingTradesCount": "3",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "2",
+        "balanceTotal": "39900",
+        "revolvingBalanceTotal": "10300",
+        "revolvingHighCreditTotal": "22000",
+        "revolvingCreditUtilization": "47",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2010-01-04"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "1",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

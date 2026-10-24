@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P01-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P01-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "MARGARET",
+            "last": "OKAFOR"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "1420",
+            "name": "WILLOW CREEK DR"
+          },
+          "location": {
+            "city": "SAN JOSE",
+            "state": "CA",
+            "zipCode": "95125"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1001"
+      },
+      "dateOfBirth": "1984-03-14"
+    },
+    "originalInputs": {
+      "firstName": "MARGARET",
+      "lastName": "OKAFOR",
+      "ssn": "XXXXX1001",
+      "dob": "1984-03-14",
+      "street1": "1420 WILLOW CREEK DR",
+      "city": "SAN JOSE",
+      "state": "CA",
+      "zip": "95125"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

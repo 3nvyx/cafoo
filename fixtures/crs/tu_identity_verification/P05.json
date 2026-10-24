@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P05-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P05-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "RICKY",
+            "last": "DALTON"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "7031",
+            "name": "SUNSET RIDGE RD"
+          },
+          "location": {
+            "city": "ORLANDO",
+            "state": "FL",
+            "zipCode": "32819"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1005"
+      },
+      "dateOfBirth": "1988-09-09"
+    },
+    "originalInputs": {
+      "firstName": "RICKY",
+      "lastName": "DALTON",
+      "ssn": "XXXXX1005",
+      "dob": "1988-09-09",
+      "street1": "7031 SUNSET RIDGE RD",
+      "city": "ORLANDO",
+      "state": "FL",
+      "zip": "32819"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

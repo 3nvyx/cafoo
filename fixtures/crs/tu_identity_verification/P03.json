@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P03-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P03-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "JASMINE",
+            "last": "REYES"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "2210",
+            "name": "UNIVERSITY AVE APT 4B"
+          },
+          "location": {
+            "city": "BERKELEY",
+            "state": "CA",
+            "zipCode": "94704"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1003"
+      },
+      "dateOfBirth": "2004-06-21"
+    },
+    "originalInputs": {
+      "firstName": "JASMINE",
+      "lastName": "REYES",
+      "ssn": "XXXXX1003",
+      "dob": "2004-06-21",
+      "street1": "2210 UNIVERSITY AVE APT 4B",
+      "city": "BERKELEY",
+      "state": "CA",
+      "zip": "94704"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

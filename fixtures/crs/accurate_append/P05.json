@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P05-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P05-aa-reverse",
+      "records": [
+        {
+          "firstName": "RICKY",
+          "lastName": "DALTON",
+          "houseNo": "7031",
+          "streetName": "SUNSET RIDGE RD",
+          "address": "7031 SUNSET RIDGE RD",
+          "city": "ORLANDO",
+          "state": "FL",
+          "postalCode": "32819"
+        }
+      ]
+    }
+  }
+}

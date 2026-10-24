@@ -1,0 +1,79 @@
+{
+  "status": 200,
+  "requestId": "fx-P12-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result FAIL. SSN issued to a different name; DOB mismatch; address not associated with SSN",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P12-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "noHit",
+      "ssnMatchIndicator": "noMatch",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "VICTOR",
+            "last": "ANAND"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "55",
+            "name": "WATER ST FL 20"
+          },
+          "location": {
+            "city": "NEW YORK",
+            "state": "NY",
+            "zipCode": "10041"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1012"
+      },
+      "dateOfBirth": "1968-08-08"
+    },
+    "originalInputs": {
+      "firstName": "VICTOR",
+      "lastName": "ANAND",
+      "ssn": "XXXXX1012",
+      "dob": "1968-08-08",
+      "street1": "55 WATER ST FL 20",
+      "city": "NEW YORK",
+      "state": "NY",
+      "zip": "10041"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": [
+            {
+              "code": "2201",
+              "text": "SSN issued to a different name; DOB mismatch"
+            },
+            {
+              "code": "2101",
+              "text": "Address not associated with SSN"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

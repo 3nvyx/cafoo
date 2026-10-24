@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-pitchpoint_blj",
+  "synthesized": true,
+  "endpoint": "/pp/fcrablj/data",
+  "expectedOutcome": "BankruptciesFound/JudgmentsFound/LiensFound: 0/0/0",
+  "body": {
+    "TransactionID": "fx-P14-pitchpoint_blj",
+    "Status": {
+      "Code": "S000",
+      "Description": "Success"
+    },
+    "Report": {
+      "Subject": {
+        "FirstName": "HAROLD",
+        "LastName": "PETTIGREW",
+        "SSN": "XXXXX1014"
+      },
+      "Summary": {
+        "BankruptciesFound": "0",
+        "JudgmentsFound": "0",
+        "LiensFound": "0"
+      },
+      "Bankruptcies": null,
+      "Judgments": null,
+      "Liens": null
+    }
+  }
+}

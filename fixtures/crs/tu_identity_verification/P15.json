@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P15-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P15-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": true,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "NICOLE",
+            "last": "FARRAGUT"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "7700",
+            "name": "NE 72ND AVE"
+          },
+          "location": {
+            "city": "PORTLAND",
+            "state": "OR",
+            "zipCode": "97218"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1015"
+      },
+      "dateOfBirth": "1983-03-30"
+    },
+    "originalInputs": {
+      "firstName": "NICOLE",
+      "lastName": "FARRAGUT",
+      "ssn": "XXXXX1015",
+      "dob": "1983-03-30",
+      "street1": "7700 NE 72ND AVE",
+      "city": "PORTLAND",
+      "state": "OR",
+      "zip": "97218"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

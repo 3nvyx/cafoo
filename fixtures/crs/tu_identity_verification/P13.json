@@ -1,0 +1,79 @@
+{
+  "status": 200,
+  "requestId": "fx-P13-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result FAIL. SSN issue date inconsistent with DOB; multiple names linked to SSN",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P13-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "noMatch",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "KAYLA",
+            "last": "BRENNAN"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "9021",
+            "name": "KINGSTON PIKE"
+          },
+          "location": {
+            "city": "KNOXVILLE",
+            "state": "TN",
+            "zipCode": "37923"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1013"
+      },
+      "dateOfBirth": "1999-12-24"
+    },
+    "originalInputs": {
+      "firstName": "KAYLA",
+      "lastName": "BRENNAN",
+      "ssn": "XXXXX1013",
+      "dob": "1999-12-24",
+      "street1": "9021 KINGSTON PIKE",
+      "city": "KNOXVILLE",
+      "state": "TN",
+      "zip": "37923"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": [
+            {
+              "code": "2202",
+              "text": "SSN issue date inconsistent with DOB"
+            },
+            {
+              "code": "2201",
+              "text": "Multiple names linked to SSN"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

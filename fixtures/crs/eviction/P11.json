@@ -1,0 +1,71 @@
+{
+  "status": 200,
+  "requestId": "fx-P11-eviction",
+  "synthesized": true,
+  "endpoint": "/eviction/new-request",
+  "expectedOutcome": "2 UD San Diego: 2022 dismissed, 2024 judgment $4,850",
+  "body": {
+    "orderResponse": {
+      "message": "Request Processed Successfully",
+      "reference": null,
+      "responseID": "fx-P11-cic-evct",
+      "name": "BRANDON SZABO",
+      "disclaimer": "Synthesized sandbox fixture.",
+      "status": null
+    },
+    "response": {
+      "notice": null,
+      "count": 2,
+      "countWest4": 0,
+      "countNational1": 2,
+      "candidate": [
+        {
+          "firstName": "BRANDON",
+          "lastName": "SZABO",
+          "zipCode": "91950",
+          "state": "CA",
+          "subject": {
+            "fullName": "SZABO, BRANDON",
+            "dob": "05-15-1995",
+            "caseNumber": "37-2022-00009034-CL-UD-CTL"
+          },
+          "activity": {
+            "court": "SUPERIOR COURT OF CALIFORNIA, COUNTY OF SAN DIEGO",
+            "agencyState": "CA",
+            "agencyCounty": "SAN DIEGO",
+            "filingDate": "2022-03-08",
+            "caseNo": "37-2022-00009034-CL-UD-CTL",
+            "plaintiff": "BAYVIEW TERRACE LP",
+            "noticeType": "UNLAWFUL DETAINER",
+            "judgement": "DISMISSED",
+            "dismissalDate": "2022-05-02"
+          }
+        },
+        {
+          "firstName": "BRANDON",
+          "lastName": "SZABO",
+          "zipCode": "91950",
+          "state": "CA",
+          "subject": {
+            "fullName": "SZABO, BRANDON",
+            "dob": "05-15-1995",
+            "caseNumber": "37-2024-00006121-CL-UD-CTL"
+          },
+          "activity": {
+            "court": "SUPERIOR COURT OF CALIFORNIA, COUNTY OF SAN DIEGO",
+            "agencyState": "CA",
+            "agencyCounty": "SAN DIEGO",
+            "filingDate": "2024-02-12",
+            "caseNo": "37-2024-00006121-CL-UD-CTL",
+            "plaintiff": "HIGHLAND PARK APARTMENTS LLC",
+            "noticeType": "UNLAWFUL DETAINER",
+            "judgement": "JUDGMENT FOR PLAINTIFF",
+            "judgementFor": "PLAINTIFF",
+            "judgementDate": "2024-04-19",
+            "judgementAmount": "4850.00"
+          }
+        }
+      ]
+    }
+  }
+}

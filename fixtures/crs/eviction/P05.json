@@ -1,0 +1,24 @@
+{
+  "status": 200,
+  "requestId": "fx-P05-eviction",
+  "synthesized": true,
+  "endpoint": "/eviction/new-request",
+  "expectedOutcome": "clean",
+  "body": {
+    "orderResponse": {
+      "message": "Request Processed Successfully",
+      "reference": null,
+      "responseID": "fx-P05-cic-evct",
+      "name": "RICKY DALTON",
+      "disclaimer": "Synthesized sandbox fixture.",
+      "status": null
+    },
+    "response": {
+      "notice": null,
+      "count": 0,
+      "countWest4": 0,
+      "countNational1": 0,
+      "candidate": []
+    }
+  }
+}

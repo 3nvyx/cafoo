@@ -1,0 +1,48 @@
+{
+  "status": 200,
+  "requestId": "fx-P08-pitchpoint_blj",
+  "synthesized": true,
+  "endpoint": "/pp/fcrablj/data",
+  "expectedOutcome": "BankruptciesFound/JudgmentsFound/LiensFound: 1 judgment $12,300 + 1 state tax lien $7,450",
+  "body": {
+    "TransactionID": "fx-P08-pitchpoint_blj",
+    "Status": {
+      "Code": "S000",
+      "Description": "Success"
+    },
+    "Report": {
+      "Subject": {
+        "FirstName": "PRIYA",
+        "LastName": "VENKATESAN",
+        "SSN": "XXXXX1008"
+      },
+      "Summary": {
+        "BankruptciesFound": "0",
+        "JudgmentsFound": "1",
+        "LiensFound": "1"
+      },
+      "Bankruptcies": null,
+      "Judgments": {
+        "Judgment": {
+          "CaseNumber": "2024-M1-118842",
+          "CourtName": "CIRCUIT COURT OF COOK COUNTY",
+          "FilingDate": "2024-06-18",
+          "Amount": "12300.00",
+          "Plaintiff": "LAKEVIEW RENOVATION CONTRACTORS INC",
+          "Status": "Unsatisfied"
+        }
+      },
+      "Liens": {
+        "Lien": {
+          "LienType": "State Tax Lien",
+          "CaseNumber": "IL-TL-2025-004417",
+          "CourtName": "COOK COUNTY RECORDER OF DEEDS",
+          "FilingDate": "2025-02-03",
+          "Amount": "7450.00",
+          "Creditor": "ILLINOIS DEPARTMENT OF REVENUE",
+          "Status": "Unreleased"
+        }
+      }
+    }
+  }
+}

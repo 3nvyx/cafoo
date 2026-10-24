@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P06-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P06-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "ANGELA",
+            "last": "MORRISSEY"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "960",
+            "name": "MAPLEWOOD AVE"
+          },
+          "location": {
+            "city": "COLUMBUS",
+            "state": "OH",
+            "zipCode": "43209"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1006"
+      },
+      "dateOfBirth": "1979-04-18"
+    },
+    "originalInputs": {
+      "firstName": "ANGELA",
+      "lastName": "MORRISSEY",
+      "ssn": "XXXXX1006",
+      "dob": "1979-04-18",
+      "street1": "960 MAPLEWOOD AVE",
+      "city": "COLUMBUS",
+      "state": "OH",
+      "zip": "43209"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

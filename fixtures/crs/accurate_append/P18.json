@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P18-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P18-aa-reverse",
+      "records": [
+        {
+          "firstName": "TERRENCE",
+          "lastName": "ABERNATHY",
+          "houseNo": "2102",
+          "streetName": "S HALSTED ST",
+          "address": "2102 S HALSTED ST",
+          "city": "CHICAGO",
+          "state": "IL",
+          "postalCode": "60608"
+        }
+      ]
+    }
+  }
+}

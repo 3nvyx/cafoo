@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P20-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P20-aa-reverse",
+      "records": [
+        {
+          "firstName": "DOLORES",
+          "lastName": "WHITCOMB",
+          "houseNo": "612",
+          "streetName": "OCEAN VIEW DR",
+          "address": "612 OCEAN VIEW DR",
+          "city": "SANTA BARBARA",
+          "state": "CA",
+          "postalCode": "93109"
+        }
+      ]
+    }
+  }
+}

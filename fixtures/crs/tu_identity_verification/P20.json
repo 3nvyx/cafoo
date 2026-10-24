@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P20-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P20-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "DOLORES",
+            "last": "WHITCOMB"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "612",
+            "name": "OCEAN VIEW DR"
+          },
+          "location": {
+            "city": "SANTA BARBARA",
+            "state": "CA",
+            "zipCode": "93109"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1020"
+      },
+      "dateOfBirth": "1952-05-04"
+    },
+    "originalInputs": {
+      "firstName": "DOLORES",
+      "lastName": "WHITCOMB",
+      "ssn": "XXXXX1020",
+      "dob": "1952-05-04",
+      "street1": "612 OCEAN VIEW DR",
+      "city": "SANTA BARBARA",
+      "state": "CA",
+      "zip": "93109"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

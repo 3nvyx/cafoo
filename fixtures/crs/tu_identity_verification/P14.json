@@ -1,0 +1,75 @@
+{
+  "status": 200,
+  "requestId": "fx-P14-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result FAIL. SSN reported as belonging to a deceased person (Death Master File)",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P14-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "HAROLD",
+            "last": "PETTIGREW"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "310",
+            "name": "ELM ST"
+          },
+          "location": {
+            "city": "DAYTON",
+            "state": "OH",
+            "zipCode": "45402"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1014"
+      },
+      "dateOfBirth": "1948-01-19"
+    },
+    "originalInputs": {
+      "firstName": "HAROLD",
+      "lastName": "PETTIGREW",
+      "ssn": "XXXXX1014",
+      "dob": "1948-01-19",
+      "street1": "310 ELM ST",
+      "city": "DAYTON",
+      "state": "OH",
+      "zip": "45402"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": [
+            {
+              "code": "2301",
+              "text": "SSN reported as belonging to a deceased person (Death Master File)"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

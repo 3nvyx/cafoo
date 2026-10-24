@@ -1,0 +1,246 @@
+{
+  "status": 200,
+  "requestId": "fx-P20-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): FileReturned, no score (TU/EFX noScoreReasonType=ScoringNotAvailable)",
+  "body": {
+    "requestData": {
+      "firstName": "DOLORES",
+      "lastName": "WHITCOMB",
+      "ssn": "XXXXX1020",
+      "addresses": [
+        {
+          "addressLine1": "612 OCEAN VIEW DR",
+          "city": "SANTA BARBARA",
+          "state": "CA",
+          "postalCode": "93109",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P20-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "TransUnion",
+          "creditFileInfileDate": "1971-04-01"
+        },
+        "aliases": [
+          {
+            "firstName": "DOLORES",
+            "lastName": "WHITCOMB"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1020"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "612 OCEAN VIEW DR",
+            "city": "SANTA BARBARA",
+            "state": "CA",
+            "postalCode": "93109",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1127",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2019-05-31",
+        "accountStatusType": "Closed",
+        "accountType": "Mortgage",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "WASHINGTON MUTUAL",
+        "accountOpenedDate": "1978-06-01",
+        "highBalanceAmount": "92000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsMonthsCount": "360",
+        "businessType": "Banking",
+        "accountClosedDate": "2008-06-01",
+        "lastActivityDate": "2019-05-01",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1128",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2019-05-31",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SEARS",
+        "accountOpenedDate": "1971-04-01",
+        "creditLimitAmount": "2500",
+        "highBalanceAmount": "1000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "accountClosedDate": "2014-02-01",
+        "lastActivityDate": "2019-05-01",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1129",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2019-05-31",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AMERICAN EXPRESS",
+        "accountOpenedDate": "1983-09-01",
+        "creditLimitAmount": "15000",
+        "highBalanceAmount": "6000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "accountClosedDate": "2018-07-01",
+        "lastActivityDate": "2019-05-01",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1130",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2019-05-31",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "GMAC",
+        "accountOpenedDate": "2004-03-01",
+        "highBalanceAmount": "21000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "accountClosedDate": "2009-03-01",
+        "lastActivityDate": "2019-05-01",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1131",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2019-05-31",
+        "accountStatusType": "Closed",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "BANK OF AMERICA",
+        "accountOpenedDate": "1990-11-01",
+        "creditLimitAmount": "10000",
+        "highBalanceAmount": "4000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "accountClosedDate": "2019-05-01",
+        "lastActivityDate": "2019-05-01",
+        "sourceType": "TransUnion"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "TransUnionVantageScore4.0",
+        "sourceType": "TransUnion",
+        "createdDate": "2026-10-20",
+        "scoreValue": null,
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "noScoreReasonType": "ScoringNotAvailable",
+        "noScoreReasonTypeDescription": "Scoring not available",
+        "scoreFactors": []
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "5",
+        "openTradesCount": "0",
+        "revolvingTradesCount": "3",
+        "mortgageTradesCount": "1",
+        "installmentTradesCount": "1",
+        "balanceTotal": "0",
+        "revolvingBalanceTotal": "0",
+        "revolvingHighCreditTotal": "0",
+        "revolvingCreditUtilization": "0",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "1971-04-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "0",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

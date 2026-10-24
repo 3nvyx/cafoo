@@ -1,0 +1,153 @@
+{
+  "status": 200,
+  "requestId": "fx-P03-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): 660, thin file (1 / 1 / 5 tradelines)",
+  "body": {
+    "requestData": {
+      "firstName": "JASMINE",
+      "lastName": "REYES",
+      "ssn": "XXXXX1003",
+      "addresses": [
+        {
+          "addressLine1": "2210 UNIVERSITY AVE APT 4B",
+          "city": "BERKELEY",
+          "state": "CA",
+          "postalCode": "94704",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P03-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "TransUnion",
+          "creditFileInfileDate": "2026-02-01"
+        },
+        "aliases": [
+          {
+            "firstName": "JASMINE",
+            "lastName": "REYES"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1003"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "2210 UNIVERSITY AVE APT 4B",
+            "city": "BERKELEY",
+            "state": "CA",
+            "postalCode": "94704",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "DISCOVER BANK",
+        "inquiryDate": "2026-01-28",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "TransUnion"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1016",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER STUDENT",
+        "accountOpenedDate": "2026-02-01",
+        "creditLimitAmount": "500",
+        "highBalanceAmount": "200",
+        "currentBalanceAmount": "140",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "TransUnion"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "TransUnionVantageScore4.0",
+        "sourceType": "TransUnion",
+        "createdDate": "2026-10-20",
+        "scoreValue": "660",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "20",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "1",
+        "openTradesCount": "1",
+        "revolvingTradesCount": "1",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "0",
+        "balanceTotal": "140",
+        "revolvingBalanceTotal": "140",
+        "revolvingHighCreditTotal": "500",
+        "revolvingCreditUtilization": "28",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2026-02-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

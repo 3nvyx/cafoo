@@ -1,0 +1,69 @@
+{
+  "status": 200,
+  "requestId": "fx-P13-fraud_finder",
+  "synthesized": true,
+  "endpoint": "/fraud-finder/fraud-finder",
+  "expectedOutcome": "risk.score 88 (high), email 3 days old, phone owner no_match, voip prepaid. Send name, phone, email and address; ipAddress is free.",
+  "body": {
+    "eam": {
+      "date_first_seen": "2026-10-17",
+      "longevity": 0,
+      "velocity": 9,
+      "popularity": 0
+    },
+    "dam": {
+      "date_first_seen": "1995-08-13",
+      "longevity": 3,
+      "velocity": 10,
+      "popularity": 10
+    },
+    "risk": {
+      "score": 88,
+      "tumbling_risk": 2,
+      "query_id": "fx-P13-fraud_finder",
+      "domain": {
+        "domain_risk_score": 6
+      },
+      "ip": {
+        "routing_type": "international proxy",
+        "organization": "HOSTING PROVIDER",
+        "proxy_type": "web",
+        "hosting_facility": true,
+        "latitude": "0",
+        "longitude": "0"
+      },
+      "postal": {
+        "first_name_match": "no_match",
+        "last_name_match": "no_match",
+        "street_match": "no_match",
+        "city_match": "match",
+        "zip_match": "match",
+        "address_type": "Street",
+        "deliverability": "deliverable",
+        "deliverability_substatus": "deliverable",
+        "ip_postal_distance": "500-1000 miles"
+      },
+      "phone": {
+        "line_type": "voip",
+        "carrier": "BANDWIDTH.COM",
+        "status": "live",
+        "prepaid": true,
+        "owner": {
+          "first_name_match": "no_match",
+          "last_name_match": "no_match",
+          "street_match": "no_match",
+          "city_match": "no_match",
+          "zip_match": "no_match",
+          "type": "person"
+        }
+      }
+    },
+    "email_validation": {
+      "address": "kb.9921x@example.com",
+      "status": "valid",
+      "status_code": 50,
+      "domain_type": "freeisp",
+      "role_account": false
+    }
+  }
+}

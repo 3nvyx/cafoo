@@ -1,0 +1,274 @@
+{
+  "status": 200,
+  "requestId": "fx-P09-credit_report-tu",
+  "synthesized": true,
+  "endpoint": "/transunion/credit-report/standard/tu-prequal-fico9",
+  "expectedOutcome": "(TU / EFX / EXP): 700 / 700 / 700 clean",
+  "body": {
+    "requestData": {
+      "firstName": "DEREK",
+      "lastName": "HOLLOWAY",
+      "ssn": "XXXXX1009",
+      "addresses": [
+        {
+          "addressLine1": "4875 W COLFAX AVE",
+          "city": "DENVER",
+          "state": "CO",
+          "postalCode": "80204",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": true,
+      "transunionConfig": "tu-prequal-fico9",
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": false,
+      "experianConfig": null
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P09-tu",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "TransUnion",
+          "creditFileInfileDate": "2003-09-01"
+        },
+        "aliases": [
+          {
+            "firstName": "DEREK",
+            "lastName": "HOLLOWAY"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1009"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "4875 W COLFAX AVE",
+            "city": "DENVER",
+            "state": "CO",
+            "postalCode": "80204",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "CAPITAL ONE",
+        "inquiryDate": "2025-06-01",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "TransUnion"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1044",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CAPITAL AUTO FINANCE",
+        "accountOpenedDate": "2023-04-02",
+        "highBalanceAmount": "32000",
+        "currentBalanceAmount": "14200",
+        "monthlyPaymentAmount": "610",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1045",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CHASE CARD SERVICES",
+        "accountOpenedDate": "2006-02-11",
+        "creditLimitAmount": "18000",
+        "highBalanceAmount": "7200",
+        "currentBalanceAmount": "640",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1046",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "AMERICAN EXPRESS",
+        "accountOpenedDate": "2009-08-20",
+        "creditLimitAmount": "25000",
+        "highBalanceAmount": "10000",
+        "currentBalanceAmount": "1210",
+        "monthlyPaymentAmount": "36",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1047",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CITI CARDS",
+        "accountOpenedDate": "2011-03-05",
+        "creditLimitAmount": "12000",
+        "highBalanceAmount": "4800",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1048",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "DISCOVER BANK",
+        "accountOpenedDate": "2014-10-12",
+        "creditLimitAmount": "9000",
+        "highBalanceAmount": "3600",
+        "currentBalanceAmount": "310",
+        "monthlyPaymentAmount": "25",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "TransUnion"
+      },
+      {
+        "accountIdentifier": "XXXX1049",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Closed",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "NAVIENT",
+        "accountOpenedDate": "2003-09-01",
+        "highBalanceAmount": "28000",
+        "currentBalanceAmount": "0",
+        "monthlyPaymentAmount": "0",
+        "loanType": "Educational",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "accountClosedDate": "2013-05-30",
+        "sourceType": "TransUnion"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "TransUnionVantageScore4.0",
+        "sourceType": "TransUnion",
+        "createdDate": "2026-10-20",
+        "scoreValue": "700",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "14",
+            "scoreFactorText": "Length of time accounts have been established"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "6",
+        "openTradesCount": "5",
+        "revolvingTradesCount": "4",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "2",
+        "balanceTotal": "16360",
+        "revolvingBalanceTotal": "2160",
+        "revolvingHighCreditTotal": "64000",
+        "revolvingCreditUtilization": "3",
+        "pastDueTotal": "0",
+        "oldestTradelineDate": "2003-09-01"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "0",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "inquiriesCount": "1",
+        "currentAdverseTradelineCount": "0",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

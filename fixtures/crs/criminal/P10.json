@@ -1,0 +1,65 @@
+{
+  "status": 200,
+  "requestId": "fx-P10-criminal",
+  "synthesized": true,
+  "endpoint": "/criminal/new-request",
+  "expectedOutcome": "1 MISDEMEANOR disorderly conduct, Wayne County, DISMISSED 2014",
+  "body": {
+    "orderResponse": {
+      "message": "Request Results",
+      "reference": null,
+      "responseID": "fx-P10-cic-crim",
+      "name": "LAUREN KOWALCZYK",
+      "disclaimer": "Synthesized sandbox fixture. Records must be verified before any adverse action.",
+      "status": null
+    },
+    "cicCriminal": {
+      "candidates": {
+        "count": 1,
+        "message": "Records Found"
+      },
+      "errorCode": null,
+      "errorMessage": null
+    },
+    "response": {
+      "notice": null,
+      "count": 1,
+      "countWest4": 0,
+      "countNational1": 1,
+      "candidate": [
+        {
+          "firstName": "LAUREN",
+          "lastName": "KOWALCZYK",
+          "state": "MI",
+          "zipCode": "48226",
+          "zone": "MI",
+          "subject": {
+            "fullName": "KOWALCZYK, LAUREN",
+            "dob": "10-03-1992",
+            "caseNumber": "14-003318-SM",
+            "jurisdiction": "WAYNE COUNTY",
+            "state": "MI",
+            "category": "CRIMINAL",
+            "source": "WAYNE COUNTY COURT RECORDS"
+          },
+          "offenses": {
+            "count": "1",
+            "offense": [
+              {
+                "caseType": "MISDEMEANOR",
+                "description": "DISORDERLY CONDUCT",
+                "statute": "MCL 750.167",
+                "offenseDate": "2014-07-04",
+                "filingDate": "2014-07-07",
+                "disposition": "DISMISSED",
+                "dispositionDate": "2014-09-15",
+                "court": "36TH DISTRICT COURT",
+                "status": "CLOSED"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

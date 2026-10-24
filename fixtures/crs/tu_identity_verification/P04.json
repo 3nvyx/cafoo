@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P04-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P04-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "noHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "TOMAS",
+            "last": "LINDQVIST"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "415",
+            "name": "PINE ST UNIT 12"
+          },
+          "location": {
+            "city": "SEATTLE",
+            "state": "WA",
+            "zipCode": "98101"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1004"
+      },
+      "dateOfBirth": "1990-01-30"
+    },
+    "originalInputs": {
+      "firstName": "TOMAS",
+      "lastName": "LINDQVIST",
+      "ssn": "XXXXX1004",
+      "dob": "1990-01-30",
+      "street1": "415 PINE ST UNIT 12",
+      "city": "SEATTLE",
+      "state": "WA",
+      "zip": "98101"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

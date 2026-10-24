@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P10-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P10-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "LAUREN",
+            "last": "KOWALCZYK"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "1181",
+            "name": "WOODWARD AVE"
+          },
+          "location": {
+            "city": "DETROIT",
+            "state": "MI",
+            "zipCode": "48226"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1010"
+      },
+      "dateOfBirth": "1992-10-03"
+    },
+    "originalInputs": {
+      "firstName": "LAUREN",
+      "lastName": "KOWALCZYK",
+      "ssn": "XXXXX1010",
+      "dob": "1992-10-03",
+      "street1": "1181 WOODWARD AVE",
+      "city": "DETROIT",
+      "state": "MI",
+      "zip": "48226"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

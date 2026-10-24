@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "requestId": "fx-P05-criminal",
+  "synthesized": true,
+  "endpoint": "/criminal/new-request",
+  "expectedOutcome": "clean",
+  "body": {
+    "orderResponse": {
+      "message": "Request Results",
+      "reference": null,
+      "responseID": "fx-P05-cic-crim",
+      "name": "RICKY DALTON",
+      "disclaimer": "Synthesized sandbox fixture. Records must be verified before any adverse action.",
+      "status": null
+    },
+    "cicCriminal": {
+      "candidates": {
+        "count": 0,
+        "message": "No Records Found"
+      },
+      "errorCode": null,
+      "errorMessage": null
+    },
+    "response": {
+      "notice": null,
+      "count": 0,
+      "countWest4": 0,
+      "countNational1": 0,
+      "candidate": []
+    }
+  }
+}

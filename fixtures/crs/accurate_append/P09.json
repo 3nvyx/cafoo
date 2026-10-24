@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P09-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P09-aa-reverse",
+      "records": [
+        {
+          "firstName": "DEREK",
+          "lastName": "HOLLOWAY",
+          "houseNo": "4875",
+          "streetName": "W COLFAX AVE",
+          "address": "4875 W COLFAX AVE",
+          "city": "DENVER",
+          "state": "CO",
+          "postalCode": "80204"
+        }
+      ]
+    }
+  }
+}

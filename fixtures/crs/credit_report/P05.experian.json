@@ -1,0 +1,317 @@
+{
+  "status": 200,
+  "requestId": "fx-P05-credit_report-exp",
+  "synthesized": true,
+  "endpoint": "/experian/credit-report/standard/exp-prequal-vantage4",
+  "expectedOutcome": "(TU / EFX / EXP): 540 / 540 / 540, collections, 90dpd",
+  "body": {
+    "requestData": {
+      "firstName": "RICKY",
+      "lastName": "DALTON",
+      "ssn": "XXXXX1005",
+      "addresses": [
+        {
+          "addressLine1": "7031 SUNSET RIDGE RD",
+          "city": "ORLANDO",
+          "state": "FL",
+          "postalCode": "32819",
+          "borrowerResidencyType": "Current"
+        }
+      ]
+    },
+    "repositoryIncluded": {
+      "transunion": false,
+      "transunionConfig": null,
+      "equifax": false,
+      "equifaxConfig": null,
+      "experian": true,
+      "experianConfig": "exp-prequal-vantage4"
+    },
+    "responseDetail": {
+      "dateOrdered": "2026-10-20T15:04:05Z",
+      "dateRequested": "2026-10-20T15:04:05Z",
+      "referenceNumber": "fx-P05-exp",
+      "creditPullType": "Soft"
+    },
+    "responseAlertMessages": [],
+    "errorMessages": null,
+    "creditFiles": [
+      {
+        "creditFileDetail": {
+          "borrowerSourceType": "Borrower",
+          "creditFileResultStatusType": "FileReturned",
+          "sourceType": "Experian",
+          "creditFileInfileDate": "2017-03-10"
+        },
+        "aliases": [
+          {
+            "firstName": "RICKY",
+            "lastName": "DALTON"
+          }
+        ],
+        "ssns": [
+          {
+            "ssn": "XXXXX1005"
+          }
+        ],
+        "dobs": [],
+        "addresses": [
+          {
+            "addressLine1": "7031 SUNSET RIDGE RD",
+            "city": "ORLANDO",
+            "state": "FL",
+            "postalCode": "32819",
+            "borrowerResidencyType": "Current",
+            "dateReported": "2026-09-30"
+          }
+        ],
+        "employments": []
+      }
+    ],
+    "inquiries": [
+      {
+        "creditorName": "CARVANA",
+        "inquiryDate": "2026-09-28",
+        "businessType": "Automotive",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "CREDIT ONE BANK",
+        "inquiryDate": "2026-09-15",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "MISSION LANE",
+        "inquiryDate": "2026-09-03",
+        "businessType": "Banking",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "UPSTART NETWORK",
+        "inquiryDate": "2026-08-27",
+        "businessType": "Finance",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "OPORTUN",
+        "inquiryDate": "2026-08-12",
+        "businessType": "Finance",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      },
+      {
+        "creditorName": "AVANT",
+        "inquiryDate": "2026-07-30",
+        "businessType": "Finance",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "sourceType": "Experian"
+      }
+    ],
+    "tradelines": [
+      {
+        "accountIdentifier": "XXXX1023",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "Late90Days",
+        "currentRatingCode": "4",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "412",
+        "_30DayLates": "3",
+        "_60DayLates": "2",
+        "_90DayLates": "1",
+        "creditorName": "CAPITAL ONE",
+        "accountOpenedDate": "2017-03-10",
+        "creditLimitAmount": "3000",
+        "highBalanceAmount": "3010",
+        "currentBalanceAmount": "3010",
+        "monthlyPaymentAmount": "90",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1024",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "2",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "CREDIT ONE BANK",
+        "accountOpenedDate": "2019-08-21",
+        "creditLimitAmount": "1500",
+        "highBalanceAmount": "1488",
+        "currentBalanceAmount": "1488",
+        "monthlyPaymentAmount": "45",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1025",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Revolving",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "1",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "SYNCHRONY BANK",
+        "accountOpenedDate": "2020-01-14",
+        "creditLimitAmount": "2500",
+        "highBalanceAmount": "2470",
+        "currentBalanceAmount": "2470",
+        "monthlyPaymentAmount": "74",
+        "termsDescription": "Revolving",
+        "businessType": "Banking",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1026",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Installment",
+        "currentRatingType": "AsAgreed",
+        "currentRatingCode": "1",
+        "derogatoryDataIndicator": false,
+        "pastDueAmount": "0",
+        "_30DayLates": "2",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "WESTLAKE FINANCIAL",
+        "accountOpenedDate": "2022-06-30",
+        "highBalanceAmount": "18500",
+        "currentBalanceAmount": "13900",
+        "monthlyPaymentAmount": "455",
+        "loanType": "Automobile",
+        "termsMonthsCount": "60",
+        "businessType": "Finance",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1027",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Open",
+        "currentRatingType": "Collection",
+        "currentRatingCode": "9",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "1840",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "PORTFOLIO RECOVERY ASSOCIATES",
+        "originalCreditorName": "COMENITY BANK",
+        "accountOpenedDate": "2024-11-02",
+        "businessType": "CollectionServices",
+        "highBalanceAmount": "1840",
+        "currentBalanceAmount": "1840",
+        "sourceType": "Experian"
+      },
+      {
+        "accountIdentifier": "XXXX1028",
+        "accountOwnershipType": "Individual",
+        "borrowerSourceType": "Borrower",
+        "accountReportedDate": "2026-09-30",
+        "accountStatusType": "Open",
+        "accountType": "Open",
+        "currentRatingType": "Collection",
+        "currentRatingCode": "9",
+        "derogatoryDataIndicator": true,
+        "pastDueAmount": "690",
+        "_30DayLates": "0",
+        "_60DayLates": "0",
+        "_90DayLates": "0",
+        "creditorName": "MIDLAND CREDIT MANAGEMENT",
+        "originalCreditorName": "VERIZON WIRELESS",
+        "accountOpenedDate": "2025-07-19",
+        "businessType": "CollectionServices",
+        "highBalanceAmount": "690",
+        "currentBalanceAmount": "690",
+        "sourceType": "Experian"
+      }
+    ],
+    "publicRecords": [],
+    "scores": [
+      {
+        "borrowerSourceType": "Borrower",
+        "modelName": "ExperianVantageScore4.0",
+        "sourceType": "Experian",
+        "createdDate": "2026-10-20",
+        "scoreValue": "540",
+        "scoreMinimumValue": "300",
+        "scoreMaximumValue": "850",
+        "scoreFactors": [
+          {
+            "scoreFactorCode": "04",
+            "scoreFactorText": "Number of accounts in collection"
+          },
+          {
+            "scoreFactorCode": "18",
+            "scoreFactorText": "Number of accounts with delinquency"
+          },
+          {
+            "scoreFactorCode": "08",
+            "scoreFactorText": "Too many inquiries last 12 months"
+          }
+        ]
+      }
+    ],
+    "summaries": {
+      "tradeSummary": {
+        "tradesCount": "6",
+        "openTradesCount": "6",
+        "revolvingTradesCount": "3",
+        "mortgageTradesCount": "0",
+        "installmentTradesCount": "1",
+        "balanceTotal": "23398",
+        "revolvingBalanceTotal": "6968",
+        "revolvingHighCreditTotal": "7000",
+        "revolvingCreditUtilization": "100",
+        "pastDueTotal": "2942",
+        "oldestTradelineDate": "2017-03-10"
+      },
+      "derogatorySummary": {
+        "chargeOffsCount": "0",
+        "collectionsCount": "2",
+        "bankruptciesCount": "0",
+        "publicRecordsCount": "0",
+        "_30DayLates": "8",
+        "_60DayLates": "2",
+        "_90DayLates": "1",
+        "inquiriesCount": "6",
+        "currentAdverseTradelineCount": "3",
+        "priorAdverseTradelineCount": "0"
+      }
+    }
+  }
+}

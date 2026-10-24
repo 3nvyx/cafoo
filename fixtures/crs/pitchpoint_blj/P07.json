@@ -1,0 +1,38 @@
+{
+  "status": 200,
+  "requestId": "fx-P07-pitchpoint_blj",
+  "synthesized": true,
+  "endpoint": "/pp/fcrablj/data",
+  "expectedOutcome": "BankruptciesFound/JudgmentsFound/LiensFound: 1 bankruptcy Ch.13 open",
+  "body": {
+    "TransactionID": "fx-P07-pitchpoint_blj",
+    "Status": {
+      "Code": "S000",
+      "Description": "Success"
+    },
+    "Report": {
+      "Subject": {
+        "FirstName": "MARCUS",
+        "LastName": "BELLAMY",
+        "SSN": "XXXXX1007"
+      },
+      "Summary": {
+        "BankruptciesFound": "1",
+        "JudgmentsFound": "0",
+        "LiensFound": "0"
+      },
+      "Bankruptcies": {
+        "Bankruptcy": {
+          "Chapter": "13",
+          "CaseNumber": "25-52187",
+          "CourtName": "US BANKRUPTCY COURT NORTHERN DISTRICT OF GEORGIA",
+          "FilingDate": "2025-03-10",
+          "Status": "Open",
+          "StatusDate": "2025-03-10"
+        }
+      },
+      "Judgments": null,
+      "Liens": null
+    }
+  }
+}

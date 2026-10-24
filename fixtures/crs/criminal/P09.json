@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "requestId": "fx-P09-criminal",
+  "synthesized": true,
+  "endpoint": "/criminal/new-request",
+  "expectedOutcome": "1 FELONY burglary 2nd degree, Denver, CONVICTED 2021",
+  "body": {
+    "orderResponse": {
+      "message": "Request Results",
+      "reference": null,
+      "responseID": "fx-P09-cic-crim",
+      "name": "DEREK HOLLOWAY",
+      "disclaimer": "Synthesized sandbox fixture. Records must be verified before any adverse action.",
+      "status": null
+    },
+    "cicCriminal": {
+      "candidates": {
+        "count": 1,
+        "message": "Records Found"
+      },
+      "errorCode": null,
+      "errorMessage": null
+    },
+    "response": {
+      "notice": null,
+      "count": 1,
+      "countWest4": 0,
+      "countNational1": 1,
+      "candidate": [
+        {
+          "firstName": "DEREK",
+          "lastName": "HOLLOWAY",
+          "state": "CO",
+          "zipCode": "80204",
+          "zone": "CO",
+          "subject": {
+            "fullName": "HOLLOWAY, DEREK",
+            "dob": "02-11-1986",
+            "caseNumber": "20CR06211",
+            "jurisdiction": "DENVER COUNTY",
+            "state": "CO",
+            "category": "CRIMINAL",
+            "source": "DENVER COUNTY COURT RECORDS"
+          },
+          "offenses": {
+            "count": "1",
+            "offense": [
+              {
+                "caseType": "FELONY",
+                "description": "BURGLARY - 2ND DEGREE",
+                "statute": "CRS 18-4-203",
+                "offenseDate": "2020-11-07",
+                "filingDate": "2020-11-16",
+                "disposition": "CONVICTED",
+                "dispositionDate": "2021-06-04",
+                "convictionDate": "2021-06-04",
+                "court": "DENVER DISTRICT COURT",
+                "sentenceLength": "4 YEARS PROBATION",
+                "status": "CLOSED"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

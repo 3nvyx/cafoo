@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P17-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P17-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "ELENA",
+            "last": "CASTELLANOS"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "4400",
+            "name": "N CENTRAL EXPY STE 100"
+          },
+          "location": {
+            "city": "DALLAS",
+            "state": "TX",
+            "zipCode": "75206"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1017"
+      },
+      "dateOfBirth": "1987-11-20"
+    },
+    "originalInputs": {
+      "firstName": "ELENA",
+      "lastName": "CASTELLANOS",
+      "ssn": "XXXXX1017",
+      "dob": "1987-11-20",
+      "street1": "4400 N CENTRAL EXPY STE 100",
+      "city": "DALLAS",
+      "state": "TX",
+      "zip": "75206"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}

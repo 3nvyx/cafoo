@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P12-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for RAJESH MENON (a different person)",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P12-aa-reverse",
+      "records": [
+        {
+          "firstName": "RAJESH",
+          "lastName": "MENON",
+          "houseNo": "1120",
+          "streetName": "OAK TREE RD",
+          "address": "1120 OAK TREE RD",
+          "city": "EDISON",
+          "state": "NJ",
+          "postalCode": "08820"
+        }
+      ]
+    }
+  }
+}

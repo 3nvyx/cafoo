@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P01-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P01-aa-reverse",
+      "records": [
+        {
+          "firstName": "MARGARET",
+          "lastName": "OKAFOR",
+          "houseNo": "1420",
+          "streetName": "WILLOW CREEK DR",
+          "address": "1420 WILLOW CREEK DR",
+          "city": "SAN JOSE",
+          "state": "CA",
+          "postalCode": "95125"
+        }
+      ]
+    }
+  }
+}

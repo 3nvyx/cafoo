@@ -1,0 +1,26 @@
+{
+  "status": 200,
+  "requestId": "fx-P10-accurate_append",
+  "synthesized": true,
+  "endpoint": "/accurate-append/reverse",
+  "expectedOutcome": "one result for the persona",
+  "body": {
+    "success": true,
+    "message": "Unified reverse completed successfully",
+    "data": {
+      "transactionId": "fx-P10-aa-reverse",
+      "records": [
+        {
+          "firstName": "LAUREN",
+          "lastName": "KOWALCZYK",
+          "houseNo": "1181",
+          "streetName": "WOODWARD AVE",
+          "address": "1181 WOODWARD AVE",
+          "city": "DETROIT",
+          "state": "MI",
+          "postalCode": "48226"
+        }
+      ]
+    }
+  }
+}

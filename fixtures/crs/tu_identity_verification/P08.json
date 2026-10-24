@@ -1,0 +1,70 @@
+{
+  "status": 200,
+  "requestId": "fx-P08-tu_identity_verification",
+  "synthesized": true,
+  "endpoint": "/transunion/identity-manager-verification/basic",
+  "expectedOutcome": "result PASS. name, SSN, DOB and address all verify",
+  "body": {
+    "fileNumber": "01",
+    "consumerID": "fx-P08-tuid",
+    "fileSummary": {
+      "fileHitIndicator": "regularHit",
+      "ssnMatchIndicator": "exact",
+      "consumerStatementIndicator": false,
+      "creditDataStatus": {
+        "suppressed": false,
+        "doNotPromote": false,
+        "freeze": false,
+        "minor": false,
+        "disputed": false
+      }
+    },
+    "indicative": {
+      "name": [
+        {
+          "person": {
+            "first": "PRIYA",
+            "last": "VENKATESAN"
+          }
+        }
+      ],
+      "address": [
+        {
+          "status": "current",
+          "street": {
+            "number": "3300",
+            "name": "N LAKE SHORE DR APT 15C"
+          },
+          "location": {
+            "city": "CHICAGO",
+            "state": "IL",
+            "zipCode": "60657"
+          }
+        }
+      ],
+      "socialSecurity": {
+        "number": "XXXXX1008"
+      },
+      "dateOfBirth": "1981-07-27"
+    },
+    "originalInputs": {
+      "firstName": "PRIYA",
+      "lastName": "VENKATESAN",
+      "ssn": "XXXXX1008",
+      "dob": "1981-07-27",
+      "street1": "3300 N LAKE SHORE DR APT 15C",
+      "city": "CHICAGO",
+      "state": "IL",
+      "zip": "60657"
+    },
+    "addOnProducts": [
+      {
+        "code": "07030",
+        "status": "defaultDelivered",
+        "idManagerVerification": {
+          "messages": []
+        }
+      }
+    ]
+  }
+}
