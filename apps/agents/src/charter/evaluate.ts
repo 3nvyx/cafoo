@@ -17,6 +17,7 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { charterPlan, combinePlans, findSpacetimeBin, loadScenarios, runScenarios, scenariosDir, snapshotDb, SpacetimeCli, type CharterPlan, type Db, type Scenario, type ScenarioResult } from '@cafoo/eval-harness';
 import { STDB_DB } from '../env';
+import { closePeriod } from '../close-period';
 import { HARNESSES, type Role, type Rule } from '../harness';
 import { repoRoot, ROLE_DISPLAY, type Cast } from '../stdb';
 import { builtinCharter, type CharterOverride } from './active';
@@ -194,7 +195,7 @@ export async function evaluateCharter(c: CharterUnderEval, opts: EvaluateOptions
   const startedAt = new Date().toISOString();
   const mode = opts.mode ?? 'dry_run';
   const step = opts.onStep ?? (() => {});
-  const ym = opts.ym ?? process.env.CLOSE_PERIOD ?? '2026-09';
+  const ym = opts.ym ?? closePeriod();
   const published = mode === 'dry_run' ? (opts.published ?? []).filter(p => p.role !== c.role) : [];
   const report: EvalReport = {
     versionId: c.versionId.toString(),

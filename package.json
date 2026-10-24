@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Cafoo: the agentic finance ERP. Agents propose, an Advisor rules, the CFO confirms, every number drills down.",
-  "packageManager": "pnpm@10",
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
     "lint:refs": "bash scripts/lint-refs.sh",
     "test": "pnpm -r --if-present test",

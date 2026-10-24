@@ -2,17 +2,19 @@
  * HTTP gateway: starts a close, reports provider status, and speaks the OpenAI chat-completions dialect
  * so Open WebUI (or any OpenAI-compatible client) can talk to the Advisor.
  *
- * It listens on every interface (Open WebUI in Docker reaches it through host.docker.internal), so it guards itself:
- * it answers only to allowlisted Host names (DNS rebinding), browsers get CORS only for allowlisted origins, every
- * POST must be JSON (a cross-site page cannot send that without a preflight the allowlist refuses) and is refused
- * outright from a foreign Origin, and /v1/* requires a bearer key when GATEWAY_API_KEY is set. Open WebUI's server
- * sends no Origin and JSON bodies, so it is unaffected. Its background task prompts get canned JSON, never the Advisor.
+ * It listens on 127.0.0.1 unless GATEWAY_HOST opts in to another interface (Open WebUI in Docker on Linux reaches it
+ * through host.docker.internal, which needs one), and it guards itself either way: it answers only to allowlisted Host
+ * names (DNS rebinding), browsers get CORS only for allowlisted origins, every POST must be JSON (a cross-site page
+ * cannot send that without a preflight the allowlist refuses) and is refused outright from a foreign Origin, and /v1/*
+ * (the Advisor, which reads the books and, in live mode, spends API budget) requires a bearer key when GATEWAY_API_KEY
+ * is set and answers only this machine when it is not. Open WebUI's server sends no Origin and JSON bodies, so it is
+ * unaffected by the Origin and JSON checks. Its background task prompts get canned JSON, never the Advisor.
  * Other modules add routes (src/http.ts Route) that pass the same guards; one that changes state runs only from this
  * machine or with the gateway API key.
  */
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { GATEWAY_PORT, agentsLive, gatewayAllowedHosts, gatewayAllowedOrigins, providers } from './env';
+import { GATEWAY_PORT, agentsLive, gatewayAllowedHosts, gatewayAllowedOrigins, gatewayHost, providers } from './env';
 import { BadRequest, TooLarge, changesState, matchRoute, readJson, type Route } from './http';
 import { runScriptedClose } from './scripted/close';
 import type { Cast } from './stdb';
@@ -139,6 +141,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   /** May this request change state (start a close)? From this machine always; from elsewhere only with the key. */
   const mayChangeState = (req: IncomingMessage) => isLocal(req.socket.remoteAddress) || (!!apiKey && bearerMatches(req.headers.authorization, apiKey));
   const notFromHere = apiKey ? 'starting a close from another machine needs the gateway API key (Authorization: Bearer)' : 'starting a close is allowed only from this machine; set GATEWAY_API_KEY to allow it from elsewhere';
+  const chatNotFromHere = 'the Advisor answers other machines only with the gateway API key: set GATEWAY_API_KEY and send it as Authorization: Bearer <key>';
   const changeNotFromHere = apiKey ? 'this request changes state; from another machine it needs the gateway API key (Authorization: Bearer)' : 'this request changes state and is allowed only from this machine; set GATEWAY_API_KEY to allow it from elsewhere';
   const routes = opts.routes ?? [];
 
@@ -171,8 +174,11 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         const { started, state } = startClose(periodYm);
         return json(202, { ...state, started });
       }
-      if (url.pathname.startsWith('/v1/') && apiKey && !bearerMatches(req.headers.authorization, apiKey)) {
-        return json(401, { error: { message: 'missing or wrong API key', type: 'invalid_request_error' } });
+      // With a key, /v1/* needs it from every caller; without one, only this machine may talk to the Advisor (it reads
+      // the books and, in live mode, spends API budget), whatever interface the gateway listens on.
+      if (url.pathname.startsWith('/v1/')) {
+        if (apiKey && !bearerMatches(req.headers.authorization, apiKey)) return json(401, { error: { message: 'missing or wrong API key', type: 'invalid_request_error' } });
+        if (!apiKey && !isLocal(req.socket.remoteAddress)) return json(403, { error: { message: chatNotFromHere, type: 'invalid_request_error' } });
       }
       if (req.method === 'GET' && url.pathname === '/v1/models') {
         return json(200, { object: 'list', data: [{ id: 'cafoo-advisor', object: 'model', owned_by: 'cafoo' }] });
@@ -236,12 +242,18 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
 }
 
 /**
- * Start the gateway on GATEWAY_PORT. `routes` are added behind the same guards as the built-in ones (src/http.ts);
- * `more.status` adds fields to GET /status; `more.closes` shares the map of closes by month; `more.beforeClose` runs
- * before each close starts.
+ * Start the gateway on GATEWAY_HOST (default 127.0.0.1) and GATEWAY_PORT. `routes` are added behind the same guards as
+ * the built-in ones (src/http.ts); `more.status` adds fields to GET /status; `more.closes` shares the map of closes by
+ * month; `more.beforeClose` runs before each close starts.
  */
 export function startGateway(cast: Cast, liveClose?: CloseRunner, routes: readonly Route[] = [], more: Pick<GatewayOptions, 'status' | 'closes' | 'beforeClose'> = {}) {
   const server = createGateway(cast, { liveClose, routes, ...more });
-  server.listen(GATEWAY_PORT, () => console.log(`gateway listening on http://localhost:${GATEWAY_PORT} (${agentsLive() ? 'live agents' : 'demo mode'})`));
+  const host = gatewayHost();
+  server.listen(GATEWAY_PORT, host, () => {
+    console.log(`gateway listening on http://${host.includes(':') ? `[${host}]` : host}:${GATEWAY_PORT} (${agentsLive() ? 'live agents' : 'demo mode'})`);
+    if (!isLoopback(host) && host !== 'localhost' && !process.env.GATEWAY_API_KEY?.trim()) {
+      console.log('GATEWAY_API_KEY is not set: /v1/* and state changes answer only this machine; set it to let Open WebUI in Docker in.');
+    }
+  });
   return server;
 }

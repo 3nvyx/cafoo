@@ -23,20 +23,28 @@ export const STDB_URI = process.env.SPACETIMEDB_URI?.replace(/^http/, 'ws') ?? '
 export const STDB_DB = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
 export const GATEWAY_PORT = Number(process.env.GATEWAY_PORT ?? 8787);
 /**
- * Gateway guards (it listens on every interface so Open WebUI in Docker can reach it):
+ * Gateway address and guards:
+ * - GATEWAY_HOST: the address the gateway listens on. Default 127.0.0.1, this machine only. Set "0.0.0.0" (every
+ *   interface) only when something outside this machine's loopback must reach it, such as Open WebUI in Docker on
+ *   Linux, and set GATEWAY_API_KEY with it: without a key the gateway refuses /v1/* to any other address.
  * - GATEWAY_ALLOWED_ORIGINS: comma-separated browser origins that get CORS and may POST /close. Default: the web
  *   app's dev and preview origins, http://localhost:5173, http://127.0.0.1:5173, http://localhost:4173,
  *   http://127.0.0.1:4173. Server-to-server callers (Open WebUI's backend, curl) send no Origin and are not affected.
- * - GATEWAY_API_KEY: when set, /v1/* (the OpenAI-compatible endpoint) requires `Authorization: Bearer <key>`;
- *   give Open WebUI the same value as OPENAI_API_KEY. Unset: /v1/* is open, as before. Starting a close (POST /close,
- *   or "start the close" in chat) needs no key only from this machine (a loopback TCP address, as the web app's
- *   browser and curl on the host are); from any other address it needs the bearer key, and is refused when no key is
- *   set. A forged Host header does not help: the check is on the connection's address. Docker Open WebUI connects
- *   from the bridge network, so it can chat without a key but start a close only with one.
+ * - GATEWAY_API_KEY: when set, /v1/* (the OpenAI-compatible endpoint) requires `Authorization: Bearer <key>` from
+ *   every caller; give Open WebUI the same value as OPENAI_API_KEY. Unset: /v1/* answers only this machine (a loopback
+ *   TCP address), because the Advisor reads the books and, in live mode, spends API budget. Starting a close (POST
+ *   /close, or "start the close" in chat) likewise needs no key only from this machine (as the web app's browser and
+ *   curl on the host connect); from any other address it needs the bearer key, and is refused when no key is set. A
+ *   forged Host header does not help: the check is on the connection's address. Docker Open WebUI connects from the
+ *   bridge network, so it needs the key both to chat and to start a close.
  * - GATEWAY_ALLOWED_HOSTS: comma-separated extra Host names the gateway answers to (against DNS rebinding). Always
  *   allowed: localhost, 127.0.0.1, ::1, host.docker.internal, and the host of every allowed origin. "*" turns the
  *   check off (for example to reach the gateway by a LAN address).
  */
+/** The address the gateway listens on: GATEWAY_HOST, else 127.0.0.1. */
+export function gatewayHost(env: NodeJS.ProcessEnv = process.env): string {
+  return env.GATEWAY_HOST?.trim() || '127.0.0.1';
+}
 export const DEFAULT_GATEWAY_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173', 'http://127.0.0.1:4173'];
 export function gatewayAllowedOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
   const list = (env.GATEWAY_ALLOWED_ORIGINS ?? '').split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean);

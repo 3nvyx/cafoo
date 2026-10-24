@@ -11,6 +11,8 @@ The monthly close still takes a team of people about ten days. Most of that time
 Agents propose, an Advisor rules, the CFO confirms, and every number drills down.
 
 Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) create Proposals and can never commit them. A Red Team agent on a second model vendor critiques each Proposal. The Advisor approves, rejects, or amends it, always with a rationale. Any ruling at or above the Materiality threshold (default $10,000) waits in the CFO's "Needs your OK" queue. The CFO confirms or sends it back, can reverse any entry, and always confirms the period lock.
+The Advisor rules and never proposes, and no identity approves or confirms a Proposal it proposed.
+A credit tier is computed in the module from the recorded cascade facts, and a credit decision must cite the customer's latest check at that tier, with payment terms no longer than the tier allows.
 
 The gate is enforced in the database, not in prompts. SpacetimeDB reducers check the caller's identity, so a worker agent that ignores its instructions still cannot write to the ledger. The live feed has its own identity that can only add raw bank lines and invoices, and nobody becomes CFO by asking: the seat is claimed with a one-time secret. Every Proposal and ruling carries a Plain summary (one sentence, no jargon) and a technical rationale. Simple mode shows the sentence. Expert mode shows the journal lines, account codes, critiques, and raw payloads.
 
@@ -30,7 +32,7 @@ Open WebUI (optional)       -- OpenAI-compatible /v1 on the gateway -->  Advisor
 
 ## Quickstart
 
-You need Node 22.9 or later, pnpm 10, and the SpacetimeDB CLI. Docker is only needed for Open WebUI.
+You need Node 22.9 or later, pnpm 10 (the repo pins 10.28.0 in `package.json`), and the SpacetimeDB CLI. Docker is only needed for Open WebUI.
 
 ```sh
 pnpm install
@@ -63,16 +65,31 @@ The loader takes the `advisor` role (the first connection to ask for it keeps it
 
 `pnpm -F @cafoo/web dev` on its own runs the UI against an in-browser Demo mode with nothing else started. To point it at the live database and gateway, set `PUBLIC_DATA_SOURCE=spacetime`; see `apps/web/README.md`.
 
-Optional chat front-end. Open WebUI talks to the gateway's OpenAI-compatible endpoint:
+Optional chat front-end. Open WebUI talks to the gateway's OpenAI-compatible endpoint.
+The gateway listens on 127.0.0.1 by default, which a container cannot reach, so first set two values in `.env` and restart the orchestrator.
+`GATEWAY_HOST="0.0.0.0"` makes it listen on every interface, and `GATEWAY_API_KEY` is a long random string, for example the output of `openssl rand -hex 24`:
+
+```sh
+GATEWAY_HOST="0.0.0.0"
+GATEWAY_API_KEY="<long random string>"
+```
+
+Without `GATEWAY_API_KEY` the gateway answers `/v1/*` only from this machine, so the container gets 403.
+Then start Open WebUI with the same key as `OPENAI_API_KEY`:
 
 ```sh
 docker run -d --name open-webui -p 3001:8080 --add-host=host.docker.internal:host-gateway \
-  -e OPENAI_API_BASE_URL=http://host.docker.internal:8787/v1 -e OPENAI_API_KEY=dev \
+  -e OPENAI_API_BASE_URL=http://host.docker.internal:8787/v1 -e OPENAI_API_KEY='<the GATEWAY_API_KEY value>' \
   -e ENABLE_OLLAMA_API=false -e ENABLE_TITLE_GENERATION=false -e ENABLE_TAGS_GENERATION=false -e ENABLE_FOLLOW_UP_GENERATION=false \
   -v open-webui:/app/backend/data ghcr.io/open-webui/open-webui:main
 ```
 
-Then open http://localhost:3001 and pick the `cafoo-advisor` model. The image is about 1.6 GB to download. The three `ENABLE_*_GENERATION` flags stop Open WebUI from sending its own background prompts (titles, tags, follow-ups) to the Advisor. Starting a close is allowed only from this machine (a loopback connection) or with `Authorization: Bearer <GATEWAY_API_KEY>`; Open WebUI in Docker connects from the Docker network, so to start a close from its chat, set `GATEWAY_API_KEY` and pass the same value as `OPENAI_API_KEY`.
+Then open http://localhost:3001 and pick the `cafoo-advisor` model.
+The image is about 1.6 GB to download.
+The three `ENABLE_*_GENERATION` flags stop Open WebUI from sending its own background prompts (titles, tags, follow-ups) to the Advisor.
+`--add-host=host.docker.internal:host-gateway` makes `host.docker.internal` resolve to the host on Linux, where Docker does not define it.
+Open WebUI in Docker connects from the Docker network, not from loopback, so it needs the key both to chat and to start a close; with the key it can do both.
+Once `GATEWAY_HOST` is `0.0.0.0`, other machines on your network can reach the port too; the key is what keeps them out of `/v1/*` and anything that changes state.
 
 ## The group close, the feed, and charters
 
@@ -90,22 +107,29 @@ The agent gateway reports what is running: `GET /status` (providers, closes, `fe
 
 ## Demo mode and environment
 
-With zero API keys, Cafoo runs end to end. Every external call replays recorded fixtures, and the close runs over the real accounting engines with scripted narration. The writes go through the same role identities and reducers as live agents, so the gate and the audit trail are identical. Each key you add switches that one provider to live calls. `DEMO_MODE="1"` forces fixtures even when keys are present.
+With zero API keys, Cafoo runs end to end.
+Without `ANTHROPIC_API_KEY` no model is called: the close is the scripted close in `apps/agents/src/scripted/`, run over the real accounting engines (bank matching, revenue schedules, accruals, allowances, the credit cascade, consolidation), with scripted narration and scripted Advisor rulings, and the Advisor chat answers from the ledger tables.
+Without `XAI_API_KEY` the Red Team writes rule-based critiques.
+Bright Data and CRS answer from recorded fixtures, Moss becomes a local keyword search over the same policy documents, and Apify is skipped.
+The writes go through the same role identities and reducers as live agents, so the gate and the audit trail are identical.
+Each key you add switches that one provider to live calls.
+`DEMO_MODE="1"` keeps every provider on its demo stand-in even when keys are present.
 
 | Variable | Used for | When empty |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Claude Agent SDK: Advisor, Bookkeeper, Revenue, Credit & Risk | Replays `fixtures/agents/` |
-| `XAI_API_KEY` | Grok: Red Team | Scripted critiques |
+| `ANTHROPIC_API_KEY` | Claude Agent SDK: Advisor, Bookkeeper, Revenue, Credit & Risk | Scripted close over the real accounting engines; the Advisor chat answers from the ledger tables |
+| `XAI_API_KEY` | Grok: Red Team | Rule-based scripted critiques |
 | `API_TOKEN` | Bright Data: live vendor lookups during the close | `fixtures/brightdata/` |
 | `APIFY_TOKEN` | Apify: customer-site crawls into Moss (roadmap) | Skipped |
 | `CRS_USERNAME`, `CRS_PASSWORD`, `CRS_BASE_URL`, `CRS_REPLAY` | CRS Credit API sandbox: identity, fraud, bureaus, public records | `fixtures/crs/` |
 | `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Moss: vector search over policies and past entries | Local keyword search |
 | `SPACETIMEDB_URI`, `SPACETIMEDB_DB_NAME` | Ledger database | `http://localhost:3000`, `cafoo` |
 | `GATEWAY_PORT` | Agent gateway and OpenAI-compatible endpoint | `8787` |
+| `GATEWAY_HOST` | Address the gateway listens on; `0.0.0.0` for Open WebUI in Docker (set `GATEWAY_API_KEY` too) | `127.0.0.1`, this machine only |
 | `GATEWAY_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the gateway and start a close | The web app's dev and preview origins on localhost and 127.0.0.1 (ports 5173 and 4173) |
 | `GATEWAY_ALLOWED_HOSTS` | Extra Host names the gateway answers to (comma-separated; `*` turns the check off, e.g. for a LAN address) | localhost, 127.0.0.1, [::1], host.docker.internal, and the host of every allowed origin |
-| `GATEWAY_API_KEY` | When set, `/v1/*` requires `Authorization: Bearer <key>`; give Open WebUI the same value as `OPENAI_API_KEY` | Open |
-| `DEMO_MODE` | Force fixtures | `1` in the example file |
+| `GATEWAY_API_KEY` | When set, `/v1/*` requires `Authorization: Bearer <key>` from every caller, and other machines may start a close with it; give Open WebUI the same value as `OPENAI_API_KEY` | `/v1/*` and state changes answer only this machine |
+| `DEMO_MODE` | Keep every provider on its demo stand-in even when keys are present | `1` in the example file |
 | `CLOSE_PERIOD` | Close month for seed data, `YYYY-MM` | Last completed month |
 | `FEED_INTERVAL_MS` | Milliseconds between feed events (`0` sends a month's events back to back) | `8000` |
 | `FEED_DEBOUNCE_MS` | Quiet time after the last new bank line before the continuous Bookkeeper proposes | `2000` |
@@ -133,6 +157,7 @@ pnpm eval --rerun                    # reseed, rerun the scripted close and chec
 ```
 
 Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine is deterministic and has 142 unit tests. The credit cascade reproduces all 20 expected decisions from the sandbox dataset.
+Its tier rules (`packages/crs-mcp/src/tiers.ts`, no imports, I/O or clock) are also run by the module, so the tier on a recorded Credit Check is computed, never taken from the agent.
 
 ## Repo layout
 
@@ -152,7 +177,7 @@ packages/stdb-bindings/   Generated SpacetimeDB client bindings and the module s
 spacetimedb/spacetimedb/  SpacetimeDB module: tables and reducers, including the approval gate
 seed/                     Deterministic demo group (Cafoo Inc, Cafoo Ltd, eliminations) with planted anomalies, the October feed
                           plan, and the CFO bootstrap (bootstrap.ts)
-fixtures/                 Recorded responses for Demo mode (agents, brightdata, crs, moss)
+fixtures/                 Recorded responses and documents for Demo mode (brightdata, crs, moss policies)
 docs/                     Product spec, pitch, roadmap, ADRs
 ```
 
