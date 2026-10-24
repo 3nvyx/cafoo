@@ -2,9 +2,7 @@
  * Bookkeeper helpers shared by the month-end close and the continuous Bookkeeper on the live bank feed: how an
  * unexplained outflow is classified from its bank description, the counterparty lookup, and date labels.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { repoRoot } from './stdb';
+import { brightDataLive, googleResults, recordedLookup } from './brightdata';
 
 export type OutflowClass = { code: string; label: string; needsLookup?: boolean };
 
@@ -24,22 +22,18 @@ export const dayLabel = (micros: bigint) => new Date(Number(micros / 1000n)).toL
 
 /** Bright Data lookup in live mode; recorded answer otherwise. */
 export async function vendorLookup(counterparty: string): Promise<string> {
-  const token = process.env.API_TOKEN;
-  if (token && process.env.DEMO_MODE !== '1') {
+  if (brightDataLive()) {
     try {
-      const res = await fetch('https://api.brightdata.com/request', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zone: process.env.WEB_UNLOCKER_ZONE ?? 'web_unlocker1', url: `https://www.google.com/search?q=${encodeURIComponent(counterparty + ' company')}`, format: 'raw' }),
-      });
-      const text = await res.text();
-      return `search results summarized: ${text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 240)}…`;
+      const results = await googleResults(`${counterparty} company`, 3);
+      if (results.length === 0) return `web search found nothing for "${counterparty}"; classifying from the bank description.`;
+      const lines = results.map(r => `${r.title} (${r.displayLink}): ${r.description}`.replace(/\s+/g, ' ').slice(0, 160));
+      return `web search (Bright Data): ${lines.join(' | ')}`;
     } catch (e) {
-      return `lookup failed (${(e as Error).message}); classifying from the bank description.`;
+      const why = e instanceof Error ? e.message : String(e);
+      const recorded = recordedLookup(counterparty);
+      return recorded ? `${recorded} (live lookup failed: ${why}; recorded answer used)` : `lookup failed (${why}); classifying from the bank description.`;
     }
   }
-  const slug = counterparty.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const p = join(repoRoot, 'fixtures', 'brightdata', `${slug}.md`);
-  if (existsSync(p)) return readFileSync(p, 'utf8').trim().split('\n').slice(0, 3).join(' ');
-  return `no public record found for "${counterparty}"; classifying from the bank description.`;
+  const recorded = recordedLookup(counterparty);
+  return recorded ?? `no public record found for "${counterparty}"; classifying from the bank description.`;
 }

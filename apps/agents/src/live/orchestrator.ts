@@ -15,6 +15,7 @@ import { harnessGate } from '../harness/hook';
 import { BOOKS_TOOLS, mcp } from '../harness/rules';
 import { catchUpAmounts } from '../revenue-catchup';
 import { groupSnapshot, rootSubsidiary, snapshot } from '../snapshot';
+import { ruleOpen } from '../scripted/rulings';
 import type { RoleConn } from '../stdb';
 import { claudeProcessEnv } from './openai-bridge';
 
@@ -120,14 +121,54 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     }
   };
   const periodId = [...A.db.period.iter()].find(p => p.ym === periodYm)?.id;
+  const runAndRule = async (prompt: string) => {
+    await run(prompt);
+    await ruleRemaining();
+  };
   const pendingSchedules = () =>
     [...A.db.proposal.iter()].filter(p => p.periodId === periodId && p.kind.tag === 'RevenueSchedule' && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag));
+  /**
+   * Subagents run in the background, so the Advisor's run can end while workers still file Proposals.
+   * Wait until the proposal and message counts stop changing for `quietMs` (cap `maxMs`).
+   */
+  const quiesce = async (quietMs = 30_000, maxMs = 10 * 60_000) => {
+    const count = () => `${[...A.db.proposal.iter()].length}:${[...A.db.agentMessage.iter()].length}`;
+    const start = Date.now();
+    let last = count();
+    let lastChange = Date.now();
+    while (Date.now() - start < maxMs) {
+      await sleep(2000);
+      const now = count();
+      if (now !== last) {
+        last = now;
+        lastChange = Date.now();
+      } else if (Date.now() - lastChange >= quietMs) return;
+    }
+    onStep('workers still active after the wait cap; ruling on what is filed');
+  };
+  const openProposals = () => [...A.db.proposal.iter()].filter(p => p.periodId === periodId && p.status.tag === 'Open').sort((a, b) => Number(a.id - b.id));
+  /** Rule on every open Proposal: a bounded Advisor run first, then the deterministic pass for anything it left. */
+  const ruleRemaining = async () => {
+    await quiesce();
+    let open = openProposals();
+    if (!open.length) return;
+    onStep(`${open.length} proposal(s) still open after delegation; the Advisor rules on them now`);
+    await run(
+      `Delegation is finished for ${periodYm}. ${open.length} proposals are still open. Call list_proposals for ${periodYm} with status Open, weigh each Red Team critique, and rule on every one with approve_proposal or reject_proposal (technical rationale plus a one-sentence plain summary). Do not delegate again and do not propose anything. Then mark the close tasks done and call request_period_lock.`
+    );
+    open = openProposals();
+    if (open.length) {
+      onStep(`${open.length} proposal(s) left unruled by the Advisor; applying the standard rulings`);
+      await ruleOpen(cast, open, { thread: `close:${periodYm}`, snapshot: snapshot(A, periodYm), log: onStep });
+    }
+  };
   try {
     // The opening message marks the close as started, so a second run resumes instead of proposing twice.
     await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     await run(
       `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification)${group ? ', 4) consolidation (revalue Cafoo Ltd\'s foreign-currency balances at the closing rate and propose the balance and activity eliminations; it raises any intercompany difference in the close thread first)' : ''}. Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
     );
+    await ruleRemaining();
     // Revenue catch-up, as in the scripted close: the recognition entry had to leave out any customer whose new
     // schedule waited for a ruling. Once those schedules are decided, recognize their lines through the month.
     if (pendingSchedules().length) {
@@ -144,7 +185,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (due.size) {
       const lines = [...due].map(([cid, amt]) => `${s.customerName.get(cid) ?? 'customer'} (customerId ${cid}): ${amt} minor units`).join('; ');
       onStep(`revenue catch-up for ${due.size} customer(s)`);
-      await run(
+      await runAndRule(
         `Revenue catch-up for ${periodYm}: the revenue schedules for these customers were approved after the recognition entry had to leave them out: ${lines}. Delegate to revenue: propose one recognition journal entry for ${periodYm} with recognizeScheduleYm ${periodYm} that, for each customer, debits 2400 and credits 4000 by exactly that amount on lines tagged with the customerId. Then list proposals, consider the critique, rule on it, and request the lock (the books refuse the lock until this revenue is recognized).`
       );
     }
