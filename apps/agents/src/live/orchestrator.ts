@@ -16,6 +16,7 @@ import { BOOKS_TOOLS, mcp } from '../harness/rules';
 import { catchUpAmounts } from '../revenue-catchup';
 import { groupSnapshot, rootSubsidiary, snapshot } from '../snapshot';
 import type { RoleConn } from '../stdb';
+import { claudeProcessEnv } from './openai-bridge';
 
 const ADVISOR = HARNESSES.advisor;
 const safeJson = (s: string): Record<string, unknown> => {
@@ -84,6 +85,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   let total = 0;
   /** One Advisor query over the same servers, subagents and gate. */
   const run = async (prompt: string) => {
+    const env = await claudeProcessEnv();
     for await (const msg of query({
       prompt,
       options: {
@@ -101,7 +103,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
           PostToolUse: [{ matcher: 'SendMessage', hooks: [mirror] }, { matcher: '^mcp__', hooks: [gate] }],
           PostToolUseFailure: [{ matcher: '^mcp__', hooks: [gate] }],
         },
-        env: { ...process.env, CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '1', CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: '4' },
+        env,
         maxBudgetUsd: Number(process.env.CLOSE_BUDGET_USD ?? 15),
         settingSources: [],
       },
@@ -155,6 +157,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
 /** Ask-the-books in live mode: the Advisor answers with read-only tools. */
 export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<string> {
   const books = booksServer(cast);
+  const env = await claudeProcessEnv();
   for await (const msg of query({
     prompt: question,
     options: {
@@ -167,6 +170,7 @@ export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<
       maxTurns: 6,
       includePartialMessages: true,
       settingSources: [],
+      env,
     },
   })) {
     if (msg.type === 'stream_event') {

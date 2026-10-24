@@ -22,7 +22,7 @@ The gate is enforced in the database, not in prompts. SpacetimeDB reducers check
 SvelteKit UI (CFO app)      <- live subscriptions ->  SpacetimeDB module (ledger, Proposals, Approvals, agent messages,
                                                       charter versions, feed log, audit trail)
 Agent orchestrator (:8787)  -- reducer calls, one identity per role -->  SpacetimeDB
-  Advisor, Bookkeeper, Revenue, Credit & Risk, Consolidation: Claude Agent SDK (TypeScript)
+  Advisor, Bookkeeper, Revenue, Credit & Risk, Consolidation: Claude Agent SDK (TypeScript), OpenAI or Anthropic behind the same Anthropic Messages API
   Red Team: Grok through the Vercel AI SDK
   Feed: simulated bank and invoice feed (ingest only) and the continuous Bookkeeper
   Charter eval runner: full eval on a scratch database, or a quick check against the recorded close
@@ -117,7 +117,12 @@ Each key you add switches that one provider to live calls.
 
 | Variable | Used for | When empty |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Claude Agent SDK: Advisor, Bookkeeper, Revenue, Credit & Risk | Scripted close over the real accounting engines; the Advisor chat answers from the ledger tables |
+| `AGENT_PROVIDER` | `openai` (default in the example) or `anthropic`. The Claude Agent SDK still speaks the Anthropic Messages API either way. `openai` runs a local bridge that forwards those calls to OpenAI | `anthropic` when unset, unless only `OPENAI_API_KEY` is set |
+| `OPENAI_API_KEY` | OpenAI key for Advisor, Bookkeeper, Revenue, Credit & Risk when `AGENT_PROVIDER=openai` | Scripted close over the real accounting engines; the Advisor chat answers from the ledger tables |
+| `OPENAI_BASE_URL` | OpenAI Responses API origin, including `/v1` | `https://api.openai.com/v1` |
+| `OPENAI_REASONING_EFFORT` | Reasoning effort sent upstream (`low`, `medium`, `high`) | `low` |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL` | OpenAI model ids for the SDK aliases opus (Advisor), sonnet (workers), and haiku (SDK background work) | `gpt-6.1-sol`, `gpt-6-luna`, `gpt-6-luna` |
+| `ANTHROPIC_API_KEY` | Claude Agent SDK when `AGENT_PROVIDER=anthropic`. Ignored in openai mode | Scripted close over the real accounting engines; the Advisor chat answers from the ledger tables |
 | `XAI_API_KEY` | Grok: Red Team | Rule-based scripted critiques |
 | `API_TOKEN` | Bright Data: live vendor lookups during the close | `fixtures/brightdata/` |
 | `APIFY_TOKEN` | Apify: customer-site crawls into Moss (roadmap) | Skipped |

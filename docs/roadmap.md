@@ -33,7 +33,7 @@ Every Proposal and ruling carries a Plain summary and a technical rationale. Sim
 
 Demo mode runs all of it with zero API keys. Live mode switches on one provider at a time as keys are added. Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine has 142 unit tests, and the credit cascade reproduces all 20 expected decisions in the sandbox dataset.
 
-Integrations today: SpacetimeDB, Claude Agent SDK, Grok through the Vercel AI SDK, Moss, Bright Data, CRS Credit API sandbox, and Open WebUI as an optional chat front-end.
+Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind the Anthropic Messages API; see `.env.example`), Grok through the Vercel AI SDK, Moss, Bright Data, CRS Credit API sandbox, and Open WebUI as an optional chat front-end.
 
 ## Next 90 days (roadmap)
 
