@@ -349,12 +349,16 @@ function applyProposal(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['proposal']
 /**
  * Undo the non-ledger side effects an entry produced when it posted, so the next close can redo them:
  * bank matches that point at the entry (or whose payment entry it is) go back to unmatched, the invoice or bill
- * they settled goes back to unpaid, and revenue schedule lines it recognized go back to unrecognized.
+ * they settled goes back to unpaid once no other match still settles it, and revenue schedule lines it recognized
+ * go back to unrecognized.
  */
 function unwindEntrySideEffects(ctx: Ctx, je: NonNullable<ReturnType<Ctx['db']['journalEntry']['id']['find']>>) {
   let unmatched = 0;
   let reopened = 0;
   let unrecognized = 0;
+  // A bank_match proposal posts exactly one payment entry per invoice/bill match, so an entry owns at most one.
+  let paymentMatchFound = false;
+  const settled: { kind: 'invoice' | 'bill'; id: bigint }[] = [];
   const matches = [...ctx.db.bankMatch.iter()];
   for (const m of matches) {
     const tx = ctx.db.bankTransaction.id.find(m.bankTxId);
@@ -362,23 +366,25 @@ function unwindEntrySideEffects(ctx: Ctx, je: NonNullable<ReturnType<Ctx['db']['
     if (m.targetKind.tag === 'je') {
       // Journal proposals with bankTxIds, or a bank_match proposal that pointed straight at this entry.
       owned = m.targetId === je.id;
-    } else if (tx && je.proposalId !== undefined && m.proposalId === je.proposalId) {
-      // A bank_match proposal posts one payment entry per match; its memo is built from the target and the bank line.
-      if (m.targetKind.tag === 'invoice') {
-        const inv = ctx.db.invoice.id.find(m.targetId);
-        owned = !!inv && je.memo === `Payment received ${inv.number}: ${tx.description}`;
-        if (owned && inv && inv.status.tag === 'paid') {
-          const overdue = inv.dueAt.microsSinceUnixEpoch < ctx.timestamp.microsSinceUnixEpoch;
-          ctx.db.invoice.id.update({ ...inv, status: { tag: overdue ? 'overdue' : 'open' } });
-          reopened++;
+    } else if (!paymentMatchFound && tx && je.proposalId !== undefined && m.proposalId === je.proposalId) {
+      // The payment entry's memo is built from the target and the bank line, its total is the bank amount, and it
+      // posts in the bank line's month. Two bank lines with the same description can settle the same invoice or bill
+      // (a duplicate payment), so all three must agree, and only the first such match is taken.
+      const sameAmount = je.totalMinor === abs(tx.amountMinor);
+      const samePeriod = ctx.db.period.ym.find(tx.ym)?.id === je.periodId;
+      if (sameAmount && samePeriod) {
+        // Bill references are not unique across vendors, so the party on the entry's lines must match too.
+        const lines = [...ctx.db.journalLine.jeId.filter(je.id)];
+        if (m.targetKind.tag === 'invoice') {
+          const inv = ctx.db.invoice.id.find(m.targetId);
+          owned = !!inv && je.memo === `Payment received ${inv.number}: ${tx.description}` && lines.every(l => l.customerId === inv.customerId);
+        } else {
+          const b = ctx.db.bill.id.find(m.targetId);
+          owned = !!b && je.memo === `Payment ${b.externalRef}: ${tx.description}` && lines.every(l => l.vendorId === b.vendorId);
         }
-      } else {
-        const b = ctx.db.bill.id.find(m.targetId);
-        owned = !!b && je.memo === `Payment ${b.externalRef}: ${tx.description}`;
-        if (owned && b && b.status.tag === 'paid') {
-          const blocked = ctx.db.vendor.id.find(b.vendorId)?.verification.tag === 'blocked';
-          ctx.db.bill.id.update({ ...b, status: { tag: blocked ? 'overdue' : 'open' } });
-          reopened++;
+        if (owned) {
+          paymentMatchFound = true;
+          settled.push({ kind: m.targetKind.tag === 'invoice' ? 'invoice' : 'bill', id: m.targetId });
         }
       }
     }
@@ -386,6 +392,26 @@ function unwindEntrySideEffects(ctx: Ctx, je: NonNullable<ReturnType<Ctx['db']['
     ctx.db.bankMatch.id.delete(m.id);
     if (tx && tx.matched) ctx.db.bankTransaction.id.update({ ...tx, matched: false });
     unmatched++;
+  }
+  // Reopen a settled invoice or bill only when no remaining bank match still pays it.
+  for (const s of settled) {
+    const stillPaid = [...ctx.db.bankMatch.iter()].some(x => x.targetKind.tag === s.kind && x.targetId === s.id);
+    if (stillPaid) continue;
+    if (s.kind === 'invoice') {
+      const inv = ctx.db.invoice.id.find(s.id);
+      if (inv && inv.status.tag === 'paid') {
+        const overdue = inv.dueAt.microsSinceUnixEpoch < ctx.timestamp.microsSinceUnixEpoch;
+        ctx.db.invoice.id.update({ ...inv, status: { tag: overdue ? 'overdue' : 'open' } });
+        reopened++;
+      }
+    } else {
+      const b = ctx.db.bill.id.find(s.id);
+      if (b && b.status.tag === 'paid') {
+        const blocked = ctx.db.vendor.id.find(b.vendorId)?.verification.tag === 'blocked';
+        ctx.db.bill.id.update({ ...b, status: { tag: blocked ? 'overdue' : 'open' } });
+        reopened++;
+      }
+    }
   }
   const recognized = [...ctx.db.revenueScheduleLine.iter()].filter(sl => sl.jeId === je.id);
   for (const sl of recognized) {
@@ -766,35 +792,73 @@ export const cfoReverse = spacetimedb.reducer(
     requireRole(ctx, ['cfo'], 'reverse entries');
     const je = ctx.db.journalEntry.id.find(jeId);
     if (!je) throw new SenderError(`Unknown journal entry ${jeId}`);
-    if ([...ctx.db.journalEntry.iter()].some(x => x.reversalOf === jeId)) throw new SenderError(`Entry ${jeId} was already reversed.`);
-    const lines = [...ctx.db.journalLine.jeId.filter(jeId)].map(l => ({
-      accountCode: l.accountCode,
-      debitMinor: l.creditMinor,
-      creditMinor: l.debitMinor,
-      ccy: l.ccy,
-      fxRateE6: l.fxRateE6,
-      customerId: l.customerId,
-      vendorId: l.vendorId,
-      memo: `Reversal: ${l.memo}`,
-    }));
+    // Undoing a CFO reversal would bring an entry back without redoing its side effects; post a new entry instead.
+    if (je.source.tag === 'manual' && je.reversalOf != null) throw new SenderError(`Entry ${jeId} is itself a reversal; post a new entry instead of reversing it.`);
+    // An approved accrual posts its own next-month reversal: source agent, the accrual's proposal, reversalOf the
+    // accrual. Every other reversal (the CFO's) is posted manually with no proposal, so only those block a reversal.
+    const isAutoAccrualReversal = (x: NonNullable<typeof je>) =>
+      x.source.tag === 'agent' &&
+      x.proposalId != null &&
+      x.proposalId === je.proposalId &&
+      ctx.db.proposal.id.find(x.proposalId)?.kind.tag === 'accrual';
+    const reversals = [...ctx.db.journalEntry.iter()].filter(x => x.reversalOf === jeId);
+    if (reversals.some(x => !isAutoAccrualReversal(x))) throw new SenderError(`Entry ${jeId} was already reversed.`);
+    // Reversing an accrual must cancel it in both months: the accrual itself, and its automatic reversal in the
+    // next month (unless the CFO already reversed that one directly). Otherwise the next month keeps a credit
+    // for an accrual that no longer exists.
+    const autoReversals = reversals.filter(r => ![...ctx.db.journalEntry.iter()].some(x => x.reversalOf === r.id));
+    for (const r of autoReversals) {
+      const rp = periodById(ctx, r.periodId);
+      if (rp.status.tag === 'closed' || ctx.db.periodLock.periodId.find(rp.id)) {
+        throw new SenderError(
+          `Entry ${jeId} is an accrual whose automatic reversal (entry ${r.id}) is in locked period ${rp.ym}. Unlock ${rp.ym} first, then reverse the accrual; both months are reversed together.`
+        );
+      }
+    }
+    const flip = (id: bigint) =>
+      [...ctx.db.journalLine.jeId.filter(id)].map(l => ({
+        accountCode: l.accountCode,
+        debitMinor: l.creditMinor,
+        creditMinor: l.debitMinor,
+        ccy: l.ccy,
+        fxRateE6: l.fxRateE6,
+        customerId: l.customerId,
+        vendorId: l.vendorId,
+        memo: `Reversal: ${l.memo}`,
+      }));
     const rev = postEntry(ctx, {
       subsidiaryId: je.subsidiaryId,
       periodId: je.periodId,
       memo: `Reversal of entry ${jeId}: ${reasonPlain}`,
-      lines,
+      lines: flip(jeId),
       source: 'manual',
       proposalId: undefined,
       reversalOf: jeId,
       role: 'cfo',
     });
+    const cancelled: bigint[] = [];
+    for (const r of autoReversals) {
+      postEntry(ctx, {
+        subsidiaryId: r.subsidiaryId,
+        periodId: r.periodId,
+        memo: `Reversal of entry ${r.id} (automatic reversal of accrual ${jeId}): ${reasonPlain}`,
+        lines: flip(r.id),
+        source: 'manual',
+        proposalId: undefined,
+        reversalOf: r.id,
+        role: 'cfo',
+      });
+      cancelled.push(r.id);
+    }
     const undone = unwindEntrySideEffects(ctx, je);
+    const autoNote = cancelled.length > 0 ? `; automatic accrual reversal(s) ${cancelled.join(', ')} also reversed` : '';
     audit(
       ctx,
       'cfo',
       'cfo_reverse',
       'journal_entry',
       rev.id,
-      `${reasonPlain} (reverses entry ${jeId}; ${undone.unmatched} bank match(es) undone, ${undone.reopened} invoice/bill(s) reopened, ${undone.unrecognized} schedule line(s) unrecognized)`
+      `${reasonPlain} (reverses entry ${jeId}; ${undone.unmatched} bank match(es) undone, ${undone.reopened} invoice/bill(s) reopened, ${undone.unrecognized} schedule line(s) unrecognized${autoNote})`
     );
   }
 );

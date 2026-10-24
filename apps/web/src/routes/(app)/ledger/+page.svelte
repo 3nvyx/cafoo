@@ -90,7 +90,8 @@
 			return { key: l.id, code: a?.code ?? '', name: a?.name ?? l.accountId, debitMinor: l.debitMinor, creditMinor: l.creditMinor, highlight: matchesLine(l) };
 		});
 
-	const reversed = $derived(new Set(db.journalEntries().flatMap((j) => (j.reversesJeId ? [j.reversesJeId] : []))));
+	// An accrual's automatic next-month reversal (source agent) does not count: the CFO can still reverse the accrual.
+	const reversed = $derived(new Set(db.journalEntries().flatMap((j) => (j.reversesJeId && j.source !== 'agent' ? [j.reversesJeId] : []))));
 	const SOURCE = { seed: 'Imported', agent: 'Agent', manual: 'Manual' } as const;
 
 	let reversing = $state<JournalEntry | null>(null);
@@ -172,7 +173,7 @@
 							{#if j.proposalId}<a class="drill" href="/proposals?status=all#proposal-{j.proposalId}">From a Proposal</a>{/if}
 							{#if j.reversesJeId}<a class="drill" href={drill({ je: j.reversesJeId })}>Reverses an earlier entry</a>{/if}
 							<span class="flex-1"></span>
-							{#if !j.reversesJeId && !reversed.has(j.id)}
+							{#if !(j.reversesJeId && j.source !== 'agent') && !reversed.has(j.id)}
 								<button
 									class="btn text-sm"
 									onclick={() => {

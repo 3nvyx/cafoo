@@ -56,6 +56,33 @@ function connect(): Promise<DbConnection> {
   });
 }
 
+/**
+ * A database seeded by an older seed lacks accounts added since (e.g. 1250 Receivable from Vendors). seedAccounts
+ * skips codes that exist, so add just the missing ones. Once setup is sealed only the CFO may seed, and this loader
+ * runs as the advisor, so on a sealed database it reports what is missing instead of failing.
+ */
+async function topUpAccounts(conn: DbConnection, seed: Seed) {
+  const have = new Set([...conn.db.account.iter()].map(a => a.code));
+  const missing = seed.accounts.filter(a => !have.has(a.code));
+  if (missing.length === 0) return;
+  const codes = missing.map(a => `${a.code} ${a.name}`).join(', ');
+  const sealed = [...conn.db.settings.iter()].some(s => s.key === 'setup_sealed' && s.valueI64 === 1n);
+  if (sealed) {
+    console.warn(
+      `missing account(s) ${codes}: setup is sealed, so only the CFO can add them. Run \`pnpm demo:reset\` to reload the demo with the current chart of accounts.`
+    );
+    return;
+  }
+  try {
+    await conn.reducers.seedAccounts({ subsidiaryCode: 'US', accounts: missing });
+    await waitFor(() => missing.every(a => [...conn.db.account.iter()].some(x => x.code === a.code)), 'missing accounts');
+    console.log(`added missing account(s): ${codes}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`could not add missing account(s) ${codes}: ${msg}. Run \`pnpm demo:reset\` to reload the demo.`);
+  }
+}
+
 async function main() {
   const seedPath = join(root, 'seed', 'out', 'seed.json');
   if (!existsSync(seedPath)) throw new Error('Run `pnpm -F @cafoo/seed generate` first.');
@@ -76,6 +103,7 @@ async function main() {
       await waitFor(() => conn.db.subsidiary.count() === 0n, 'reset');
       console.log('demo data cleared');
     } else {
+      await topUpAccounts(conn, seed);
       console.log('database already seeded; set SEED_RESET=1 to reload');
       process.exit(0);
     }
