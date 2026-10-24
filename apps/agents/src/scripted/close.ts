@@ -124,10 +124,10 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
         subsidiaryId: subId,
         periodYm: closeYm,
         memo: `Duplicate payment to ${vendor} on ${d.externalRef}; refund requested`,
-        lines: [line('1200', d.amountMinor, 0n, `Due back from ${vendor} (duplicate payment)`, { vendorId: bill.vendorId }), line('1000', 0n, d.amountMinor, 'Second payment, same reference', { vendorId: bill.vendorId })],
+        lines: [line('1250', d.amountMinor, 0n, `Due back from ${vendor} (duplicate payment)`, { vendorId: bill.vendorId }), line('1000', 0n, d.amountMinor, 'Second payment, same reference', { vendorId: bill.vendorId })],
         bankTxIds: [d.duplicateTxId.toString()],
       },
-      rationale: `Bank transactions ${d.firstTxId} and ${d.duplicateTxId} both pay ${d.externalRef} (${money(d.amountMinor)}). The first settles the bill; the second is an overpayment. Record the cash out and a receivable from the vendor so the expense is not doubled, and request a refund.`,
+      rationale: `Bank transactions ${d.firstTxId} and ${d.duplicateTxId} both pay ${d.externalRef} (${money(d.amountMinor)}). The first settles the bill; the second is an overpayment. Record the cash out and a receivable from the vendor (1250 Receivable from Vendors) so the expense is not doubled, and request a refund.`,
       summaryPlain: `We paid ${vendor} twice for the same ${money(d.amountMinor)} bill; record the second payment as money they owe us back.`,
       amountMinor: d.amountMinor,
       periodYm: closeYm,
@@ -333,7 +333,8 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     }
     await pause(0.4);
   }
-  // Vendors due a first payment or never verified
+  // Vendors due a first payment or never verified. A clean check marks the vendor verified in the module
+  // (recordCreditCheck), so verified vendors drop out of this list on later closes; blocked ones stay blocked.
   const unverified = s.vendors.filter(v => v.verification.tag === 'Unverified' && v.ownerPersonaId);
   for (const v of unverified) {
     const result = await runCascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
@@ -352,8 +353,10 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
         periodYm: closeYm,
         closeTaskId: task(5),
       });
+    } else if (result.decision === 'APPROVE' && (result.tier === 'A' || result.tier === 'B')) {
+      await say(C, thread, `${v.name}'s owner verified cleanly (tier ${result.tier}). Marked verified; no action needed.`, `${v.name} passed vendor verification.`);
     } else {
-      await say(C, thread, `${v.name}'s owner verified cleanly (tier ${result.tier}). No action needed.`, `${v.name} passed vendor verification.`);
+      await say(C, thread, `${v.name}'s owner check came back ${result.decision} at tier ${result.tier}: ${result.summaryTechnical} Leaving the vendor unverified for a human to review before any payment.`, `${v.name} needs a closer look before we pay them.`);
     }
   }
   await pause();

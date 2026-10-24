@@ -346,6 +346,55 @@ function applyProposal(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['proposal']
   throw new SenderError(`Unknown proposal kind ${kind}`);
 }
 
+/**
+ * Undo the non-ledger side effects an entry produced when it posted, so the next close can redo them:
+ * bank matches that point at the entry (or whose payment entry it is) go back to unmatched, the invoice or bill
+ * they settled goes back to unpaid, and revenue schedule lines it recognized go back to unrecognized.
+ */
+function unwindEntrySideEffects(ctx: Ctx, je: NonNullable<ReturnType<Ctx['db']['journalEntry']['id']['find']>>) {
+  let unmatched = 0;
+  let reopened = 0;
+  let unrecognized = 0;
+  const matches = [...ctx.db.bankMatch.iter()];
+  for (const m of matches) {
+    const tx = ctx.db.bankTransaction.id.find(m.bankTxId);
+    let owned = false;
+    if (m.targetKind.tag === 'je') {
+      // Journal proposals with bankTxIds, or a bank_match proposal that pointed straight at this entry.
+      owned = m.targetId === je.id;
+    } else if (tx && je.proposalId !== undefined && m.proposalId === je.proposalId) {
+      // A bank_match proposal posts one payment entry per match; its memo is built from the target and the bank line.
+      if (m.targetKind.tag === 'invoice') {
+        const inv = ctx.db.invoice.id.find(m.targetId);
+        owned = !!inv && je.memo === `Payment received ${inv.number}: ${tx.description}`;
+        if (owned && inv && inv.status.tag === 'paid') {
+          const overdue = inv.dueAt.microsSinceUnixEpoch < ctx.timestamp.microsSinceUnixEpoch;
+          ctx.db.invoice.id.update({ ...inv, status: { tag: overdue ? 'overdue' : 'open' } });
+          reopened++;
+        }
+      } else {
+        const b = ctx.db.bill.id.find(m.targetId);
+        owned = !!b && je.memo === `Payment ${b.externalRef}: ${tx.description}`;
+        if (owned && b && b.status.tag === 'paid') {
+          const blocked = ctx.db.vendor.id.find(b.vendorId)?.verification.tag === 'blocked';
+          ctx.db.bill.id.update({ ...b, status: { tag: blocked ? 'overdue' : 'open' } });
+          reopened++;
+        }
+      }
+    }
+    if (!owned) continue;
+    ctx.db.bankMatch.id.delete(m.id);
+    if (tx && tx.matched) ctx.db.bankTransaction.id.update({ ...tx, matched: false });
+    unmatched++;
+  }
+  const recognized = [...ctx.db.revenueScheduleLine.iter()].filter(sl => sl.jeId === je.id);
+  for (const sl of recognized) {
+    ctx.db.revenueScheduleLine.id.update({ ...sl, recognized: false, jeId: undefined });
+    unrecognized++;
+  }
+  return { unmatched, reopened, unrecognized };
+}
+
 function postMessage(
   ctx: Ctx,
   role: string,
@@ -355,7 +404,7 @@ function postMessage(
   summaryPlain: string,
   proposalId: bigint | undefined
 ) {
-  ctx.db.agentMessage.insert({
+  return ctx.db.agentMessage.insert({
     id: 0n,
     threadId,
     sender: ctx.sender,
@@ -371,12 +420,16 @@ function postMessage(
 // ---------- lifecycle ----------
 
 export const init = spacetimedb.init(ctx => {
+  const done: string[] = [];
   if (!ctx.db.settings.key.find(MATERIALITY_KEY)) {
     ctx.db.settings.insert({ key: MATERIALITY_KEY, valueI64: DEFAULT_MATERIALITY_MINOR, valueText: '' });
+    done.push(`materiality ${DEFAULT_MATERIALITY_MINOR}`);
   }
   if (ctx.db.overdueSweep.count() === 0n) {
     ctx.db.overdueSweep.insert({ scheduledId: 0n, scheduledAt: ScheduleAt.interval(60_000_000n) });
+    done.push('overdue sweep scheduled');
   }
+  if (done.length > 0) audit(ctx, 'system', 'init', 'settings', 0n, done.join('; '));
 });
 
 export const overdueSweepTick = spacetimedb.reducer(
@@ -385,11 +438,10 @@ export const overdueSweepTick = spacetimedb.reducer(
   (ctx, _args) => {
     if (!ctx.senderAuth.isInternal) throw new SenderError('The overdue sweep runs on a schedule only.');
     const now = ctx.timestamp.microsSinceUnixEpoch;
-    for (const inv of ctx.db.invoice.iter()) {
-      if (inv.status.tag === 'open' && inv.dueAt.microsSinceUnixEpoch < now) {
-        ctx.db.invoice.id.update({ ...inv, status: { tag: 'overdue' } });
-      }
-    }
+    const due = [...ctx.db.invoice.iter()].filter(inv => inv.status.tag === 'open' && inv.dueAt.microsSinceUnixEpoch < now);
+    for (const inv of due) ctx.db.invoice.id.update({ ...inv, status: { tag: 'overdue' } });
+    // Audit only sweeps that changed something, so the once-a-minute timer does not flood the trail.
+    if (due.length > 0) audit(ctx, 'system', 'overdue_sweep', 'invoice', 0n, `${due.length} invoice(s) marked overdue: ${due.map(i => i.number).join(', ')}`);
     // Re-arm: interval rows are re-inserted by the scheduler automatically.
   }
 );
@@ -519,7 +571,8 @@ export const postAgentMessage = spacetimedb.reducer(
     if (!['statement', 'critique', 'question', 'ruling'].includes(k)) throw new SenderError(`Unknown message kind ${kind}`);
     if (k === 'ruling' && role !== 'advisor') throw new SenderError('Only the advisor posts rulings.');
     if (k === 'critique' && role !== 'redteam') throw new SenderError('Only the red team posts critiques.');
-    postMessage(ctx, role, threadId, k, body, summaryPlain, proposalId);
+    const msg = postMessage(ctx, role, threadId, k, body, summaryPlain, proposalId);
+    audit(ctx, role, 'post_agent_message', 'agent_message', msg.id, `${k} in ${threadId}: ${summaryPlain}`);
   }
 );
 
@@ -625,6 +678,15 @@ export const recordCreditCheck = spacetimedb.reducer(
       createdAt: ctx.timestamp,
     });
     audit(ctx, role, 'record_credit_check', 'credit_check', row.id, `${a.subjectKind} ${a.subjectId} ${a.product} → ${a.tier}`);
+    // A clean owner check (approve at tier A or B) verifies the vendor so later closes skip it. Blocking still needs a
+    // ruled vendor_block proposal, and a blocked vendor is never flipped back to verified here.
+    if (a.subjectKind === 'vendor' && a.decision.toUpperCase() === 'APPROVE' && (a.tier === 'A' || a.tier === 'B')) {
+      const v = ctx.db.vendor.id.find(a.subjectId);
+      if (v && v.verification.tag === 'unverified') {
+        ctx.db.vendor.id.update({ ...v, verification: { tag: 'verified' }, verificationNote: `Owner check passed (tier ${a.tier}, request ${a.requestId || 'n/a'}).` });
+        audit(ctx, role, 'verify_vendor', 'vendor', v.id, `Owner check passed at tier ${a.tier}`);
+      }
+    }
   }
 );
 
@@ -725,7 +787,15 @@ export const cfoReverse = spacetimedb.reducer(
       reversalOf: jeId,
       role: 'cfo',
     });
-    audit(ctx, 'cfo', 'cfo_reverse', 'journal_entry', rev.id, reasonPlain);
+    const undone = unwindEntrySideEffects(ctx, je);
+    audit(
+      ctx,
+      'cfo',
+      'cfo_reverse',
+      'journal_entry',
+      rev.id,
+      `${reasonPlain} (reverses entry ${jeId}; ${undone.unmatched} bank match(es) undone, ${undone.reopened} invoice/bill(s) reopened, ${undone.unrecognized} schedule line(s) unrecognized)`
+    );
   }
 );
 
@@ -808,10 +878,11 @@ export const sealSetup = spacetimedb.reducer((ctx) => {
 export const seedSubsidiary = spacetimedb.reducer(
   { code: t.string(), name: t.string(), functionalCcy: t.string(), parentCode: t.option(t.string()) },
   (ctx, { code, name, functionalCcy, parentCode }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     if (ctx.db.subsidiary.code.find(code)) return;
     const parent = parentCode ? ctx.db.subsidiary.code.find(parentCode) : null;
-    ctx.db.subsidiary.insert({ id: 0n, code, name, functionalCcy, parentId: parent?.id });
+    const sub = ctx.db.subsidiary.insert({ id: 0n, code, name, functionalCcy, parentId: parent?.id });
+    audit(ctx, role, 'seed_subsidiary', 'subsidiary', sub.id, `${code} ${name} (${functionalCcy})`);
   }
 );
 
@@ -826,11 +897,13 @@ const AccountArg = t.object('AccountArg', {
 export const seedAccounts = spacetimedb.reducer(
   { subsidiaryCode: t.string(), accounts: t.array(AccountArg) },
   (ctx, { subsidiaryCode, accounts }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
     if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
+    let added = 0;
     for (const a of accounts) {
       if (ctx.db.account.code.find(a.code)) continue;
+      added++;
       ctx.db.account.insert({
         id: 0n,
         subsidiaryId: sub.id,
@@ -841,17 +914,20 @@ export const seedAccounts = spacetimedb.reducer(
         sortOrder: a.sortOrder,
       });
     }
+    audit(ctx, role, 'seed_accounts', 'account', sub.id, `${added} of ${accounts.length} account(s) added to ${subsidiaryCode}`);
   }
 );
 
 export const seedPeriods = spacetimedb.reducer(
   { subsidiaryCode: t.string(), yms: t.array(t.string()), closedYms: t.array(t.string()) },
   (ctx, { subsidiaryCode, yms, closedYms }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
     if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
+    const added: string[] = [];
     for (const ym of yms) {
       if (ctx.db.period.ym.find(ym)) continue;
+      added.push(ym);
       const [y, m] = ym.split('-').map(Number);
       const closed = closedYms.includes(ym);
       const p = ctx.db.period.insert({
@@ -873,14 +949,16 @@ export const seedPeriods = spacetimedb.reducer(
         });
       }
     }
+    audit(ctx, role, 'seed_periods', 'period', sub.id, `${added.length} period(s) added to ${subsidiaryCode}: ${added.join(', ')}; locked: ${closedYms.filter(y => added.includes(y)).join(', ') || 'none'}`);
   }
 );
 
 export const seedFxRate = spacetimedb.reducer(
   { fromCcy: t.string(), toCcy: t.string(), ym: t.string(), rateE6: t.i64(), kind: t.string() },
   (ctx, a) => {
-    requireSeeder(ctx);
-    ctx.db.fxRate.insert({ id: 0n, fromCcy: a.fromCcy, toCcy: a.toCcy, ym: a.ym, rateE6: a.rateE6, kind: { tag: a.kind as any } });
+    const role = requireSeeder(ctx);
+    const row = ctx.db.fxRate.insert({ id: 0n, fromCcy: a.fromCcy, toCcy: a.toCcy, ym: a.ym, rateE6: a.rateE6, kind: { tag: a.kind as any } });
+    audit(ctx, role, 'seed_fx_rate', 'fx_rate', row.id, `${a.fromCcy}/${a.toCcy} ${a.ym} ${a.kind} ${a.rateE6}`);
   }
 );
 
@@ -895,7 +973,7 @@ const CustomerArg = t.object('CustomerArg', {
 export const seedCustomers = spacetimedb.reducer(
   { subsidiaryCode: t.string(), customers: t.array(CustomerArg) },
   (ctx, { subsidiaryCode, customers }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
     if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
     for (const c of customers) {
@@ -911,6 +989,7 @@ export const seedCustomers = spacetimedb.reducer(
         allowanceMinor: 0n,
       });
     }
+    audit(ctx, role, 'seed_customers', 'customer', sub.id, `${customers.length} customer(s) added to ${subsidiaryCode}`);
   }
 );
 
@@ -924,7 +1003,7 @@ const VendorArg = t.object('VendorArg', {
 export const seedVendors = spacetimedb.reducer(
   { subsidiaryCode: t.string(), vendors: t.array(VendorArg) },
   (ctx, { subsidiaryCode, vendors }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
     if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
     for (const v of vendors) {
@@ -939,6 +1018,7 @@ export const seedVendors = spacetimedb.reducer(
         verificationNote: '',
       });
     }
+    audit(ctx, role, 'seed_vendors', 'vendor', sub.id, `${vendors.length} vendor(s) added to ${subsidiaryCode}`);
   }
 );
 
@@ -953,7 +1033,7 @@ export const seedContract = spacetimedb.reducer(
     items: t.array(ContractItemArg),
   },
   (ctx, a) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     if (ctx.db.contract.code.find(a.code)) return;
     const c = ctx.db.contract.insert({
       id: 0n,
@@ -975,6 +1055,7 @@ export const seedContract = spacetimedb.reducer(
         description: it.description,
       });
     }
+    audit(ctx, role, 'seed_contract', 'contract', c.id, `${a.code} for customer ${a.customerId}: ${a.items.length} item(s), ${a.totalMinor} minor`);
   }
 );
 
@@ -985,7 +1066,7 @@ export const seedRevenueScheduleLines = spacetimedb.reducer(
     lines: t.array(t.object('SeedScheduleLine', { ym: t.string(), amountMinor: t.i64(), recognized: t.bool() })),
   },
   (ctx, { contractCode, customerId, lines }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const c = ctx.db.contract.code.find(contractCode);
     if (!c) throw new SenderError(`Unknown contract ${contractCode}`);
     const items = [...ctx.db.contractItem.contractId.filter(c.id)];
@@ -1002,6 +1083,7 @@ export const seedRevenueScheduleLines = spacetimedb.reducer(
         jeId: undefined,
       });
     }
+    audit(ctx, role, 'seed_revenue_schedule', 'revenue_schedule_line', c.id, `${lines.length} schedule line(s) for ${contractCode} (${lines.filter(l => l.recognized).length} already recognized)`);
   }
 );
 
@@ -1017,10 +1099,10 @@ export const seedInvoice = spacetimedb.reducer(
     status: t.string(),
   },
   (ctx, a) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     if (ctx.db.invoice.number.find(a.number)) return;
     const contract = a.contractCode ? ctx.db.contract.code.find(a.contractCode) : null;
-    ctx.db.invoice.insert({
+    const inv = ctx.db.invoice.insert({
       id: 0n,
       customerId: a.customerId,
       contractId: contract?.id,
@@ -1031,6 +1113,7 @@ export const seedInvoice = spacetimedb.reducer(
       amountMinor: a.amountMinor,
       status: { tag: a.status as any },
     });
+    audit(ctx, role, 'seed_invoice', 'invoice', inv.id, `${a.number} ${a.ym} ${a.amountMinor} minor (${a.status})`);
   }
 );
 
@@ -1046,8 +1129,8 @@ export const seedBill = spacetimedb.reducer(
     status: t.string(),
   },
   (ctx, a) => {
-    requireSeeder(ctx);
-    ctx.db.bill.insert({
+    const role = requireSeeder(ctx);
+    const b = ctx.db.bill.insert({
       id: 0n,
       vendorId: a.vendorId,
       externalRef: a.externalRef,
@@ -1058,6 +1141,7 @@ export const seedBill = spacetimedb.reducer(
       expenseAccountCode: a.expenseAccountCode,
       status: { tag: a.status as any },
     });
+    audit(ctx, role, 'seed_bill', 'bill', b.id, `${a.externalRef} ${a.ym} ${a.amountMinor} minor (${a.status})`);
   }
 );
 
@@ -1074,7 +1158,7 @@ const BankTxArg = t.object('BankTxArg', {
 export const seedBankTransactions = spacetimedb.reducer(
   { subsidiaryCode: t.string(), txs: t.array(BankTxArg) },
   (ctx, { subsidiaryCode, txs }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
     if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
     for (const x of txs) {
@@ -1090,6 +1174,7 @@ export const seedBankTransactions = spacetimedb.reducer(
         matched: x.matched,
       });
     }
+    audit(ctx, role, 'seed_bank_transactions', 'bank_transaction', sub.id, `${txs.length} bank transaction(s) added to ${subsidiaryCode} (${txs.filter(x => x.matched).length} pre-matched)`);
   }
 );
 
@@ -1131,6 +1216,7 @@ export const seedJournalEntry = spacetimedb.reducer(
         memo: l.memo,
       });
     }
+    audit(ctx, role, 'seed_journal_entry', 'journal_entry', je.id, `${periodYm}: ${memo} (${lines.length} lines, ${total} minor)`);
   }
 );
 
@@ -1144,7 +1230,7 @@ const CloseTaskArg = t.object('CloseTaskArg', {
 export const seedCloseTasks = spacetimedb.reducer(
   { periodYm: t.string(), tasks: t.array(CloseTaskArg) },
   (ctx, { periodYm, tasks }) => {
-    requireSeeder(ctx);
+    const role = requireSeeder(ctx);
     const p = periodByYm(ctx, periodYm);
     for (const task of tasks) {
       ctx.db.closeTask.insert({
@@ -1158,6 +1244,7 @@ export const seedCloseTasks = spacetimedb.reducer(
         evidenceProposalIds: '',
       });
     }
+    audit(ctx, role, 'seed_close_tasks', 'close_task', p.id, `${tasks.length} close task(s) for ${periodYm}`);
   }
 );
 

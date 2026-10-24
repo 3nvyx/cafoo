@@ -200,6 +200,7 @@ function main() {
       ['1100', 'Accounts Receivable', 'asset'],
       ['1150', 'Allowance for Doubtful Accounts', 'asset'],
       ['1200', 'Prepaid Expenses', 'asset'],
+      ['1250', 'Receivable from Vendors', 'asset'],
       ['1500', 'Equipment', 'asset'],
       ['2000', 'Accounts Payable', 'liability'],
       ['2100', 'Accrued Liabilities', 'liability'],

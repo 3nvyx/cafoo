@@ -250,6 +250,16 @@ describe('charter scenarios on the recorded close', () => {
     expect(String(offenders[0]!.problem)).toMatch(/more than one sentence/);
   });
 
+  it('thread messages and vendor verification in the audit trail are not rulings', async () => {
+    const t = snapshot();
+    for (const role of ['bookkeeper', 'revenue', 'credit', 'redteam']) {
+      t.audit_event!.push({ ...t.audit_event![0]!, id: nextId(t.audit_event!), actor_role: role, action: 'post_agent_message', target_table: 'agent_message' });
+    }
+    t.audit_event!.push({ ...t.audit_event![0]!, id: nextId(t.audit_event!), actor_role: 'credit', action: 'verify_vendor', target_table: 'vendor' });
+    const results = await Promise.all(charters.map((s) => run(s, t)));
+    expect(results.filter((r) => r.status !== 'PASS').map((r) => `${r.id}: ${r.detail}`)).toEqual([]);
+  });
+
   for (const [id, mutate] of Object.entries(MUTATIONS)) {
     it(`${id} fails when its rule is broken`, async () => {
       const s = byId.get(id);

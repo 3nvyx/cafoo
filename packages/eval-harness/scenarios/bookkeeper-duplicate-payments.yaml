@@ -19,10 +19,10 @@ assertions:
       summary_plain: { imatches: "duplicate payment" }
     min: 1
   - type: sql_all
-    label: second payment booked as money owed back (1200 due-back line, cash out), never as expense
+    label: second payment booked as money owed back (1250 Receivable from Vendors line, cash out), never as expense
     sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
     where:
       payload_json.memo: { imatches: "^duplicate payment" }
     require:
-      payload_json.lines.0.accountCode: "1200"
+      payload_json.lines.0.accountCode: "1250"
       payload_json.lines.1.accountCode: "1000"

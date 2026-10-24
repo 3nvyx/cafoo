@@ -7,7 +7,7 @@ assertions:
     label: bookkeeper audit trail holds only proposals and task progress
     sql: "SELECT * FROM audit_event WHERE actor_role = 'bookkeeper'"
     require:
-      action: { in: [propose, update_close_task] }
+      action: { in: [propose, update_close_task, post_agent_message] }
   - type: sql_all
     label: bookkeeper never marks a task done
     sql: "SELECT * FROM audit_event WHERE actor_role = 'bookkeeper' AND action = 'update_close_task'"

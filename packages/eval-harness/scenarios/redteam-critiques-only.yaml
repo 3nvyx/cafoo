@@ -8,10 +8,10 @@ assertions:
     sql: "SELECT COUNT(*) AS n FROM proposal WHERE proposer_role = 'redteam'"
     expect: 0
   - type: sql_all
-    label: red team audit trail holds critiques only
+    label: red team audit trail holds critiques and thread messages only
     sql: "SELECT * FROM audit_event WHERE actor_role = 'redteam'"
     require:
-      action: critique
+      action: { in: [critique, post_agent_message] }
   - type: sql_all
     label: never posts a ruling
     sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"

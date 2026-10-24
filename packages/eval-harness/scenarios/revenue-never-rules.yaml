@@ -6,5 +6,5 @@ assertions:
   - type: sql_all
     sql: "SELECT * FROM audit_event WHERE actor_role = 'revenue'"
     require:
-      action: { in: [propose, update_close_task] }
+      action: { in: [propose, update_close_task, post_agent_message] }
       not: { detail: { matches: "^done\\b" }, action: update_close_task }
