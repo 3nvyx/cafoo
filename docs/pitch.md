@@ -1,10 +1,10 @@
 # Cafoo pitch
 
-A three-minute spoken script, a demo cue list, and the ten slides for the in-app `/pitch` route. The demo runs on the seeded company in Demo mode, so it needs no API keys and no network.
+A three-minute spoken script, a demo cue list, and the ten slides for the in-app `/pitch` route. The demo runs on the seeded group in Demo mode, so it needs no API keys and no network.
 
 ## Before you start
 
-Run the quickstart in the [README](../README.md) with September 2026 as the close month. Open the Launchpad in Simple mode. Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000.
+Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Launchpad in Simple mode. Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
 
 ## Script
 
@@ -18,11 +18,11 @@ Cafoo is a finance ERP built around that answer. Agents do the close, but they c
 
 ### 1:00 Live demo
 
-Let me close September for a SaaS company with twenty customers.
+Let me close September for a SaaS group: a US company with twenty customers and its UK subsidiary.
 
 | Cue | On screen | Say |
 |---|---|---|
-| 1 | Launchpad. Click Close September. Close Tasks turn to in progress. | "One click. Five agents come online." |
+| 1 | Launchpad. Click Close September. Close Tasks turn to in progress. | "One click. Six agents come online." |
 | 2 | Bookkeeper files one Proposal matching 9 vendor payments to their bills, every match at least 80% confident. | "Nine payments matched in one Proposal." |
 | 3 | Two more matches below 75% arrive as separate Proposals. | "Two it is unsure about. It says so." |
 | 4 | Duplicate payment to Northwind Cloud, booked as money due back from the vendor. | "Same bill paid twice. Caught and booked as a refund owed to us." |
@@ -32,10 +32,12 @@ Let me close September for a SaaS company with twenty customers.
 | 8 | $66,200 of subscription revenue across 14 customers, and $57,420 of usage revenue. | "Revenue recognized and tied to deferred revenue." |
 | 9 | Credit & Risk runs the cascade on every guarantor. Risk Tiers and Allowances appear. Two vendors are blocked. | "Credit is checked on the owners behind the invoices. More on that in a minute." |
 | 10 | Red Team rejects the two weak matches and questions the largest reserve. | "The second model pushes back. It wins on the weak matches." |
-| 11 | Advisor rules on about 48 Proposals. Material ones move to Needs your OK. | "Small items post. Big ones wait for me." |
-| 12 | Open one item. Toggle Expert mode. Journal lines, codes, the critique, the raw payload. Toggle back. Confirm. | "One sentence for me. Every line for my controller." |
-| 13 | Advisor requests the lock. Click Lock September. Board Pack renders. | "I lock the month. Not the agent." |
-| 14 | Click revenue in the Board Pack. Land on the journal lines, then the Proposal, then the Debate. | "Every number drills down to who proposed it and why." |
+| 11 | Consolidation agent restates Cafoo Ltd's dollar loan at September's closing rate (a £4,404.78 gain, $5,638.12) and proposes removing the $245,000 the companies owe each other and the $15,000 of service fees. | "Two companies, two currencies. The loan between them is restated and taken out of the group's books, to the cent." |
+| 12 | Advisor rules on 52 Proposals. The revaluation posts; the eliminations and the other material items move to Needs your OK. | "Small items post. Big ones wait for me." |
+| 13 | Open one item. Toggle Expert mode. Journal lines, codes, the critique, the raw payload. Toggle back. Confirm. | "One sentence for me. Every line for my controller." |
+| 14 | Advisor requests the lock. Click Lock September. Board Pack renders; switch it to Consolidated: a column per company, an Eliminations column, and the currency translation adjustment. | "I lock the month. Not the agent. And here is the group as one company." |
+| 15 | Click revenue in the Board Pack. Land on the journal lines, then the Proposal, then the Debate. | "Every number drills down to who proposed it and why." |
+| 16 | Back on the Launchpad, switch the feed on. October's bank lines and invoices arrive one by one; exact receipts match as they land, a partial payment stays open, the $48,600 payroll run waits for the CFO. | "September is locked, so the books keep moving. October matches itself as the money arrives, and the big one still waits for me." |
 
 ### 2:00 Why now
 
@@ -47,7 +49,7 @@ Most SaaS companies sell to small businesses, and a small business is only as go
 
 ### 2:40 Roadmap and the ask
 
-Today Cafoo closes one company in one currency. In the next ninety days we add multi-entity and FX with consolidation, live bank and billing feeds, and charters the finance team writes for its own agents. By 2027, Cafoo uses those audited books to negotiate working-capital terms for its customers. We are raising [amount] to take our first design partners live. If you run finance at a SaaS company, let's close your next month together.
+Today Cafoo closes a group of companies across currencies, keeps the next month current from a live feed, and lets the finance team tighten its own agents' charters, never loosen them. In the next ninety days we connect real bank and billing providers, add a lock per company, and offer a hosted Cafoo for each customer. By 2027, Cafoo uses those audited books to negotiate working-capital terms for its customers. We are raising [amount] to take our first design partners live. If you run finance at a SaaS company, let's close your next month together.
 
 ## Slide outline for `/pitch`
 
@@ -55,11 +57,11 @@ Today Cafoo closes one company in one currency. In the next ninety days we add m
 2. **The close still takes 10 days.** Most of it is matching, accruing, and chasing receipts by hand.
 3. **Everyone has agents. Nobody trusts them to post.** So we built the approval gate first and the agents second.
 4. **Propose, critique, rule, confirm.** Worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material.
-5. **Live demo: close September.** About 48 Proposals, a Red Team that pushes back, and a CFO who locks the month.
+5. **Live demo: close September.** 52 Proposals across two companies and two currencies, a Red Team that pushes back, a CFO who locks the month, then October's feed.
 6. **Every number drills down.** From the Board Pack to the journal lines, the Proposal, and the Debate behind each figure.
 7. **Credit and risk, built in.** Owner checks on every guarantor and vendor, a $48,000 reserve, two vendors blocked before payment.
 8. **Why now.** Models that can be checked, and a database that streams every row and every agent message live.
-9. **Where this goes.** Now: the single-company close. Next 90 days: multi-entity, FX, live feeds, custom charters. 2027: an agentic credit exchange.
+9. **Where this goes.** Now: the group close with consolidation, a live feed, stricter-only custom charters. Next 90 days: real bank and billing feeds, per-company locks, hosted deployment. 2027: an agentic credit exchange.
 10. **The ask.** Raising [amount] to take our first design partners live.
 
 Replace `[amount]` before presenting.
