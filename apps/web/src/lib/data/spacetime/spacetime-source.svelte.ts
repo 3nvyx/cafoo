@@ -259,9 +259,9 @@ export class SpacetimeDataSource implements DataSource {
 						this.#conn.ledger = 'live';
 					})
 					.subscribeToAllTables();
-				// The browser is the CFO seat. A second browser reuses the token, so
-				// "role already held" is expected and harmless.
-				conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'CFO', model: 'human' }).catch(() => {});
+				// The browser is the CFO seat. A second tab on the same origin reuses the token and is already registered;
+				// a different origin or a stale tab may hold it, in which case the seat frees when that tab disconnects.
+				void this.#claimCfoSeat(conn);
 			})
 			.onConnectError((_ctx, err) => {
 				this.#conn.ledger = 'offline';
@@ -339,11 +339,47 @@ export class SpacetimeDataSource implements DataSource {
 		}
 	}
 
+	async #claimCfoSeat(conn: DbConnection): Promise<boolean> {
+		try {
+			await conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'CFO', model: 'human' });
+			this.#conn.cfoSeat = 'mine';
+			if (this.#conn.message?.startsWith('Another browser')) this.#conn.message = undefined;
+			return true;
+		} catch (err) {
+			const text = err instanceof Error ? err.message : String(err);
+			if (/registered as cfo/i.test(text)) {
+				this.#conn.cfoSeat = 'mine';
+				return true;
+			}
+			this.#conn.cfoSeat = 'held';
+			this.#conn.message = 'Another browser holds the CFO seat. Close that tab (the seat frees when it disconnects), then retry.';
+			return false;
+		}
+	}
+
 	async #call(fallback: string, fn: (c: DbConnection) => Promise<unknown>) {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
+		if (this.#conn.cfoSeat !== 'mine') {
+			const ok = await this.#claimCfoSeat(this.#db);
+			if (!ok) throw new Error('Another browser holds the CFO seat. Close that tab, wait a moment, and try again.');
+		}
 		try {
 			await fn(this.#db);
 		} catch (err) {
+			const text = err instanceof Error ? err.message : String(err);
+			if (/not registered|Only cfo/i.test(text)) {
+				// The seat may have been released and reclaimed elsewhere; try once more after re-registering.
+				this.#conn.cfoSeat = 'unknown';
+				if (await this.#claimCfoSeat(this.#db)) {
+					try {
+						await fn(this.#db);
+						return;
+					} catch (again) {
+						throw plain(again, fallback);
+					}
+				}
+				throw new Error('Another browser holds the CFO seat. Close that tab, wait a moment, and try again.');
+			}
 			throw plain(err, fallback);
 		}
 	}

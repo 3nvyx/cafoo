@@ -46,6 +46,7 @@ import ProposeReducer from "./propose_reducer";
 import RecordCreditCheckReducer from "./record_credit_check_reducer";
 import RegisterAgentReducer from "./register_agent_reducer";
 import RejectProposalReducer from "./reject_proposal_reducer";
+import ReleaseCfoReducer from "./release_cfo_reducer";
 import RequestPeriodLockReducer from "./request_period_lock_reducer";
 import ResetDemoReducer from "./reset_demo_reducer";
 import SealSetupReducer from "./seal_setup_reducer";
@@ -467,6 +468,7 @@ const reducersSchema = __reducers(
   __reducerSchema("record_credit_check", RecordCreditCheckReducer),
   __reducerSchema("register_agent", RegisterAgentReducer),
   __reducerSchema("reject_proposal", RejectProposalReducer),
+  __reducerSchema("release_cfo", ReleaseCfoReducer),
   __reducerSchema("request_period_lock", RequestPeriodLockReducer),
   __reducerSchema("reset_demo", ResetDemoReducer),
   __reducerSchema("seal_setup", SealSetupReducer),

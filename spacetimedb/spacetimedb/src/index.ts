@@ -944,6 +944,46 @@ export const overdueSweepTick = spacetimedb.reducer(
 
 // ---------- identities and roles ----------
 
+/** Drop every identity that holds the CFO seat so the next browser can claim it. */
+function releaseCfoSeat(ctx: Ctx, why: string, actor: string) {
+  let released = 0;
+  for (const row of [...ctx.db.agentIdentity.iter()]) {
+    if (row.role.tag === 'cfo') {
+      ctx.db.agentIdentity.identity.delete(row.identity);
+      released++;
+    }
+  }
+  const roster = ctx.db.agentRoster.role.find('cfo');
+  if (roster) ctx.db.agentRoster.role.delete('cfo');
+  if (released > 0) audit(ctx, actor, 'release_cfo_seat', 'agent_identity', 0n, why);
+  return released;
+}
+
+/**
+ * The CFO seat belongs to a browser. When that browser disconnects, the seat is freed, so a closed or stale tab
+ * never locks the next one out. Agent roles are unaffected: the orchestrator re-grants them on every boot.
+ */
+export const onDisconnect = spacetimedb.clientDisconnected(ctx => {
+  const row = ctx.db.agentIdentity.identity.find(ctx.sender);
+  if (row && row.role.tag === 'cfo') {
+    ctx.db.agentIdentity.identity.delete(ctx.sender);
+    const roster = ctx.db.agentRoster.role.find('cfo');
+    if (roster) ctx.db.agentRoster.role.delete('cfo');
+    audit(ctx, 'cfo', 'release_cfo_seat', 'agent_identity', 0n, 'The CFO browser disconnected; the seat is free.');
+  }
+});
+
+/** Force-free the CFO seat (advisor, database owner, or the CFO itself), e.g. after a tab was lost. */
+export const releaseCfo = spacetimedb.reducer(ctx => {
+  const role = roleOf(ctx);
+  const owner = ctx.db.settings.key.find(OWNER_KEY)?.valueText;
+  const isOwner = !!owner && owner === ctx.sender.toHexString();
+  if (role !== 'advisor' && role !== 'cfo' && !isOwner) {
+    throw new SenderError(`Only the advisor, the CFO, or the database owner may release the CFO seat. Your connection is ${role ?? 'not registered'}.`);
+  }
+  releaseCfoSeat(ctx, 'Released on request.', role ?? 'owner');
+});
+
 export const registerAgent = spacetimedb.reducer(
   { role: Role, displayName: t.string(), model: t.string() },
   (ctx, { role, displayName, model }) => {
@@ -1887,6 +1927,7 @@ export const resetDemo = spacetimedb.reducer(
       }
     }
     audit(ctx, role ?? (isOwner ? 'owner' : 'cfo'), 'reset_demo', 'all', 0n, 'Demo data cleared.');
+    if (role !== 'cfo') releaseCfoSeat(ctx, 'Demo reset.', role ?? 'owner');
   }
 );
 

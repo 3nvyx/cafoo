@@ -34,6 +34,8 @@ export interface ConnectionState {
 	/** Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working. */
 	closes: { periodYm: string; status: 'running' | 'done' }[];
 	message?: string;
+	/** Live mode only: whether this browser holds the CFO seat. 'held' means another browser has it. */
+	cfoSeat?: 'mine' | 'held' | 'unknown';
 }
 
 export interface ChangeEvent<T = unknown> {
