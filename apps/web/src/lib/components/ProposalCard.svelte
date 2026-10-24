@@ -39,7 +39,8 @@
 			code: l.code,
 			name: accounts.get(l.code)?.name ?? (l.memo || l.code),
 			debitMinor: l.debitMinor,
-			creditMinor: l.creditMinor
+			creditMinor: l.creditMinor,
+			ccy: l.ccy ?? db.subsidiaries().find((s) => s.id === accounts.get(l.code)?.subsidiaryId)?.baseCurrency
 		}))
 	);
 	const schedule = $derived(scheduleLinesOf(payload));

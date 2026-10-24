@@ -23,7 +23,9 @@ export const KIND: Record<ProposalKind, string> = {
 	credit_decision: 'Credit decision',
 	accrual: 'Accrual',
 	vendor_block: 'Vendor block',
-	vendor_verify: 'Vendor check'
+	vendor_verify: 'Vendor check',
+	fx_revaluation: 'Revaluation',
+	ic_elimination: 'Elimination'
 };
 
 export const STATUS: Record<ProposalStatus, { label: string; tone: Tone }> = {

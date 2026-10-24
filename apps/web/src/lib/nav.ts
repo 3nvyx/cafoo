@@ -16,6 +16,7 @@ export const NAV: NavItem[] = [
 	{ href: '/close', label: 'Close', icon: 'checklist', primary: true },
 	{ href: '/ledger', label: 'Ledger', icon: 'book' },
 	{ href: '/reports', label: 'Board Pack', icon: 'chart' },
+	{ href: '/charters', label: 'Charters', icon: 'shield' },
 	{ href: '/customers', label: 'Customers', icon: 'users' },
 	{ href: '/vendors', label: 'Vendors', icon: 'truck' },
 	{ href: '/settings', label: 'Settings', icon: 'sliders' }

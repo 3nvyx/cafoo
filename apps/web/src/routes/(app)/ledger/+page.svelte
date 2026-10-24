@@ -4,7 +4,8 @@
 	import { tick } from 'svelte';
 	import { db } from '#lib/data/index.js';
 	import { isDebitNormal, monthName, periodLabel, periodShort, ymShort } from '#lib/data/derive.js';
-	import { formatMoney, toBig } from '#lib/data/money.js';
+	import { formatMoney } from '#lib/data/money.js';
+	import { functionalNet } from '#lib/data/group.js';
 	import type { JournalEntry, Period } from '#lib/data/types.js';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -22,6 +23,11 @@
 	const drillKind = $derived(parsed.kind);
 	const drillValue = $derived(parsed.values[0] ?? '');
 	const periodParam = $derived(params.get('period'));
+	/** An account or type drill narrowed to one company (its Subsidiary code), as the Board Pack links per company. */
+	const company = $derived(db.subsidiaries().find((s) => s.code === params.get('company')));
+	const subById = $derived(new Map(db.subsidiaries().map((s) => [s.id, s])));
+	/** The currency an account's company keeps its books in. */
+	const ccyOf = (accountId: string) => subById.get(byId.get(accountId)?.subsidiaryId ?? '')?.baseCurrency ?? 'USD';
 	let q = $state('');
 
 	const accounts = $derived(db.accounts());
@@ -45,11 +51,12 @@
 
 	/** The accounts an account drill (one or several codes) or a type drill (e.g. revenue,expense) covers. */
 	const drillAccounts = $derived(
-		drillKind === 'account'
+		(drillKind === 'account'
 			? accounts.filter((a) => parsed.values.includes(a.code))
 			: drillKind === 'type'
 				? accounts.filter((a) => parsed.values.includes(a.type))
 				: []
+		).filter((a) => !company || a.subsidiaryId === company.id)
 	);
 	const drillAccountIds = $derived(new Set(drillAccounts.map((a) => a.id)));
 
@@ -73,14 +80,17 @@
 	const names = (xs: string[]) => (xs.length < 3 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
 	const drillLabel = $derived.by(() => {
+		const at = company ? ` at ${company.name}` : '';
+		const multi = new Set(drillAccounts.map((a) => a.subsidiaryId)).size > 1;
+		const accountName = (a: (typeof drillAccounts)[number]) => (ui.expert ? `${a.code} ${a.name}` : multi ? `${a.name} (${subById.get(a.subsidiaryId)?.name ?? a.subsidiaryId})` : a.name);
 		if (drillKind === 'account') {
 			if (!drillAccounts.length) return parsed.values.join(', ');
-			return names(drillAccounts.map((a) => (ui.expert ? `${a.code} ${a.name}` : a.name)));
+			return names(drillAccounts.map(accountName)) + at;
 		}
 		if (drillKind === 'type') {
 			const t = new Set(parsed.values);
-			if (t.size === 2 && t.has('revenue') && t.has('expense')) return 'the income statement accounts (revenue and expenses)';
-			return `the ${names(parsed.values)} accounts`;
+			if (t.size === 2 && t.has('revenue') && t.has('expense')) return `the income statement accounts (revenue and expenses)${at}`;
+			return `the ${names(parsed.values)} accounts${at}`;
 		}
 		if (drillKind === 'customer') return db.customers().find((c) => c.id === drillValue)?.name ?? drillValue;
 		if (drillKind === 'vendor') return db.vendors().find((v) => v.id === drillValue)?.name ?? drillValue;
@@ -89,17 +99,30 @@
 	});
 
 	/**
-	 * Net movement on the drilled accounts across the rows shown. Accounts on one side keep their natural sign; the
-	 * income statement nets to income (revenue less expenses), the way the Board Pack figure that linked here does.
+	 * Net movement on the drilled accounts across the rows shown, in each company's own currency (lines in another
+	 * currency at their recorded rate), one figure per company. Accounts on one side keep their natural sign; the income
+	 * statement nets to income (revenue less expenses), the way the Board Pack figure that linked here does.
 	 */
 	const drillTotal = $derived.by(() => {
 		if (!drillAccounts.length) return null;
-		let t = 0n;
-		for (const j of entries) for (const l of linesByJe.get(j.id) ?? []) if (drillAccountIds.has(l.accountId)) t += toBig(l.debitMinor) - toBig(l.creditMinor);
-		if (drillAccounts.every((a) => isDebitNormal(a.type))) return { label: 'net', amount: t.toString() };
-		if (drillAccounts.every((a) => !isDebitNormal(a.type))) return { label: 'net', amount: (-t).toString() };
-		if (drillAccounts.every((a) => a.type === 'revenue' || a.type === 'expense')) return { label: 'net income', amount: (-t).toString() };
-		return { label: 'net debit', amount: t.toString() };
+		const bySub = new Map<string, bigint>();
+		for (const a of drillAccounts) bySub.set(a.subsidiaryId, 0n);
+		for (const j of entries)
+			for (const l of linesByJe.get(j.id) ?? []) {
+				if (!drillAccountIds.has(l.accountId)) continue;
+				const sub = byId.get(l.accountId)!.subsidiaryId;
+				bySub.set(sub, (bySub.get(sub) ?? 0n) + functionalNet(l));
+			}
+		const allDebit = drillAccounts.every((a) => isDebitNormal(a.type));
+		const allCredit = drillAccounts.every((a) => !isDebitNormal(a.type));
+		const label = allDebit || allCredit ? 'net' : drillAccounts.every((a) => a.type === 'revenue' || a.type === 'expense') ? 'net income' : 'net debit';
+		const k = allDebit || label === 'net debit' ? 1n : -1n;
+		const multi = bySub.size > 1;
+		const amounts = [...bySub].map(([sub, t]) => {
+			const s = subById.get(sub);
+			return { key: sub, prefix: multi ? `${s?.name ?? sub} ` : '', text: formatMoney((k * t).toString(), { currency: s?.baseCurrency ?? 'USD' }) };
+		});
+		return { label, amounts };
 	});
 
 	let open = $state<Record<string, boolean>>({});
@@ -110,11 +133,16 @@
 		}
 	});
 
-	const total = (j: JournalEntry) => (linesByJe.get(j.id) ?? []).reduce((t, l) => t + toBig(l.debitMinor), 0n).toString();
+	/** An entry's size: its debits in its company's own currency (lines in another currency at their recorded rate). */
+	const total = (j: JournalEntry) => {
+		const ls = linesByJe.get(j.id) ?? [];
+		const debits = ls.reduce((t, l) => t + functionalNet({ debitMinor: l.debitMinor, creditMinor: '0', fxRateE6: l.fxRateE6 }), 0n);
+		return formatMoney(debits.toString(), { currency: ls[0] ? ccyOf(ls[0].accountId) : 'USD' });
+	};
 	const view = (j: JournalEntry): LineView[] =>
 		(linesByJe.get(j.id) ?? []).map((l) => {
 			const a = byId.get(l.accountId);
-			return { key: l.id, code: a?.code ?? '', name: a?.name ?? l.accountId, debitMinor: l.debitMinor, creditMinor: l.creditMinor, highlight: matchesLine(l) };
+			return { key: l.id, code: a?.code ?? '', name: a?.name ?? l.accountId, debitMinor: l.debitMinor, creditMinor: l.creditMinor, ccy: l.ccy || ccyOf(l.accountId), highlight: matchesLine(l) };
 		});
 
 	/**
@@ -191,7 +219,7 @@
 	const reverseBody = $derived.by(() => {
 		if (!reversing) return '';
 		const r = reversal(reversing);
-		const what = `This posts an equal and opposite entry for “${reversing.memo}” (${formatMoney(total(reversing))})`;
+		const what = `This posts an equal and opposite entry for “${reversing.memo}” (${total(reversing)})`;
 		if (r.state !== 'ok') return `${what}, but it cannot be posted right now.`;
 		const own = monthOf(reversing.periodId);
 		const where =
@@ -239,7 +267,8 @@
 			{drillKind === 'je' ? 'Showing the entry' : 'Showing entries that touch'} <span class="font-medium">{drillLabel}</span>
 			{#if periodFilter.kind === 'range'}<span class="opacity-80">· {periodFilterLabel(periodFilter)}</span>{/if}
 			{#if drillTotal !== null}
-				<span class="opacity-80">· {drillTotal.label}</span> <span class="num font-medium">{formatMoney(drillTotal.amount)}</span>
+				<span class="opacity-80">· {drillTotal.label}</span>
+				{#each drillTotal.amounts as a, i (a.key)}{#if i > 0}<span class="opacity-80"> · </span>{/if}<span class="opacity-80">{a.prefix}</span><span class="num font-medium">{a.text}</span>{/each}
 			{/if}
 		</p>
 		<a href="/ledger?period={encodeURIComponent(periodValue)}" class="btn btn-quiet -my-2 self-start text-sm text-on-secondary-container sm:self-auto"><Icon name="x" size={16} />Clear drill-down</a>
@@ -268,7 +297,7 @@
 						<Pill tone={j.source === 'agent' ? 'accent' : j.source === 'manual' ? 'warn' : 'muted'}>{SOURCE[j.source]}</Pill>
 					</span>
 					<span class="num order-2 flex items-center justify-end gap-2 md:order-none">
-						{formatMoney(total(j))}
+						{total(j)}
 						<Icon name="chevronDown" size={16} class="text-ink-3 transition-transform duration-200 {open[j.id] ? 'rotate-180' : ''}" />
 					</span>
 				</button>

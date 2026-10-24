@@ -35,7 +35,10 @@ const ACCESSORS = {
 	closeTask: 'close_task',
 	creditCheck: 'credit_check',
 	auditEvent: 'audit_event',
-	settings: 'settings'
+	settings: 'settings',
+	fxRate: 'fx_rate',
+	charterVersion: 'charter_version',
+	charterEval: 'charter_eval'
 } as const satisfies Record<string, U.TableName>;
 
 type Accessor = keyof typeof ACCESSORS;
@@ -60,6 +63,9 @@ interface Mirror {
 	credit_check: U.CreditCheck[];
 	audit_event: U.AuditEvent[];
 	settings: U.Settings;
+	fx_rate: U.FxRate[];
+	charter_version: U.CharterVersion[];
+	charter_eval: U.CharterEval[];
 }
 
 const empty = (): Mirror => ({
@@ -81,7 +87,10 @@ const empty = (): Mirror => ({
 	close_task: [],
 	credit_check: [],
 	audit_event: [],
-	settings: { materialityThresholdMinor: '1000000' }
+	settings: { materialityThresholdMinor: '1000000', reportingCcy: 'USD' },
+	fx_rate: [],
+	charter_version: [],
+	charter_eval: []
 });
 
 function readToken(): string | undefined {
@@ -152,6 +161,9 @@ export class SpacetimeDataSource implements DataSource {
 	creditChecks = () => this.#t.credit_check;
 	auditEvents = () => this.#t.audit_event;
 	settings = () => this.#t.settings;
+	fxRates = () => this.#t.fx_rate;
+	charterVersions = () => this.#t.charter_version;
+	charterEvals = () => this.#t.charter_eval;
 	liveActivity = () => null;
 	now = () => new Date().toISOString();
 	connection = () => this.#conn;
@@ -233,6 +245,73 @@ export class SpacetimeDataSource implements DataSource {
 
 	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
 		await this.#call('Could not unlock this Period.', (c) => c.reducers.unlockPeriod({ periodYm: periodId, rationale: reasonPlain }));
+	}
+
+	// Charters: versions, publishing and retiring are module reducers; the catalog and the eval runner live on the gateway.
+	async charterCatalog(): Promise<U.CharterCatalog> {
+		return (await this.#gateway('GET', '/charters/catalog', 'Could not load the charter catalog from the agent gateway.')) as U.CharterCatalog;
+	}
+
+	async saveCharterDraft(d: { role: string; bodyMd: string; mapping: U.CharterMappingEntry[]; summaryPlain: string; basedOnVersionId?: string }): Promise<void> {
+		await this.#call('Could not save this Charter draft.', (c) =>
+			c.reducers.saveCharterDraft({
+				role: d.role,
+				bodyMd: d.bodyMd,
+				mappingJson: JSON.stringify(d.mapping),
+				summaryPlain: d.summaryPlain,
+				basedOnVersionId: d.basedOnVersionId ? BigInt(d.basedOnVersionId) : undefined
+			})
+		);
+	}
+
+	async startCharterEval(versionId: string, mode: U.CharterEvalMode): Promise<U.CharterEvalRun> {
+		this.#readOnlyCheck();
+		return (await this.#gateway('POST', `/charters/${encodeURIComponent(versionId)}/eval`, 'The agent gateway could not start the eval.', { mode })) as U.CharterEvalRun;
+	}
+
+	async charterEvalRun(versionId: string): Promise<U.CharterEvalRun> {
+		return (await this.#gateway('GET', `/charters/${encodeURIComponent(versionId)}/eval`, 'Could not read the eval status from the agent gateway.')) as U.CharterEvalRun;
+	}
+
+	async publishCharter(versionId: string, notePlain: string): Promise<void> {
+		await this.#call('Could not publish this Charter version.', (c) => c.reducers.publishCharter({ charterVersionId: BigInt(versionId), notePlain }));
+	}
+
+	async retireLiveCharter(role: string, notePlain: string): Promise<void> {
+		await this.#call('Could not restore the built-in Charter.', (c) => c.reducers.retireLiveCharter({ role, notePlain }));
+	}
+
+	/** One gateway request; its JSON error (or text) becomes the thrown message. */
+	async #gateway(method: 'GET' | 'POST', path: string, fallback: string, body?: unknown): Promise<unknown> {
+		let res: Response;
+		try {
+			res = await fetch(`${this.#cfg.gateway}${path}`, {
+				method,
+				...(method === 'POST' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) } : {})
+			});
+		} catch {
+			this.#conn.agents = 'offline';
+			throw new Error('The agents are offline. Start the agent gateway, then try again.');
+		}
+		this.#conn.agents = 'online';
+		const text = await res.text().catch(() => '');
+		let parsed: unknown;
+		try {
+			parsed = text ? JSON.parse(text) : {};
+		} catch {
+			parsed = undefined;
+		}
+		if (!res.ok) {
+			const err = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : text;
+			throw new Error(err ? `${fallback} ${err.charAt(0).toUpperCase()}${err.slice(1)}.` : `${fallback} (${res.status})`);
+		}
+		if (parsed === undefined) throw new Error(fallback);
+		return parsed;
+	}
+
+	#readOnlyCheck() {
+		if (this.#seat.status === 'unclaimed') throw new Error('This browser is read-only: nobody has claimed the CFO seat yet. Open your claim link to claim it.');
+		if (this.#seat.status === 'other') throw new Error('This browser is read-only: it does not hold the CFO seat. Use the browser that claimed it.');
 	}
 
 	/**
@@ -389,9 +468,17 @@ export class SpacetimeDataSource implements DataSource {
 		if (d.has('creditCheck')) t.credit_check = all(c.db.creditCheck.iter()).map(M.creditCheck);
 		if (d.has('auditEvent')) t.audit_event = all(c.db.auditEvent.iter()).map(M.auditEvent).sort(byTime('at'));
 		if (d.has('settings')) {
-			const row = all(c.db.settings.iter()).find((s) => s.key === 'materiality_threshold_minor');
-			if (row) t.settings = { materialityThresholdMinor: row.valueI64.toString() };
+			const rows = all(c.db.settings.iter());
+			const threshold = rows.find((s) => s.key === 'materiality_threshold_minor');
+			const reporting = rows.find((s) => s.key === 'reporting_ccy');
+			t.settings = {
+				materialityThresholdMinor: threshold ? threshold.valueI64.toString() : t.settings.materialityThresholdMinor,
+				reportingCcy: reporting?.valueText || t.settings.reportingCcy
+			};
 		}
+		if (d.has('fxRate')) t.fx_rate = all(c.db.fxRate.iter()).map(M.fxRate);
+		if (d.has('charterVersion')) t.charter_version = all(c.db.charterVersion.iter()).map(M.charterVersion).sort((a, b) => a.role.localeCompare(b.role) || b.version - a.version);
+		if (d.has('charterEval')) t.charter_eval = all(c.db.charterEval.iter()).map(M.charterEval).sort(byTime('ranAt'));
 	}
 
 	/**
@@ -400,8 +487,7 @@ export class SpacetimeDataSource implements DataSource {
 	 */
 	async #call(fallback: string, fn: (c: DbConnection) => Promise<unknown>) {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
-		if (this.#seat.status === 'unclaimed') throw new Error('This browser is read-only: nobody has claimed the CFO seat yet. Open your claim link to claim it.');
-		if (this.#seat.status === 'other') throw new Error('This browser is read-only: it does not hold the CFO seat. Use the browser that claimed it.');
+		this.#readOnlyCheck();
 		try {
 			await fn(this.#db);
 		} catch (err) {

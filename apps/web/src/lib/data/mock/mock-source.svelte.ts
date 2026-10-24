@@ -5,7 +5,27 @@
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
 // CFO locks it.
 import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
-import type { AgentMessage, AgentRole, BankMatch, CloseTaskStatus, JournalLine, LiveActivity, Minor, Proposal, ProviderStatus, TableName } from '../types';
+import type {
+	AgentMessage,
+	AgentRole,
+	BankMatch,
+	CharterCatalog,
+	CharterEvalMode,
+	CharterEvalRun,
+	CharterMappingEntry,
+	CloseTaskStatus,
+	JournalLine,
+	LiveActivity,
+	Minor,
+	Proposal,
+	ProviderStatus,
+	TableName
+} from '../types';
+import { editorProblems } from '../../charter';
+import { eliminations, formatMinor, revaluation, translate, ymFromString, type JournalEntryInput } from '@cafoo/ledger-core';
+import { toCore } from '../group';
+import { roleName } from '../../labels';
+import catalogJson from './seed/charters.json';
 import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
 import { accountIdFor, loadSeed, type Tables } from './seed';
@@ -38,6 +58,7 @@ export class MockDataSource implements DataSource {
 	#timers: ReturnType<typeof setTimeout>[] = [];
 	#boot = Date.now();
 	#seq = 0;
+	#evalRuns = new Map<string, CharterEvalRun>();
 
 	// Reads
 	subsidiaries = () => this.#t.subsidiary;
@@ -59,6 +80,9 @@ export class MockDataSource implements DataSource {
 	creditChecks = () => this.#t.credit_check;
 	auditEvents = () => this.#t.audit_event;
 	settings = () => this.#t.settings;
+	fxRates = () => this.#t.fx_rate;
+	charterVersions = () => this.#t.charter_version;
+	charterEvals = () => this.#t.charter_eval;
 	providers = () => PROVIDERS;
 	liveActivity = () => this.#activity;
 	now = () => this.#now();
@@ -226,12 +250,120 @@ export class MockDataSource implements DataSource {
 		this.#audit('cfo', 'period.unlock', 'period', periodId, { reason });
 	}
 
+	// Charters. Demo mode has no eval runner: an eval checks the line mapping the way the editor does (every line mapped,
+	// every shipped rule kept) and replays the steps a real run reports. The publish and retire rules are the module's.
+	async charterCatalog(): Promise<CharterCatalog> {
+		return structuredClone(catalogJson) as unknown as CharterCatalog;
+	}
+
+	async saveCharterDraft(d: { role: string; bodyMd: string; mapping: CharterMappingEntry[]; summaryPlain: string; basedOnVersionId?: string }): Promise<void> {
+		if (!d.bodyMd.trim()) throw new Error('A charter needs its text.');
+		if (d.summaryPlain.trim().length < 10) throw new Error('Every charter draft needs a plain-English summary of the change.');
+		const version = this.#t.charter_version.filter((v) => v.role === d.role).reduce((a, v) => Math.max(a, v.version), 0) + 1;
+		const row = {
+			id: this.#id('cv'),
+			role: d.role,
+			version,
+			status: 'draft' as const,
+			bodyMd: d.bodyMd,
+			mappingJson: JSON.stringify(d.mapping),
+			summaryPlain: d.summaryPlain.trim(),
+			basedOnVersionId: d.basedOnVersionId,
+			authoredByRole: 'cfo',
+			createdAt: this.#now()
+		};
+		this.#t.charter_version.push(row);
+		this.#emit('charter_version', 'insert', row);
+		this.#audit('cfo', 'save_charter_draft', 'charter_version', row.id, { role: d.role, version });
+	}
+
+	async startCharterEval(versionId: string, mode: CharterEvalMode): Promise<CharterEvalRun> {
+		const v = this.#t.charter_version.find((x) => x.id === versionId);
+		if (!v) throw new Error(`There is no charter version ${versionId}.`);
+		if (v.status === 'live') throw new Error(`Version ${v.version} of the ${v.role} charter is already published.`);
+		if ([...this.#evalRuns.values()].some((r) => r.status === 'running')) throw new Error('Another eval is still running; wait for it to finish.');
+		const run: CharterEvalRun = { versionId, status: 'running', mode, steps: [], startedAt: this.#now() };
+		this.#evalRuns.set(versionId, run);
+		const live = () => this.#evalRuns.get(versionId)!;
+		const steps = mode === 'dry_run'
+			? ['Checking that every line is mapped to a rule or a scenario', 'Publishing a fresh ledger to the scratch database', 'Loading the demo company', `Running the 2026-09 close with the draft ${v.role} charter`, 'Running the eval scenarios on the dry-run close']
+			: ['Checking that every line is mapped to a rule or a scenario', 'Running the eval scenarios on the recorded close'];
+		steps.forEach((m, i) => this.#later(700 * (i + 1), () => live().steps.push(m)));
+		this.#later(700 * (steps.length + 1), async () => {
+			const catalog = await this.charterCatalog();
+			let mapping: CharterMappingEntry[] = [];
+			try {
+				mapping = JSON.parse(v.mappingJson);
+			} catch {
+				/* reported as a problem below */
+			}
+			const problems = editorProblems(catalog, v.role, v.bodyMd, mapping);
+			const passed = problems.length === 0;
+			const words = mode === 'dry_run' ? 'dry run' : 'check against the recorded close';
+			const summaryPlain = passed
+				? mode === 'dry_run'
+					? `The ${roleName(v.role as AgentRole)} charter, version ${v.version}, passed its dry run in Demo mode: every line is mapped and every shipped rule stays, so the CFO can publish it.`
+					: `The ${roleName(v.role as AgentRole)} charter, version ${v.version}, passed its check against the recorded close in Demo mode; it needs a passing dry run before the CFO can publish it.`
+				: `The ${roleName(v.role as AgentRole)} charter, version ${v.version}, failed its ${words}: ${problems.length === 1 ? 'one mapping problem' : `${problems.length} mapping problems`} must be fixed first.`;
+			const report = { versionId, role: v.role, mode, demo: true, coverage: { ok: passed, problems }, probes: [], scenarios: [], passed, publishable: passed && mode === 'dry_run' };
+			const row = { id: this.#id('ce'), charterVersionId: versionId, passed, mode, resultsJson: JSON.stringify(report), summaryPlain, ranByRole: 'advisor', ranAt: this.#now() };
+			this.#t.charter_eval.push(row);
+			this.#emit('charter_eval', 'insert', row);
+			this.#audit('advisor', 'record_charter_eval', 'charter_eval', row.id, { versionId, mode, passed });
+			const r = live();
+			r.steps.push(report.publishable ? 'Recorded a passing dry run: the CFO can publish this version' : passed ? 'Recorded a passing quick check; a dry run must pass before the CFO can publish' : 'Recorded a failing eval');
+			r.status = 'done';
+			r.passed = passed;
+			r.publishable = report.publishable;
+			r.finishedAt = this.#now();
+		});
+		return structuredClone(run);
+	}
+
+	async charterEvalRun(versionId: string): Promise<CharterEvalRun> {
+		const r = this.#evalRuns.get(versionId);
+		return r ? structuredClone(r) : { versionId, status: 'idle', steps: [] };
+	}
+
+	async publishCharter(versionId: string, notePlain: string): Promise<void> {
+		const v = this.#t.charter_version.find((x) => x.id === versionId);
+		if (!v) throw new Error(`Unknown charter version ${versionId}`);
+		if (v.status === 'live') throw new Error(`Version ${v.version} of the ${v.role} charter is already live.`);
+		const evals = this.#t.charter_eval.filter((e) => e.charterVersionId === versionId);
+		const latest = evals[evals.length - 1];
+		if (!latest) throw new Error(`Run an eval of version ${v.version} of the ${v.role} charter first; a charter publishes only after its latest eval passes.`);
+		if (!latest.passed) throw new Error(`The latest eval of version ${v.version} of the ${v.role} charter failed: ${latest.summaryPlain}`);
+		if (latest.mode !== 'dry_run') throw new Error(`The latest eval of version ${v.version} of the ${v.role} charter was a quick check; a charter publishes only after a passing dry run (a full close on a scratch database).`);
+		const prior = this.#t.charter_version.find((x) => x.role === v.role && x.status === 'live');
+		if (prior) {
+			prior.status = 'retired';
+			this.#emit('charter_version', 'update', prior);
+		}
+		v.status = 'live';
+		v.publishedAt = this.#now();
+		this.#emit('charter_version', 'update', v);
+		const note = notePlain.trim();
+		this.#message({ role: 'cfo', kind: 'statement', threadId: `charter:${v.role}`, body: `Published version ${v.version} of the ${v.role} charter, replacing ${prior ? `version ${prior.version}` : 'the built-in charter'}${note ? `: ${note}` : '.'}`, summary: `You published version ${v.version} of the ${v.role} charter.` });
+		this.#audit('cfo', 'publish_charter', 'charter_version', v.id, { role: v.role, version: v.version });
+	}
+
+	async retireLiveCharter(role: string, notePlain: string): Promise<void> {
+		const live = this.#t.charter_version.find((x) => x.role === role && x.status === 'live');
+		if (!live) throw new Error(`The ${role} has no published charter; the built-in charter already applies.`);
+		live.status = 'retired';
+		this.#emit('charter_version', 'update', live);
+		const note = notePlain.trim();
+		this.#message({ role: 'cfo', kind: 'statement', threadId: `charter:${role}`, body: `Retired version ${live.version} of the ${role} charter; the built-in charter applies again${note ? `: ${note}` : '.'}`, summary: `You restored the built-in ${role} charter.` });
+		this.#audit('cfo', 'retire_live_charter', 'charter_version', live.id, { role });
+	}
+
 	/** Demo only: put every table back to the seed. */
 	resetDemo(): void {
 		for (const t of this.#timers) clearTimeout(t);
 		this.#timers = [];
 		this.#activity = null;
 		this.#closes = [];
+		this.#evalRuns.clear();
 		this.#t = loadSeed();
 		this.#boot = Date.now();
 	}
@@ -292,6 +424,9 @@ export class MockDataSource implements DataSource {
 				if (p) this.#rule(p, step.body, step.summary, step.rationale);
 				break;
 			}
+			case 'consolidate':
+				this.#consolidate(periodId, step.taskId);
+				break;
 			case 'wrapup': {
 				const waiting = this.#t.proposal.filter((p) => p.periodId === periodId && p.status === 'awaiting_cfo');
 				const n = waiting.length;
@@ -304,6 +439,49 @@ export class MockDataSource implements DataSource {
 				});
 				break;
 			}
+		}
+	}
+
+	/**
+	 * The Consolidation agent's three Proposals for the month, computed from the books as they stand by the ledger engine
+	 * (the same revaluation() and eliminations() the scripted close and the module use): Cafoo Ltd's dollar balances
+	 * revalued at the closing rate, the balances the companies owe each other, and the month's service fees.
+	 */
+	#consolidate(periodId: string, taskId: string) {
+		const t = this.#t;
+		const core = toCore({ subsidiaries: t.subsidiary, accounts: t.account, entries: t.journal_entry, lines: t.journal_line, rates: t.fx_rate, reportingCcy: t.settings.reportingCcy });
+		const ym = ymFromString(periodId);
+		const uk = core.entities.find((e) => !e.isElimination && e.parentId !== null);
+		const fx = uk && core.accounts.find((a) => a.subsidiaryId === uk.id && a.code.startsWith('7100'));
+		const byId = new Map(core.accounts.map((a) => [a.id, a]));
+		const lines = (entry: JournalEntryInput): ScriptLine[] =>
+			entry.lines.map((l) => ({ account: byId.get(l.accountId)!.code, debitMinor: l.debitMinor.toString(), creditMinor: l.creditMinor.toString() }));
+		const debits = (entry: JournalEntryInput, ccy: string) =>
+			translate(entry.lines.reduce((s, l) => s + l.debitMinor, 0n), core.rates, ccy, t.settings.reportingCcy, ym, 'closing');
+		const propose = (id: string, kind: Proposal['kind'], entry: JournalEntryInput, ccy: string, summary: string, rationale: string, body: string) => {
+			this.#addProposal(
+				{ id, periodId, kind, payloadJson: JSON.stringify({ memo: entry.memo, lines: lines(entry) }), rationale, summaryPlain: summary, amountMinor: debits(entry, ccy).toString(), proposerRole: 'consolidation', status: 'open', createdAt: this.#now() },
+				taskId
+			);
+			this.#message({ proposalId: id, role: 'consolidation', kind: 'statement', body, summary });
+		};
+		if (uk && fx) {
+			const rev = revaluation({ entity: uk, lines: core.lines, accountsById: byId, rates: core.rates, ym, periodId: 0n, fxGainLossAccountId: fx.id });
+			if (rev.entry) {
+				const gain = formatMinor(rev.gainMinor, uk.functionalCcy);
+				propose('pr-c1', 'fx_revaluation', rev.entry, uk.functionalCcy, `Restate what ${uk.name} owes in dollars at the month's closing rate, a ${gain} gain.`, `Revaluation of ${rev.items.length} foreign-currency balances at the closing rate.`, `PROPOSE pr-c1: ${rev.entry.memo}; gain ${gain}.`);
+			}
+		}
+		const el = eliminations({ entities: core.entities, accounts: core.accounts, lines: core.lines, rates: core.rates, reportingCcy: t.settings.reportingCcy, ym, periodId: 0n });
+		const usd = (n: bigint) => formatMinor(n, t.settings.reportingCcy);
+		if (el.balance.entry) {
+			const total = el.balance.pairs.reduce((s, p) => s + p.amountMinor, 0n);
+			propose('pr-c2', 'ic_elimination', el.balance.entry, t.settings.reportingCcy, `Remove the ${usd(total)} the group companies owe each other from the group's reports; it reverses next month.`, 'Balance elimination, posted to the Elimination subsidiary.', `PROPOSE pr-c2: ${el.balance.entry.memo}.`);
+		}
+		if (el.activity.entry) {
+			const total = el.activity.pairs.reduce((s, p) => s + p.amountMinor, 0n);
+			const diff = el.activity.pairs.reduce((s, p) => s + p.differenceMinor, 0n);
+			propose('pr-c3', 'ic_elimination', el.activity.entry, t.settings.reportingCcy, `Remove this month's ${usd(total)} of service fees between the group companies from the group's reports.`, `Activity elimination; the two sides differ by ${usd(diff < 0n ? -diff : diff)} of translation rounding.`, `PROPOSE pr-c3: ${el.activity.entry.memo}.`);
 		}
 	}
 

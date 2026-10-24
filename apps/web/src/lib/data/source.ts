@@ -1,5 +1,12 @@
 import type {
 	Account,
+	CharterCatalog,
+	CharterEval,
+	CharterEvalMode,
+	CharterEvalRun,
+	CharterMappingEntry,
+	CharterVersion,
+	FxRate,
 	AgentMessage,
 	Approval,
 	AuditEvent,
@@ -90,6 +97,12 @@ export interface DataSource {
 	creditChecks(): CreditCheck[];
 	auditEvents(): AuditEvent[];
 	settings(): Settings;
+	/** Recorded FX rates (spot, average, closing) per currency pair and month. */
+	fxRates(): FxRate[];
+	/** Every Charter version of every agent: drafts, the live one per role, and retired ones. */
+	charterVersions(): CharterVersion[];
+	/** Every recorded Charter eval. */
+	charterEvals(): CharterEval[];
 	providers(): ProviderStatus[];
 	/** What an agent is doing right now, or null when idle. */
 	liveActivity(): LiveActivity | null;
@@ -127,6 +140,21 @@ export interface DataSource {
 	lockPeriod(periodId: string): Promise<void>;
 	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */
 	unlockPeriod(periodId: string, reasonPlain: string): Promise<void>;
+	/** What a charter line can map to (rule templates, eval scenarios) and each agent's Built-in Charter. */
+	charterCatalog(): Promise<CharterCatalog>;
+	/** Save an edited Charter as a new draft version. A draft changes nothing until the CFO publishes it. */
+	saveCharterDraft(draft: { role: string; bodyMd: string; mapping: CharterMappingEntry[]; summaryPlain: string; basedOnVersionId?: string }): Promise<void>;
+	/**
+	 * Start an eval of a saved version: the full eval ('dry_run', a whole close on a scratch database) or the quick
+	 * check ('snapshot', against the recorded close). The result arrives as a Charter eval row.
+	 */
+	startCharterEval(versionId: string, mode: CharterEvalMode): Promise<CharterEvalRun>;
+	/** The eval runner's progress for a version ('idle' when none is running or ran for it since the gateway started). */
+	charterEvalRun(versionId: string): Promise<CharterEvalRun>;
+	/** CFO publishes a version; refused unless its latest eval is a passing full eval. The previous live one retires. */
+	publishCharter(versionId: string, notePlain: string): Promise<void>;
+	/** CFO retires a role's live Charter; the Built-in Charter applies again. */
+	retireLiveCharter(role: string, notePlain: string): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
 }

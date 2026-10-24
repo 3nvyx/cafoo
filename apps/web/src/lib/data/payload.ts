@@ -30,6 +30,8 @@ export interface PayloadJournalLine {
 	memo: string;
 	debitMinor: Minor;
 	creditMinor: Minor;
+	/** The line's currency, when the payload says (live payloads do). */
+	ccy?: string;
 	customerId?: string;
 }
 
@@ -42,6 +44,7 @@ export function journalLinesOf(payload: Raw | null): PayloadJournalLine[] {
 			memo: typeof l.memo === 'string' ? l.memo : '',
 			debitMinor: minor(l.debitMinor ?? '0'),
 			creditMinor: minor(l.creditMinor ?? '0'),
+			ccy: typeof l.ccy === 'string' && l.ccy ? l.ccy : undefined,
 			customerId: normId(l.customerId)
 		}));
 }
