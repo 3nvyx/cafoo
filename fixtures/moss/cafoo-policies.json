@@ -1,0 +1,26 @@
+[
+  {
+    "id": "accruals",
+    "text": "# Policy: accruals and cut-off\nWork performed in the close month but billed after month end is accrued at the billed amount (or a documented estimate) to Accrued Liabilities and reversed in the following month. Bills already recorded in the month are never accrued again.\n"
+  },
+  {
+    "id": "bank-reconciliation",
+    "text": "# Policy: bank reconciliation\nEvery bank transaction is matched to an invoice, a bill, or a journal entry within the close. Matches at or above 75% confidence may be proposed in bulk; between 50% and 75% each match needs its own ruling; below 50% the transaction is left unmatched and the counterparty is asked for remittance detail. A second outflow with the same vendor reference within 45 days is a duplicate payment: book it as due back from the vendor, not as expense.\n"
+  },
+  {
+    "id": "credit-and-allowance",
+    "text": "# Policy: credit risk and allowance for doubtful accounts\nBefore net terms are granted, and at every close, the guarantor behind each customer with open receivables goes through the credit cascade: identity verification, fraud score, three bureau reports, public records. Tiers: A (all scores 740+, clean) 1% reserve and 45-day terms; B (680+) 5% and 30 days; C (thin, frozen, no score) 10% and 15 days; D (below 680, discharged bankruptcy, liens, collections) 50% and prepay; BLOCK (active bankruptcy, deceased, identity failure, synthetic identity, high fraud) 100% and no terms. The allowance entry books only the change from the current reserve. Only sandbox persona data may be sent to the credit provider.\n"
+  },
+  {
+    "id": "materiality",
+    "text": "# Policy: materiality and approvals\nWorker agents propose; the Chief Finance Advisor rules; the CFO confirms anything at or above the materiality threshold (default $10,000) and always confirms the period lock. Every proposal and ruling carries a one-sentence plain summary and a technical rationale. The CFO may reverse any posted entry with a reason; reversals are new entries, never deletions.\n"
+  },
+  {
+    "id": "revenue-recognition",
+    "text": "# Policy: revenue recognition\nSubscription contracts are recognized straight-line over the service term, starting in the invoice month, with any rounding remainder in the last month. Usage plans are recognized in the month of use at the invoiced amount. Nothing is recognized before the service month. Deferred revenue must roll forward: opening plus billings minus recognized equals closing, and the closing balance must equal the ledger.\n"
+  },
+  {
+    "id": "vendor-verification",
+    "text": "# Policy: vendor verification\nA vendor receiving its first payment must have a verified owner: identity verification passed and fraud score below the high threshold. A vendor whose owner fails is blocked from payment and procurement is notified before any due date. Blocked vendors stay blocked until a verified owner is on file.\n"
+  }
+]

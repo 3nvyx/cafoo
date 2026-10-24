@@ -19,7 +19,7 @@ The gate is enforced in the database, not in prompts. SpacetimeDB reducers check
 ```
 SvelteKit UI (CFO app)      <- live subscriptions ->  SpacetimeDB module (ledger, Proposals, Approvals, agent messages, audit trail)
 Agent orchestrator (:8787)  -- reducer calls, one identity per role -->  SpacetimeDB
-  Advisor, Bookkeeper, Revenue, Credit & Risk: Claude Agent SDK (TypeScript)
+  Advisor, Bookkeeper, Revenue, Credit & Risk: Claude Agent SDK (TypeScript), OpenAI or Anthropic behind the same Anthropic Messages API
   Red Team: Grok through the Vercel AI SDK
   Tools: ledger-core engine, CRS Credit API cascade, Bright Data lookups, Moss vector search
 Open WebUI (optional)       -- OpenAI-compatible /v1 on the gateway -->  Advisor chat
@@ -74,7 +74,12 @@ With zero API keys, Cafoo runs end to end. Every external call replays recorded 
 
 | Variable | Used for | When empty |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Claude Agent SDK: Advisor, Bookkeeper, Revenue, Credit & Risk | Replays `fixtures/agents/` |
+| `AGENT_PROVIDER` | `openai` (default in the example) or `anthropic`. The Claude Agent SDK still speaks the Anthropic Messages API either way. `openai` runs a local bridge that forwards those calls to OpenAI | `anthropic` when unset, unless only `OPENAI_API_KEY` is set |
+| `OPENAI_API_KEY` | OpenAI key for Advisor, Bookkeeper, Revenue, Credit & Risk when `AGENT_PROVIDER=openai` | Replays `fixtures/agents/` |
+| `OPENAI_BASE_URL` | OpenAI Responses API origin, including `/v1` | `https://api.openai.com/v1` |
+| `OPENAI_REASONING_EFFORT` | Reasoning effort sent upstream (`low`, `medium`, `high`) | `low` |
+| `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL` | OpenAI model ids for the SDK aliases opus (Advisor), sonnet (workers), and haiku (SDK background work) | `gpt-6.1-sol`, `gpt-6-luna`, `gpt-6-luna` |
+| `ANTHROPIC_API_KEY` | Claude Agent SDK when `AGENT_PROVIDER=anthropic`. Ignored in openai mode | Replays `fixtures/agents/` |
 | `XAI_API_KEY` | Grok: Red Team | Scripted critiques |
 | `API_TOKEN` | Bright Data: live vendor lookups during the close | `fixtures/brightdata/` |
 | `APIFY_TOKEN` | Apify: customer-site crawls into Moss (roadmap) | Skipped |
