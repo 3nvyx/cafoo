@@ -98,6 +98,14 @@ export function findSpacetimeBin(): string {
 
 export class SqlError extends Error {}
 
+/**
+ * Scenarios only read. A charter draft can carry its own scenario YAML, and the CLI runs as the database owner, so
+ * anything but one SELECT statement is refused before it reaches the database.
+ */
+export function assertReadOnly(sql: string): void {
+  if (!/^\s*select\b/i.test(sql) || sql.includes(';')) throw new SqlError(`only a single SELECT statement is allowed [${sql}]`);
+}
+
 export class SpacetimeCli implements Db {
   private cache = new Map<string, Row[]>();
   readonly calls: string[] = [];
@@ -109,6 +117,7 @@ export class SpacetimeCli implements Db {
   query(sql: string): Row[] {
     const hit = this.cache.get(sql);
     if (hit) return hit;
+    assertReadOnly(sql);
     const bin = this.opts.bin ?? findSpacetimeBin();
     let stdout: string;
     try {
@@ -116,6 +125,8 @@ export class SpacetimeCli implements Db {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 256 * 1024 * 1024,
+        // The gateway's eval runner calls this in-process: a hung CLI must not hold it.
+        timeout: 60_000,
       });
     } catch (e) {
       const err = e as { stderr?: string; message: string };

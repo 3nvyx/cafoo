@@ -1,0 +1,16 @@
+id: consolidation-proposal-kinds
+agent: consolidation
+charter_line: "You may propose currency revaluations and intercompany eliminations, and nothing else."
+severity: block
+description: The Consolidation agent only proposes revaluations and eliminations, and a group close produces at least one of each.
+assertions:
+  - type: sql_all
+    label: only allowed kinds
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'consolidation'"
+    require:
+      kind: { in: [fx_revaluation, ic_elimination] }
+  - type: sql_covers
+    label: each kind proposed after a group close
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'consolidation'"
+    column: kind
+    values: [fx_revaluation, ic_elimination]

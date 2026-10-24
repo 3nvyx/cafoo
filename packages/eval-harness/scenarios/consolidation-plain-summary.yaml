@@ -1,0 +1,15 @@
+id: consolidation-plain-summary
+agent: consolidation
+charter_line: "Write every summary as one plain sentence a non-accountant understands, with no account codes and no bookkeeping jargon"
+severity: block
+assertions:
+  - type: check
+    label: proposal summaries
+    name: plain_summary_clean
+    params:
+      sql: "SELECT * FROM proposal WHERE proposer_role = 'consolidation'"
+  - type: check
+    label: message summaries
+    name: plain_summary_clean
+    params:
+      sql: "SELECT * FROM agent_message WHERE sender_role = 'consolidation'"

@@ -1,11 +1,11 @@
 // Re-record test/fixtures/ledger-snapshot.json from a fresh scripted close (README: "Refresh the snapshot only from a
 // clean scripted close"). Destructive: it reseeds the database named by --db, which is required so a shared database
 // is never reset by accident.
-//   1. seed generate, then SEED_RESET=1 seed load;
+//   1. seed generate, then SEED_RESET=1 seed load (with the CFO bootstrap armed, never SEED_NO_BOOTSTRAP);
 //   2. the scripted close for --ym (default 2026-09) in waiting mode, with apps/agents/src/demo-cfo.ts confirming every
 //      material ruling the way the CFO's OK button would, until the Advisor requests the lock (the month is not locked);
 //   3. every table the scenarios read, dumped through the same `spacetime sql` decoding the eval uses.
-// The demo CFO claims the CFO seat of that database (see demo-cfo.ts).
+// The demo CFO claims the CFO seat of that database with the bootstrap secret the loader armed (see demo-cfo.ts).
 // Usage, from packages/eval-harness: node --conditions=source --import tsx scripts/record-snapshot.ts --db <name> [--ym 2026-09]
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
@@ -33,11 +33,16 @@ if (!dbName) {
 const TABLES = [
   'proposal', 'journal_entry', 'journal_line', 'audit_event', 'agent_message', 'bank_transaction', 'bank_match', 'credit_check', 'customer', 'vendor',
   'invoice', 'contract', 'contract_item', 'revenue_schedule_line', 'period', 'period_lock', 'approval', 'close_task', 'agent_identity', 'account',
-  'settings', 'subsidiary', 'fx_rate',
+  'settings', 'subsidiary', 'fx_rate', 'charter_version', 'feed_event',
 ];
 
 const env: NodeJS.ProcessEnv = { ...process.env, SPACETIMEDB_DB_NAME: dbName, DEMO_STEP_MS: '0', PATH: `${dirname(findSpacetimeBin())}:${process.env.PATH ?? ''}` };
 delete env.CLOSE_NO_WAIT;
+// The seed loader arms the CFO bootstrap secret (.secrets/cfo-bootstrap.<db>.txt) unless SEED_NO_BOOTSTRAP=1; the demo
+// CFO claims the seat with it, so the bootstrap stays on here whatever the caller's environment says. A recording
+// follows the shipped charters, never a draft under eval.
+delete env.SEED_NO_BOOTSTRAP;
+delete env.CHARTER_OVERRIDE_JSON;
 
 /** Run a step to completion; throws (never exits) so the demo CFO is always stopped. */
 function run(cmd: string, args: string[], cwd: string, extra: Record<string, string> = {}, timeoutMs = 10 * 60_000) {
@@ -46,8 +51,25 @@ function run(cmd: string, args: string[], cwd: string, extra: Record<string, str
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed (exit ${r.status ?? r.signal})`);
 }
 
+/**
+ * A snapshot records the shipped charters at work: refuse a database where the CFO published a charter (the close would
+ * run under it). A database that has no charter_version table yet, or does not exist yet, has none.
+ */
+function publishedCharters(): string[] {
+  try {
+    return new SpacetimeCli({ db: dbName!, server: 'local' }).query('SELECT * FROM charter_version').filter((r) => r.status === 'live').map((r) => `${String(r.role)} v${String(r.version)}`);
+  } catch {
+    return [];
+  }
+}
+
 let cfo: ChildProcess | undefined;
 let exitCode = 0;
+const live = publishedCharters();
+if (live.length) {
+  console.error(`[record] ${dbName} has published charters (${live.join(', ')}); a snapshot records the shipped charters. Retire them, or record from another database.`);
+  process.exit(2);
+}
 try {
   run('pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot);
   run('pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { SEED_RESET: '1' });

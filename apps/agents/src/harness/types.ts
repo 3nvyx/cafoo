@@ -5,11 +5,11 @@
  * the ledger) are listed as evalOnly with the scenario in packages/eval-harness/scenarios/ that checks them.
  */
 
-export type Role = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam';
-export type WorkerRole = 'bookkeeper' | 'revenue' | 'credit';
+export type Role = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'consolidation';
+export type WorkerRole = 'bookkeeper' | 'revenue' | 'credit' | 'consolidation';
 
 /** Proposal kinds as the module stores them. */
-export type ProposalKind = 'journal_entry' | 'accrual' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'vendor_block' | 'vendor_verify';
+export type ProposalKind = 'journal_entry' | 'accrual' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'vendor_block' | 'vendor_verify' | 'fx_revaluation' | 'ic_elimination';
 
 /** A numbered charter line ("May 2", "Must never 3", "Escalates 1") or the Plain summary rule. */
 export type CharterLine = `May ${number}` | `Must never ${number}` | `Escalates ${number}` | 'Plain summary';

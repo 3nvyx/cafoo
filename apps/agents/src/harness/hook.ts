@@ -1,6 +1,7 @@
 /**
  * Tool hook built from the harnesses. On PreToolUse: first the cross-role server gate (no role calls another
- * role's tool server), then the calling agent's allowlist and charter rules. A denial carries the rule id and the
+ * role's tool server), then the calling agent's allowlist and charter rules, from the harness `resolve` returns
+ * (the built-in harnesses unless a published charter is passed in). A denial carries the rule id and the
  * reason so the agent can correct the call. On PostToolUse a call the gate let through joins its role's history
  * only if the tool succeeded, so rules that need history never rely on a call that failed in the tool.
  * Any error while judging (a stale cache, a broken context) denies the call: the gate fails closed.
@@ -9,12 +10,17 @@
 import type { HookCallback, HookInput, PreToolUseHookInput, SyncHookJSONOutput } from '@anthropic-ai/claude-agent-sdk';
 import { checkCall, harnessFor, WORKERS } from './index';
 import { obj, serverOf } from './rules';
-import type { RuleContext, ToolCall } from './types';
+import type { Harness, RuleContext, ToolCall } from './types';
 
 export interface HarnessGateOptions {
   /** Fresh facts for each call (Proposal status, account codes). History is added by the gate. */
   context?: () => Omit<RuleContext, 'history'>;
   onDeny?: (agent: string, tool: string, reason: string) => void;
+  /**
+   * The harness that judges an agent type (undefined: the root query, the Advisor). Defaults to harnessFor, the
+   * built-in harnesses; the live close passes activeHarnessResolver(cast.advisor) so a published charter applies.
+   */
+  resolve?: (agentType: string | undefined) => Harness | undefined;
 }
 
 /** Defensive only: with SDK 0.3.309 an MCP result with isError is raised as PostToolUseFailure and never reaches PostToolUse. */
@@ -31,6 +37,7 @@ export function serverGate(tool: string, agent: string | undefined): string | un
 }
 
 export function harnessGate(opts: HarnessGateOptions = {}): HookCallback {
+  const resolve = opts.resolve ?? harnessFor;
   // Keyed by role, not agent id: the Advisor may start the same worker more than once in one close.
   const history = new Map<string, ToolCall[]>();
   /** Allowed calls waiting for their result, by tool use id. */
@@ -61,8 +68,8 @@ export function harnessGate(opts: HarnessGateOptions = {}): HookCallback {
     try {
       const crossRole = serverGate(pre.tool_name, agent);
       if (crossRole) return refuse(crossRole);
-      const h = harnessFor(agent);
-      if (!h) return refuse(`No harness for agent type ${agent}; only the Advisor, Bookkeeper, Revenue and Credit & Risk may use these tools.`);
+      const h = resolve(agent);
+      if (!h) return refuse(`No harness for agent type ${agent}; only the Advisor and the ${WORKERS.join(', ')} agents may use these tools.`);
       const call: ToolCall = { tool: pre.tool_name, input: obj(pre.tool_input) };
       const seen = history.get(h.role) ?? [];
       const d = checkCall(h, call, { ...opts.context?.(), history: seen });

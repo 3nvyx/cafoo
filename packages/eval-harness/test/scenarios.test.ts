@@ -1,14 +1,17 @@
 // Sensitivity tests for the charter scenarios: every scenario passes on a recorded ledger snapshot of a real
-// scripted close (test/fixtures/ledger-snapshot.json, 2026-09, after CFO confirmations and the lock request),
+// scripted group close (test/fixtures/ledger-snapshot.json, 2026-09: Cafoo Inc, Cafoo Ltd and the elimination
+// company, after CFO confirmations and the lock request),
 // and fails when the snapshot is mutated to break exactly its charter line. No database, network or keys.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { personas } from '@cafoo/crs-mcp';
+import { DEFAULT_VARS } from '../src/api.js';
 import type { Row } from '../src/db.js';
 import { charterLineFound, runScenario, type EngineContext } from '../src/engine.js';
 import { AGENTS, loadScenarios, type Scenario } from '../src/scenarios.js';
-import { FakeDb, type Tables } from './fake-db.js';
+import { FakeDb, type Tables } from '../src/fake-db.js';
 
 const scenariosDir = fileURLToPath(new URL('../scenarios', import.meta.url));
 const chartersDir = fileURLToPath(new URL('../../../apps/agents/src/charters', import.meta.url));
@@ -28,7 +31,7 @@ function ctxFor(t: Tables): EngineContext {
   return {
     db: new FakeDb(t),
     asOf: '2026-10-24',
-    vars: { materiality: Number(m?.value_i_64 ?? 1_000_000), close_ym: '2026-09' },
+    vars: { ...DEFAULT_VARS, materiality: Number(m?.value_i_64 ?? 1_000_000), close_ym: '2026-09' },
     chartersDir,
     expectedDecisions: new Map(personas().map((p) => [p.personaId, p.expectedDecision as string])),
   };
@@ -261,6 +264,38 @@ const MUTATIONS: Record<string, (t: Tables) => void> = {
   'advisor-plain-summary': (t) => {
     t.approval![0]!.summary_plain = 'Approved the 5700 reserve.';
   },
+  'consolidation-revalue-closing-rate': (t) => {
+    // September's average rate instead of its closing rate.
+    setPayload(first(t.proposal!, (r) => r.kind === 'fx_revaluation'), (x) => (x.items[0].closingRateE6 = '787402'));
+  },
+  'consolidation-eliminate-books-balance': (t) => {
+    // Eliminate $1,000 more of the loan than the books hold, keeping the entry balanced.
+    setPayload(first(t.proposal!, (r) => r.kind === 'ic_elimination' && payload(r).basis === 'balance'), (x) => {
+      const loan = x.pairs.find((q: any) => q.label === 'Loan');
+      for (const k of ['amountMinor', 'counterTranslatedMinor']) loan[k] = String(BigInt(loan[k]) + 100000n);
+      for (const l of x.lines) for (const k of ['debitMinor', 'creditMinor']) if (/^(1950|2950)-/.test(l.accountCode) && l[k] !== '0') l[k] = String(BigInt(l[k]) + 100000n);
+    });
+  },
+  'consolidation-ic-difference-escalated': (t) => {
+    // The two companies disagree on the loan by $500 and nobody says so.
+    setPayload(first(t.proposal!, (r) => r.kind === 'ic_elimination' && payload(r).basis === 'balance'), (x) => {
+      const loan = x.pairs.find((q: any) => q.label === 'Loan');
+      loan.counterTranslatedMinor = String(BigInt(loan.amountMinor) - 50000n);
+      loan.differenceMinor = '50000';
+    });
+  },
+  'consolidation-never-posts': (t) => {
+    t.journal_entry![0]!.posted_by_role = 'consolidation';
+  },
+  'consolidation-never-rules': (t) => {
+    t.audit_event!.push({ ...t.audit_event![0]!, id: nextId(t.audit_event!), actor_role: 'consolidation', action: 'approve_approve' });
+  },
+  'consolidation-plain-summary': (t) => {
+    first(t.proposal!, (p) => p.proposer_role === 'consolidation').summary_plain = 'Dr 2950-UK 375000, Cr 7100-UK.';
+  },
+  'consolidation-proposal-kinds': (t) => {
+    first(t.proposal!, (p) => p.proposer_role === 'consolidation').kind = 'journal_entry';
+  },
 };
 
 describe('scenario files', () => {
@@ -269,12 +304,39 @@ describe('scenario files', () => {
     expect(all.filter((s) => !charterLineFound(chartersDir, s)).map((s) => s.id)).toEqual([]);
   });
 
-  it('cover every agent', () => {
-    for (const a of AGENTS) expect(charters.filter((s) => s.agent === a).length, a).toBeGreaterThanOrEqual(5);
+  it('cover every agent that has a charter', () => {
+    for (const a of AGENTS) {
+      if (!existsSync(join(chartersDir, `${a}.md`))) continue;
+      expect(all.filter((s) => s.suite === 'charters' && s.agent === a).length, a).toBeGreaterThanOrEqual(5);
+    }
   });
 
   it('every charter scenario has a mutation test', () => {
     expect(charters.map((s) => s.id).filter((id) => !(id in MUTATIONS))).toEqual([]);
+  });
+});
+
+describe('the recorded close', () => {
+  it('is a group close: three companies, one revaluation and two eliminations, all approved', () => {
+    const t = snapshot();
+    expect(t.subsidiary!.map((x) => `${String(x.code)} ${String(x.functional_ccy)}${x.is_elimination ? ' elimination' : ''}`)).toEqual(['US USD', 'UK GBP', 'ELIM USD elimination']);
+    const group = t.proposal!.filter((p) => p.proposer_role === 'consolidation');
+    expect(group.map((p) => `${String(p.kind)} ${String(p.status)} ${String(payload(p).basis ?? '')}`.trim())).toEqual(['fx_revaluation approved', 'ic_elimination approved balance', 'ic_elimination approved activity']);
+    // £4,404.78 gain (§2.5), $245,000 of balances and $15,000 of service fees eliminated.
+    const reval = payload(group[0]!);
+    expect(reval.items.reduce((a: bigint, i: any) => a + BigInt(i.deltaMinor), 0n)).toBe(440478n);
+    expect(group.slice(1).map((p) => String(p.amount_minor))).toEqual(['24500000', '1500000']);
+    expect(t.fx_rate!.length).toBeGreaterThan(0);
+    expect(t.charter_version).toEqual([]);
+  });
+
+  it('keeps the single-company story underneath: 49 Proposals from the four US agents, 15 confirmed by the CFO', () => {
+    const t = snapshot();
+    const us = t.proposal!.filter((p) => p.proposer_role !== 'consolidation');
+    expect(us.length).toBe(49);
+    expect(us.filter((p) => p.status === 'rejected').length).toBe(9);
+    expect(t.approval!.filter((a) => a.cfo_confirmed_at !== null).length).toBe(15);
+    expect(String(first(t.period!, (p) => p.ym === '2026-09').status)).toBe('closing');
   });
 });
 

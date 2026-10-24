@@ -16,7 +16,9 @@ import {
   type RiskTier,
 } from '@cafoo/ledger-core';
 import { CrsClient, createCrsMcpServer, runCascade } from '@cafoo/crs-mcp';
-import { exactAmount, snapshot } from '../snapshot';
+import { activeCharter } from '../charter/active';
+import { planConsolidation } from '../scripted/consolidate';
+import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
@@ -54,8 +56,9 @@ export function booksServer(cast: Cast) {
           try {
             const s = snapshot(A, periodYm);
             const unmatched = s.bankTxRows.filter(t => !t.matched && t.ym === periodYm).map(t => ({ id: t.id, bookedAt: new Date(Number(t.bookedAt.microsSinceUnixEpoch / 1000n)).toISOString().slice(0, 10), amount: money(t.amountMinor), amountMinor: t.amountMinor, description: t.description, counterparty: t.counterparty }));
-            const openInvoices = [...A.db.invoice.iter()].filter(i => i.status.tag !== 'Paid').map(i => ({ id: i.id, number: i.number, customerId: i.customerId, customer: s.customerName.get(i.customerId), ym: i.ym, amount: money(i.amountMinor), status: i.status.tag }));
-            const openBills = [...A.db.bill.iter()].filter(b => b.status.tag !== 'Paid').map(b => ({ id: b.id, externalRef: b.externalRef, vendorId: b.vendorId, vendor: s.vendorName.get(b.vendorId), ym: b.ym, billedAt: new Date(Number(b.billedAt.microsSinceUnixEpoch / 1000n)).toISOString().slice(0, 10), amount: money(b.amountMinor), expenseAccountCode: b.expenseAccountCode }));
+            // The root company's books only (the snapshot's customers and vendors).
+            const openInvoices = [...A.db.invoice.iter()].filter(i => i.status.tag !== 'Paid' && s.customerName.has(i.customerId)).map(i => ({ id: i.id, number: i.number, customerId: i.customerId, customer: s.customerName.get(i.customerId), ym: i.ym, amount: money(i.amountMinor), status: i.status.tag }));
+            const openBills = [...A.db.bill.iter()].filter(b => b.status.tag !== 'Paid' && s.vendorName.has(b.vendorId)).map(b => ({ id: b.id, externalRef: b.externalRef, vendorId: b.vendorId, vendor: s.vendorName.get(b.vendorId), ym: b.ym, billedAt: new Date(Number(b.billedAt.microsSinceUnixEpoch / 1000n)).toISOString().slice(0, 10), amount: money(b.amountMinor), expenseAccountCode: b.expenseAccountCode }));
             const subItems = s.items.filter(i => i.kind === 'subscription');
             const missingSchedules = s.contractRows.filter(k => k.plan.tag === 'Annual' && !s.scheduleLines.some(sl => subItems.some(i => i.id === sl.contractItemId && i.contractId === k.id))).map(k => ({ contractId: k.id, code: k.code, customerId: k.customerId, customer: s.customerName.get(k.customerId), startYm: k.startYm, endYm: k.endYm, total: money(k.totalMinor) }));
             const unrecognized: Record<string, string> = {};
@@ -177,6 +180,38 @@ export function booksServer(cast: Cast) {
       ),
     ],
   });
+}
+
+/** Close-thread messages and close-task progress, bound to a worker's own identity (never done: only the Advisor or CFO). */
+function threadTools(worker: RoleConn) {
+  return [
+    tool(
+      'post_message',
+      'Say something in the close thread or on a proposal thread (statement or question).',
+      { threadId: z.string().describe('close:YYYY-MM or proposal:<id>'), body: z.string(), summaryPlain: z.string(), kind: z.enum(['statement', 'question']).default('statement'), proposalId: z.string().optional() },
+      async a => {
+        try {
+          await worker.reducers.postAgentMessage({ threadId: a.threadId, kind: a.kind, body: a.body, summaryPlain: a.summaryPlain, proposalId: a.proposalId ? BigInt(a.proposalId) : undefined });
+          return ok('posted');
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      }
+    ),
+    tool(
+      'update_close_task',
+      'Move a close task to in_progress or blocked (only the Advisor or CFO can mark done).',
+      { taskId: z.string(), status: z.enum(['todo', 'in_progress', 'blocked']), note: z.string() },
+      async a => {
+        try {
+          await worker.reducers.updateCloseTask({ taskId: BigInt(a.taskId), status: a.status, note: a.note });
+          return ok('updated');
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      }
+    ),
+  ];
 }
 
 /** Proposal tools bound to a worker's own identity. */
@@ -301,35 +336,109 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       },
       readOnly
     ),
-    tool(
-      'post_message',
-      'Say something in the close thread or on a proposal thread (statement or question).',
-      { threadId: z.string().describe('close:YYYY-MM or proposal:<id>'), body: z.string(), summaryPlain: z.string(), kind: z.enum(['statement', 'question']).default('statement'), proposalId: z.string().optional() },
-      async a => {
-        try {
-          await worker.reducers.postAgentMessage({ threadId: a.threadId, kind: a.kind, body: a.body, summaryPlain: a.summaryPlain, proposalId: a.proposalId ? BigInt(a.proposalId) : undefined });
-          return ok('posted');
-        } catch (e) {
-          return fail((e as Error).message);
-        }
-      }
-    ),
-    tool(
-      'update_close_task',
-      'Move a close task to in_progress or blocked (only the Advisor or CFO can mark done).',
-      { taskId: z.string(), status: z.enum(['todo', 'in_progress', 'blocked']), note: z.string() },
-      async a => {
-        try {
-          await worker.reducers.updateCloseTask({ taskId: BigInt(a.taskId), status: a.status, note: a.note });
-          return ok('updated');
-        } catch (e) {
-          return fail((e as Error).message);
-        }
-      }
-    ),
+    ...threadTools(worker),
     ...extraTools,
   ];
   return createSdkMcpServer({ name: worker.role, version: '1.0.0', tools });
+}
+
+const consolidationLine = z.object({
+  accountCode: z.string().describe("An account of the proposal's subsidiary: the company's own codes for a revaluation (e.g. 2950-UK, 7100-UK), the elimination subsidiary's intercompany codes for an elimination (e.g. 1950-ELIM)"),
+  debitMinor: z.string(),
+  creditMinor: z.string(),
+  ccy: z.string().describe("The subsidiary's own currency"),
+  fxRateE6: z.string().default('1000000'),
+});
+
+/**
+ * The Consolidation agent's tools, bound to its own identity: read-only candidates computed by ledger-core from the
+ * whole group's books (ready-to-propose payloads), the two propose tools, and close-thread messages.
+ */
+export function consolidationServer(cast: Cast) {
+  const A = cast.advisor;
+  const C = cast.consolidation;
+  const common = { rationale: z.string().describe('Technical rationale: each balance or pair with its figures'), summaryPlain: z.string().describe('One sentence for a non-technical CFO: no account codes, amounts as money'), periodYm: z.string(), closeTaskId: z.string().optional(), amountMinor: z.string().describe('Sum of the debits in the reporting currency at the closing rate, minor units') };
+  const tolerance = () => activeCharter(A, 'consolidation').params.icDifferenceToleranceMinor;
+  const plan = (periodYm: string) => planConsolidation(groupSnapshot(A), periodYm, { toleranceMinor: tolerance() });
+  const filed = async (kind: 'fx_revaluation' | 'ic_elimination', payload: Record<string, unknown>, a: { rationale: string; summaryPlain: string; periodYm: string; closeTaskId?: string; amountMinor: string }) => {
+    try {
+      const p = await propose(C, A, { kind, payload, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.amountMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+      return ok({ proposalId: p.id, status: p.status.tag, amountMinor: p.amountMinor });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  };
+  return createSdkMcpServer({
+    name: 'consolidation',
+    version: '1.0.0',
+    tools: [
+      tool(
+        'revaluation_candidates',
+        "Each company's foreign-currency asset and liability balances through the month, restated at the recorded closing rate: a ready-to-propose fx_revaluation payload per company (items, lines), its amount in the reporting currency, and a plain summary. Empty when nothing moves.",
+        { periodYm: z.string().describe('YYYY-MM') },
+        async ({ periodYm }) => {
+          try {
+            const p = plan(periodYm);
+            return ok(p.group ? p.revaluations : { note: 'One company only: nothing to consolidate.', revaluations: [] });
+          } catch (e) {
+            return fail((e as Error).message);
+          }
+        },
+        readOnly
+      ),
+      tool(
+        'elimination_candidates',
+        "The month's intercompany eliminations: one ready-to-propose ic_elimination payload per basis (balance: cumulative, reverses next month; activity: this month's service fees), posted to the elimination subsidiary, with amounts and plain summaries; and every pair whose two sides differ by more than the tolerance, to raise in the close thread first.",
+        { periodYm: z.string().describe('YYYY-MM') },
+        async ({ periodYm }) => {
+          try {
+            const p = plan(periodYm);
+            return ok(p.group ? { eliminations: p.eliminations, differencesOverTolerance: p.differences, toleranceMinor: tolerance() } : { note: 'One company only: nothing to consolidate.', eliminations: [] });
+          } catch (e) {
+            return fail((e as Error).message);
+          }
+        },
+        readOnly
+      ),
+      tool(
+        'propose_fx_revaluation',
+        "Propose restating one company's foreign-currency balances at the month's closing rate (pass revaluation_candidates' payload unchanged). It never posts by itself: the Advisor rules, and material amounts wait for the CFO.",
+        {
+          ...common,
+          subsidiaryId: z.string(),
+          rateYm: z.string().optional().describe('Equals periodYm'),
+          memo: z.string(),
+          items: z.array(z.object({ accountCode: z.string(), ccy: z.string(), txnBalanceMinor: z.string(), closingRateE6: z.string(), bookedFunctionalMinor: z.string(), targetFunctionalMinor: z.string(), deltaMinor: z.string() })).min(1),
+          lines: z.array(consolidationLine).min(2),
+        },
+        async a => filed('fx_revaluation', { subsidiaryId: id(a.subsidiaryId), periodYm: a.periodYm, rateYm: a.rateYm ?? a.periodYm, memo: a.memo, items: a.items, lines: a.lines }, a)
+      ),
+      tool(
+        'propose_ic_elimination',
+        "Propose removing what the group's companies owe or charged each other from the combined books, posted to the elimination subsidiary (pass elimination_candidates' payload unchanged). basis balance reverses in a later month; basis activity never reverses.",
+        {
+          ...common,
+          subsidiaryId: z.string().describe('The elimination subsidiary'),
+          memo: z.string(),
+          basis: z.enum(['balance', 'activity']),
+          reversesInYm: z.string().optional(),
+          pairs: z.array(z.object({ label: z.string(), sourceSubsidiaryId: z.string(), sourceAccountCode: z.string(), counterSubsidiaryId: z.string(), counterAccountCode: z.string(), amountMinor: z.string(), counterTranslatedMinor: z.string(), differenceMinor: z.string() })).min(1),
+          lines: z.array(consolidationLine).min(2),
+        },
+        async a =>
+          filed('ic_elimination', {
+            subsidiaryId: id(a.subsidiaryId),
+            periodYm: a.periodYm,
+            memo: a.memo,
+            basis: a.basis,
+            ...(a.reversesInYm ? { reversesInYm: a.reversesInYm } : {}),
+            pairs: a.pairs.map(x => ({ ...x, sourceSubsidiaryId: id(x.sourceSubsidiaryId), counterSubsidiaryId: id(x.counterSubsidiaryId) })),
+            lines: a.lines,
+          }, a)
+      ),
+      ...threadTools(C),
+    ],
+  });
 }
 
 export function advisorServer(cast: Cast) {

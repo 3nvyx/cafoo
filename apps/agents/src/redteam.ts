@@ -11,14 +11,17 @@ import { z } from 'zod';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { redTeamLive } from './env';
-import { agentPrompt, checkCall, HARNESSES, modelFor, type Decision, type RuleContext } from './harness';
+import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
+import { activeCharter } from './charter/active';
+import { eliminationCritique } from './scripted/rulings';
 import { statusKey } from './harness/rules';
 import { Cast, repoRoot, type RoleConn } from './stdb';
 
-const RED = HARNESSES.redteam;
 type Critique = { body: string; summaryPlain: string };
+/** The Red Team's active charter (a published version, else the built-in one): its harness, prompt and model. */
+const red = (A: RoleConn) => activeCharter(A, 'redteam');
 /** Run the Red Team harness on a critique as the submit_critique tool call it is. */
-const judge = (proposalId: bigint, c: Critique, ctx: RuleContext): Decision => checkCall(RED, { tool: 'submit_critique', input: { proposalId: proposalId.toString(), ...c } }, ctx);
+const judge = (A: RoleConn, proposalId: bigint, c: Critique, ctx: RuleContext): Decision => checkCall(red(A).harness, { tool: 'submit_critique', input: { proposalId: proposalId.toString(), ...c } }, ctx);
 
 const policiesDir = join(repoRoot, 'fixtures', 'moss');
 
@@ -74,17 +77,20 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
       ? { body: `A 100% reserve is the right default for an active bankruptcy plan. Confirm none of the receivable is secured or prepaid, and that the public record is tied to the guarantor's SSN rather than a same-name match.`, summaryPlain: `The Red Team asks whether any of this debt is secured before reserving all of it.` }
       : { body: `The reserve rate follows the tier table. Confirm the open balance excludes payments received this month but not yet matched, and revisit the rate if the customer keeps paying monthly.`, summaryPlain: `The Red Team asks to confirm the unpaid balance before reserving against it.` };
   }
+  if (kind === 'FxRevaluation') return { body: `The rate is the recorded closing rate for ${payload.periodYm ?? 'the month'} and only balances held in another currency are restated. Confirm nothing in these balances was settled after month end, or the gain or loss is overstated.`, summaryPlain: `The Red Team agrees with the rate and asks whether anything was paid after month end.` };
+  if (kind === 'IcElimination') return eliminationCritique(payload);
   if (kind === 'JournalEntry' && p.amountMinor >= materiality) return { body: `Material entry. Confirm the account coding against the policy and that the bank transactions it explains are not also matched to a bill.`, summaryPlain: `The Red Team asks for a second look at a large entry.` };
   return null;
 }
 
-async function grokCritique(p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
+async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
+  const charter = red(A);
   let submitted: Critique | null = null;
   await generateText({
-    model: xai.responses(modelFor(RED)),
+    model: xai.responses(modelFor(charter.harness)),
     // The harness instructions say how to use the tools; the charter and the gate formats follow them.
-    system: agentPrompt(RED, { withInstructions: true }),
+    system: charter.prompt,
     prompt: `Proposal ${p.id} (${p.kind.tag}, ${p.proposerRole}, amount minor units ${p.amountMinor}, materiality ${materiality}):\nPlain: ${p.summaryPlain}\nRationale: ${p.rationale}\nPayload: ${p.payloadJson.slice(0, 4000)}`,
     tools: {
       search_policies: aiTool({ description: 'Search the house accounting policies', inputSchema: z.object({ query: z.string() }), execute: async ({ query }) => searchPolicies(query) }),
@@ -93,7 +99,7 @@ async function grokCritique(p: ProposalRow, materiality: bigint, ctx: () => Rule
         inputSchema: z.object({ body: z.string(), summaryPlain: z.string() }),
         execute: async a => {
           const c = ctx();
-          const d = judge(p.id, a, c);
+          const d = judge(A, p.id, a, c);
           const status = c.proposalStatus?.(p.id.toString());
           if (!d.allow && status !== undefined && statusKey(status) !== 'open') return `Stop: Proposal ${p.id} is ${status}; it was already ruled or is no longer open, so no critique can be attached. Do not call submit_critique again.`;
           if (!d.allow) return `Not submitted: ${d.reason}. Fix it and call submit_critique again.`;
@@ -102,7 +108,7 @@ async function grokCritique(p: ProposalRow, materiality: bigint, ctx: () => Rule
         },
       }),
     },
-    stopWhen: stepCountIs(RED.maxTurns ?? 6),
+    stopWhen: stepCountIs(charter.harness.maxTurns ?? 6),
   });
   return submitted;
 }
@@ -122,7 +128,7 @@ export function startCritic(cast: Cast): () => void {
       // Grok first when live; the scripted critique when Grok fails (outage, timeout, rate limit) or submits nothing
       // the harness accepts within its step cap.
       const grok = redTeamLive()
-        ? await grokCritique(p, materiality, ctx).catch(e => {
+        ? await grokCritique(A, p, materiality, ctx).catch(e => {
             console.warn(`[redteam] proposal ${p.id}: Grok failed, using the scripted critique:`, (e as Error).message);
             return null;
           })
@@ -130,7 +136,7 @@ export function startCritic(cast: Cast): () => void {
       const c = grok ?? scriptedCritique(p, materiality);
       if (!c) return;
       // Judged again at write time: the Advisor may have ruled while Grok was thinking.
-      const d = judge(p.id, c, ctx());
+      const d = judge(A, p.id, c, ctx());
       if (!d.allow) return console.warn(`[redteam] proposal ${p.id}: critique withheld: ${d.reason}`);
       await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
     } catch (e) {
@@ -142,7 +148,7 @@ export function startCritic(cast: Cast): () => void {
   };
   A.db.proposal.onInsert(onInsert as any);
   for (const p of A.db.proposal.iter()) if (p.status.tag === 'Open') void critique(p);
-  console.log(`[redteam] watching proposals (${redTeamLive() ? modelFor(RED) : 'scripted'})`);
+  console.log(`[redteam] watching proposals (${redTeamLive() ? modelFor(red(A).harness) : 'scripted'})`);
   return () => {
     stopped = true;
     try {

@@ -5,14 +5,17 @@
  * calling another role's tools or breaking a charter rule (belt); the database reducers check identity (braces).
  */
 import { query, type AgentDefinition, type HookCallback, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
-import { sleep, type Cast } from '../stdb';
-import { advisorServer, booksServer, crsServer, workerServer } from './tools';
+import { say, sleep, type Cast } from '../stdb';
+import { closeHasWork, openingMarker } from '../close-state';
+import { advisorServer, booksServer, consolidationServer, crsServer, workerServer } from './tools';
 import { startCritic } from '../redteam';
-import { agentPrompt, HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from '../harness';
+import { HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from '../harness';
+import { activeCharter, activeHarnessResolver } from '../charter/active';
 import { harnessGate } from '../harness/hook';
 import { BOOKS_TOOLS, mcp } from '../harness/rules';
 import { catchUpAmounts } from '../revenue-catchup';
-import { snapshot } from '../snapshot';
+import { groupSnapshot, rootSubsidiary, snapshot } from '../snapshot';
+import type { RoleConn } from '../stdb';
 
 const ADVISOR = HARNESSES.advisor;
 const safeJson = (s: string): Record<string, unknown> => {
@@ -23,16 +26,17 @@ const safeJson = (s: string): Record<string, unknown> => {
   }
 };
 
-/** A worker subagent exactly as its harness declares it. */
-function subagent(role: WorkerRole): AgentDefinition {
-  const h = HARNESSES[role];
-  return { description: h.description ?? role, prompt: agentPrompt(h), model: modelFor(h), tools: [...h.tools], maxTurns: h.maxTurns };
+/** A worker subagent exactly as its active charter declares it (a published version, else the built-in one). */
+function subagent(conn: RoleConn, role: WorkerRole): AgentDefinition {
+  const { harness: h, prompt } = activeCharter(conn, role);
+  return { description: h.description ?? role, prompt, model: modelFor(h), tools: [...h.tools], maxTurns: h.maxTurns };
 }
 
 export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: string) => void) {
-  const period = [...cast.advisor.db.period.iter()].find(p => p.ym === periodYm);
-  if (period && [...cast.advisor.db.proposal.iter()].some(p => p.periodId === period.id)) {
-    onStep(`${periodYm} already has proposals; resuming through the scripted path instead of proposing twice`);
+  // Resume only a close that has work of its own (src/close-state.ts): not the live feed's Proposals of an open month,
+  // and not a close that failed right after opening, before it filed anything.
+  if (closeHasWork(cast.advisor, periodYm)) {
+    onStep(`the ${periodYm} close already started; resuming through the scripted path instead of proposing twice`);
     const { runScriptedClose } = await import('../scripted/close');
     return runScriptedClose(cast, periodYm, { onStep });
   }
@@ -41,11 +45,17 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const bookkeeper = workerServer(cast.bookkeeper, cast);
   const revenue = workerServer(cast.revenue, cast);
   const credit = workerServer(cast.credit, cast);
+  const consolidation = consolidationServer(cast);
   const crs = crsServer();
+  // A group (a second trading company and an elimination subsidiary) gets the Consolidation agent too.
+  const group = groupSnapshot(cast.advisor).entities.filter(e => !e.isElimination).length > 1;
   const stopCritic = startCritic(cast);
 
   const A = cast.advisor;
+  const advisorCharter = activeCharter(A, 'advisor');
   const gate = harnessGate({
+    // Published charters change the gate as well as the prompts.
+    resolve: activeHarnessResolver(A),
     context: () => ({
       proposalStatus: id => (/^\d+$/.test(id) ? A.db.proposal.id.find(BigInt(id))?.status.tag : undefined),
       accountCodes: [...A.db.account.iter()].map(a => a.code),
@@ -60,7 +70,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (post.tool_name !== 'SendMessage') return {};
     const agent = ((post as any).agent_type as string | undefined) ?? 'advisor';
     const inp = post.tool_input as { to?: string; message?: string };
-    const who = (['bookkeeper', 'revenue', 'credit'].includes(agent) ? cast.byRole(agent as any) : cast.advisor);
+    const who = ((WORKERS as readonly string[]).includes(agent) ? cast.byRole(agent as WorkerRole) : cast.advisor);
     try {
       await who.reducers.postAgentMessage({ threadId: `close:${periodYm}`, kind: agent === 'advisor' ? 'ruling' : 'statement', body: `to ${inp.to}: ${inp.message ?? ''}`, summaryPlain: `${agent} messaged ${inp.to}.`, proposalId: undefined });
     } catch {
@@ -70,21 +80,21 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   };
 
   // The root pre-approves every harness tool so subagents can use theirs under dontAsk; the gate keeps each to its own list.
-  const allowedTools = [...new Set([ADVISOR, ...WORKERS.map(r => HARNESSES[r])].flatMap(h => h.tools))];
+  const allowedTools = [...new Set([advisorCharter.harness, ...WORKERS.map(r => activeCharter(A, r).harness)].flatMap(h => h.tools))];
   let total = 0;
   /** One Advisor query over the same servers, subagents and gate. */
   const run = async (prompt: string) => {
     for await (const msg of query({
       prompt,
       options: {
-        model: modelFor(ADVISOR),
-        systemPrompt: agentPrompt(ADVISOR),
-        tools: ADVISOR.tools.filter(t => !t.startsWith('mcp__')),
+        model: modelFor(advisorCharter.harness),
+        systemPrompt: advisorCharter.prompt,
+        tools: advisorCharter.harness.tools.filter(t => !t.startsWith('mcp__')),
         allowedTools,
-        ...(ADVISOR.maxTurns ? { maxTurns: ADVISOR.maxTurns } : {}),
+        ...(advisorCharter.harness.maxTurns ? { maxTurns: advisorCharter.harness.maxTurns } : {}),
         permissionMode: 'dontAsk',
-        mcpServers: { books, advisor, bookkeeper, revenue, credit, crs },
-        agents: Object.fromEntries(WORKERS.map(r => [r, subagent(r)])),
+        mcpServers: { books, advisor, bookkeeper, revenue, credit, consolidation, crs },
+        agents: Object.fromEntries(WORKERS.filter(r => group || r !== 'consolidation').map(r => [r, subagent(A, r)])),
         // The gate judges on PreToolUse and learns from results (history of successful calls) on the other two.
         hooks: {
           PreToolUse: [{ matcher: '^mcp__', hooks: [gate] }],
@@ -111,8 +121,10 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const pendingSchedules = () =>
     [...A.db.proposal.iter()].filter(p => p.periodId === periodId && p.kind.tag === 'RevenueSchedule' && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag));
   try {
+    // The opening message marks the close as started, so a second run resumes instead of proposing twice.
+    await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     await run(
-      `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification). Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
+      `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification)${group ? ', 4) consolidation (revalue Cafoo Ltd\'s foreign-currency balances at the closing rate and propose the balance and activity eliminations; it raises any intercompany difference in the close thread first)' : ''}. Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
     );
     // Revenue catch-up, as in the scripted close: the recognition entry had to leave out any customer whose new
     // schedule waited for a ruling. Once those schedules are decided, recognize their lines through the month.

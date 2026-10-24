@@ -1,0 +1,9 @@
+id: consolidation-ic-difference-escalated
+agent: consolidation
+charter_line: "When the two companies' books disagree on an intercompany pair by more than one dollar, say so in the close thread before proposing the elimination."
+severity: block
+description: Every intercompany pair whose two sides differ by more than the tolerance (one dollar by default) is named in a Consolidation message in the close thread. The seed ties to the cent, so a clean close has nothing to raise; the mutation plants a difference.
+assertions:
+  - type: check
+    label: differences over the tolerance are raised in the close thread
+    name: ic_difference_escalated

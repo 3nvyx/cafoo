@@ -7,6 +7,7 @@
 import { formatMinor } from '@cafoo/ledger-core';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
+import { closeHasWork } from './close-state';
 import type { Cast } from './stdb';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
@@ -176,11 +177,11 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       yield `The ${monthLabel(ym)} close is done and the lock has been requested; confirm the lock in the app when you are ready.`;
       return;
     }
-    const proposals = [...A.db.proposal.iter()].filter(p => p.periodId === period.id);
+    const resumes = closeHasWork(A, ym);
     const r = await (opts.startClose ?? startCloseOverHttp)(ym);
     if (r.status === 'failed') yield `I could not start the ${monthLabel(ym)} close: ${r.error ?? 'unknown error'}.`;
     else if (r.status === 'running') yield `The ${monthLabel(ym)} close is already running. Watch the Agents page for progress; anything material will wait for your OK.`;
-    else if (proposals.length) yield `The ${monthLabel(ym)} close already ran, so I am picking it up where it stopped instead of proposing again: ${lockOutlook(A, ym, period.id)}`;
+    else if (resumes) yield `The ${monthLabel(ym)} close already ran, so I am picking it up where it stopped instead of proposing again: ${lockOutlook(A, ym, period.id)}`;
     else yield `Starting the ${monthLabel(ym)} close. Watch the Agents page: the Bookkeeper, Revenue, and Credit & Risk will propose, the Red Team will challenge, and I will rule. Anything material will wait for your OK.`;
     return;
   }

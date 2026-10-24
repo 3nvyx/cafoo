@@ -9,15 +9,18 @@ import type { Identity } from 'spacetimedb';
 import { DbConnection } from '@cafoo/stdb-bindings';
 import { STDB_DB, STDB_URI } from './env';
 
-export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam';
+/** Agent roles. `feed` is the live bank feed's identity: it may only ingest raw bank lines and invoices. */
+export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'consolidation' | 'feed';
 /** A connection's role: an agent, or the CFO seat (only the demo CFO stand-in in src/demo-cfo.ts connects as it). */
 export type ConnRole = AgentRole | 'cfo';
-export const ROLE_TAG: Record<AgentRole, 'Advisor' | 'Bookkeeper' | 'Revenue' | 'Credit' | 'Redteam'> = {
+export const ROLE_TAG: Record<AgentRole, 'Advisor' | 'Bookkeeper' | 'Revenue' | 'Credit' | 'Redteam' | 'Consolidation' | 'Feed'> = {
   advisor: 'Advisor',
   bookkeeper: 'Bookkeeper',
   revenue: 'Revenue',
   credit: 'Credit',
   redteam: 'Redteam',
+  consolidation: 'Consolidation',
+  feed: 'Feed',
 };
 export const ROLE_DISPLAY: Record<AgentRole, string> = {
   advisor: 'Chief Finance Advisor',
@@ -25,7 +28,12 @@ export const ROLE_DISPLAY: Record<AgentRole, string> = {
   revenue: 'Revenue',
   credit: 'Credit & Risk',
   redteam: 'Red Team',
+  consolidation: 'Consolidation',
+  feed: 'Bank feed',
 };
+/** Granted roles and the model each runs on unless told otherwise. */
+const GRANTED: readonly AgentRole[] = ['bookkeeper', 'revenue', 'credit', 'redteam', 'consolidation', 'feed'];
+const DEFAULT_MODEL: Partial<Record<AgentRole, string>> = { redteam: 'grok-4.7', feed: 'deterministic feed' };
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, '..', '..', '..');
@@ -135,7 +143,9 @@ export class Cast {
     readonly bookkeeper: RoleConn,
     readonly revenue: RoleConn,
     readonly credit: RoleConn,
-    readonly redteam: RoleConn
+    readonly redteam: RoleConn,
+    readonly consolidation: RoleConn,
+    readonly feed: RoleConn
   ) {}
 
   byRole(role: AgentRole): RoleConn {
@@ -148,24 +158,22 @@ export class Cast {
     if (!roster().some(r => r.role === 'advisor')) {
       await advisor.reducers.registerAgent({ role: { tag: 'Advisor' }, displayName: ROLE_DISPLAY.advisor, model: models.advisor ?? 'claude-opus-5-5' });
     }
-    const [bookkeeper, revenue, credit, redteam] = await Promise.all(
-      (['bookkeeper', 'revenue', 'credit', 'redteam'] as AgentRole[]).map(r => RoleConn.connect(r))
-    );
-    for (const w of [bookkeeper, revenue, credit, redteam]) {
-      const role = w.role as AgentRole;
+    const [bookkeeper, revenue, credit, redteam, consolidation, feed] = await Promise.all(GRANTED.map(r => RoleConn.connect(r)));
+    for (const w of [bookkeeper, revenue, credit, redteam, consolidation, feed]) {
+      const role = w!.role as AgentRole;
       await advisor.reducers.grantRole({
-        identity: w.identity,
+        identity: w!.identity,
         role: { tag: ROLE_TAG[role] },
         displayName: ROLE_DISPLAY[role],
-        model: models[role] ?? (role === 'redteam' ? 'grok-4.7' : 'claude-sonnet-5-5'),
+        model: models[role] ?? DEFAULT_MODEL[role] ?? 'claude-sonnet-5-5',
       });
     }
-    await waitFor(() => roster().length >= 5, 'agent roster');
-    return new Cast(advisor, bookkeeper, revenue, credit, redteam);
+    await waitFor(() => GRANTED.every(r => roster().some(x => x.role === r)), 'agent roster');
+    return new Cast(advisor, bookkeeper!, revenue!, credit!, redteam!, consolidation!, feed!);
   }
 
   disconnectAll() {
-    for (const c of [this.advisor, this.bookkeeper, this.revenue, this.credit, this.redteam]) c.disconnect();
+    for (const c of [this.advisor, this.bookkeeper, this.revenue, this.credit, this.redteam, this.consolidation, this.feed]) c.disconnect();
   }
 }
 
@@ -174,7 +182,7 @@ export async function propose(
   worker: RoleConn,
   reader: RoleConn,
   args: {
-    kind: 'journal_entry' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'accrual' | 'vendor_block' | 'vendor_verify';
+    kind: 'journal_entry' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'accrual' | 'vendor_block' | 'vendor_verify' | 'fx_revaluation' | 'ic_elimination';
     payload: unknown;
     rationale: string;
     summaryPlain: string;

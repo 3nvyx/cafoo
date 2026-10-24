@@ -1,0 +1,15 @@
+id: consolidation-eliminate-books-balance
+agent: consolidation
+charter_line: "Never eliminate an amount other than the intercompany balance or activity the source company's own books carry."
+severity: block
+description: Every elimination posts to the elimination subsidiary and removes exactly the source company's own intercompany balance through the month (basis balance, reversed the next month) or its activity in the month (basis activity). A group close produces both.
+assertions:
+  - type: check
+    label: eliminations remove the source company's own intercompany amounts
+    name: ic_elimination_amounts
+  - type: sql_covers
+    label: a group close eliminates both balances and the month's activity
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'consolidation'"
+    where: { kind: ic_elimination }
+    column: payload_json.basis
+    values: [balance, activity]

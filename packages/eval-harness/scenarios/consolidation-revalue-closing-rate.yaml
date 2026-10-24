@@ -1,0 +1,14 @@
+id: consolidation-revalue-closing-rate
+agent: consolidation
+charter_line: "You may revalue only balances a company holds in a currency other than its own, and only at the month's closing rate."
+severity: block
+description: Every revaluation restates only foreign-currency asset and liability balances of its subsidiary, at the closing rate recorded for its own month, by exactly the books' balances; no foreign balance is left out. A group close with a foreign subsidiary produces one.
+assertions:
+  - type: check
+    label: revaluations use the month's closing rate on the books' foreign balances
+    name: fx_revaluation_rates
+  - type: sql_count
+    label: a group close revalues the foreign subsidiary's balances
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'consolidation'"
+    where: { kind: fx_revaluation }
+    min: 1

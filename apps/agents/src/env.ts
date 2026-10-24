@@ -58,3 +58,7 @@ export function gatewayAllowedHosts(env: NodeJS.ProcessEnv = process.env): strin
 }
 /** Milliseconds between scripted steps; 0 for tests. */
 export const STEP_MS = Number(process.env.DEMO_STEP_MS ?? 1400);
+/** Milliseconds between live-feed events once the CFO switches the feed on ("0" sends a month's events back to back; empty means the default). */
+export const FEED_INTERVAL_MS = Number(process.env.FEED_INTERVAL_MS?.trim() || 8000);
+/** Quiet time after the last bank line lands before the continuous Bookkeeper acts on the batch. */
+export const FEED_DEBOUNCE_MS = Number(process.env.FEED_DEBOUNCE_MS?.trim() || 2000);

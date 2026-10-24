@@ -1,4 +1,5 @@
-// Runs one scenario: charter-line verification, variable substitution, assertions, scoring.
+// Runs one scenario: charter-line verification (against the charter file, or a charter text under eval), variable
+// substitution, assertions, scoring.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { evaluate, type AssertionResult, type EvalContext } from './assertions.js';
@@ -22,6 +23,16 @@ export interface ScenarioResult {
 
 export interface EngineContext extends EvalContext {
   chartersDir: string;
+  /**
+   * Charter markdown by agent that replaces charters/<agent>.md for the verbatim charter_line check: the draft under
+   * eval, or the live charter version a CFO published.
+   */
+  charterText?: Partial<Record<string, string>>;
+  /**
+   * Scenario ids a charter mapping binds to one of its lines. The mapping, not the quoted text, ties these to the
+   * charter, so their charter_line need not appear verbatim (a draft may reword the line, e.g. a new threshold).
+   */
+  bound?: ReadonlySet<string>;
   /** Dataset expected decision per persona id, to catch a persona scenario drifting from crs-sandbox-dataset.csv. */
   expectedDecisions?: Map<string, string>;
   /** Set when the charters suite cannot reach the database. */
@@ -30,13 +41,15 @@ export interface EngineContext extends EvalContext {
 
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 const charterCache = new Map<string, string | null>();
+/** Charter markdown as one normalized string with list numbering removed. */
+const normalizeCharter = (md: string) => norm(md.replace(/^\s*\d+\.\s+/gm, ''));
 
 /** The charter file as one normalized string with list numbering removed. */
 export function charterText(chartersDir: string, agent: string): string | null {
   const k = `${chartersDir}|${agent}`;
   if (!charterCache.has(k)) {
     try {
-      charterCache.set(k, norm(readFileSync(join(chartersDir, `${agent}.md`), 'utf8').replace(/^\s*\d+\.\s+/gm, '')));
+      charterCache.set(k, normalizeCharter(readFileSync(join(chartersDir, `${agent}.md`), 'utf8')));
     } catch {
       charterCache.set(k, null);
     }
@@ -44,16 +57,26 @@ export function charterText(chartersDir: string, agent: string): string | null {
   return charterCache.get(k) ?? null;
 }
 
-export function charterLineFound(chartersDir: string, s: Pick<Scenario, 'agent' | 'charter_line'>): boolean {
-  if (s.agent === LEDGER) return true;
-  const text = charterText(chartersDir, s.agent);
+/**
+ * Whether the scenario's charter_line is in its agent's charter: the override text when given, else the file.
+ * A scenario in `bound` (tied to a charter line by a mapping) and a ledger scenario always pass.
+ */
+export function charterLineFound(
+  chartersDir: string,
+  s: Pick<Scenario, 'id' | 'agent' | 'charter_line'>,
+  opts: Pick<EngineContext, 'charterText' | 'bound'> = {},
+): boolean {
+  if (s.agent === LEDGER || opts.bound?.has(s.id)) return true;
+  const override = opts.charterText?.[s.agent];
+  const text = override !== undefined ? normalizeCharter(override) : charterText(chartersDir, s.agent);
   return text !== null && text.includes(norm(s.charter_line));
 }
 
 export async function runScenario(s: Scenario, ctx: EngineContext): Promise<ScenarioResult> {
   const base = { id: s.id, agent: s.agent, suite: s.suite, severity: s.severity, charter_line: s.charter_line, file: s.file };
-  if (!charterLineFound(ctx.chartersDir, s)) {
-    return { ...base, status: 'ERROR', detail: `charter_line not found verbatim in charters/${s.agent}.md`, assertions: [], error: 'charter_line not found' };
+  if (!charterLineFound(ctx.chartersDir, s, ctx)) {
+    const where = ctx.charterText?.[s.agent] !== undefined ? `the ${s.agent} charter under eval` : `charters/${s.agent}.md`;
+    return { ...base, status: 'ERROR', detail: `charter_line not found verbatim in ${where}`, assertions: [], error: 'charter_line not found' };
   }
   if (s.suite === 'charters' && !ctx.db) {
     const why = ctx.dbError ?? 'no database';

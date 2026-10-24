@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { parse } from 'yaml';
 import type { CondMap } from './conditions.js';
 
-export const AGENTS = ['advisor', 'bookkeeper', 'revenue', 'credit', 'redteam'] as const;
+export const AGENTS = ['advisor', 'bookkeeper', 'revenue', 'credit', 'redteam', 'consolidation'] as const;
 export type Agent = (typeof AGENTS)[number];
 /**
  * Cross-cutting ledger-integrity scenarios (FX rates, bank-match payment entries) that belong to no single agent's
@@ -78,17 +78,37 @@ function validate(raw: Record<string, unknown>, file: string, defaults: Record<s
   };
 }
 
+/**
+ * Scenarios from YAML text: one scenario (a mapping) or a list under `scenarios:` with shared top-level defaults.
+ * `defaults` fill keys the text leaves out (a charter draft's custom scenario gets its id, agent and charter line this
+ * way); `file` names the source in errors and reports. Throws ScenarioError on anything invalid.
+ */
+export function parseScenarioYaml(yaml: string, defaults: Record<string, unknown> = {}, file = '<inline>'): Scenario[] {
+  let doc: unknown;
+  try {
+    doc = parse(yaml);
+  } catch (e) {
+    throw new ScenarioError(`${basename(file)}: not valid YAML (${(e as Error).message.split('\n')[0]})`);
+  }
+  if (doc === null || doc === undefined) return [];
+  if (typeof doc !== 'object' || Array.isArray(doc)) throw new ScenarioError(`${basename(file)}: a scenario file is a mapping`);
+  const d = doc as Record<string, unknown>;
+  if (Array.isArray(d.scenarios)) {
+    const { scenarios, ...shared } = d;
+    return (scenarios as Record<string, unknown>[]).map((s) => {
+      if (!s || typeof s !== 'object' || Array.isArray(s)) throw new ScenarioError(`${basename(file)}: every entry under scenarios is a mapping`);
+      return validate(s, file, { ...defaults, ...shared });
+    });
+  }
+  return [validate(d, file, defaults)];
+}
+
 export function loadScenarios(dir: string): Scenario[] {
   const out: Scenario[] = [];
   const files = readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml')).sort();
   for (const f of files) {
     const path = join(dir, f);
-    const doc = parse(readFileSync(path, 'utf8')) as Record<string, unknown> | null;
-    if (!doc) continue;
-    if (Array.isArray(doc.scenarios)) {
-      const { scenarios, ...defaults } = doc;
-      for (const s of scenarios as Record<string, unknown>[]) out.push(validate(s, path, defaults));
-    } else out.push(validate(doc, path, {}));
+    out.push(...parseScenarioYaml(readFileSync(path, 'utf8'), {}, path));
   }
   const seen = new Set<string>();
   for (const s of out) {

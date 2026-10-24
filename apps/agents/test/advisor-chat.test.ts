@@ -152,14 +152,35 @@ describe('answerQuestion', () => {
     const startClose = vi.fn(async () => ({ status: 'started' as const }));
     expect(await ask(fresh(), 'start the close', { startClose, now: new Date('2026-09-20T00:00:00Z') })).toMatch(/September 2026 has not ended yet/);
     expect(startClose).not.toHaveBeenCalled();
+    // A close is under way once the Advisor opened it in the close thread.
+    const opened = [{ threadId: 'close:2026-09', senderRole: 'advisor', body: 'Opening the 2026-09 close for Cafoo Inc. Bookkeeper, Revenue, and Credit & Risk: work your tasks and propose.' }];
     const resumed = fakeCast({
       subsidiary: [{ id: 1n, name: 'Cafoo Inc' }],
       period: [{ id: 2n, ym: '2026-09', status: { tag: 'Open' } }],
       proposal: [{ id: 7n, periodId: 2n, kind: { tag: 'JournalEntry' }, status: { tag: 'AwaitingCfo' }, payloadJson: '{}', summaryPlain: 'x', amountMinor: 0n }],
+      agentMessage: opened,
     });
     expect(await ask(resumed, 'start the close', { startClose })).toMatch(/already ran, so I am picking it up where it stopped instead of proposing again: 1 item still need/);
+    // Proposals the live feed filed during the month (no close task, no opening message) do not make it a resume.
+    const fed = fakeCast({
+      subsidiary: [{ id: 1n, name: 'Cafoo Inc' }],
+      period: [{ id: 2n, ym: '2026-09', status: { tag: 'Open' } }],
+      proposal: [{ id: 7n, periodId: 2n, kind: { tag: 'BankMatch' }, status: { tag: 'Approved' }, payloadJson: '{}', summaryPlain: 'x', amountMinor: 0n }],
+    });
+    expect(await ask(fed, 'start the close', { startClose })).toMatch(/Starting the September 2026 close/);
+    // Opened but failed before filing anything: it starts again rather than resuming with nothing.
+    const failed = fakeCast({ subsidiary: [{ id: 1n, name: 'Cafoo Inc' }], period: [{ id: 2n, ym: '2026-09', status: { tag: 'Open' } }], agentMessage: opened });
+    expect(await ask(failed, 'start the close', { startClose })).toMatch(/Starting the September 2026 close/);
+    // A close from before the opening message existed filed its Proposals against close tasks.
+    const legacy = fakeCast({
+      subsidiary: [{ id: 1n, name: 'Cafoo Inc' }],
+      period: [{ id: 2n, ym: '2026-09', status: { tag: 'Open' } }],
+      proposal: [{ id: 7n, periodId: 2n, kind: { tag: 'JournalEntry' }, status: { tag: 'AwaitingCfo' }, payloadJson: '{}', summaryPlain: 'x', amountMinor: 0n, closeTaskId: 3n }],
+    });
+    expect(await ask(legacy, 'start the close', { startClose })).toMatch(/already ran/);
     const stuck = fakeCast({
       subsidiary: [{ id: 1n, name: 'Cafoo Inc' }],
+      agentMessage: opened,
       period: [{ id: 2n, ym: '2026-09', status: { tag: 'Open' } }],
       proposal: [{ id: 7n, periodId: 2n, kind: { tag: 'JournalEntry' }, status: { tag: 'Approved' }, payloadJson: '{}', summaryPlain: 'x', amountMinor: 0n }],
       closeTask: [{ id: 3n, periodId: 2n, title: 'Review payables and accruals', status: { tag: 'Blocked' }, sortOrder: 3 }],
@@ -171,6 +192,6 @@ describe('answerQuestion', () => {
     expect(text).not.toMatch(/I will ask to lock it\./);
     const closing = fakeCast({ subsidiary: [{ id: 1n, name: 'Cafoo Inc' }], period: [{ id: 2n, ym: '2026-09', status: { tag: 'Closing' } }] });
     expect(await ask(closing, 'start the close', { startClose })).toMatch(/lock has been requested/);
-    expect(startClose).toHaveBeenCalledTimes(2);
+    expect(startClose).toHaveBeenCalledTimes(5);
   });
 });
