@@ -1,0 +1,39 @@
+{
+	"vendors": [
+		{ "id": "v01", "name": "Brightline Cloud Hosting", "category": "Hosting", "verification": "verified" },
+		{ "id": "v02", "name": "Helpdesk Collective", "category": "Support contractors", "verification": "verified" },
+		{ "id": "v03", "name": "Parcel & Post Office Supply", "category": "Office supplies", "verification": "verified" },
+		{ "id": "v04", "name": "Ridgeway Legal LLP", "category": "Legal", "verification": "verified" },
+		{ "id": "v05", "name": "Meadowlark Insurance Group", "category": "Insurance", "verification": "verified" },
+		{ "id": "v06", "name": "Larkspur Coworking", "category": "Rent", "verification": "verified" },
+		{ "id": "v07", "name": "Signal Path Ads", "category": "Marketing", "verification": "verified" },
+		{ "id": "v08", "name": "Tidewater Payroll Services", "category": "Payroll", "verification": "verified" },
+		{ "id": "v09", "name": "Halvorsen Freight Co", "category": "Shipping", "verification": "unverified", "notePlain": "Bank details changed twice in ten days. Payments on hold while Credit & Risk checks." },
+		{ "id": "v10", "name": "Quillfeather Design Studio", "category": "Design", "verification": "verified" },
+		{ "id": "v11", "name": "Apex Kinetic Supplies", "category": "Hardware", "verification": "blocked", "notePlain": "No registered business matches this vendor. Blocked on September 2." },
+		{ "id": "v12", "name": "Glasshouse Analytics Tools", "category": "Software", "verification": "verified" },
+		{ "id": "v13", "name": "Morrow & Vance CPAs", "category": "Tax and audit", "verification": "verified" },
+		{ "id": "v14", "name": "Stonebridge Facilities", "category": "Facilities", "verification": "unverified", "notePlain": "New vendor. Tax form not received yet." },
+		{ "id": "v15", "name": "Zephyr Print Works", "category": "Printing", "verification": "blocked", "notePlain": "Invoice sent from a look-alike email domain. Blocked on August 12." }
+	],
+	"bills": [
+		{ "id": "b01", "number": "BCH-0731", "vendorId": "v01", "issuedAt": "2026-07-20T00:00:00Z", "dueAt": "2026-08-19T00:00:00Z", "amountMinor": "980000", "status": "paid" },
+		{ "id": "b02", "number": "BCH-0820", "vendorId": "v01", "issuedAt": "2026-08-20T00:00:00Z", "dueAt": "2026-09-19T00:00:00Z", "amountMinor": "860000", "status": "paid" },
+		{ "id": "b03", "number": "BCH-0920", "vendorId": "v01", "issuedAt": "2026-09-20T00:00:00Z", "dueAt": "2026-10-20T00:00:00Z", "amountMinor": "1120000", "status": "open" },
+		{ "id": "b04", "number": "HC-2607", "vendorId": "v02", "issuedAt": "2026-07-03T00:00:00Z", "dueAt": "2026-08-02T00:00:00Z", "amountMinor": "340000", "status": "paid" },
+		{ "id": "b05", "number": "HC-2608", "vendorId": "v02", "issuedAt": "2026-08-03T00:00:00Z", "dueAt": "2026-09-02T00:00:00Z", "amountMinor": "340000", "status": "paid" },
+		{ "id": "b06", "number": "HC-2609", "vendorId": "v02", "issuedAt": "2026-09-03T00:00:00Z", "dueAt": "2026-10-03T00:00:00Z", "amountMinor": "360000", "status": "open" },
+		{ "id": "b07", "number": "SPA-0712", "vendorId": "v07", "issuedAt": "2026-07-12T00:00:00Z", "dueAt": "2026-08-11T00:00:00Z", "amountMinor": "720000", "status": "paid" },
+		{ "id": "b08", "number": "SPA-0812", "vendorId": "v07", "issuedAt": "2026-08-12T00:00:00Z", "dueAt": "2026-09-11T00:00:00Z", "amountMinor": "890000", "status": "paid" },
+		{ "id": "b09", "number": "SPA-0912", "vendorId": "v07", "issuedAt": "2026-09-12T00:00:00Z", "dueAt": "2026-10-12T00:00:00Z", "amountMinor": "940000", "status": "open" },
+		{ "id": "b10", "number": "GAT-2609", "vendorId": "v12", "issuedAt": "2026-09-08T00:00:00Z", "dueAt": "2026-10-08T00:00:00Z", "amountMinor": "310000", "status": "open" },
+		{ "id": "b11", "number": "HFC-4471", "vendorId": "v09", "issuedAt": "2026-09-14T00:00:00Z", "dueAt": "2026-10-14T00:00:00Z", "amountMinor": "624000", "status": "open" },
+		{ "id": "b12", "number": "RL-0930", "vendorId": "v04", "issuedAt": "2026-09-30T00:00:00Z", "dueAt": "2026-10-30T00:00:00Z", "amountMinor": "400000", "status": "open" },
+		{ "id": "b13", "number": "SF-0915", "vendorId": "v14", "issuedAt": "2026-09-15T00:00:00Z", "dueAt": "2026-10-15T00:00:00Z", "amountMinor": "185000", "status": "open" },
+		{ "id": "b14", "number": "AKS-0902", "vendorId": "v11", "issuedAt": "2026-09-02T00:00:00Z", "dueAt": "2026-10-02T00:00:00Z", "amountMinor": "397500", "status": "open" },
+		{ "id": "b15", "number": "MVC-Q3", "vendorId": "v13", "issuedAt": "2026-09-28T00:00:00Z", "dueAt": "2026-10-28T00:00:00Z", "amountMinor": "550000", "status": "open" },
+		{ "id": "b16", "number": "ZPW-0811", "vendorId": "v15", "issuedAt": "2026-08-11T00:00:00Z", "dueAt": "2026-09-10T00:00:00Z", "amountMinor": "142000", "status": "overdue" },
+		{ "id": "b17", "number": "QDS-0905", "vendorId": "v10", "issuedAt": "2026-09-05T00:00:00Z", "dueAt": "2026-10-05T00:00:00Z", "amountMinor": "280000", "status": "open" },
+		{ "id": "b18", "number": "PPO-0909", "vendorId": "v03", "issuedAt": "2026-09-09T00:00:00Z", "dueAt": "2026-10-09T00:00:00Z", "amountMinor": "31200", "status": "paid" }
+	]
+}

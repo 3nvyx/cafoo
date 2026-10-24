@@ -1,0 +1,33 @@
+{
+	"subsidiaries": [{ "id": "sub-us", "name": "Cafoo Inc", "baseCurrency": "USD" }],
+	"accounts": [
+		{ "code": "1000", "name": "Operating Cash", "type": "asset" },
+		{ "code": "1100", "name": "Accounts Receivable", "type": "asset" },
+		{ "code": "1150", "name": "Allowance for Credit Losses", "type": "asset" },
+		{ "code": "1200", "name": "Prepaid Expenses", "type": "asset" },
+		{ "code": "1250", "name": "Receivable from Vendors", "type": "asset" },
+		{ "code": "1500", "name": "Equipment", "type": "asset" },
+		{ "code": "2000", "name": "Accounts Payable", "type": "liability" },
+		{ "code": "2100", "name": "Accrued Expenses", "type": "liability" },
+		{ "code": "2400", "name": "Deferred Revenue", "type": "liability" },
+		{ "code": "3000", "name": "Common Stock and Paid-in Capital", "type": "equity" },
+		{ "code": "3100", "name": "Retained Earnings", "type": "equity" },
+		{ "code": "4000", "name": "Subscription Revenue", "type": "revenue" },
+		{ "code": "4100", "name": "Services Revenue", "type": "revenue" },
+		{ "code": "5000", "name": "Hosting Costs", "type": "expense" },
+		{ "code": "5100", "name": "Customer Support", "type": "expense" },
+		{ "code": "6000", "name": "Payroll", "type": "expense" },
+		{ "code": "6100", "name": "Software and Tools", "type": "expense" },
+		{ "code": "6200", "name": "Rent", "type": "expense" },
+		{ "code": "6300", "name": "Marketing", "type": "expense" },
+		{ "code": "6400", "name": "Professional Fees", "type": "expense" },
+		{ "code": "6500", "name": "Credit Loss Expense", "type": "expense" },
+		{ "code": "6600", "name": "Insurance", "type": "expense" }
+	],
+	"periods": [
+		{ "id": "2026-07", "year": 2026, "month": 7, "status": "closed", "lockedAt": "2026-08-04T17:10:00Z" },
+		{ "id": "2026-08", "year": 2026, "month": 8, "status": "closed", "lockedAt": "2026-09-03T16:42:00Z" },
+		{ "id": "2026-09", "year": 2026, "month": 9, "status": "open" }
+	],
+	"settings": { "materialityThresholdMinor": "1000000" }
+}

@@ -1,0 +1,77 @@
+<script lang="ts">
+	// Native <dialog>: focus is trapped and Esc closes it for free.
+	let {
+		open = $bindable(false),
+		title,
+		body,
+		confirmLabel = 'Confirm',
+		danger = false,
+		inputLabel,
+		inputPlaceholder = '',
+		inputRequired = false,
+		onconfirm
+	}: {
+		open?: boolean;
+		title: string;
+		body: string;
+		confirmLabel?: string;
+		danger?: boolean;
+		inputLabel?: string;
+		inputPlaceholder?: string;
+		inputRequired?: boolean;
+		onconfirm: (value: string) => void | Promise<void>;
+	} = $props();
+
+	let el: HTMLDialogElement | undefined = $state();
+	let value = $state('');
+	let busy = $state(false);
+	const id = `dlg-${Math.random().toString(36).slice(2, 8)}`;
+
+	$effect(() => {
+		if (!el) return;
+		if (open && !el.open) {
+			value = '';
+			el.showModal();
+		} else if (!open && el.open) el.close();
+	});
+
+	async function submit(e: SubmitEvent) {
+		e.preventDefault();
+		if (inputRequired && !value.trim()) return;
+		busy = true;
+		try {
+			await onconfirm(value.trim());
+			open = false;
+		} finally {
+			busy = false;
+		}
+	}
+</script>
+
+<dialog
+	bind:this={el}
+	onclose={() => (open = false)}
+	aria-labelledby="{id}-t"
+	aria-describedby="{id}-b"
+	class="m-auto w-[min(440px,calc(100vw-32px))] rounded-card border border-line bg-surface p-0 text-ink"
+>
+	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6">
+		<h2 id="{id}-t" class="text-xl">{title}</h2>
+		<p id="{id}-b" class="text-ink-2">{body}</p>
+		{#if inputLabel}
+			<label class="flex flex-col gap-1.5 text-sm font-medium">
+				{inputLabel}
+				<!-- svelte-ignore a11y_autofocus -->
+				<input class="field text-base font-normal" bind:value placeholder={inputPlaceholder} maxlength="160" required={inputRequired} autofocus />
+			</label>
+		{/if}
+		<div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+			<button type="button" class="btn" onclick={() => (open = false)}>Cancel</button>
+			<button
+				type="submit"
+				class="btn {danger ? 'border-neg bg-neg text-white hover:!bg-neg' : 'btn-primary'}"
+				disabled={busy || (inputRequired && !value.trim())}>{busy ? 'Working…' : confirmLabel}</button
+			>
+		</div>
+	</form>
+</dialog>
