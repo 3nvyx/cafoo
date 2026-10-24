@@ -1,7 +1,16 @@
-import { formatMinor } from './money.js';
+import { ccyKey } from './fx.js';
+import { absMinor, formatMinor } from './money.js';
 import { functionalAmounts } from './posting.js';
-import type { Account, BankTransaction, JournalEntryInput, ProposalPayload, RiskTier, Ym } from './types.js';
-import { dateLabel, ymAdd, ymLabel } from './ym.js';
+import type { Account, BankTransaction, FxRevaluationPayload, IcEliminationPayload, JournalEntryInput, ProposalPayload, RiskTier, Ym } from './types.js';
+import { dateLabel, monthName, ymAdd, ymLabel } from './ym.js';
+
+/** A subsidiary as summaries name it. Pass parentId and isElimination so a revaluation can name the counterparty. */
+export interface PlainSubsidiary {
+  name: string;
+  functionalCcy: string;
+  parentId?: bigint | null;
+  isElimination?: boolean;
+}
 
 /** Lookups that let summaries use names instead of ids. All optional; ids are the fallback. */
 export interface PlainContext {
@@ -13,6 +22,8 @@ export interface PlainContext {
   periods?: ReadonlyMap<bigint, Ym>;
   /** Currency for amounts when an entry mixes currencies. Default USD. */
   functionalCcy?: string;
+  /** Subsidiary id -> name and currency, for consolidation summaries. */
+  subsidiaries?: ReadonlyMap<bigint, PlainSubsidiary>;
 }
 
 const TIER_WORDS: Readonly<Record<RiskTier, string>> = {
@@ -70,6 +81,58 @@ function asClause(s: string): string {
 function because(reason: string | undefined): string {
   const c = reason ? asClause(reason) : '';
   return c ? ` because ${c}` : '';
+}
+
+const CCY_WORDS: Readonly<Record<string, string>> = { USD: 'dollar', GBP: 'pound', EUR: 'euro' };
+
+function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+function subsidiaryName(id: bigint, ctx: PlainContext): string {
+  return ctx.subsidiaries?.get(id)?.name ?? `subsidiary ${id}`;
+}
+
+/** The one other trading company keeping its books in `ccy` (else the parent, if it does); undefined when unclear. */
+function counterpartyIn(ccy: string, selfId: bigint, ctx: PlainContext): string | undefined {
+  if (!ctx.subsidiaries) return undefined;
+  const others = [...ctx.subsidiaries.entries()].filter(([id, x]) => id !== selfId && !x.isElimination && ccyKey(x.functionalCcy) === ccy);
+  if (others.length === 1) return others[0]![1].name;
+  const parentId = ctx.subsidiaries.get(selfId)?.parentId;
+  return others.find(([id]) => id === parentId)?.[1].name;
+}
+
+function revaluationSummary(p: FxRevaluationPayload, ctx: PlainContext): string {
+  const name = subsidiaryName(p.subsidiaryId, ctx);
+  const functional = ctx.subsidiaries?.get(p.subsidiaryId)?.functionalCcy ?? p.lines[0]?.ccy ?? ctx.functionalCcy ?? 'USD';
+  const gain = p.items.reduce((s, i) => s + i.deltaMinor, 0n);
+  const result = gain === 0n ? 'with no overall gain or loss' : `a ${money(absMinor(gain), functional)} ${gain > 0n ? 'gain' : 'loss'}`;
+  const at = `${monthName(p.rateYm)}'s closing rate`;
+  const ccys = [...new Set(p.items.map((i) => ccyKey(i.ccy)))];
+  if (ccys.length !== 1) return sentence(`Restate ${possessive(name)} foreign-currency balances at ${at}, ${result}`);
+  const ccy = ccys[0]!;
+  const amt = money(p.items.reduce((s, i) => s + absMinor(i.txnBalanceMinor), 0n), ccy);
+  const other = counterpartyIn(ccy, p.subsidiaryId, ctx);
+  if (other && p.items.every((i) => i.txnBalanceMinor < 0n)) return sentence(`Restate the ${amt} ${name} owes ${other} at ${at}, ${result}`);
+  if (other && p.items.every((i) => i.txnBalanceMinor > 0n)) return sentence(`Restate the ${amt} ${other} owes ${name} at ${at}, ${result}`);
+  return sentence(`Restate ${possessive(name)} ${amt} of ${CCY_WORDS[ccy] ?? ccy} balances at ${at}, ${result}`);
+}
+
+function eliminationSummary(p: IcEliminationPayload, ctx: PlainContext): string {
+  const ccy = p.lines[0]?.ccy ?? ctx.subsidiaries?.get(p.subsidiaryId)?.functionalCcy ?? ctx.functionalCcy ?? 'USD';
+  const amt = money(p.pairs.reduce((s, x) => s + x.amountMinor, 0n), ccy);
+  const uniq = (xs: string[]) => [...new Set(xs)];
+  const sources = uniq(p.pairs.map((x) => subsidiaryName(x.sourceSubsidiaryId, ctx)));
+  const counters = uniq(p.pairs.map((x) => subsidiaryName(x.counterSubsidiaryId, ctx)));
+  const names = uniq([...sources, ...counters]);
+  if (p.basis === 'balance') {
+    const rev = p.reversesInYm ? `; it reverses in ${monthName(p.reversesInYm)}` : '';
+    return sentence(`Remove the ${amt} ${joinNames(names)} owe each other from the group's combined balance sheet${rev}`);
+  }
+  const what = joinNames(uniq(p.pairs.map((x) => x.label.toLowerCase())));
+  const who = sources.length === 1 && counters.length === 1 ? `${sources[0]} charged ${counters[0]}` : `between ${joinNames(names)}`;
+  return sentence(`Remove the ${amt} of ${what} ${who} in ${monthName(p.periodYm)} from the group's combined results`);
 }
 
 function allowanceIsIncrease(e: JournalEntryInput, ctx: PlainContext): boolean {
@@ -161,5 +224,9 @@ export function plainSummary(payload: ProposalPayload, ctx: PlainContext = {}): 
       return sentence(`Stop all payments to ${vendorName(payload.vendorId, ctx)}${because(payload.reasonPlain)}`);
     case 'vendor_verify':
       return sentence(`Mark ${vendorName(payload.vendorId, ctx)} as checked so their bills can be paid${because(payload.reasonPlain)}`);
+    case 'fx_revaluation':
+      return revaluationSummary(payload, ctx);
+    case 'ic_elimination':
+      return eliminationSummary(payload, ctx);
   }
 }

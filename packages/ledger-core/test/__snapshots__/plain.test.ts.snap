@@ -2,7 +2,13 @@
 
 exports[`plainSummary > accrual 1`] = `"Count $4,500 of Northwind Hosting's September 2026 costs now, before their bill arrives, and undo it automatically in October 2026."`;
 
+exports[`plainSummary > activity elimination 1`] = `"Remove the $15,000 of service fees Cafoo Inc charged Cafoo Ltd in September from the group's combined results."`;
+
+exports[`plainSummary > activity elimination both ways 1`] = `"Remove the $30,000 of service fees and royalties between Cafoo Inc and Cafoo Ltd in September from the group's combined results."`;
+
 exports[`plainSummary > allowance release 1`] = `"Release $40 previously set aside against Initech Holdings' unpaid invoices because their credit improved."`;
+
+exports[`plainSummary > balance elimination 1`] = `"Remove the $245,000 Cafoo Inc and Cafoo Ltd owe each other from the group's combined balance sheet; it reverses in October."`;
 
 exports[`plainSummary > bank match with transaction 1`] = `"Mark the $1,250 payment from ACME CO on September 14, 2026 as settling invoice 1042 (92% confident)."`;
 
@@ -13,6 +19,14 @@ exports[`plainSummary > credit decision block 1`] = `"Ask customer 99 to pay up 
 exports[`plainSummary > credit decision terms 1`] = `"Give Acme Co 30-day payment terms (low risk) because the owner pays on time and has no court records."`;
 
 exports[`plainSummary > duplicate payment 1`] = `"Treat the second $500 payment to Northwind Hosting as money they owe us back because the same bill was paid twice."`;
+
+exports[`plainSummary > fx revaluation gain 1`] = `"Restate the $245,000 Cafoo Ltd owes Cafoo Inc at September's closing rate, a £4,404.78 gain."`;
+
+exports[`plainSummary > fx revaluation in two currencies 1`] = `"Restate Cafoo Ltd's foreign-currency balances at September's closing rate, a £4,404.78 gain."`;
+
+exports[`plainSummary > fx revaluation loss 1`] = `"Restate the $245,000 Cafoo Ltd owes Cafoo Inc at September's closing rate, a £4,404.78 loss."`;
+
+exports[`plainSummary > fx revaluation owed to the subsidiary 1`] = `"Restate the $245,000 Cafoo Inc owes Cafoo Ltd at September's closing rate, a £4,404.78 gain."`;
 
 exports[`plainSummary > general entry 1`] = `"Record $1,234.56 for September hosting invoice."`;
 

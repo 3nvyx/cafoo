@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACCOUNTS, type SeedAccount } from './accounts';
+import { buildGroup, type GroupSeed } from './group';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -141,6 +142,8 @@ export type Seed = {
   journalEntries: JE[];
   closeTasks: { title: string; description: string; ownerRole: string; sortOrder: number }[];
   anomalies: { id: number; title: string; expect: string }[];
+  /** Cafoo Ltd, the eliminations company, FX rates and intercompany entries. Built from its own PRNG (group.ts). */
+  group: GroupSeed;
 };
 
 const BUSINESSES = [
@@ -197,7 +200,8 @@ function main() {
     closeYm,
     subsidiary: { code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD' },
     accounts: ACCOUNTS,
-    periods: { yms: [ymStr(m2), ymStr(m1), closeYm, ymStr(next)], closedYms: [ymStr(m2), ymStr(m1)] },
+    // The month after next is open too, so the next month's balance elimination has a month to reverse into.
+    periods: { yms: [ymStr(m2), ymStr(m1), closeYm, ymStr(next), ymStr(ymAdd(close, 2))], closedYms: [ymStr(m2), ymStr(m1)] },
     customers: [],
     vendors: VENDORS,
     contracts: [],
@@ -207,6 +211,7 @@ function main() {
     journalEntries: [],
     closeTasks: [],
     anomalies: [],
+    group: buildGroup(close),
   };
 
   // ---------- customers ----------

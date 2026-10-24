@@ -206,6 +206,61 @@ export interface VendorVerifyPayload {
   reasonPlain?: string;
 }
 
+/**
+ * One foreign-currency balance restated at the closing rate. Balances are debit-positive (a liability is negative);
+ * functional amounts are in the subsidiary's own currency. deltaMinor = targetFunctionalMinor - bookedFunctionalMinor.
+ */
+export interface FxRevaluationItem {
+  accountId: bigint;
+  /** Transaction currency of the balance. */
+  ccy: string;
+  /** Sum of the account's lines in `ccy`, in `ccy` minor units. */
+  txnBalanceMinor: bigint;
+  /** `ccy` to the subsidiary's currency at the closing rate of rateYm. */
+  closingRateE6: bigint;
+  /** Functional balance of all the account's lines (the foreign lines plus earlier revaluations). */
+  bookedFunctionalMinor: bigint;
+  targetFunctionalMinor: bigint;
+  deltaMinor: bigint;
+}
+
+/** Restate a subsidiary's foreign-currency balances at a month's closing rate; the offset goes to FX gain or loss. */
+export interface FxRevaluationPayload extends JournalEntryInput {
+  kind: 'fx_revaluation';
+  periodYm: Ym;
+  rateYm: Ym;
+  items: FxRevaluationItem[];
+}
+
+/** `balance`: cumulative balances, reversed next month. `activity`: one month's income and expense, never reversed. */
+export type IcBasis = 'balance' | 'activity';
+
+/**
+ * One intercompany pair. amountMinor is the source side in the reporting currency (positive); counterTranslatedMinor
+ * is the counterparty's mirror amount translated to the reporting currency (equal to amountMinor when the two sides
+ * agree); differenceMinor = amountMinor - counterTranslatedMinor, informational.
+ */
+export interface IcEliminationPair {
+  label: string;
+  sourceSubsidiaryId: bigint;
+  sourceAccountId: bigint;
+  counterSubsidiaryId: bigint;
+  counterAccountId: bigint;
+  amountMinor: bigint;
+  counterTranslatedMinor: bigint;
+  differenceMinor: bigint;
+}
+
+/** Remove what group companies owe or charge each other; posts to the elimination subsidiary in the reporting currency. */
+export interface IcEliminationPayload extends JournalEntryInput {
+  kind: 'ic_elimination';
+  periodYm: Ym;
+  basis: IcBasis;
+  /** Required for `balance`, absent for `activity`. */
+  reversesInYm?: Ym;
+  pairs: IcEliminationPair[];
+}
+
 /** In-memory (bigint) proposal payload. Use serializeProposalPayload for the wire. */
 export type ProposalPayload =
   | JournalEntryPayload
@@ -214,6 +269,8 @@ export type ProposalPayload =
   | CreditDecisionPayload
   | AccrualPayload
   | VendorBlockPayload
-  | VendorVerifyPayload;
+  | VendorVerifyPayload
+  | FxRevaluationPayload
+  | IcEliminationPayload;
 
 export type ProposalKind = ProposalPayload['kind'];

@@ -84,6 +84,12 @@ export function ymLabel(v: Ym): string {
   return `${MONTH_NAMES[v.month - 1]} ${v.year}`;
 }
 
+/** "September" */
+export function monthName(v: Ym): string {
+  assertYm(v);
+  return MONTH_NAMES[v.month - 1]!;
+}
+
 function floorDiv(a: bigint, b: bigint): bigint {
   const q = a / b;
   return (a % b !== 0n && (a < 0n) !== (b < 0n)) ? q - 1n : q;

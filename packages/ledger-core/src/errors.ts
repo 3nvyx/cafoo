@@ -9,7 +9,8 @@ export type LedgerErrorCode =
   | 'invalid_money'
   | 'invalid_ym'
   | 'invalid_payload'
-  | 'invalid_input';
+  | 'invalid_input'
+  | 'missing_rate';
 
 /** Every engine failure. `message` is plain English, safe to show the CFO. */
 export class LedgerError extends Error {
