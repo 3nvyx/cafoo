@@ -25,7 +25,7 @@ Every failure throws `LedgerError` with a `code` and a plain-English `message` s
 
 ## Modules
 
-`types.ts`: domain types and the `ProposalPayload` union (`journal_entry`, `bank_match`, `revenue_schedule`, `credit_decision`, `accrual`, `vendor_block`); `journal_entry` and `accrual` are flat `JournalEntryInput` plus their extra fields.
+`types.ts`: domain types and the `ProposalPayload` union (`journal_entry`, `bank_match`, `revenue_schedule`, `credit_decision`, `accrual`, `vendor_block`, `vendor_verify`); `journal_entry` and `accrual` are flat `JournalEntryInput` plus their extra fields.
 `JournalLine` carries `ym` so reports need no period lookup; `Bill.billedAt` is optional.
 `ym.ts`: `{year, month}` math, UTC calendar conversion from micros, `lastCompletedYm(nowMicros)` = month before the one containing now.
 `money.ts`: `parseMinor` rejects more than 2 decimals and bad grouping instead of rounding; `formatMinor` uses `$` (USD), `£` (GBP), else `CODE ` prefix; `applyFx`/`applyBp` round half away from zero; `allocateLargestRemainder` sums exactly, ties to lower index, zero weights get zero.

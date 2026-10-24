@@ -27,3 +27,5 @@ exports[`plainSummary > revenue schedule single month 1`] = `"Count $30.03 of re
 exports[`plainSummary > reversal 1`] = `"Undo an earlier $50 entry so the books show it never happened."`;
 
 exports[`plainSummary > vendor block 1`] = `"Stop all payments to Northwind Hosting because their bank details changed twice this week."`;
+
+exports[`plainSummary > vendor verify 1`] = `"Mark Northwind Hosting as checked so their bills can be paid because the owner passed identity and fraud checks."`;

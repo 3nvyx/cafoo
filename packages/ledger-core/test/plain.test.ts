@@ -34,6 +34,7 @@ describe('plainSummary', () => {
     ['credit decision terms', { kind: 'credit_decision', customerId: 5n, tier: 'B', paymentTermsDays: 30, summaryPlain: 'The owner pays on time and has no court records.' }],
     ['credit decision block', { kind: 'credit_decision', customerId: 99n, tier: 'BLOCK', paymentTermsDays: 0, summaryPlain: 'The owner is in an active bankruptcy plan.' }],
     ['vendor block', { kind: 'vendor_block', vendorId: 7n, reasonPlain: 'their bank details changed twice this week.' }],
+    ['vendor verify', { kind: 'vendor_verify', vendorId: 7n, creditCheckIds: ['req_tu_7', 'req_ff_7'], reasonPlain: 'the owner passed identity and fraud checks.' }],
   ];
 
   for (const [name, p] of cases) {

@@ -159,5 +159,7 @@ export function plainSummary(payload: ProposalPayload, ctx: PlainContext = {}): 
     }
     case 'vendor_block':
       return sentence(`Stop all payments to ${vendorName(payload.vendorId, ctx)}${because(payload.reasonPlain)}`);
+    case 'vendor_verify':
+      return sentence(`Mark ${vendorName(payload.vendorId, ctx)} as checked so their bills can be paid${because(payload.reasonPlain)}`);
   }
 }

@@ -44,7 +44,8 @@ export type ProposalPayloadJson =
   | { kind: 'revenue_schedule'; contractItemId: string; lines: RevenueScheduleLineJson[] }
   | { kind: 'credit_decision'; customerId: string; tier: RiskTier; paymentTermsDays: number; summaryPlain: string }
   | (JournalEntryInputJson & { kind: 'accrual'; reversesInYm: Ym; billId?: string })
-  | { kind: 'vendor_block'; vendorId: string; reasonPlain: string };
+  | { kind: 'vendor_block'; vendorId: string; reasonPlain: string }
+  | { kind: 'vendor_verify'; vendorId: string; creditCheckIds: string[]; reasonPlain?: string };
 
 const s = toJsonMoney;
 
@@ -93,6 +94,8 @@ export function toJsonPayload(p: ProposalPayload): ProposalPayloadJson {
       return { kind: 'credit_decision', customerId: s(p.customerId), tier: p.tier, paymentTermsDays: p.paymentTermsDays, summaryPlain: p.summaryPlain };
     case 'vendor_block':
       return { kind: 'vendor_block', vendorId: s(p.vendorId), reasonPlain: p.reasonPlain };
+    case 'vendor_verify':
+      return { kind: 'vendor_verify', vendorId: s(p.vendorId), creditCheckIds: [...p.creditCheckIds], ...(p.reasonPlain !== undefined ? { reasonPlain: p.reasonPlain } : {}) };
   }
 }
 
@@ -199,7 +202,7 @@ const TIERS: readonly RiskTier[] = ['A', 'B', 'C', 'D', 'BLOCK'];
 /** Validate a JSON-safe object (already parsed) and convert it back to the bigint payload. Shape only: balancing is validateEntry's job. */
 export function fromJsonPayload(v: unknown): ProposalPayload {
   const o = obj(v, 'payload');
-  const kind = oneOf(o, 'kind', '', ['journal_entry', 'bank_match', 'revenue_schedule', 'credit_decision', 'accrual', 'vendor_block'] as const);
+  const kind = oneOf(o, 'kind', '', ['journal_entry', 'bank_match', 'revenue_schedule', 'credit_decision', 'accrual', 'vendor_block', 'vendor_verify'] as const);
   switch (kind) {
     case 'journal_entry': {
       const p: ProposalPayload = { kind, ...entryFrom(o) };
@@ -247,6 +250,17 @@ export function fromJsonPayload(v: unknown): ProposalPayload {
     }
     case 'vendor_block':
       return { kind, vendorId: big(o, 'vendorId', ''), reasonPlain: str(o, 'reasonPlain', '') };
+    case 'vendor_verify': {
+      const creditCheckIds = arr(o, 'creditCheckIds', '').map((x, i) => {
+        if (typeof x !== 'string' || x === '') fail(`creditCheckIds[${i}]`, 'must be a non-empty request id string');
+        return x as string;
+      });
+      if (creditCheckIds.length === 0) fail('creditCheckIds', 'must cite at least one credit check');
+      const p: ProposalPayload = { kind, vendorId: big(o, 'vendorId', ''), creditCheckIds };
+      const r = optStr(o, 'reasonPlain', '');
+      if (r !== undefined) p.reasonPlain = r;
+      return p;
+    }
   }
 }
 

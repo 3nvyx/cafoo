@@ -10,6 +10,8 @@ const samples: ProposalPayload[] = [
   { kind: 'credit_decision', customerId: 5n, tier: 'B', paymentTermsDays: 30, summaryPlain: 'Owner has solid credit.' },
   { kind: 'accrual', subsidiaryId: 1n, periodId: 9n, memo: 'Accrue', reversesInYm: { year: 2026, month: 10 }, billId: 2n, lines: [dr(HOSTING.id, 1n, { vendorId: 7n }), cr(ACCRUED.id, 1n, { vendorId: 7n })] },
   { kind: 'vendor_block', vendorId: 7n, reasonPlain: 'the vendor matched a sanctions list' },
+  { kind: 'vendor_verify', vendorId: 7n, creditCheckIds: ['req_tu_7', 'req_ff_7'], reasonPlain: 'the owner passed identity and fraud checks' },
+  { kind: 'vendor_verify', vendorId: 8n, creditCheckIds: ['req_tu_8'] },
 ];
 
 describe('proposal payload JSON', () => {
@@ -39,6 +41,10 @@ describe('proposal payload JSON', () => {
       { kind: 'wire_transfer' },
       { kind: 'vendor_block', vendorId: 7, reasonPlain: 'x' },
       { kind: 'vendor_block', vendorId: '7.5', reasonPlain: 'x' },
+      { kind: 'vendor_verify', vendorId: '7', creditCheckIds: [] },
+      { kind: 'vendor_verify', vendorId: '7', creditCheckIds: [''] },
+      { kind: 'vendor_verify', vendorId: '7', creditCheckIds: [42] },
+      { kind: 'vendor_verify', vendorId: '7' },
       { kind: 'credit_decision', customerId: '1', tier: 'Z', paymentTermsDays: 30, summaryPlain: '' },
       { kind: 'credit_decision', customerId: '1', tier: 'A', paymentTermsDays: -1, summaryPlain: '' },
       { kind: 'bank_match', bankTxId: '1', targetKind: 'invoice', targetId: '1', scoreBp: 10001, reasons: [], bucket: 'auto' },

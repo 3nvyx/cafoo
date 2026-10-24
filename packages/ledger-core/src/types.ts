@@ -198,6 +198,14 @@ export interface VendorBlockPayload {
   reasonPlain: string;
 }
 
+/** Verify a vendor after a clean owner credit check; cites the recorded identity and fraud check request ids. */
+export interface VendorVerifyPayload {
+  kind: 'vendor_verify';
+  vendorId: bigint;
+  creditCheckIds: string[];
+  reasonPlain?: string;
+}
+
 /** In-memory (bigint) proposal payload. Use serializeProposalPayload for the wire. */
 export type ProposalPayload =
   | JournalEntryPayload
@@ -205,6 +213,7 @@ export type ProposalPayload =
   | RevenueSchedulePayload
   | CreditDecisionPayload
   | AccrualPayload
-  | VendorBlockPayload;
+  | VendorBlockPayload
+  | VendorVerifyPayload;
 
 export type ProposalKind = ProposalPayload['kind'];
