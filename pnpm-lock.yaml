@@ -22,9 +22,15 @@ importers:
       '@cafoo/crs-mcp':
         specifier: workspace:*
         version: link:../../packages/crs-mcp
+      '@cafoo/eval-harness':
+        specifier: workspace:*
+        version: link:../../packages/eval-harness
       '@cafoo/ledger-core':
         specifier: workspace:*
         version: link:../../packages/ledger-core
+      '@cafoo/seed':
+        specifier: workspace:*
+        version: link:../../seed
       '@cafoo/stdb-bindings':
         specifier: workspace:*
         version: link:../../packages/stdb-bindings
@@ -56,6 +62,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@cafoo/ledger-core':
+        specifier: workspace:*
+        version: link:../../packages/ledger-core
       spacetimedb:
         specifier: ^2.13.0
         version: 2.13.0(svelte@5.57.2)

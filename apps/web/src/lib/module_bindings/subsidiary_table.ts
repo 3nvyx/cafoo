@@ -16,4 +16,5 @@ export default __t.row({
   name: __t.string(),
   functionalCcy: __t.string().name("functional_ccy"),
   parentId: __t.option(__t.u64()).name("parent_id"),
+  isElimination: __t.bool().name("is_elimination"),
 });

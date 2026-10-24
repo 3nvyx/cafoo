@@ -35,19 +35,27 @@ import {
 
 // Import all reducer arg schemas
 import ApproveProposalReducer from "./approve_proposal_reducer";
+import ArmCfoBootstrapReducer from "./arm_cfo_bootstrap_reducer";
 import CfoConfirmReducer from "./cfo_confirm_reducer";
 import CfoReverseReducer from "./cfo_reverse_reducer";
 import CfoSendBackReducer from "./cfo_send_back_reducer";
+import ClaimCfoReducer from "./claim_cfo_reducer";
 import CritiqueReducer from "./critique_reducer";
 import GrantRoleReducer from "./grant_role_reducer";
+import IngestBankTransactionsReducer from "./ingest_bank_transactions_reducer";
+import IngestInvoicesReducer from "./ingest_invoices_reducer";
 import LockPeriodReducer from "./lock_period_reducer";
 import PostAgentMessageReducer from "./post_agent_message_reducer";
 import ProposeReducer from "./propose_reducer";
+import PublishCharterReducer from "./publish_charter_reducer";
+import RecordCharterEvalReducer from "./record_charter_eval_reducer";
 import RecordCreditCheckReducer from "./record_credit_check_reducer";
 import RegisterAgentReducer from "./register_agent_reducer";
 import RejectProposalReducer from "./reject_proposal_reducer";
 import RequestPeriodLockReducer from "./request_period_lock_reducer";
 import ResetDemoReducer from "./reset_demo_reducer";
+import RetireLiveCharterReducer from "./retire_live_charter_reducer";
+import SaveCharterDraftReducer from "./save_charter_draft_reducer";
 import SealSetupReducer from "./seal_setup_reducer";
 import SeedAccountsReducer from "./seed_accounts_reducer";
 import SeedBankTransactionsReducer from "./seed_bank_transactions_reducer";
@@ -62,6 +70,7 @@ import SeedPeriodsReducer from "./seed_periods_reducer";
 import SeedRevenueScheduleLinesReducer from "./seed_revenue_schedule_lines_reducer";
 import SeedSubsidiaryReducer from "./seed_subsidiary_reducer";
 import SeedVendorsReducer from "./seed_vendors_reducer";
+import SetFeedEnabledReducer from "./set_feed_enabled_reducer";
 import SetMaterialityReducer from "./set_materiality_reducer";
 import UnlockPeriodReducer from "./unlock_period_reducer";
 import UpdateCloseTaskReducer from "./update_close_task_reducer";
@@ -77,11 +86,14 @@ import AuditEventRow from "./audit_event_table";
 import BankMatchRow from "./bank_match_table";
 import BankTransactionRow from "./bank_transaction_table";
 import BillRow from "./bill_table";
+import CharterEvalRow from "./charter_eval_table";
+import CharterVersionRow from "./charter_version_table";
 import CloseTaskRow from "./close_task_table";
 import ContractRow from "./contract_table";
 import ContractItemRow from "./contract_item_table";
 import CreditCheckRow from "./credit_check_table";
 import CustomerRow from "./customer_table";
+import FeedEventRow from "./feed_event_table";
 import FxRateRow from "./fx_rate_table";
 import InvoiceRow from "./invoice_table";
 import JournalEntryRow from "./journal_entry_table";
@@ -216,6 +228,34 @@ const tablesSchema = __schema({
       { name: 'bill_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, BillRow),
+  charterEval: __table({
+    name: 'charter_eval',
+    indexes: [
+      { accessor: 'charterVersionId', name: 'charter_eval_charter_version_id_idx_btree', algorithm: 'btree', columns: [
+        'charterVersionId',
+      ] },
+      { accessor: 'id', name: 'charter_eval_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'charter_eval_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CharterEvalRow),
+  charterVersion: __table({
+    name: 'charter_version',
+    indexes: [
+      { accessor: 'id', name: 'charter_version_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'role', name: 'charter_version_role_idx_btree', algorithm: 'btree', columns: [
+        'role',
+      ] },
+    ],
+    constraints: [
+      { name: 'charter_version_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CharterVersionRow),
   closeTask: __table({
     name: 'close_task',
     indexes: [
@@ -287,6 +327,20 @@ const tablesSchema = __schema({
       { name: 'customer_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CustomerRow),
+  feedEvent: __table({
+    name: 'feed_event',
+    indexes: [
+      { accessor: 'externalId', name: 'feed_event_external_id_idx_btree', algorithm: 'btree', columns: [
+        'externalId',
+      ] },
+      { accessor: 'ym', name: 'feed_event_ym_idx_btree', algorithm: 'btree', columns: [
+        'ym',
+      ] },
+    ],
+    constraints: [
+      { name: 'feed_event_external_id_key', constraint: 'unique', columns: ['externalId'] },
+    ],
+  }, FeedEventRow),
   fxRate: __table({
     name: 'fx_rate',
     indexes: [
@@ -456,19 +510,27 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("approve_proposal", ApproveProposalReducer),
+  __reducerSchema("arm_cfo_bootstrap", ArmCfoBootstrapReducer),
   __reducerSchema("cfo_confirm", CfoConfirmReducer),
   __reducerSchema("cfo_reverse", CfoReverseReducer),
   __reducerSchema("cfo_send_back", CfoSendBackReducer),
+  __reducerSchema("claim_cfo", ClaimCfoReducer),
   __reducerSchema("critique", CritiqueReducer),
   __reducerSchema("grant_role", GrantRoleReducer),
+  __reducerSchema("ingest_bank_transactions", IngestBankTransactionsReducer),
+  __reducerSchema("ingest_invoices", IngestInvoicesReducer),
   __reducerSchema("lock_period", LockPeriodReducer),
   __reducerSchema("post_agent_message", PostAgentMessageReducer),
   __reducerSchema("propose", ProposeReducer),
+  __reducerSchema("publish_charter", PublishCharterReducer),
+  __reducerSchema("record_charter_eval", RecordCharterEvalReducer),
   __reducerSchema("record_credit_check", RecordCreditCheckReducer),
   __reducerSchema("register_agent", RegisterAgentReducer),
   __reducerSchema("reject_proposal", RejectProposalReducer),
   __reducerSchema("request_period_lock", RequestPeriodLockReducer),
   __reducerSchema("reset_demo", ResetDemoReducer),
+  __reducerSchema("retire_live_charter", RetireLiveCharterReducer),
+  __reducerSchema("save_charter_draft", SaveCharterDraftReducer),
   __reducerSchema("seal_setup", SealSetupReducer),
   __reducerSchema("seed_accounts", SeedAccountsReducer),
   __reducerSchema("seed_bank_transactions", SeedBankTransactionsReducer),
@@ -483,6 +545,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_revenue_schedule_lines", SeedRevenueScheduleLinesReducer),
   __reducerSchema("seed_subsidiary", SeedSubsidiaryReducer),
   __reducerSchema("seed_vendors", SeedVendorsReducer),
+  __reducerSchema("set_feed_enabled", SetFeedEnabledReducer),
   __reducerSchema("set_materiality", SetMaterialityReducer),
   __reducerSchema("unlock_period", UnlockPeriodReducer),
   __reducerSchema("update_close_task", UpdateCloseTaskReducer),

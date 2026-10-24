@@ -1,7 +1,9 @@
 /**
  * Module smoke test. Publishes the working-tree module to a throwaway database, seeds it with the demo loader, and
- * checks every gate, refusal and legitimate flow that the module reviews pinned down, then deletes the database.
- * A second throwaway database checks an in-place upgrade from a module that predates bank_match.paymentJeId.
+ * checks every gate, refusal and legitimate flow that the module reviews pinned down, then deletes the database: the
+ * CFO seat bootstrap, the two-tier gate, revenue, bank and vendor rules, revaluations and eliminations, charters, the
+ * live feed and resetDemo. A second throwaway database checks an in-place upgrade from a module that predates
+ * bank_match.paymentJeId (seeded with that commit's own loader and bindings, extracted with git archive).
  * Exits non-zero on any failed assertion.
  *
  *   pnpm -F @cafoo/stdb-bindings smoke
@@ -11,7 +13,8 @@
  * (default 57884e2); SMOKE_SKIP_LEGACY=1 skips the upgrade check; SMOKE_KEEP=1 keeps the databases for inspection.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, copyFileSync, mkdirSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, copyFileSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,16 +75,38 @@ async function section(name: string, f: () => Promise<void>) {
 // ---------- process helpers ----------
 function run(cmd: string, args: string[], env: Record<string, string> = {}, cwd = repo) {
   const r = spawnSync(cmd, args, { cwd, env: { ...process.env, ...env }, encoding: 'utf8' });
-  if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed: ${(r.stderr || r.stdout || String(r.error)).trim().slice(-600)}`);
+  if (r.status !== 0) {
+    const out = (r.stderr || r.stdout || String(r.error)).trim();
+    // The spacetime CLI puts a reducer's refusal on its first "Error:" line, ahead of a long backtrace.
+    const first = out.match(/^Error: .*$/m)?.[0];
+    throw new Error(`${cmd} ${args.join(' ')} failed: ${first ? `${first} … ` : ''}${out.slice(-600)}`);
+  }
   return r.stdout;
 }
 const publish = (db: string, dir: string, fresh: boolean) =>
   run(BIN, ['publish', db, '--server', 'local', '--yes', '--no-config', '-p', dir, ...(fresh ? ['--delete-data=always'] : [])]);
 const dropDb = (db: string) => spawnSync(BIN, ['delete', db, '-s', 'local', '--yes'], { encoding: 'utf8' });
+// The smoke arms its own CFO claim (below), so the loader must not arm one.
 const seedDb = (db: string) => {
   run('pnpm', ['-F', '@cafoo/seed', 'generate']);
-  run('pnpm', ['-F', '@cafoo/seed', 'load'], { SPACETIMEDB_DB_NAME: db });
+  run('pnpm', ['-F', '@cafoo/seed', 'load'], { SPACETIMEDB_DB_NAME: db, SEED_NO_BOOTSTRAP: '1' });
 };
+const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
+/** Arm a one-time CFO claim as the database owner: the CLI identity that published the smoke database. */
+const armBootstrap = (db: string, secret: string, ttlMinutes = 60) =>
+  run(BIN, ['call', db, 'arm_cfo_bootstrap', JSON.stringify(sha256(secret)), String(ttlMinutes), '--server', 'local', '--no-config', '--yes']);
+
+// ---------- money (same rounding as ledger-core and the module) ----------
+const FX = 1_000_000n;
+const divRound = (n: bigint, d: bigint) => {
+  const neg = n < 0n !== d < 0n;
+  const an = n < 0n ? -n : n;
+  const ad = d < 0n ? -d : d;
+  const q = (an * 2n + ad) / (ad * 2n);
+  return neg ? -q : q;
+};
+const applyFx = (amount: bigint, rateE6: bigint) => divRound(amount * (rateE6 === 0n ? FX : rateE6), FX);
+const absB = (n: bigint) => (n < 0n ? -n : n);
 
 // ---------- connections ----------
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -94,15 +119,15 @@ async function waitFor<T>(f: () => T | undefined | null | false, what: string, m
     await sleep(25);
   }
 }
-type Who = { conn: DbConnection; identity: NonNullable<DbConnection['identity']>; name: string };
+type Who = { conn: DbConnection; identity: NonNullable<DbConnection['identity']>; name: string; token: string };
 function connect(db: string, name: string, token?: string, tables?: string[]): Promise<Who> {
   return new Promise((resolve, reject) => {
     DbConnection.builder()
       .withUri(URI)
       .withDatabaseName(db)
       .withToken(token)
-      .onConnect((conn, identity) => {
-        const sub = conn.subscriptionBuilder().onApplied(() => resolve({ conn, identity, name }));
+      .onConnect((conn, identity, newToken) => {
+        const sub = conn.subscriptionBuilder().onApplied(() => resolve({ conn, identity, name, token: newToken }));
         if (tables) sub.subscribe(tables.map(t => `SELECT * FROM ${t}`));
         else sub.subscribeToAllTables();
       })
@@ -130,9 +155,26 @@ async function main() {
 
   const A = await connect(DB, 'advisor', advisorToken(DB));
   const X = await connect(DB, 'cfo');
-  await X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' });
+  await section('CFO seat: claimed only with the owner-armed one-time secret', async () => {
+    await refuses('a connection registers itself as CFO', () => X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' }), /Claim the CFO seat with the one-time bootstrap secret/);
+    await refuses('a claim before any secret is armed', () => X.conn.reducers.claimCfo({ secret: 'nothing-armed', displayName: 'Smoke CFO' }), /No CFO claim is armed/);
+    const secret = randomBytes(18).toString('base64url');
+    await refuses('the advisor arms a CFO claim', () => A.conn.reducers.armCfoBootstrap({ secretSha256: sha256(secret), ttlMinutes: 60 }), /Only the database owner/);
+    await refuses('the owner arms with a malformed hash', async () => run(BIN, ['call', DB, 'arm_cfo_bootstrap', '"abc"', '60', '--server', 'local', '--no-config', '--yes']), /64-character hex/);
+    await accepts('the database owner arms a CFO claim through the CLI', async () => armBootstrap(DB, secret));
+    await refuses('a claim with a wrong secret', () => X.conn.reducers.claimCfo({ secret: `${secret}x`, displayName: 'Smoke CFO' }), /not the claim secret/);
+    await refuses('the advisor claims with the right secret', () => A.conn.reducers.claimCfo({ secret, displayName: 'Advisor' }), /registered as advisor/);
+    await accepts('a claim with the armed secret (surrounding whitespace ignored)', () => X.conn.reducers.claimCfo({ secret: ` ${secret}\n`, displayName: 'Smoke CFO' }));
+    const roster = await waitFor(() => X.conn.db.agentRoster.role.find('cfo'), 'cfo roster row');
+    check(roster.model === 'human' && roster.displayName === 'Smoke CFO', 'the roster shows the human CFO', `${roster.displayName} (${roster.model})`);
+    const Y = await connect(DB, 'second claimant', undefined, ['agent_roster']);
+    await refuses('a second claim with the same secret', () => Y.conn.reducers.claimCfo({ secret, displayName: 'Impostor' }), /already claimed/);
+    Y.conn.disconnect();
+    await refuses('the owner arms again once a CFO exists', async () => armBootstrap(DB, secret), /already claimed/);
+    await accepts('the CFO re-registers as itself (display-name refresh)', () => X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' }));
+  });
   const workers: Record<string, Who> = {};
-  for (const [role, tag] of [['bookkeeper', 'Bookkeeper'], ['revenue', 'Revenue'], ['credit', 'Credit'], ['redteam', 'Redteam']] as const) {
+  for (const [role, tag] of [['bookkeeper', 'Bookkeeper'], ['revenue', 'Revenue'], ['credit', 'Credit'], ['redteam', 'Redteam'], ['consolidation', 'Consolidation'], ['feed', 'Feed']] as const) {
     workers[role] = await connect(DB, role);
     await A.conn.reducers.grantRole({ identity: workers[role]!.identity, role: { tag }, displayName: `Smoke ${role}`, model: 'smoke' });
   }
@@ -140,9 +182,13 @@ async function main() {
   const R = workers.revenue!;
   const C = workers.credit!;
   const RT = workers.redteam!;
+  const CN = workers.consolidation!;
+  const F = workers.feed!;
   const db = X.conn.db;
   await sleep(300);
-  const sub = [...db.subsidiary.iter()][0]!.id.toString();
+  // The root company: no parent and not the elimination company (iteration order is not guaranteed once UK/ELIM exist).
+  const root = [...db.subsidiary.iter()].find(s => s.parentId === undefined && !s.isElimination)!;
+  const sub = root.id.toString();
 
   let seq = 0;
   type P = NonNullable<ReturnType<typeof db.proposal.id.find>>;
@@ -178,7 +224,7 @@ async function main() {
   // CFO-only fixtures (setup is sealed after the load): FX rates, probe invoices and bank lines.
   await X.conn.reducers.seedFxRate({ fromCcy: 'EUR', toCcy: 'USD', ym: NEXT, rateE6: 1_080_000n, kind: 'spot' });
   await X.conn.reducers.seedFxRate({ fromCcy: 'jpy', toCcy: 'usd', ym: NEXT, rateE6: 6_700n, kind: 'spot' });
-  const cust0 = [...db.customer.iter()][0]!;
+  const cust0 = [...db.customer.iter()].find(c => c.subsidiaryId === root.id)!;
   await X.conn.reducers.seedInvoice({ customerId: cust0.id, contractCode: undefined, number: 'SMOKE-EUR-1', ym: CLOSE, issuedAtMicros: 1788000000000000n, dueAtMicros: 1799000000000000n, amountMinor: 110000n, status: 'open' });
   const bds = await waitFor(() => [...db.vendor.iter()].find(v => v.name.startsWith('Brennan')), 'BDS vendor');
   await X.conn.reducers.seedBankTransactions({
@@ -197,7 +243,7 @@ async function main() {
   const txLocked = await waitFor(() => [...db.bankTransaction.iter()].find(t => t.description === 'SMOKE LOCKED MONTH LINE'), 'locked-month line');
   const txMisc = await waitFor(() => [...db.bankTransaction.iter()].find(t => t.description === 'SMOKE MISC OUTFLOW'), 'misc outflow');
   const txRefund = await waitFor(() => [...db.bankTransaction.iter()].find(t => t.description === 'SMOKE REFUND FROM BRENNAN'), 'BDS refund');
-  const anyJe = [...db.journalEntry.iter()][0]!;
+  const anyJe = [...db.journalEntry.iter()].find(j => j.subsidiaryId === root.id)!;
 
   await section('Finding 1: a month with unrecognized subscription revenue cannot lock', async () => {
     const due = unrecognized(CLOSE);
@@ -250,6 +296,77 @@ async function main() {
     await refuses('advisor resets the sealed demo', () => A.conn.reducers.resetDemo({ confirm: 'RESET' }), /sealed/);
     await refuses('advisor seeds a journal entry after sealing', () => A.conn.reducers.seedJournalEntry({ subsidiaryCode: 'US', periodYm: CLOSE, memo: 'x', lines: [{ accountCode: '1000', debitMinor: 1n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n, customerId: undefined, vendorId: undefined, memo: '' }, { accountCode: '3000', debitMinor: 0n, creditMinor: 1n, ccy: 'USD', fxRateE6: 1000000n, customerId: undefined, vendorId: undefined, memo: '' }] }), /sealed/);
     await A.conn.reducers.rejectProposal({ proposalId: open.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+  });
+
+  await section('Feed on fresh seed data: the month being closed is never a feed month', async () => {
+    const at = (ym: string) => {
+      const [y, m] = ym.split('-').map(Number);
+      return BigInt(Date.UTC(y!, m! - 1, 10, 12)) * 1000n;
+    };
+    const line = (externalId: string, ym: string) => ({ externalId, bookedAtMicros: at(ym), amountMinor: 1000n, ccy: 'USD', description: `SMOKE FRESH ${externalId}`, counterparty: 'Smoke Feed Co' });
+    await accepts('the CFO switches the feed on', () => X.conn.reducers.setFeedEnabled({ enabled: true }));
+    await refuses(`the feed books into ${CLOSE}, whose previous month carries only the seed's lock`, () => F.conn.reducers.ingestBankTransactions({ subsidiaryCode: root.code, txs: [line('smk-fresh-1', CLOSE)] }), new RegExp(`${PREV} was locked by the seed data, not closed by the CFO`));
+    await refuses(`the feed books into ${NEXT} while ${CLOSE} is open`, () => F.conn.reducers.ingestBankTransactions({ subsidiaryCode: root.code, txs: [line('smk-fresh-2', NEXT)] }), new RegExp(`${CLOSE} is not locked yet`));
+    await refuses('an invoice into the month being closed', () => F.conn.reducers.ingestInvoices({ invoices: [{ externalId: 'smk-fresh-inv', customerId: cust0.id, contractCode: undefined, number: 'SMOKE-FRESH-1', issuedAtMicros: at(CLOSE), dueAtMicros: at(CLOSE) + 30n * 86_400_000_000n, amountMinor: 1000n }] }), /locked by the seed data/);
+    await accepts('the CFO switches the feed off again', () => X.conn.reducers.setFeedEnabled({ enabled: false }));
+    check(db.feedEvent.count() === 0n, 'nothing was booked');
+  });
+
+  await section('Charters: drafts, evals, and publishing only after a passing eval', async () => {
+    const mapping = JSON.stringify([{ label: 'May 1', text: 'Propose journal entries.', target: { kind: 'rule', template: 'builtin:bookkeeper.may.1' } }]);
+    const body = '# Bookkeeper\n\nMay 1: Propose journal entries.\n';
+    const draft = (who: Who, o: Partial<{ role: string; bodyMd: string; mappingJson: string; summaryPlain: string; basedOnVersionId: bigint }>) =>
+      who.conn.reducers.saveCharterDraft({ role: 'bookkeeper', bodyMd: body, mappingJson: mapping, summaryPlain: 'Smoke draft of the bookkeeper charter.', basedOnVersionId: undefined, ...o });
+    await refuses('a worker saves a charter draft', () => draft(B, {}), /Only cfo or ui may save charter drafts/);
+    await refuses('a draft for a role without a charter', () => draft(X, { role: 'cfo' }), /Charters exist for/);
+    await refuses('a mapping that is not a JSON list', () => draft(X, { mappingJson: '{"May 1":"x"}' }), /must be a JSON list/);
+    await refuses('a draft without a plain summary', () => draft(X, { summaryPlain: 'short' }), /plain-English summary/);
+    await refuses('a charter over 20 KB', () => draft(X, { bodyMd: 'x'.repeat(21 * 1024) }), /at most 20 KB/);
+    await accepts('the CFO saves a bookkeeper draft', () => draft(X, { summaryPlain: 'Smoke: raise the batch threshold to 90%.' }));
+    const v1 = await waitFor(() => [...db.charterVersion.iter()].find(v => v.summaryPlain === 'Smoke: raise the batch threshold to 90%.'), 'draft v1');
+    check(v1.role === 'bookkeeper' && v1.version === 1 && v1.status.tag === 'Draft' && v1.authoredByRole === 'cfo', 'the first draft is version 1 (built-in is 0)', `${v1.role} v${v1.version} ${v1.status.tag} by ${v1.authoredByRole}`);
+    const U = await connect(DB, 'browser', undefined, ['charter_version']);
+    await U.conn.reducers.registerAgent({ role: { tag: 'Ui' }, displayName: 'Smoke browser', model: 'browser' });
+    await accepts('a browser (ui) saves version 2 based on version 1', () => draft(U, { summaryPlain: 'Smoke: second draft from the browser.', basedOnVersionId: v1.id }));
+    U.conn.disconnect();
+    const v2 = await waitFor(() => [...db.charterVersion.iter()].find(v => v.summaryPlain === 'Smoke: second draft from the browser.'), 'draft v2');
+    check(v2.version === 2 && v2.basedOnVersionId === v1.id, 'the next draft is version 2 and names its base', `v${v2.version} based on ${v2.basedOnVersionId}`);
+    const evalOf = (who: Who, id: bigint, passed: boolean, summaryPlain: string, mode = 'snapshot') =>
+      who.conn.reducers.recordCharterEval({ charterVersionId: id, passed, mode, resultsJson: JSON.stringify({ versionId: id.toString(), passed }), summaryPlain });
+    const publish = (who: Who, id: bigint, notePlain = '') => who.conn.reducers.publishCharter({ charterVersionId: id, notePlain });
+    await refuses('publishing a version that was never evaluated', () => publish(X, v1.id), /Run an eval of version 1 of the bookkeeper charter first/);
+    await refuses('a worker records an eval', () => evalOf(B, v1.id, true, 'Smoke eval from a worker.'), /Only advisor may record charter evals/);
+    await refuses('an eval with an unknown mode', () => evalOf(A, v1.id, true, 'Smoke eval in a made-up mode.', 'live'), /mode must be dry_run or snapshot/);
+    await accepts('the eval runner records a passing snapshot eval', () => evalOf(A, v1.id, true, 'Smoke eval passed in snapshot mode.'));
+    await sleep(20);
+    await accepts('and then a failing one', () => evalOf(A, v1.id, false, 'Smoke eval failed: the May 2 probe was denied.'));
+    await sleep(100);
+    await refuses('publishing when the latest eval failed', () => publish(X, v1.id), /latest eval of version 1 of the bookkeeper charter failed: Smoke eval failed/);
+    await refuses('the advisor publishes a charter', () => publish(A, v1.id), /Only cfo may publish charters/);
+    await sleep(20);
+    await accepts('the eval runner records a passing dry run', () => evalOf(A, v1.id, true, 'Smoke eval passed in a dry run.', 'dry_run'));
+    await sleep(100);
+    await accepts('the CFO publishes version 1 after its latest eval passed', () => publish(X, v1.id, 'Smoke: tighter batch threshold.'));
+    const live1 = await waitFor(() => (db.charterVersion.id.find(v1.id)!.status.tag === 'Live' ? db.charterVersion.id.find(v1.id) : undefined), 'v1 live');
+    check(live1.publishedAt !== undefined && live1.publishedBy !== undefined, 'the live version carries who published it and when');
+    const note = await waitFor(() => [...db.agentMessage.iter()].find(m => m.threadId === 'charter:bookkeeper' && m.senderRole === 'cfo'), 'charter message', 3000).catch(() => undefined);
+    check(!!note && /^The CFO published version 1 of the bookkeeper charter: Smoke: tighter batch threshold\.$/.test(note.summaryPlain), 'publishing posts a plain message in the charter thread', note?.summaryPlain ?? 'no message');
+    await refuses('an eval of the live version', () => evalOf(A, v1.id, true, 'Smoke eval of a live version.'), /already live/);
+    await accepts('version 2 passes a snapshot eval', () => evalOf(A, v2.id, true, 'Smoke snapshot eval of version 2 passed.'));
+    await sleep(100);
+    await refuses('publishing on a passing snapshot eval alone', () => publish(X, v2.id), /was a snapshot run; a charter publishes only after a passing dry run/);
+    await sleep(20);
+    await accepts('version 2 passes a dry run', () => evalOf(A, v2.id, true, 'Smoke dry run of version 2 passed.', 'dry_run'));
+    await sleep(100);
+    await accepts('the CFO publishes version 2', () => publish(X, v2.id));
+    await waitFor(() => db.charterVersion.id.find(v2.id)!.status.tag === 'Live', 'v2 live');
+    check(db.charterVersion.id.find(v1.id)!.status.tag === 'Retired', 'publishing version 2 retires version 1');
+    await accepts('the CFO restores the built-in charter', () => X.conn.reducers.retireLiveCharter({ role: 'bookkeeper', notePlain: 'Smoke: back to the shipped charter.' }));
+    await waitFor(() => db.charterVersion.id.find(v2.id)!.status.tag === 'Retired', 'v2 retired');
+    check([...db.charterVersion.iter()].every(v => v.role !== 'bookkeeper' || v.status.tag !== 'Live'), 'no bookkeeper version is live; the built-in applies');
+    await refuses('restoring the built-in charter twice', () => X.conn.reducers.retireLiveCharter({ role: 'bookkeeper', notePlain: '' }), /has no published charter/);
+    await accepts('a retired version whose latest eval passed can be published again', () => publish(X, v1.id, 'Smoke: reinstate version 1.'));
+    await waitFor(() => db.charterVersion.id.find(v1.id)!.status.tag === 'Live', 'v1 live again');
   });
 
   await section('H1, findings 2 and 10: FX rates and materiality', async () => {
@@ -368,13 +485,13 @@ async function main() {
   });
 
   await section('M3, L2: bank lines already matched, in locked months, or listed twice', async () => {
-    const seedMatched = [...db.bankTransaction.iter()].find(t => t.matched && t.ym === PREV)!;
+    const seedMatched = [...db.bankTransaction.iter()].find(t => t.matched && t.ym === PREV && t.subsidiaryId === root.id)!;
     const bm = (matches: object[]) => propose(B, 'bank_match', { matches }, CLOSE);
     await refuses(`bank match on a ${PREV} line the seed marked matched`, () => bm([{ bankTxId: seedMatched.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }]), /already matched/);
     await refuses('bankTxIds citing a seed-matched line', () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '1', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1' }], { bankTxIds: [seedMatched.id.toString()] }), /already matched/);
     await refuses(`bank match on an unmatched line in locked ${PREV}`, () => bm([{ bankTxId: txLocked.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }]), /locked/);
     await refuses(`bankTxIds citing an unmatched line in locked ${PREV}`, () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '7777', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '7777' }], { bankTxIds: [txLocked.id.toString()] }), /locked/);
-    const free = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === CLOSE)!;
+    const free = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === CLOSE && t.subsidiaryId === root.id)!;
     await refuses(`L2: "0${free.id}" and "${free.id}" in one bank match`, () => bm([{ bankTxId: `0${free.id}`, targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }, { bankTxId: free.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }]), /appears twice/);
     await refuses('L2: duplicate bankTxIds in a journal entry', () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '1', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1' }], { bankTxIds: [`0${free.id}`, Number(free.id)] }), /listed twice/);
   });
@@ -437,16 +554,261 @@ async function main() {
     await refuses('accrual reversing in a month that does not exist', () => je(B, CLOSE, [{ accountCode: '5600', debitMinor: '10000', creditMinor: '0' }, { accountCode: '2100', debitMinor: '0', creditMinor: '10000' }], { reversesInYm: '2031-01' }, 'accrual'), /Unknown period/);
   });
 
-  await section('L1: the CFO sees a conflict that arose while a proposal waited', async () => {
-    const payroll = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === CLOSE && t.amountMinor <= -1_000_000n)!;
+  // ---------- group companies: the seed's UK and ELIM if it has them, else fixtures with the §2.5 codes ----------
+  const UK_FIXTURE = 'UK';
+  async function ensureGroup() {
+    const find = () => ({ uk: [...db.subsidiary.iter()].find(x => x.code === UK_FIXTURE && !x.isElimination), elim: [...db.subsidiary.iter()].find(x => x.isElimination) });
+    let { uk, elim } = find();
+    if (uk && elim) return { uk, elim, fromSeed: true };
+    const r = X.conn.reducers;
+    await r.seedSubsidiary({ code: UK_FIXTURE, name: 'Smoke Ltd', functionalCcy: 'GBP', parentCode: root.code, isElimination: false });
+    await r.seedSubsidiary({ code: 'ELIM', name: 'Smoke group eliminations', functionalCcy: 'USD', parentCode: root.code, isElimination: true });
+    const acc = (code: string, name: string, accountType: string, isIntercompany: boolean) => ({ code, name, accountType, isIntercompany, sortOrder: Number(code.slice(0, 4)) });
+    await r.seedAccounts({ subsidiaryCode: root.code, accounts: [acc('1900', 'Due from Smoke Ltd', 'asset', true), acc('1950', 'Loan to Smoke Ltd', 'asset', true), acc('4900', 'Intercompany service fees', 'revenue', true), acc('7100', 'FX gain or loss', 'expense', false)] });
+    await r.seedAccounts({ subsidiaryCode: UK_FIXTURE, accounts: [acc('1000-UK', 'Cash', 'asset', false), acc('2900-UK', 'Due to Cafoo Inc', 'liability', true), acc('2950-UK', 'Loan from Cafoo Inc', 'liability', true), acc('3000-UK', 'Share capital', 'equity', false), acc('5500-UK', 'Rent & Office', 'expense', false), acc('5900-UK', 'Intercompany service fees', 'expense', true), acc('7100-UK', 'FX gain or loss', 'expense', false)] });
+    await r.seedAccounts({ subsidiaryCode: 'ELIM', accounts: [acc('1900-ELIM', 'Due from (eliminated)', 'asset', true), acc('1950-ELIM', 'Loan to (eliminated)', 'asset', true), acc('2900-ELIM', 'Due to (eliminated)', 'liability', true), acc('2950-ELIM', 'Loan from (eliminated)', 'liability', true), acc('4900-ELIM', 'Service fees (eliminated)', 'revenue', true), acc('5900-ELIM', 'Service fees (eliminated)', 'expense', true)] });
+    for (const [from, to, ym, rateE6, kind] of [['USD', 'GBP', PREV, 800000n, 'closing'], ['USD', 'GBP', PREV, 800000n, 'average'], ['GBP', 'USD', PREV, 1250000n, 'closing'], ['GBP', 'USD', CLOSE, 1280000n, 'closing'], ['USD', 'GBP', CLOSE, 781250n, 'closing'], ['USD', 'GBP', CLOSE, 787402n, 'average'], ['GBP', 'USD', NEXT, 1280000n, 'closing']] as const) {
+      await r.seedFxRate({ fromCcy: from, toCcy: to, ym, rateE6, kind });
+    }
+    await waitFor(() => [...db.account.iter()].some(a => a.code === '5900-ELIM') && [...db.fxRate.iter()].some(x => x.ym === NEXT && x.fromCcy === 'GBP'), 'group accounts and rates');
+    const line = (accountCode: string, debitMinor: bigint, creditMinor: bigint, ccy: string, fxRateE6: bigint) => ({ accountCode, debitMinor, creditMinor, ccy, fxRateE6, customerId: undefined, vendorId: undefined, memo: 'smoke group' });
+    await r.seedJournalEntry({ subsidiaryCode: UK_FIXTURE, periodYm: PREV, memo: 'Smoke loan received', lines: [line('1000-UK', 16_000_000n, 0n, 'GBP', FX), line('2950-UK', 0n, 20_000_000n, 'USD', 800000n)] });
+    await r.seedJournalEntry({ subsidiaryCode: root.code, periodYm: PREV, memo: 'Smoke loan to Smoke Ltd', lines: [line('1950', 20_000_000n, 0n, 'USD', FX), line('3000', 0n, 20_000_000n, 'USD', FX)] });
+    await r.seedJournalEntry({ subsidiaryCode: root.code, periodYm: CLOSE, memo: 'Smoke service fee', lines: [line('1900', 1_500_000n, 0n, 'USD', FX), line('4900', 0n, 1_500_000n, 'USD', FX)] });
+    await r.seedJournalEntry({ subsidiaryCode: UK_FIXTURE, periodYm: CLOSE, memo: 'Smoke service fee', lines: [line('5900-UK', 1_500_000n, 0n, 'USD', 787402n), line('2900-UK', 0n, 1_500_000n, 'USD', 787402n)] });
+    await waitFor(() => [...db.journalEntry.iter()].filter(j => j.memo.startsWith('Smoke service fee')).length === 2, 'group entries');
+    ({ uk, elim } = find());
+    return { uk: uk!, elim: elim!, fromSeed: false };
+  }
+  const ymOfJe = new Map<bigint, string>();
+  const entryYm = (jeId: bigint) => {
+    let y = ymOfJe.get(jeId);
+    if (y === undefined) ymOfJe.set(jeId, (y = db.period.id.find(db.journalEntry.id.find(jeId)!.periodId)!.ym));
+    return y;
+  };
+  const acctLines = (accountId: bigint, ym: string, mode: 'through' | 'in') => [...db.journalLine.accountId.filter(accountId)].filter(l => (mode === 'through' ? entryYm(l.jeId) <= ym : entryYm(l.jeId) === ym));
+  const functionalNet = (ls: { debitMinor: bigint; creditMinor: bigint; fxRateE6: bigint }[]) => ls.reduce((a, l) => a + applyFx(l.debitMinor, l.fxRateE6) - applyFx(l.creditMinor, l.fxRateE6), 0n);
+  const closing = (from: string, to: string, ym: string) => {
+    if (from === to) return FX;
+    const rows = [...db.fxRate.iter()].filter(x => x.ym === ym && x.kind.tag === 'Closing');
+    const direct = rows.find(x => x.fromCcy === from && x.toCcy === to);
+    if (direct) return direct.rateE6;
+    const inverse = rows.find(x => x.fromCcy === to && x.toCcy === from);
+    if (!inverse) throw new Error(`no ${from}/${to} closing rate for ${ym}`);
+    return divRound(FX * FX, inverse.rateE6);
+  };
+  type JL = { accountCode: string; debitMinor: string; creditMinor: string; ccy: string; fxRateE6: string };
+  const jl = (accountCode: string, debitPositive: bigint, ccy: string): JL => ({ accountCode, debitMinor: (debitPositive > 0n ? debitPositive : 0n).toString(), creditMinor: (debitPositive < 0n ? -debitPositive : 0n).toString(), ccy, fxRateE6: '1000000' });
+  /** The revaluation the module expects, computed from the client's copy of the ledger exactly as ledger-core does. */
+  function revaluationOf(uk: { id: bigint; code: string; functionalCcy: string }, ym: string) {
+    const items: Record<string, string>[] = [];
+    const lines: JL[] = [];
+    let gain = 0n;
+    const accounts = [...db.account.iter()].filter(a => a.subsidiaryId === uk.id && (a.accountType.tag === 'Asset' || a.accountType.tag === 'Liability')).sort((a, b) => (a.code < b.code ? -1 : 1));
+    for (const a of accounts) {
+      const ls = acctLines(a.id, ym, 'through');
+      const foreign = ls.find(l => l.ccy !== uk.functionalCcy);
+      if (!foreign) continue;
+      const txn = ls.filter(l => l.ccy === foreign.ccy).reduce((s, l) => s + l.debitMinor - l.creditMinor, 0n);
+      const booked = functionalNet(ls);
+      const rate = closing(foreign.ccy, uk.functionalCcy, ym);
+      const target = applyFx(txn, rate);
+      const delta = target - booked;
+      items.push({ accountCode: a.code, ccy: foreign.ccy, txnBalanceMinor: `${txn}`, closingRateE6: `${rate}`, bookedFunctionalMinor: `${booked}`, targetFunctionalMinor: `${target}`, deltaMinor: `${delta}` });
+      if (delta !== 0n) lines.push(jl(a.code, delta, uk.functionalCcy));
+      gain += delta;
+    }
+    if (gain !== 0n) lines.push(jl(`7100-${uk.code}`, -gain, uk.functionalCcy));
+    return { subsidiaryId: uk.id.toString(), periodYm: ym, rateYm: ym, memo: `Smoke revaluation of ${uk.code} at the ${ym} closing rate`, items, lines };
+  }
+  const IC = [
+    { label: 'Intercompany balance', basis: 'balance', src: '1900', cnt: '2900' },
+    { label: 'Loan', basis: 'balance', src: '1950', cnt: '2950' },
+    { label: 'Service fees', basis: 'activity', src: '4900', cnt: '5900' },
+  ] as const;
+  /** The elimination the module expects for one basis: each pair at the source amount, undone on the ELIM accounts. */
+  function eliminationOf(elim: { id: bigint; code: string }, uk: { id: bigint; code: string }, basis: 'balance' | 'activity', ym: string) {
+    const pairs: Record<string, string>[] = [];
+    const lines: JL[] = [];
+    for (const d of IC.filter(x => x.basis === basis)) {
+      const sa = [...db.account.iter()].find(a => a.code === d.src)!;
+      const signed = functionalNet(acctLines(sa.id, ym, basis === 'balance' ? 'through' : 'in'));
+      if (signed === 0n) continue;
+      const amount = absB(signed);
+      pairs.push({ label: d.label, sourceSubsidiaryId: root.id.toString(), sourceAccountCode: d.src, counterSubsidiaryId: uk.id.toString(), counterAccountCode: `${d.cnt}-${uk.code}`, amountMinor: `${amount}`, counterTranslatedMinor: `${amount}`, differenceMinor: '0' });
+      lines.push(jl(`${d.src}-${elim.code}`, -signed, 'USD'), jl(`${d.cnt}-${elim.code}`, signed, 'USD'));
+    }
+    return { subsidiaryId: elim.id.toString(), periodYm: ym, memo: `Smoke ${basis} elimination for ${ym}`, basis, ...(basis === 'balance' ? { reversesInYm: NEXT } : {}), pairs, lines };
+  }
+
+  await section('Group: an entry posts only to its own company\'s accounts', async () => {
+    await ensureGroup();
+    await refuses(`a ${root.code} journal entry with a line on a UK account`, () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '100', creditMinor: '0' }, { accountCode: '1000-UK', debitMinor: '0', creditMinor: '100' }]), /Account 1000-UK belongs to UK, not US/);
+    await refuses(`the CFO seeds a ${root.code} entry with a line on a UK account`, () => X.conn.reducers.seedJournalEntry({ subsidiaryCode: root.code, periodYm: CLOSE, memo: 'x', lines: [{ accountCode: '6000', debitMinor: 1n, creditMinor: 0n, ccy: 'USD', fxRateE6: FX, customerId: undefined, vendorId: undefined, memo: '' }, { accountCode: '1000-UK', debitMinor: 0n, creditMinor: 1n, ccy: 'USD', fxRateE6: FX, customerId: undefined, vendorId: undefined, memo: '' }] }), /belongs to UK, not US/);
+    await refuses('the consolidation agent proposes a journal entry', () => je(CN, CLOSE, [{ accountCode: '6000', debitMinor: '100', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '100' }]), /consolidation does not propose journal_entry/);
+  });
+
+  await section('Group: the elimination company, other companies\' bank lines, and amounts in the reporting currency', async () => {
+    const { uk, elim } = await ensureGroup();
+    const onElim = [{ accountCode: '4900-ELIM', debitMinor: '900000', creditMinor: '0' }, { accountCode: '5900-ELIM', debitMinor: '0', creditMinor: '900000' }];
+    await refuses('a bookkeeper journal entry on the elimination company', () => propose(B, 'journal_entry', { subsidiaryId: elim.id.toString(), periodYm: CLOSE, memo: 'smoke', lines: onElim }, CLOSE), /ELIM is the elimination company; it takes only ic_elimination proposals/);
+    await refuses('an accrual on the elimination company', () => propose(B, 'accrual', { subsidiaryId: elim.id.toString(), periodYm: CLOSE, memo: 'smoke', lines: onElim, reversesInYm: NEXT }, CLOSE), /takes only ic_elimination proposals/);
+    // A UK bank line can be reconciled only by a UK entry.
+    await X.conn.reducers.seedBankTransactions({ subsidiaryCode: uk.code, txs: [{ bookedAtMicros: 1789000000000000n, ym: CLOSE, amountMinor: -5000n, ccy: uk.functionalCcy, description: 'SMOKE UK BANK LINE', counterparty: 'Smoke Landlord Ltd', matched: false }] });
+    const ukTx = await waitFor(() => [...db.bankTransaction.iter()].find(t => t.description === 'SMOKE UK BANK LINE'), 'UK bank line');
+    await refuses(`a ${root.code} entry citing a ${uk.code} bank line`, () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '5000', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '5000' }], { bankTxIds: [ukTx.id.toString()] }), new RegExp(`Bank transaction ${ukTx.id} is ${uk.code}'s; an entry for ${root.code} cannot reconcile another company's bank line`));
+    await refuses(`a bank match of a ${uk.code} line to a ${root.code} entry`, () => propose(B, 'bank_match', { matches: [{ bankTxId: ukTx.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }] }, CLOSE), /a bank line is reconciled only by its own company's entry/);
+    const ukJe = (lines: object[], extra: object = {}) => propose(B, 'journal_entry', { subsidiaryId: uk.id.toString(), periodYm: CLOSE, memo: 'smoke UK entry', lines, ...extra }, CLOSE);
+    const own = await accepts(`a ${uk.code} entry citing its own bank line`, () => ukJe([{ accountCode: `5500-${uk.code}`, debitMinor: '5000', creditMinor: '0', ccy: uk.functionalCcy }, { accountCode: `1000-${uk.code}`, debitMinor: '0', creditMinor: '5000', ccy: uk.functionalCcy }], { bankTxIds: [ukTx.id.toString()] }));
+    if (own) await A.conn.reducers.rejectProposal({ proposalId: own.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+    // Rounding half away from zero, and a foreign entry sized line by line in the reporting currency: $0.07 at
+    // 0.787402 is 5.51 pence, so 6 pence (truncation would give 5 and refuse the entry); 6 pence at the 1.28 closing
+    // rate is 7.68 cents, so 8 cents.
+    const usdAvg = [...db.fxRate.iter()].find(x => x.ym === CLOSE && x.fromCcy === 'USD' && x.toCcy === uk.functionalCcy && x.rateE6 === 787402n);
+    if (usdAvg) {
+      const tiny = await accepts(`a ${uk.code} entry with a $0.07 line at 0.787402 against 6 pence (balances only when rounding half away from zero)`, () => ukJe([{ accountCode: `5500-${uk.code}`, debitMinor: '7', creditMinor: '0', ccy: 'USD', fxRateE6: '787402' }, { accountCode: `1000-${uk.code}`, debitMinor: '0', creditMinor: '6', ccy: uk.functionalCcy }]));
+      if (tiny) {
+        check(tiny.amountMinor === 8n, 'its size is 8 cents: the dollar line as is, the 6 pence at the closing rate rounded half away from zero', `${tiny.amountMinor}`);
+        await A.conn.reducers.rejectProposal({ proposalId: tiny.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+      }
+    } else fail('rounding probe', `no USD/${uk.functionalCcy} 787402 rate for ${CLOSE}`);
+    // A foreign schedule line in a month without its own rate is sized at the latest earlier closing rate, never 1:1.
+    let ukCustomer = [...db.customer.iter()].find(c => c.subsidiaryId === uk.id);
+    if (!ukCustomer) {
+      await X.conn.reducers.seedCustomers({ subsidiaryCode: uk.code, customers: [{ name: 'Smoke UK Customer', domain: 'smoke.example', guarantorPersonaId: 'P01', guarantorName: 'Smoke Guarantor', paymentTermsDays: 30 }] });
+      ukCustomer = await waitFor(() => [...db.customer.iter()].find(c => c.subsidiaryId === uk.id), 'UK customer');
+    }
+    await X.conn.reducers.seedContract({ customerId: ukCustomer.id, code: 'SMOKE-UK-C1', startYm: '2027-01', endYm: '2027-12', totalMinor: 10_800_000n, plan: { tag: 'Annual' }, items: [{ kind: { tag: 'Subscription' }, priceMinor: 10_800_000n, qty: 1n, sspMinor: 10_800_000n, description: 'Smoke UK subscription' }] });
+    const ukContract = await waitFor(() => [...db.contract.iter()].find(c => c.code === 'SMOKE-UK-C1'), 'UK contract');
+    const ukItem = await waitFor(() => [...db.contractItem.contractId.filter(ukContract.id)][0], 'UK contract item');
+    const schedLine = (ym: string) => ({ contractItemId: ukItem.id.toString(), customerId: ukCustomer!.id.toString(), ym, amountMinor: '900000' });
+    const latest = [...db.fxRate.iter()].filter(x => x.kind.tag === 'Closing' && x.ym <= '2027-01' && ((x.fromCcy === uk.functionalCcy && x.toCcy === 'USD') || (x.fromCcy === 'USD' && x.toCcy === uk.functionalCcy))).map(x => x.ym).sort().pop()!;
+    const expected = applyFx(900000n, closing(uk.functionalCcy, 'USD', latest));
+    const sched = await accepts(`a ${uk.code} £9,000 schedule line for 2027-01, a month with no rate of its own`, () => propose(R, 'revenue_schedule', { lines: [schedLine('2027-01')] }, CLOSE));
+    if (sched) {
+      check(sched.amountMinor === expected && expected > 900000n, `it counts at the ${latest} closing rate, not 1:1`, `${sched.amountMinor} USD cents (expected ${expected})`);
+      await A.conn.reducers.rejectProposal({ proposalId: sched.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+    }
+    await refuses(`a ${uk.code} schedule line in a month before any rate`, () => propose(R, 'revenue_schedule', { lines: [schedLine('2019-01')] }, CLOSE), new RegExp(`no ${uk.functionalCcy}/USD closing rate is recorded for 2019-01 or any month before it`));
+  });
+
+  await section('Consolidation: a revaluation must restate foreign balances at the closing rate, to the cent', async () => {
+    const { uk, fromSeed } = await ensureGroup();
+    const good = revaluationOf(uk, CLOSE);
+    check(good.items.length >= 1 && good.lines.length >= 2, `the ledger gives ${uk.code} something to revalue in ${CLOSE}`, good.items.map(i => `${i.accountCode} ${i.ccy} delta ${i.deltaMinor}`).join('; '));
+    const fx = (payload: object) => propose(CN, 'fx_revaluation', payload, CLOSE);
+    const first = good.items[0]!;
+    const wrongDelta = { ...good, items: good.items.map((i, k) => (k === 0 ? { ...i, deltaMinor: `${BigInt(i.deltaMinor!) + 100n}` } : i)) };
+    await refuses('a revaluation with a wrong delta', () => fx(wrongDelta), new RegExp(`Item ${first.accountCode}: deltaMinor is .*but target minus booked is ${first.deltaMinor}`));
+    const avg = [...db.fxRate.iter()].find(x => x.ym === CLOSE && x.kind.tag === 'Average' && x.fromCcy === first.ccy && x.toCcy === uk.functionalCcy);
+    if (avg && avg.rateE6 !== BigInt(first.closingRateE6!)) {
+      await refuses('a revaluation at the average rate instead of the closing rate', () => fx({ ...good, items: good.items.map((i, k) => (k === 0 ? { ...i, closingRateE6: `${avg.rateE6}` } : i)) }), /closingRateE6 is .* but the .* closing rate/);
+    }
+    const shifted = good.lines.map(l => ({ ...l, debitMinor: l.debitMinor === '0' ? '0' : `${BigInt(l.debitMinor) + 1n}`, creditMinor: l.creditMinor === '0' ? '0' : `${BigInt(l.creditMinor) + 1n}` }));
+    if (good.lines.length === 2) await refuses('revaluation lines a cent off the deltas', () => fx({ ...good, lines: shifted }), /The revaluation lines net/);
+    await refuses('revaluation lines in a foreign currency', () => fx({ ...good, lines: good.lines.map(l => ({ ...l, ccy: 'USD' })) }), /own currency \(GBP\)/);
+    const pnl = [...db.account.iter()].find(a => a.code === `5900-${uk.code}`);
+    if (pnl) await refuses('revaluing an expense account', () => fx({ ...good, items: [...good.items, { ...first, accountCode: pnl.code }] }), /only asset and liability balances are revalued/);
+    await refuses('a revaluation for the elimination company', () => fx({ ...good, subsidiaryId: [...db.subsidiary.iter()].find(x => x.isElimination)!.id.toString() }), /elimination company/);
+    const p = await accepts('the exact revaluation', () => fx(good));
+    if (!p) return;
+    const debits = good.lines.reduce((a, l) => a + BigInt(l.debitMinor), 0n);
+    const usd = applyFx(debits, closing(uk.functionalCcy, 'USD', CLOSE));
+    check(p.amountMinor === usd, 'its amount is the sum of its debits in the reporting currency at the closing rate', `${debits} ${uk.functionalCcy} pence -> ${p.amountMinor} USD cents (expected ${usd})`);
+    if (fromSeed) check(debits === 440478n && p.amountMinor === 563812n, 'on the seeded group it is the planned £4,404.78 gain, $5,638.12', `${debits} pence, ${p.amountMinor} cents`);
+    await refuses('a second revaluation while the first waits', () => fx(good), /still waiting/);
+    await settle(p);
+    const posted = entriesOf(p.id);
+    check(posted.length === 1 && posted[0]!.subsidiaryId === uk.id, `the revaluation posts one ${uk.code} entry`, `${posted.length} entries`);
+    const again = revaluationOf(uk, CLOSE);
+    check(again.items.every(i => i.deltaMinor === '0'), 'afterwards every item stands at the closing rate (deltas zero)');
+    await refuses('revaluing again once balances stand at the closing rate', () => fx(again), /nothing to revalue/);
+  });
+
+  await section('Consolidation: an elimination removes exactly what the group companies owe each other', async () => {
+    const { uk, elim } = await ensureGroup();
+    const bal = eliminationOf(elim, uk, 'balance', CLOSE);
+    const act = eliminationOf(elim, uk, 'activity', CLOSE);
+    check(bal.pairs.length >= 1 && act.pairs.length >= 1, `the ledger has intercompany balances and ${CLOSE} activity to eliminate`, `${bal.pairs.map(x => `${x.label} ${x.amountMinor}`).join('; ')} | ${act.pairs.map(x => `${x.label} ${x.amountMinor}`).join('; ')}`);
+    const ic = (payload: object) => propose(CN, 'ic_elimination', payload, CLOSE);
+    const wrong = { ...bal, pairs: bal.pairs.map((x, k) => (k === 0 ? { ...x, amountMinor: `${BigInt(x.amountMinor!) + 100n}` } : x)) };
+    await refuses('an elimination with a wrong pair amount', () => ic(wrong), new RegExp(`Pair "${bal.pairs[0]!.label}": amountMinor is \\d+, but ${bal.pairs[0]!.sourceAccountCode} in ${root.code} shows ${bal.pairs[0]!.amountMinor}`));
+    await refuses('an elimination posted to a trading company', () => ic({ ...bal, subsidiaryId: uk.id.toString() }), /not the elimination company/);
+    const loan = bal.pairs.find(x => x.label === 'Loan');
+    if (loan) {
+      await refuses('the Loan pair listed twice', () => ic({ ...bal, pairs: [...bal.pairs, loan] }), /already appears in another pair/);
+      await refuses('a balance pair of the loan against an expense account', () => ic({ ...bal, pairs: bal.pairs.map(x => (x === loan ? { ...x, counterAccountCode: `5900-${uk.code}` } : x)) }), new RegExp(`1950 pairs with group code 2950, not 5900-${uk.code}`));
+    } else fail('elimination pinning', 'no Loan pair in the ledger');
+    if (act.pairs[0]) await refuses('an activity pair of service fees against a liability', () => ic({ ...act, pairs: [{ ...act.pairs[0], counterAccountCode: `2900-${uk.code}` }] }), new RegExp(`4900 pairs with group code 5900, not 2900-${uk.code}`));
+    const { reversesInYm: _drop, ...noReversal } = bal;
+    await refuses('a balance elimination that does not reverse', () => ic(noReversal), /reverses the next month/);
+    await refuses('an activity elimination that reverses', () => ic({ ...act, reversesInYm: NEXT }), /does not reverse/);
+    await refuses('elimination lines that leave part of a pair standing', () => ic({ ...bal, lines: bal.lines.map(l => ({ ...l, debitMinor: l.debitMinor === '0' ? '0' : `${BigInt(l.debitMinor) - 100n}`, creditMinor: l.creditMinor === '0' ? '0' : `${BigInt(l.creditMinor) - 100n}` })) }), /The elimination lines net/);
+    const p = await accepts('the exact balance elimination', () => ic(bal));
+    if (p) {
+      const total = bal.pairs.reduce((a, x) => a + BigInt(x.amountMinor!), 0n);
+      check(p.amountMinor === total, 'its amount is the sum of the pairs', `${p.amountMinor} vs ${total}`);
+      await refuses('a second balance elimination while the first waits', () => ic(bal), /still waiting/);
+      await approve(p);
+      check(status(p.id) === 'AwaitingCfo', 'a material elimination waits for the CFO', status(p.id));
+      await X.conn.reducers.cfoConfirm({ proposalId: p.id, note: 'smoke' });
+      await waitFor(() => status(p.id) === 'Approved', 'elimination applied');
+      const posted = entriesOf(p.id);
+      const main = posted.find(j => j.reversalOf === undefined);
+      const auto = posted.find(j => j.reversalOf !== undefined);
+      check(!!main && !!auto && entryYm(main.id) === CLOSE && entryYm(auto.id) === NEXT && auto.reversalOf === main.id && main.subsidiaryId === elim.id, `it posts in ${CLOSE} on the elimination company and reverses itself in ${NEXT}`, posted.map(j => `${j.id} ${entryYm(j.id)} rev:${j.reversalOf ?? '-'}`).join('; '));
+      await refuses(`eliminating ${CLOSE} balances twice`, () => ic(eliminationOf(elim, uk, 'balance', CLOSE)), /already eliminated on the balance basis/);
+      if (main && auto) {
+        await accepts('the CFO reverses the elimination', () => X.conn.reducers.cfoReverse({ jeId: main.id, reasonPlain: 'smoke: undo elimination' }));
+        const r1 = await waitFor(() => [...db.journalEntry.iter()].find(j => j.reversalOf === main.id && j.source.tag === 'Manual'), 'reversal of the elimination');
+        const r2 = await waitFor(() => [...db.journalEntry.iter()].find(j => j.reversalOf === auto.id && j.source.tag === 'Manual'), 'reversal of its automatic reversal', 3000).catch(() => undefined);
+        check(!!r1 && !!r2 && entryYm(r2.id) === NEXT, `reversing an elimination also reverses its ${NEXT} automatic reversal, as for an accrual`);
+        const redo = await accepts('once reversed, the month can be eliminated again', () => ic(eliminationOf(elim, uk, 'balance', CLOSE)));
+        if (redo) await A.conn.reducers.rejectProposal({ proposalId: redo.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+      }
+    }
+    const a = await accepts('the exact activity elimination', () => ic(act));
+    if (a) {
+      await settle(a);
+      const posted = entriesOf(a.id);
+      check(posted.length === 1 && entryYm(posted[0]!.id) === CLOSE, 'an activity elimination posts once, with no reversal', `${posted.length} entries`);
+      await refuses(`eliminating ${CLOSE} activity twice`, () => ic(eliminationOf(elim, uk, 'activity', CLOSE)), /already eliminated on the activity basis/);
+    }
+  });
+
+  await section('L1: one waiting Proposal per bank line, and the CFO sees a conflict that arose while a proposal waited', async () => {
+    const payroll = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === CLOSE && t.amountMinor <= -1_000_000n && t.subsidiaryId === root.id)!;
     const bm = await propose(B, 'bank_match', { matches: [{ bankTxId: payroll.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }] }, CLOSE);
     await approve(bm);
     check(status(bm.id) === 'AwaitingCfo', 'a material bank match waits for the CFO');
-    const claim = await je(B, CLOSE, [{ accountCode: '5300', debitMinor: '1000', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1000' }], { bankTxIds: [payroll.id.toString()] });
-    await settle(claim);
-    await refuses('CFO confirms the bank match after the line was claimed', () => X.conn.reducers.cfoConfirm({ proposalId: bm.id, note: 'go' }), /already matched/);
+    const citedRe = new RegExp(`Bank transaction ${payroll.id} is already cited by pending proposal ${bm.id}\\.`);
+    const claim = () => je(B, CLOSE, [{ accountCode: '5300', debitMinor: '1000', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1000' }], { bankTxIds: [payroll.id.toString()] });
+    await refuses('a journal entry citing a bank line a waiting bank match already cites', claim, citedRe);
+    await refuses('a second bank match on that line (id written "0…")', () => propose(B, 'bank_match', { matches: [{ bankTxId: `0${payroll.id}`, targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 8000 }] }, CLOSE), citedRe);
+    await X.conn.reducers.cfoSendBack({ proposalId: bm.id, notePlain: 'smoke: check the payee' });
+    await waitFor(() => status(bm.id) === 'SentBack', 'send back');
+    await refuses('a sent-back bank match still holds its line', claim, citedRe);
+    await accepts('the Advisor resubmits the sent-back bank match by ruling on it again', () => A.conn.reducers.approveProposal({ proposalId: bm.id, rationale: 'smoke: re-reviewed after the send-back', summaryPlain: 'Re-approved after the CFO sent it back.', amendedPayloadJson: undefined }));
+    await waitFor(() => status(bm.id) === 'AwaitingCfo', 'resubmitted');
+    // The conflict that can still arise while the CFO waits: its payee gets blocked.
+    let payee = [...db.vendor.iter()].find(v => v.name.trim().toLowerCase() === payroll.counterparty.trim().toLowerCase());
+    if (!payee) {
+      await X.conn.reducers.seedVendors({ subsidiaryCode: root.code, vendors: [{ name: payroll.counterparty, domain: 'smoke.example', category: 'smoke', ownerPersonaId: undefined }] });
+      payee = await waitFor(() => [...db.vendor.iter()].find(v => v.name === payroll.counterparty), 'payee vendor');
+    }
+    await settle(await propose(C, 'vendor_block', { vendorId: payee.id.toString(), reasonPlain: 'smoke: the payee failed its checks while the match waited' }, CLOSE));
+    await refuses('CFO confirms the bank match after its payee was blocked', () => X.conn.reducers.cfoConfirm({ proposalId: bm.id, note: 'go' }), /is blocked/);
     await X.conn.reducers.cfoSendBack({ proposalId: bm.id, notePlain: 'smoke cleanup' });
     await A.conn.reducers.rejectProposal({ proposalId: bm.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+    await waitFor(() => status(bm.id) === 'Rejected', 'rejected');
+    // A rejected Proposal no longer holds its line (shown on a line whose payee is not blocked).
+    const bm2 = await propose(B, 'bank_match', { matches: [{ bankTxId: txMisc.id.toString(), targetKind: 'je', targetId: anyJe.id.toString(), scoreBp: 9000 }] }, CLOSE);
+    const miscEntry = () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '1234', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1234' }], { bankTxIds: [txMisc.id.toString()] });
+    await refuses('a journal entry citing a line an open bank match cites', miscEntry, new RegExp(`already cited by pending proposal ${bm2.id}\\.`));
+    await A.conn.reducers.rejectProposal({ proposalId: bm2.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+    await waitFor(() => status(bm2.id) === 'Rejected', 'bm2 rejected');
+    const freed = await accepts('once that bank match is rejected, another proposal may cite the line', miscEntry);
+    if (freed) await A.conn.reducers.rejectProposal({ proposalId: freed.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
   });
 
   await section(`Q1: corrections to a locked month post in the next open month`, async () => {
@@ -489,6 +851,77 @@ async function main() {
     check(reopened?.summaryPlain === `The CFO reopened ${CLOSE}: smoke reopen`, 'unlocking posts a close-thread message with the reason', reopened?.summaryPlain ?? 'no message');
   });
 
+  await section('Feed: rows arrive only through the feed role, only into the open month after a locked one', async () => {
+    const at = (ym: string, day: number) => {
+      const [y, m] = ym.split('-').map(Number);
+      return BigInt(Date.UTC(y!, m! - 1, day, 12)) * 1000n;
+    };
+    const tx = (externalId: string, ym: string, amountMinor: bigint) => ({ externalId, bookedAtMicros: at(ym, 10), amountMinor, ccy: 'usd', description: `SMOKE FEED ${externalId}`, counterparty: 'Smoke Feed Co' });
+    const bank = (who: Who, txs: ReturnType<typeof tx>[], subsidiaryCode = root.code) => who.conn.reducers.ingestBankTransactions({ subsidiaryCode, txs });
+    const feedOn = () => [...db.settings.iter()].find(x => x.key === 'feed_enabled')?.valueI64 === 1n;
+    await refuses('the feed ingests while the CFO has it off', () => bank(F, [tx('smk-1', NEXT, 1000n)]), /live feed is off/);
+    await refuses('the advisor switches the feed on', () => A.conn.reducers.setFeedEnabled({ enabled: true }), /Only cfo may switch the live feed/);
+    await accepts('the CFO switches the feed on', () => X.conn.reducers.setFeedEnabled({ enabled: true }));
+    await waitFor(() => feedOn(), 'feed on');
+    await refuses('a worker ingests bank lines', () => bank(B, [tx('smk-1', NEXT, 1000n)]), /Only feed may ingest feed rows/);
+    await refuses('the feed proposes', () => F.conn.reducers.propose({ kind: 'journal_entry', payloadJson: '{}', rationale: 'x', summaryPlain: 'The feed trying to propose.', amountMinor: 0n, periodYm: NEXT, closeTaskId: undefined }), /may propose/);
+    await refuses(`the feed books into ${NEXT} while ${CLOSE} is still open`, () => bank(F, [tx('smk-1', NEXT, 1000n)]), new RegExp(`${CLOSE} is not locked yet`));
+    const first = [...db.period.iter()].map(x => x.ym).sort()[0]!;
+    await accepts(`CFO unlocks the first month of the books (${first})`, () => X.conn.reducers.unlockPeriod({ periodYm: first, rationale: 'smoke: feed probe' }));
+    await refuses(`the feed books into ${first}, which has no locked month before it`, () => bank(F, [tx('smk-first', first, 1000n)]), new RegExp(`the books have no ${ymAdd(first, -1)} period before ${first}`));
+    await accepts(`CFO locks ${first} again`, () => X.conn.reducers.lockPeriod({ periodYm: first, rationale: 'smoke relock' }));
+    await accepts(`CFO locks ${CLOSE} again`, () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke relock' }));
+    await refuses(`the feed books into locked ${CLOSE}`, () => bank(F, [tx('smk-2', CLOSE, 1000n)]), new RegExp(`${CLOSE} is closed; the feed books only into the open month`));
+    await refuses('the feed books into a month the books do not have', () => bank(F, [tx('smk-3', ymAdd(NEXT, 6), 1000n)]), /books have no/);
+    await refuses('the feed books a bank line for the elimination company', () => bank(F, [tx('smk-4', NEXT, 1000n)], 'ELIM'), /elimination company/);
+    await refuses('a zero-amount line refuses the whole batch', () => bank(F, [tx('smk-5', NEXT, 500n), tx('smk-6', NEXT, 0n)]), /cannot be zero/);
+    check(!db.feedEvent.externalId.find('smk-5'), 'nothing from a refused batch is booked');
+    await accepts(`the feed books two ${NEXT} bank lines, one listed twice`, () => bank(F, [tx('smk-a', NEXT, 125000n), tx('smk-b', NEXT, -4200n), tx('smk-a', NEXT, 125000n)]));
+    const evA = await waitFor(() => db.feedEvent.externalId.find('smk-a'), 'feed event a');
+    const evB = await waitFor(() => db.feedEvent.externalId.find('smk-b'), 'feed event b');
+    const rowA = db.bankTransaction.id.find(evA.rowId);
+    check(!!rowA && rowA.ym === NEXT && !rowA.matched && rowA.ccy === 'USD' && rowA.amountMinor === 125000n && rowA.subsidiaryId === root.id && evA.kind.tag === 'BankTx' && evA.ym === NEXT, 'the bank line is unmatched, in the open month, and linked from its feed event', rowA ? `${rowA.ym} ${rowA.ccy} ${rowA.amountMinor} matched=${rowA.matched}` : 'missing');
+    check(!!db.bankTransaction.id.find(evB.rowId), 'the second line is booked too');
+    await accepts('a replayed bank line is accepted and skipped', () => bank(F, [tx('smk-a', NEXT, 125000n)]));
+    await sleep(200);
+    check([...db.bankTransaction.iter()].filter(t => t.description === 'SMOKE FEED smk-a').length === 1, 'the replayed line is booked once');
+    const inv = (externalId: string, number: string, customerId = cust0.id) => ({ externalId, customerId, contractCode: undefined, number, issuedAtMicros: at(NEXT, 5), dueAtMicros: at(NEXT, 5) + 30n * 86_400_000_000n, amountMinor: 250000n });
+    await refuses('an invoice for an unknown customer', () => F.conn.reducers.ingestInvoices({ invoices: [inv('smk-inv-0', 'SMOKE-FEED-0', 999999n)] }), /unknown customer/);
+    await refuses('a worker ingests invoices', () => B.conn.reducers.ingestInvoices({ invoices: [inv('smk-inv-1', 'SMOKE-FEED-1')] }), /Only feed/);
+    await accepts('the feed books a new invoice', () => F.conn.reducers.ingestInvoices({ invoices: [inv('smk-inv-1', 'SMOKE-FEED-1')] }));
+    const evI = await waitFor(() => db.feedEvent.externalId.find('smk-inv-1'), 'invoice feed event');
+    const invRow = db.invoice.id.find(evI.rowId);
+    check(!!invRow && invRow.number === 'SMOKE-FEED-1' && invRow.status.tag === 'Open' && invRow.ym === NEXT && evI.kind.tag === 'Invoice' && evI.subsidiaryId === cust0.subsidiaryId, 'the invoice is open, in the open month, and linked from its feed event');
+    await accepts('an invoice whose number is already in the books is skipped', () => F.conn.reducers.ingestInvoices({ invoices: [inv('smk-inv-2', 'SMOKE-FEED-1')] }));
+    await sleep(200);
+    check(!db.feedEvent.externalId.find('smk-inv-2') && [...db.invoice.iter()].filter(i => i.number === 'SMOKE-FEED-1').length === 1, 'the duplicate number is not booked');
+    // The feed stops once the open month's own close starts.
+    await X.conn.reducers.seedCloseTasks({ periodYm: NEXT, tasks: [{ title: 'Smoke next-month task', description: 'smoke', ownerRole: 'bookkeeper', sortOrder: 1 }] });
+    const nextTask = await waitFor(() => [...db.closeTask.iter()].find(t => t.title === 'Smoke next-month task'), 'next-month close task');
+    await B.conn.reducers.updateCloseTask({ taskId: nextTask.id, status: 'in_progress', note: 'smoke: the close starts' });
+    await waitFor(() => db.closeTask.id.find(nextTask.id)!.status.tag === 'InProgress', 'task in progress');
+    await refuses(`the feed books into ${NEXT} once its close has started`, () => bank(F, [tx('smk-closing', NEXT, 1000n)]), new RegExp(`the ${NEXT} close has started \\(close task "Smoke next-month task" is in progress\\)`));
+    await B.conn.reducers.updateCloseTask({ taskId: nextTask.id, status: 'todo', note: 'smoke: not yet' });
+    await waitFor(() => db.closeTask.id.find(nextTask.id)!.status.tag === 'Todo', 'task back to todo');
+    await accepts(`the feed books into ${NEXT} again while its close has not started`, () => bank(F, [tx('smk-after', NEXT, 1000n)]));
+    await accepts('the CFO switches the feed off', () => X.conn.reducers.setFeedEnabled({ enabled: false }));
+    await waitFor(() => !feedOn(), 'feed off');
+    await refuses('the feed ingests after it is switched off', () => bank(F, [tx('smk-c', NEXT, 1000n)]), /live feed is off/);
+  });
+
+  await section('resetDemo clears the books and the feed log, keeps charters and the CFO', async () => {
+    const charters = db.charterVersion.count();
+    const evals = db.charterEval.count();
+    await X.conn.reducers.setFeedEnabled({ enabled: true });
+    await accepts('the CFO resets the demo', () => X.conn.reducers.resetDemo({ confirm: 'RESET' }));
+    await waitFor(() => db.subsidiary.count() === 0n, 'reset');
+    await sleep(200);
+    check(db.feedEvent.count() === 0n && db.bankTransaction.count() === 0n, 'feed events and bank lines are cleared');
+    check(db.charterVersion.count() === charters && db.charterEval.count() === evals && charters > 0n, 'charter versions and evals survive', `${db.charterVersion.count()} versions, ${db.charterEval.count()} evals`);
+    check([...db.settings.iter()].find(x => x.key === 'feed_enabled')?.valueI64 === 0n, 'the reset turns the live feed off');
+    check(!!db.agentRoster.role.find('cfo'), 'the CFO keeps the seat');
+  });
+
   A.conn.disconnect();
   X.conn.disconnect();
   for (const w of Object.values(workers)) w.conn.disconnect();
@@ -501,24 +934,43 @@ async function legacy() {
     console.log(`\nSKIPPED the in-place upgrade check: commit ${LEGACY_REF} is not in this clone (shallow clone or rewritten history). Set LEGACY_REF to a commit from before bank_match.paymentJeId existed to run it.`);
     return;
   }
-  const dir = mkdtempSync(join(tmpdir(), 'cafoo-legacy-module-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cafoo-legacy-'));
   try {
-    copyFileSync(join(moduleDir, 'package.json'), join(dir, 'package.json'));
-    copyFileSync(join(moduleDir, 'tsconfig.json'), join(dir, 'tsconfig.json'));
-    symlinkSync(join(moduleDir, 'node_modules'), join(dir, 'node_modules'));
-    mkdirSync(join(dir, 'src'));
-    for (const f of ['index.ts', 'tables.ts']) writeFileSync(join(dir, 'src', f), run('git', ['-C', repo, 'show', `${LEGACY_REF}:spacetimedb/spacetimedb/src/${f}`]));
-    console.log(`\npublishing the ${LEGACY_REF} module to ${LEGACY_DB} and seeding it`);
-    publish(LEGACY_DB, dir, true);
-    seedDb(LEGACY_DB);
-    // The old schema has no paymentJeId, so these connections do not subscribe to bank_match.
-    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'vendor', 'subsidiary', 'agent_roster'];
-    const A = await connect(LEGACY_DB, 'advisor', advisorToken(LEGACY_DB), tables);
+    // That commit's module, generated bindings and seed loader, extracted with git archive (the work tree is untouched),
+    // so the old database is seeded exactly as it was then, whatever today's loader and bindings expect.
+    const paths = ['spacetimedb/spacetimedb/src', 'spacetimedb/spacetimedb/package.json', 'spacetimedb/spacetimedb/tsconfig.json', 'packages/stdb-bindings/src', 'packages/stdb-bindings/package.json', 'seed/src', 'seed/package.json'];
+    const archive = spawnSync('git', ['-C', repo, 'archive', '--format=tar', LEGACY_REF, ...paths], { maxBuffer: 256 * 1024 * 1024 });
+    if (archive.status !== 0) throw new Error(`git archive ${LEGACY_REF} failed: ${archive.stderr?.toString().trim()}`);
+    const untar = spawnSync('tar', ['-x', '-C', dir], { input: archive.stdout });
+    if (untar.status !== 0) throw new Error(`tar failed: ${untar.stderr?.toString().trim()}`);
+    const oldModule = join(dir, 'spacetimedb', 'spacetimedb');
+    symlinkSync(join(moduleDir, 'node_modules'), join(oldModule, 'node_modules'));
+    symlinkSync(join(repo, 'packages', 'stdb-bindings', 'node_modules'), join(dir, 'packages', 'stdb-bindings', 'node_modules'));
+    mkdirSync(join(dir, 'seed', 'node_modules', '@cafoo'), { recursive: true });
+    symlinkSync(join(dir, 'packages', 'stdb-bindings'), join(dir, 'seed', 'node_modules', '@cafoo', 'stdb-bindings'));
+    symlinkSync(realpathSync(join(repo, 'seed', 'node_modules', 'spacetimedb')), join(dir, 'seed', 'node_modules', 'spacetimedb'));
+    if (!existsSync(join(repo, 'seed', 'out', 'seed.json'))) run('pnpm', ['-F', '@cafoo/seed', 'generate']);
+    mkdirSync(join(dir, 'seed', 'out'), { recursive: true });
+    copyFileSync(join(repo, 'seed', 'out', 'seed.json'), join(dir, 'seed', 'out', 'seed.json'));
+    console.log(`\npublishing the ${LEGACY_REF} module to ${LEGACY_DB} and seeding it with that commit's loader`);
+    publish(LEGACY_DB, oldModule, true);
+    const tsx = join(repo, 'packages', 'stdb-bindings', 'node_modules', '.bin', 'tsx');
+    run(tsx, [join(dir, 'seed', 'src', 'load.ts')], { SPACETIMEDB_DB_NAME: LEGACY_DB }, join(dir, 'seed'));
+    const oldToken = [join(dir, '.secrets', LEGACY_DB, 'advisor.token'), join(dir, '.secrets', 'advisor.token')].find(f => existsSync(f));
+    if (!oldToken) throw new Error('the legacy loader saved no advisor token');
+    // Rows of tables whose schema changed since (bank_match.paymentJeId, subsidiary.isElimination) would not decode with
+    // today's bindings, so these connections do not subscribe to them.
+    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'vendor', 'agent_roster'];
+    const A = await connect(LEGACY_DB, 'advisor', readFileSync(oldToken, 'utf8').trim(), tables);
     const B = await connect(LEGACY_DB, 'bookkeeper', undefined, tables);
+    // The old module seats the CFO by first claim and records no database owner, so an owner-armed claim is impossible
+    // after the upgrade; a real database upgraded in place keeps the CFO it already had.
+    const X0 = await connect(LEGACY_DB, 'cfo', undefined, tables);
+    await X0.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' });
     await A.conn.reducers.grantRole({ identity: B.identity, role: { tag: 'Bookkeeper' }, displayName: 'Smoke bookkeeper', model: 'smoke' });
     const db = A.conn.db;
-    const sub = [...db.subsidiary.iter()][0]!.id.toString();
-    const close = JSON.parse(readFileSync(join(repo, 'seed', 'out', 'seed.json'), 'utf8')).closeYm as string;
+    const sub = [...db.journalEntry.iter()][0]!.subsidiaryId.toString();
+    const close = JSON.parse(readFileSync(join(dir, 'seed', 'out', 'seed.json'), 'utf8')).closeYm as string;
     const lumen = [...db.vendor.iter()].find(v => v.name === 'Lumen Analytics')!;
     const bill = [...db.bill.iter()].find(b => b.vendorId === lumen.id && b.ym === close)!;
     const tx = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === close && t.amountMinor === -bill.amountMinor && t.counterparty === lumen.name)!;
@@ -534,11 +986,14 @@ async function legacy() {
     pass(`old module posted a payment entry (${payment.id}) and a bad-rate entry (${badRate.id})`);
     A.conn.disconnect();
     B.conn.disconnect();
+    X0.conn.disconnect();
 
     await accepts('M1: the working-tree module publishes over it in place', async () => publish(LEGACY_DB, moduleDir, false));
-    const X = await connect(LEGACY_DB, 'cfo');
-    await X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' });
+    const X = await connect(LEGACY_DB, 'cfo', X0.token);
+    await accepts('the upgraded database keeps its CFO (re-registering as itself)', () => X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' }));
     await sleep(300);
+    const old = [...X.conn.db.subsidiary.iter()][0];
+    check(!!old && old.isElimination === false, 'the existing subsidiary reads isElimination = false after the upgrade');
     const match = [...X.conn.db.bankMatch.iter()].find(m => m.bankTxId === tx.id)!;
     check(!!match && match.paymentJeId === undefined, 'the pre-upgrade match has no paymentJeId');
     const before = X.conn.db.bankMatch.count();
@@ -553,6 +1008,9 @@ async function legacy() {
   }
 }
 
+// A row that does not decode is thrown from a websocket callback, outside any await: record it and carry on, so the
+// run still reports every result (the affected waits then time out and fail on their own).
+process.on('uncaughtException', e => fail('uncaught exception', msgOf(e)));
 try {
   await main();
 } catch (e) {

@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./feed": "./src/feed.ts"
+  },
   "scripts": {
     "generate": "tsx src/generate.ts",
     "load": "tsx src/load.ts",
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "bootstrap": "tsx src/bootstrap.ts"
   },
   "dependencies": {
     "@cafoo/stdb-bindings": "workspace:*",

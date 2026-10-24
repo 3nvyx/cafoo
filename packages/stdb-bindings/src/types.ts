@@ -163,6 +163,54 @@ export const BillStatus = __t.enum("BillStatus", {
 });
 export type BillStatus = __Infer<typeof BillStatus>;
 
+export const CfoBootstrap = __t.object("CfoBootstrap", {
+  key: __t.string(),
+  secretSha256: __t.string(),
+  createdAt: __t.timestamp(),
+  expiresAt: __t.timestamp(),
+});
+export type CfoBootstrap = __Infer<typeof CfoBootstrap>;
+
+export const CharterEval = __t.object("CharterEval", {
+  id: __t.u64(),
+  charterVersionId: __t.u64(),
+  passed: __t.bool(),
+  mode: __t.string(),
+  resultsJson: __t.string(),
+  summaryPlain: __t.string(),
+  ranBy: __t.identity(),
+  ranByRole: __t.string(),
+  ranAt: __t.timestamp(),
+});
+export type CharterEval = __Infer<typeof CharterEval>;
+
+// The tagged union or sum type for the algebraic type `CharterStatus`.
+export const CharterStatus = __t.enum("CharterStatus", {
+  Draft: __t.unit(),
+  Live: __t.unit(),
+  Retired: __t.unit(),
+});
+export type CharterStatus = __Infer<typeof CharterStatus>;
+
+export const CharterVersion = __t.object("CharterVersion", {
+  id: __t.u64(),
+  role: __t.string(),
+  version: __t.u32(),
+  get status() {
+    return CharterStatus;
+  },
+  bodyMd: __t.string(),
+  mappingJson: __t.string(),
+  summaryPlain: __t.string(),
+  basedOnVersionId: __t.option(__t.u64()),
+  authoredBy: __t.identity(),
+  authoredByRole: __t.string(),
+  createdAt: __t.timestamp(),
+  publishedBy: __t.option(__t.identity()),
+  publishedAt: __t.option(__t.timestamp()),
+});
+export type CharterVersion = __Infer<typeof CharterVersion>;
+
 export const CloseTask = __t.object("CloseTask", {
   id: __t.u64(),
   periodId: __t.u64(),
@@ -275,6 +323,46 @@ export const EntrySource = __t.enum("EntrySource", {
   Manual: __t.unit(),
 });
 export type EntrySource = __Infer<typeof EntrySource>;
+
+export const FeedBankTxArg = __t.object("FeedBankTxArg", {
+  externalId: __t.string(),
+  bookedAtMicros: __t.i64(),
+  amountMinor: __t.i64(),
+  ccy: __t.string(),
+  description: __t.string(),
+  counterparty: __t.string(),
+});
+export type FeedBankTxArg = __Infer<typeof FeedBankTxArg>;
+
+export const FeedEvent = __t.object("FeedEvent", {
+  externalId: __t.string(),
+  get kind() {
+    return FeedKind;
+  },
+  rowId: __t.u64(),
+  subsidiaryId: __t.u64(),
+  ym: __t.string(),
+  ingestedAt: __t.timestamp(),
+});
+export type FeedEvent = __Infer<typeof FeedEvent>;
+
+export const FeedInvoiceArg = __t.object("FeedInvoiceArg", {
+  externalId: __t.string(),
+  customerId: __t.u64(),
+  contractCode: __t.option(__t.string()),
+  number: __t.string(),
+  issuedAtMicros: __t.i64(),
+  dueAtMicros: __t.i64(),
+  amountMinor: __t.i64(),
+});
+export type FeedInvoiceArg = __Infer<typeof FeedInvoiceArg>;
+
+// The tagged union or sum type for the algebraic type `FeedKind`.
+export const FeedKind = __t.enum("FeedKind", {
+  BankTx: __t.unit(),
+  Invoice: __t.unit(),
+});
+export type FeedKind = __Infer<typeof FeedKind>;
 
 // The tagged union or sum type for the algebraic type `FxKind`.
 export const FxKind = __t.enum("FxKind", {
@@ -461,6 +549,8 @@ export const ProposalKind = __t.enum("ProposalKind", {
   Accrual: __t.unit(),
   VendorBlock: __t.unit(),
   VendorVerify: __t.unit(),
+  FxRevaluation: __t.unit(),
+  IcElimination: __t.unit(),
 });
 export type ProposalKind = __Infer<typeof ProposalKind>;
 
@@ -496,6 +586,8 @@ export const Role = __t.enum("Role", {
   Redteam: __t.unit(),
   Cfo: __t.unit(),
   Ui: __t.unit(),
+  Consolidation: __t.unit(),
+  Feed: __t.unit(),
 });
 export type Role = __Infer<typeof Role>;
 
@@ -526,6 +618,7 @@ export const Subsidiary = __t.object("Subsidiary", {
   name: __t.string(),
   functionalCcy: __t.string(),
   parentId: __t.option(__t.u64()),
+  isElimination: __t.bool(),
 });
 export type Subsidiary = __Infer<typeof Subsidiary>;
 

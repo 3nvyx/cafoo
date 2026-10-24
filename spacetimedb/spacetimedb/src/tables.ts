@@ -9,6 +9,9 @@ export const Role = t.enum('Role', {
   redteam: t.unit(),
   cfo: t.unit(),
   ui: t.unit(),
+  // Appended: enum variants only ever go at the end.
+  consolidation: t.unit(),
+  feed: t.unit(),
 });
 
 export const AccountType = t.enum('AccountType', {
@@ -39,6 +42,8 @@ export const ProposalKind = t.enum('ProposalKind', {
   accrual: t.unit(),
   vendor_block: t.unit(),
   vendor_verify: t.unit(),
+  fx_revaluation: t.unit(),
+  ic_elimination: t.unit(),
 });
 
 export const ProposalStatus = t.enum('ProposalStatus', {
@@ -116,6 +121,17 @@ export const FxKind = t.enum('FxKind', {
   closing: t.unit(),
 });
 
+export const CharterStatus = t.enum('CharterStatus', {
+  draft: t.unit(),
+  live: t.unit(),
+  retired: t.unit(),
+});
+
+export const FeedKind = t.enum('FeedKind', {
+  bank_tx: t.unit(),
+  invoice: t.unit(),
+});
+
 // ---------- shared object types for reducer args ----------
 export const LineArg = t.object('LineArg', {
   accountCode: t.string(),
@@ -145,6 +161,8 @@ const subsidiary = table(
     name: t.string(),
     functionalCcy: t.string(),
     parentId: t.option(t.u64()),
+    /** The group's elimination company: holds only consolidation eliminations, never trades. */
+    isElimination: t.bool().default(false),
   }
 );
 
@@ -486,6 +504,73 @@ const auditEvent = table(
   }
 );
 
+/**
+ * A charter as the CFO's team edited it. Rows are immutable once written except for status and the publish stamp:
+ * an edit is a new draft row with version = the role's highest + 1. The shipped charter .md files are the implicit
+ * built-in version 0, which applies whenever a role has no live row.
+ */
+const charterVersion = table(
+  { name: 'charter_version', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    role: t.string().index('btree'),
+    version: t.u32(),
+    status: CharterStatus,
+    bodyMd: t.string(),
+    /** JSON array of CharterMappingEntry: each charter line mapped to a rule template, a scenario or a custom scenario. */
+    mappingJson: t.string(),
+    summaryPlain: t.string(),
+    basedOnVersionId: t.option(t.u64()),
+    authoredBy: t.identity(),
+    authoredByRole: t.string(),
+    createdAt: t.timestamp(),
+    publishedBy: t.option(t.identity()),
+    publishedAt: t.option(t.timestamp()),
+  }
+);
+
+/** One eval run of a charter version, recorded by the gateway's eval runner. publishCharter needs the latest to pass. */
+const charterEval = table(
+  { name: 'charter_eval', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    charterVersionId: t.u64().index('btree'),
+    passed: t.bool(),
+    /** 'dry_run' (scratch database, scripted close) or 'snapshot' (recorded ledger). */
+    mode: t.string(),
+    resultsJson: t.string(),
+    summaryPlain: t.string(),
+    ranBy: t.identity(),
+    ranByRole: t.string(),
+    ranAt: t.timestamp(),
+  }
+);
+
+/** Every row the feed ingested, by its external id, so a replayed feed event is skipped instead of booked twice. */
+const feedEvent = table(
+  { name: 'feed_event', public: true },
+  {
+    externalId: t.string().primaryKey(),
+    kind: FeedKind,
+    /** The bank_transaction or invoice row it created. */
+    rowId: t.u64(),
+    subsidiaryId: t.u64(),
+    ym: t.string().index('btree'),
+    ingestedAt: t.timestamp(),
+  }
+);
+
+/** Private: the SHA-256 of the one-time secret that claims the CFO seat. Armed by the database owner; deleted on claim. */
+const cfoBootstrap = table(
+  { name: 'cfo_bootstrap' },
+  {
+    key: t.string().primaryKey(),
+    secretSha256: t.string(),
+    createdAt: t.timestamp(),
+    expiresAt: t.timestamp(),
+  }
+);
+
 export const overdueSweep = table(
   { name: 'overdue_sweep' },
   {
@@ -521,6 +606,10 @@ const spacetimedb = schema({
   creditCheck,
   auditEvent,
   overdueSweep,
+  charterVersion,
+  charterEval,
+  feedEvent,
+  cfoBootstrap,
 });
 
 export default spacetimedb;
