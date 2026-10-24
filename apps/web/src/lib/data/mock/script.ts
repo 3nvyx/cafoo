@@ -203,7 +203,7 @@ export const CLOSE_SCRIPT: Step[] = [
 				tiers: { c06: 'D', c14: 'D', c15: 'BLOCK' },
 				ratesBp: { D: 7500, BLOCK: 10000 },
 				memo: 'Allowance for credit losses, September',
-				lines: [L('6500', '1127500', '0'), L('1150', '0', '1127500')]
+				lines: [L('6500', '1127500', '0'), L('1150', '0', '337500', { customerId: 'c06' }), L('1150', '0', '690000', { customerId: 'c14' }), L('1150', '0', '100000', { customerId: 'c15' })]
 			},
 			taskId: 'ct-4'
 		},

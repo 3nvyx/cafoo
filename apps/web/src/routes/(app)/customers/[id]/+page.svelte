@@ -6,6 +6,7 @@
 	import Pill from '#lib/components/Pill.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { STATUS, TIER, dateTime, drill, shortDate } from '#lib/labels.js';
+	import { customerIdsOf } from '#lib/proposals.js';
 	import { ui } from '#lib/ui.svelte.js';
 
 	const c = $derived(db.customers().find((x) => x.id === page.params.id));
@@ -25,7 +26,8 @@
 	const ar = $derived(c ? openReceivable(db.invoices(), c.id) : '0');
 	const allowance = $derived(c ? allowanceFor(c, db.invoices()) : '0');
 	const arr = $derived(c ? contractArr(db.contracts(), c.id, asOf) : '0');
-	const related = $derived(c ? db.proposals().filter((p) => p.payloadJson.includes(`"${c.id}"`)) : []);
+	// Only customer-bearing payload fields count: a subsidiary, vendor or bank line with the same id is not this customer.
+	const related = $derived(c ? db.proposals().filter((p) => customerIdsOf(p, db).has(c.id)) : []);
 
 	const FACTS: { key: string; label: string }[] = [
 		{ key: 'identity', label: 'Identity' },

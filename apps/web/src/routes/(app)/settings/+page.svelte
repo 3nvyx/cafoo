@@ -4,19 +4,63 @@
 	import ModeToggle from '#lib/components/ModeToggle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Pill from '#lib/components/Pill.svelte';
-	import { attempt, toasts } from '#lib/toast.svelte.js';
+	import { toasts } from '#lib/toast.svelte.js';
 
 	const current = $derived(toNumber(db.settings().materialityThresholdMinor));
+	/** What the slider shows while the CFO moves it, until the server value catches up (or refuses). */
 	let draft = $state<number | null>(null);
 	const shown = $derived(draft ?? current);
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
 	let resetOpen = $state(false);
 
+	// Arrow keys fire `change` on every step, so the change is saved once: on release or blur, or after a pause.
+	const SETTLE_MS = 700;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	let saving = false;
+	let again = false;
+
+	$effect(() => {
+		if (draft !== null && !saving && draft === current) draft = null;
+	});
+	$effect(() => () => {
+		// Leaving the page with a change still waiting saves it.
+		if (timer) void commit();
+	});
+
+	function settle() {
+		clearTimeout(timer);
+		timer = setTimeout(() => void commit(), SETTLE_MS);
+	}
+
 	async function commit() {
-		if (draft === null || draft === current) return;
+		clearTimeout(timer);
+		timer = undefined;
+		if (draft === null) return;
+		if (saving) {
+			again = true;
+			return;
+		}
 		const value = draft;
-		const ok = await attempt(() => db.setMateriality(String(Math.round(value * 100))), `Threshold set to ${formatMoney(String(value * 100), { whole: true })}.`);
-		if (ok) draft = null;
+		if (value === current) {
+			draft = null;
+			return;
+		}
+		saving = true;
+		try {
+			await db.setMateriality(String(Math.round(value * 100)));
+			toasts.push(`Threshold set to ${formatMoney(String(Math.round(value * 100)), { whole: true })}.`, 'success');
+		} catch (err) {
+			// Refused: show the server's value again, and drop any step taken while this one was in flight.
+			again = false;
+			draft = null;
+			toasts.error(err);
+		} finally {
+			saving = false;
+		}
+		if (again) {
+			again = false;
+			await commit();
+		} else if (draft === current) draft = null;
 	}
 </script>
 
@@ -42,8 +86,13 @@
 				max="100000"
 				step="1000"
 				value={shown}
-				oninput={(e) => (draft = Number((e.currentTarget as HTMLInputElement).value))}
-				onchange={commit}
+				oninput={(e) => {
+					draft = Number((e.currentTarget as HTMLInputElement).value);
+					settle();
+				}}
+				onchange={settle}
+				onpointerup={() => void commit()}
+				onblur={() => void commit()}
 				class="h-11 w-full accent-[var(--accent)]"
 				aria-valuetext={formatMoney(String(shown * 100), { whole: true })}
 			/>

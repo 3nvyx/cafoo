@@ -94,12 +94,17 @@ export interface DataSource {
 	cfoConfirm(proposalId: string): Promise<void>;
 	/** CFO sends a Proposal back to its worker agent with a one-line note. */
 	cfoSendBack(proposalId: string, notePlain: string): Promise<void>;
-	/** CFO reverses a posted Journal Entry. Posts an equal and opposite entry. */
+	/**
+	 * CFO reverses a posted Journal Entry: posts an equal and opposite entry in the entry's own month if that month is
+	 * open, otherwise in the earliest open month after it.
+	 */
 	cfoReverse(jeId: string, reasonPlain: string): Promise<void>;
 	setMateriality(minor: Minor): Promise<void>;
 	setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void>;
 	/** CFO locks the Period. The Board Pack becomes final. */
 	lockPeriod(periodId: string): Promise<void>;
+	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */
+	unlockPeriod(periodId: string, reasonPlain: string): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
 }

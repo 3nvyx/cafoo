@@ -20,7 +20,8 @@ export const KIND: Record<ProposalKind, string> = {
 	revenue_schedule: 'Revenue Schedule',
 	credit_decision: 'Credit decision',
 	accrual: 'Accrual',
-	vendor_block: 'Vendor block'
+	vendor_block: 'Vendor block',
+	vendor_verify: 'Vendor check'
 };
 
 export const STATUS: Record<ProposalStatus, { label: string; tone: Tone }> = {
@@ -75,11 +76,5 @@ export function timeOnly(iso: string): string {
 	return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
 }
 
-/** Build a ledger drill-down link. */
-export function drill(target: { account?: string; je?: string; customer?: string; vendor?: string }, periodId?: string | 'all'): string {
-	const [k, v] = Object.entries(target).find(([, val]) => !!val) ?? [];
-	const q = new URLSearchParams();
-	if (k && v) q.set('drill', `${k}:${v}`);
-	if (periodId) q.set('period', periodId);
-	return `/ledger?${q.toString()}`;
-}
+/** Ledger drill-down links live in drill.ts; re-exported here because most screens import labels. */
+export { drill } from './drill';

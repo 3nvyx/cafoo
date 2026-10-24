@@ -210,6 +210,10 @@ export class SpacetimeDataSource implements DataSource {
 		await this.#call('Could not lock this Period.', (c) => c.reducers.lockPeriod({ periodYm: periodId, rationale: 'Locked by the CFO from the close checklist' }));
 	}
 
+	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
+		await this.#call('Could not unlock this Period.', (c) => c.reducers.unlockPeriod({ periodYm: periodId, rationale: reasonPlain }));
+	}
+
 	/**
 	 * Ask the gateway which closes exist. Re-polls every 3 s while one is running,
 	 * then stops. Called on startup and after starting a close.

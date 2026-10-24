@@ -119,6 +119,8 @@ export interface Bill {
 export interface BankTransaction {
 	id: string;
 	bookedAt: Iso;
+	/** The month ("yyyy-mm") whose bank reconciliation this line belongs to. */
+	ym: string;
 	/** Positive is money in, negative is money out. */
 	amountMinor: Minor;
 	description: string;
@@ -136,6 +138,10 @@ export interface BankMatch {
 	/** Confidence in basis points, 0..10000. */
 	scoreBp: number;
 	bucket: MatchBucket;
+	/** The Proposal that made the match. */
+	proposalId?: string;
+	/** The payment entry the match posted (invoice and bill targets). */
+	paymentJeId?: string;
 }
 
 export type ProposalKind =
@@ -144,7 +150,8 @@ export type ProposalKind =
 	| 'revenue_schedule'
 	| 'credit_decision'
 	| 'accrual'
-	| 'vendor_block';
+	| 'vendor_block'
+	| 'vendor_verify';
 
 export type ProposalStatus =
 	| 'open'

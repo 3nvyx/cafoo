@@ -12,7 +12,7 @@ export interface LockGate {
 	awaiting: number;
 	sentBack: number;
 	pendingTasks: number;
-	/** The Advisor's latest ruling in the close thread, e.g. its lock request. */
+	/** The Advisor's lock request (its latest ruling in the close thread), while the Period is waiting for the lock. */
 	request: AgentMessage | undefined;
 	/** Plain sentence for why the lock is not available yet ('' when it is). */
 	blocker: string;
@@ -29,10 +29,15 @@ export function lockGate(db: DataSource, periodId: string): LockGate {
 	// Advisor-owned tasks (and the CFO's own lock task) finish when the lock lands.
 	const pendingTasks = tasks.filter((t) => t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done').length;
 	const thread = `close:${periodId}`;
-	const request = db
-		.agentMessages()
-		.filter((m) => m.threadId === thread && m.kind === 'ruling')
-		.at(-1);
+	// The Advisor's lock request stands only while the month is waiting for the lock: once the CFO locks it, or
+	// unlocks it again, that request is history.
+	const request =
+		period?.status === 'closing'
+			? db
+					.agentMessages()
+					.filter((m) => m.threadId === thread && m.kind === 'ruling')
+					.at(-1)
+			: undefined;
 	const started = closes.length > 0 || period?.status === 'closing';
 	const canLock =
 		!!period &&
@@ -50,4 +55,18 @@ export function lockGate(db: DataSource, periodId: string): LockGate {
 	}
 
 	return { period, started, running: closes.some((c) => c.status === 'running'), canLock, awaiting, sentBack, pendingTasks, request, blocker };
+}
+
+/** The earliest month after `periodId` that still takes postings, if any. */
+export function nextOpenPeriod(periods: Period[], periodId: string): Period | undefined {
+	return periods.filter((p) => p.id > periodId && p.status !== 'closed').sort((a, b) => a.id.localeCompare(b.id))[0];
+}
+
+/**
+ * Where a correction (a CFO reversal) to an entry of month `periodId` posts, as the ledger module decides it: that
+ * month while it is open, otherwise the earliest open month after it. Undefined when every such month is locked.
+ */
+export function correctionPeriod(periods: Period[], periodId: string): Period | undefined {
+	const own = periods.find((p) => p.id === periodId);
+	return own && own.status !== 'closed' ? own : nextOpenPeriod(periods, periodId);
 }

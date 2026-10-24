@@ -2,7 +2,8 @@
 	import type { ArrWaterfall } from '#lib/data/derive.js';
 	import { formatMoney, toNumber } from '#lib/data/money.js';
 
-	let { w, href }: { w: ArrWaterfall; href: string } = $props();
+	// ARR comes from contracts, so the bars link nowhere unless a caller passes `href`.
+	let { w, href }: { w: ArrWaterfall; href?: string } = $props();
 
 	const steps = $derived.by(() => {
 		const start = toNumber(w.start);
@@ -37,13 +38,18 @@
 			{@const x = gap + i * (bw + gap)}
 			{@const y1 = y(Math.max(s.from, s.to))}
 			{@const h = Math.max(2, Math.abs(y(s.from) - y(s.to)))}
-			<a {href} aria-label="{s.label}: {formatMoney(s.minor, { whole: true })}">
+			{#snippet bar()}
 				<rect {x} y={y1} width={bw} height={h} rx="3" fill={color[s.kind]} opacity={s.kind === 'total' ? 1 : 0.85} />
 				<text x={x + bw / 2} y={y1 - 8} text-anchor="middle" font-family="var(--font-mono)" font-size="13" fill="var(--ink)">
 					{s.kind === 'down' && s.minor !== '0' ? '-' : s.kind === 'up' && s.minor !== '0' ? '+' : ''}{formatMoney(s.minor, { compact: true })}
 				</text>
 				<text x={x + bw / 2} y={H - 14} text-anchor="middle" font-size="13" fill="var(--ink-2)">{s.label}</text>
-			</a>
+			{/snippet}
+			{#if href}
+				<a {href} aria-label="{s.label}: {formatMoney(s.minor, { whole: true })}">{@render bar()}</a>
+			{:else}
+				<g>{@render bar()}</g>
+			{/if}
 			{#if i < steps.length - 1}
 				<line x1={x + bw} x2={x + bw + gap} y1={y(s.to)} y2={y(s.to)} stroke="var(--line-strong)" stroke-dasharray="3 3" />
 			{/if}

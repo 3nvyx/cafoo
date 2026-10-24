@@ -5,8 +5,9 @@
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
 // CFO locks it.
 import type { ChangeEvent, ConnectionState, DataSource } from '../source';
-import type { AgentMessage, AgentRole, CloseTaskStatus, JournalLine, LiveActivity, Minor, Proposal, ProviderStatus, TableName } from '../types';
+import type { AgentMessage, AgentRole, BankMatch, CloseTaskStatus, JournalLine, LiveActivity, Minor, Proposal, ProviderStatus, TableName } from '../types';
 import { formatMoney, toBig } from '../money';
+import { journalLinesOf, parsePayload } from '../payload';
 import { accountIdFor, loadSeed, type Tables } from './seed';
 import { CLOSE_SCRIPT, type ScriptLine, type Step } from './script';
 
@@ -120,15 +121,50 @@ export class MockDataSource implements DataSource {
 		this.#later(4500, () => this.#resubmit(p, note));
 	}
 
+	/**
+	 * Posts in the entry's own month if it is open, otherwise in the earliest open month after it, and undoes the bank
+	 * reconciliation the entry carries. Refused while that bank line's month is locked, as the ledger module does.
+	 */
 	async cfoReverse(jeId: string, reasonPlain: string): Promise<void> {
 		const je = this.#t.journal_entry.find((j) => j.id === jeId);
 		if (!je) throw new Error(`Unknown journal entry ${jeId}`);
-		const open = this.#t.period.find((p) => p.status === 'open');
-		if (!open) throw new Error('There is no open period to post the reversal into.');
+		if (je.source === 'manual' && je.reversesJeId) throw new Error('This entry is itself a reversal. Post a new entry instead of reversing it.');
+		if (this.#t.journal_entry.some((j) => j.reversesJeId === jeId && j.source !== 'agent')) throw new Error('This entry was already reversed.');
+		const open = this.#t.period
+			.filter((p) => p.id >= je.periodId && p.status !== 'closed')
+			.sort((a, b) => a.id.localeCompare(b.id))[0];
+		if (!open) throw new Error(`Period ${je.periodId} and every later period are locked. Unlock one before reversing.`);
+		const owned = this.#t.bank_match.filter((m) => (m.targetKind === 'journal_entry' && m.targetId === jeId) || m.paymentJeId === jeId);
+		for (const m of owned) {
+			const tx = this.#t.bank_transaction.find((t) => t.id === m.bankTransactionId);
+			if (tx && this.#t.period.find((p) => p.id === tx.ym)?.status === 'closed') {
+				throw new Error(`Reversing this entry would undo the bank reconciliation of ${tx.ym}, which is locked: bank line "${tx.description}" would go back to unmatched. Unlock ${tx.ym} first, or correct it with a new entry.`);
+			}
+		}
 		const lines = this.#t.journal_line.filter((l) => l.jeId === jeId).map((l) => ({ ...l, debitMinor: l.creditMinor, creditMinor: l.debitMinor }));
 		const reason = reasonPlain.trim() || 'Reversed by the CFO';
 		const id = this.#postEntry({ periodId: open.id, memo: `Reversal of "${je.memo}": ${reason}`, source: 'manual', postedByRole: 'cfo', reversesJeId: jeId, lines });
-		this.#audit('cfo', 'journal_entry.reverse', 'journal_entry', jeId, { reversalId: id, reason });
+		this.#unwind(owned);
+		this.#audit('cfo', 'journal_entry.reverse', 'journal_entry', jeId, { reversalId: id, reason, unmatched: owned.length });
+	}
+
+	/** A reversed entry's bank matches go away: the bank lines are unmatched again and what they paid is unpaid. */
+	#unwind(owned: BankMatch[]) {
+		for (const m of owned) {
+			this.#t.bank_match = this.#t.bank_match.filter((x) => x.id !== m.id);
+			this.#emit('bank_match', 'delete', m);
+			const tx = this.#t.bank_transaction.find((t) => t.id === m.bankTransactionId);
+			if (tx?.matched) {
+				tx.matched = false;
+				this.#emit('bank_transaction', 'update', tx);
+			}
+			if (this.#t.bank_match.some((x) => x.targetKind === m.targetKind && x.targetId === m.targetId)) continue;
+			const doc = m.targetKind === 'invoice' ? this.#t.invoice.find((i) => i.id === m.targetId) : m.targetKind === 'bill' ? this.#t.bill.find((b) => b.id === m.targetId) : undefined;
+			if (doc?.status === 'paid') {
+				doc.status = doc.dueAt < this.#now() ? 'overdue' : 'open';
+				this.#emit(m.targetKind === 'invoice' ? 'invoice' : 'bill', 'update', doc);
+			}
+		}
 	}
 
 	async setMateriality(minor: Minor): Promise<void> {
@@ -170,6 +206,18 @@ export class MockDataSource implements DataSource {
 		}
 		this.#message({ role: 'cfo', kind: 'statement', body: `LOCK ${periodId}.`, summary: 'You locked the period. The Board Pack is final.', threadId: closeThread(periodId) });
 		this.#audit('cfo', 'period.lock', 'period', periodId, {});
+	}
+
+	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
+		const period = this.#t.period.find((p) => p.id === periodId);
+		if (!period) throw new Error(`Unknown period ${periodId}`);
+		if (period.status !== 'closed') throw new Error(`Period ${periodId} is not locked.`);
+		const reason = reasonPlain.trim() || 'Unlocked by the CFO';
+		period.status = 'open';
+		period.lockedAt = undefined;
+		this.#emit('period', 'update', period);
+		this.#message({ role: 'cfo', kind: 'statement', body: `UNLOCK ${periodId}: ${reason}`, summary: `You unlocked the period: ${reason}`, threadId: closeThread(periodId) });
+		this.#audit('cfo', 'period.unlock', 'period', periodId, { reason });
 	}
 
 	/** Demo only: put every table back to the seed. */
@@ -259,7 +307,7 @@ export class MockDataSource implements DataSource {
 		const material = toBig(p.amountMinor) >= threshold;
 		const limit = formatMoney(this.#t.settings.materialityThresholdMinor, { whole: true });
 		const base = summary.replace(/\.$/, '');
-		const done = p.payloadJson.includes('"lines"') ? ' and posted it.' : '.';
+		const done = journalLinesOf(parsePayload(p.payloadJson)).length ? ' and posted it.' : '.';
 		const approval = {
 			id: this.#id('ap'),
 			proposalId: p.id,
@@ -319,8 +367,9 @@ export class MockDataSource implements DataSource {
 		} catch {
 			/* raw payload is not JSON: nothing to post */
 		}
-		if (payload.lines?.length) {
-			this.#postEntry({
+		const jeId = !payload.lines?.length
+			? undefined
+			: this.#postEntry({
 				periodId: p.periodId,
 				memo: payload.memo ?? p.summaryPlain,
 				source: 'agent',
@@ -328,7 +377,6 @@ export class MockDataSource implements DataSource {
 				proposalId: p.id,
 				lines: payload.lines.map((l) => ({ id: '', jeId: '', accountId: accountIdFor(l.account), debitMinor: l.debitMinor, creditMinor: l.creditMinor, customerId: l.customerId, vendorId: l.vendorId }))
 			});
-		}
 		if (p.kind === 'bank_match' && payload.bankTransactionId) {
 			const bt = this.#t.bank_transaction.find((b) => b.id === payload.bankTransactionId);
 			if (bt) {
@@ -341,7 +389,7 @@ export class MockDataSource implements DataSource {
 					inv.status = 'paid';
 					this.#emit('invoice', 'update', inv);
 				}
-				const m = { id: this.#id('bm'), bankTransactionId: payload.bankTransactionId, targetKind: 'invoice' as const, targetId: payload.invoiceId, scoreBp: payload.scoreBp ?? 9000, bucket: payload.bucket ?? 'strong' };
+				const m = { id: this.#id('bm'), bankTransactionId: payload.bankTransactionId, targetKind: 'invoice' as const, targetId: payload.invoiceId, scoreBp: payload.scoreBp ?? 9000, bucket: payload.bucket ?? 'strong', proposalId: p.id, paymentJeId: jeId };
 				this.#t.bank_match.push(m);
 				this.#emit('bank_match', 'insert', m);
 			}

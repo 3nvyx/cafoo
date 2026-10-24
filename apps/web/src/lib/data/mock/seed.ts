@@ -95,7 +95,7 @@ export function loadSeed(): Tables {
 		invoice: customers.invoices as Invoice[],
 		vendor: vendors.vendors as Vendor[],
 		bill: vendors.bills as Bill[],
-		bank_transaction: bank.bankTransactions,
+		bank_transaction: bank.bankTransactions.map((t) => ({ ...t, ym: t.bookedAt.slice(0, 7) })),
 		bank_match: bank.bankMatches as BankMatch[],
 		proposal: governance.proposals as Proposal[],
 		approval: governance.approvals as Approval[],

@@ -117,6 +117,7 @@ export const bill = (r: B.Bill): U.Bill => ({
 export const bankTransaction = (r: B.BankTransaction): U.BankTransaction => ({
 	id: String(r.id),
 	bookedAt: iso(r.bookedAt),
+	ym: r.ym,
 	amountMinor: r.amountMinor.toString(),
 	description: r.description,
 	counterparty: r.counterparty,
@@ -129,7 +130,9 @@ export const bankMatch = (r: B.BankMatch): U.BankMatch => ({
 	targetKind: r.targetKind.tag === 'Je' ? 'journal_entry' : r.targetKind.tag === 'Bill' ? 'bill' : 'invoice',
 	targetId: String(r.targetId),
 	scoreBp: r.scoreBp,
-	bucket: r.scoreBp >= 9500 ? 'exact' : r.scoreBp >= 8000 ? 'strong' : 'weak'
+	bucket: r.scoreBp >= 9500 ? 'exact' : r.scoreBp >= 8000 ? 'strong' : 'weak',
+	proposalId: sid(r.proposalId),
+	paymentJeId: sid(r.paymentJeId)
 });
 
 export const proposal = (r: B.Proposal, ym: PeriodYm): U.Proposal => ({

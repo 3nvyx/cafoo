@@ -14,6 +14,11 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 export const monthName = (m: number) => MONTHS[m - 1] ?? '';
 export const periodLabel = (p: Pick<Period, 'year' | 'month'>) => `${monthName(p.month)} ${p.year}`;
 export const periodShort = (p: Pick<Period, 'year' | 'month'>) => `${monthName(p.month).slice(0, 3)} ${p.year}`;
+/** "2026-09" to "Sep 2026". */
+export function ymShort(ym: string): string {
+	const [y, m] = ym.split('-').map(Number);
+	return y && m ? periodShort({ year: y, month: m }) : ym;
+}
 
 /** Last instant of a Period, as an ISO date (yyyy-mm-dd). */
 export function periodEnd(p: Pick<Period, 'year' | 'month'>): string {
@@ -52,6 +57,12 @@ export function quarterOf(periods: Period[], periodId: string): Set<string> {
 	return new Set(periods.filter((x) => x.year === p.year && Math.floor((x.month - 1) / 3) === q && x.id <= periodId).map((x) => x.id));
 }
 
+/** The quarter-to-date months of `periodId` as an inclusive range of period ids, for drill-down links. */
+export function quarterRange(periods: Period[], periodId: string): { from: string; to: string } {
+	const ids = [...quarterOf(periods, periodId)].sort();
+	return { from: ids[0] ?? periodId, to: periodId };
+}
+
 export interface StatementRow {
 	account: Account;
 	month: Minor;
@@ -88,6 +99,8 @@ export interface BalanceRow {
 	account: Account | null;
 	label: string;
 	amount: Minor;
+	/** Earnings rows (no account): the months of income statement activity the amount sums. */
+	periods?: { from?: string; to: string };
 }
 
 export interface BalanceSheet {
@@ -101,7 +114,8 @@ export interface BalanceSheet {
 }
 
 export function balanceSheet(books: Books, periods: Period[], periodId: string): BalanceSheet {
-	const b = balances(books, periodsThrough(periods, periodId));
+	const through = periodsThrough(periods, periodId);
+	const b = balances(books, through);
 	const rows = (t: AccountType): BalanceRow[] =>
 		books.accounts
 			.filter((a) => a.type === t)
@@ -111,12 +125,21 @@ export function balanceSheet(books: Books, periods: Period[], periodId: string):
 	// The Allowance is contra-asset: it carries a credit, so it shows negative under assets.
 	const liabilities = rows('liability');
 	const equity = rows('equity');
+	// Income statement activity not yet closed to Retained Earnings: this year's months (ids are "yyyy-mm"), and any
+	// earlier year's separately, so "Current year earnings" is exactly the year to date.
+	const year = periods.find((p) => p.id === periodId)?.year ?? Number(periodId.slice(0, 4));
+	const yearStart = `${year}-01`;
+	const ytd = balances(books, new Set([...through].filter((id) => id >= yearStart)));
+	const prior = balances(books, new Set([...through].filter((id) => id < yearStart)));
 	let earnings = 0n;
+	let earlier = 0n;
 	for (const a of books.accounts) {
-		if (a.type === 'revenue') earnings += b.get(a.id) ?? 0n;
-		if (a.type === 'expense') earnings -= b.get(a.id) ?? 0n;
+		const sign = a.type === 'revenue' ? 1n : a.type === 'expense' ? -1n : 0n;
+		earnings += sign * (ytd.get(a.id) ?? 0n);
+		earlier += sign * (prior.get(a.id) ?? 0n);
 	}
-	equity.push({ account: null, label: 'Current year earnings', amount: earnings.toString() });
+	if (earlier !== 0n) equity.push({ account: null, label: "Earlier years' earnings", amount: earlier.toString(), periods: { to: `${year - 1}-12` } });
+	equity.push({ account: null, label: 'Current year earnings', amount: earnings.toString(), periods: { from: yearStart, to: periodId } });
 	const total = (rs: BalanceRow[]) => rs.reduce((t, r) => t + toBig(r.amount), 0n);
 	const ta = total(assets), tl = total(liabilities), te = total(equity);
 	return {

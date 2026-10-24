@@ -12,7 +12,7 @@
 	import { arrive } from '#lib/motion.js';
 	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
-	import { lockGate } from '#lib/close.js';
+	import { lockGate, nextOpenPeriod } from '#lib/close.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
 	const tasks = $derived(db.closeTasks().filter((t) => t.periodId === ui.periodId).sort((a, b) => a.order - b.order));
@@ -21,7 +21,18 @@
 	const canLock = $derived(gate.canLock);
 	const month = $derived(period ? monthName(period.month) : '');
 
+	// What reversing one of this month's entries does once it is locked, from the months that exist (the module posts a
+	// correction in the earliest open month after a locked one, and refuses to undo a locked month's bank reconciliation).
+	const after = $derived(period ? nextOpenPeriod(db.periods(), period.id) : undefined);
+	const afterMonth = $derived(after ? periodLabel(after) : '');
+	const reversalNote = $derived(
+		after
+			? `A reversal of a ${month} entry posts in ${afterMonth} instead, except for entries tied to a ${month} bank line: those need ${month} unlocked first.`
+			: `No later month is open, so to reverse a ${month} entry, unlock ${month} first.`
+	);
+
 	let confirmOpen = $state(false);
+	let unlockOpen = $state(false);
 	let expanded = $state<Record<string, boolean>>({});
 	const SHOW = 4;
 
@@ -105,7 +116,7 @@
 				<h2 id="lock-h" class="text-xl">{period.status === 'closed' ? `${month} is locked` : `Lock ${month}`}</h2>
 				<p class="mt-1 text-ink-2">
 					{#if period.status === 'closed'}
-						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}. Nothing can post to {month} anymore. The Board Pack is final.
+						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}. Nothing can post to {month} anymore. The Board Pack is final. {reversalNote}
 					{:else if canLock}
 						{#if gate.request}<span class="mb-1 block text-ink"><span class="font-medium">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</span>{/if}
 						Locking stops anyone, including the agents, from posting to {month}. Any tasks still open are marked done.
@@ -120,17 +131,34 @@
 				<Icon name="lock" size={18} />Lock {month}
 			</button>
 		{:else}
-			<a href="/reports" class="btn btn-lg w-full sm:w-auto">Open the Board Pack <Icon name="arrowRight" size={18} /></a>
+			<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+				<button class="btn btn-lg w-full sm:w-auto" onclick={() => (unlockOpen = true)}>Unlock {month}</button>
+				<a href="/reports" class="btn btn-lg w-full sm:w-auto">Open the Board Pack <Icon name="arrowRight" size={18} /></a>
+			</div>
 		{/if}
 	</section>
 
 	<ConfirmDialog
 		bind:open={confirmOpen}
 		title="Lock {periodLabel(period)}?"
-		body="After this, nothing can be posted to {month}, by you or by any agent. Corrections will go into the next month. The Board Pack becomes final."
+		body="After this, nothing can be posted to {month}, by you or by any agent, and the Board Pack becomes final. {reversalNote} You can unlock {month} again if you need to."
 		confirmLabel="Lock {month}"
 		onconfirm={async () => {
 			await attempt(() => db.lockPeriod(period.id), `${month} is locked. The Board Pack is final.`);
+		}}
+	/>
+
+	<ConfirmDialog
+		bind:open={unlockOpen}
+		title="Unlock {periodLabel(period)}?"
+		body="{month} opens again: you and the agents can post to it, and the Board Pack goes back to a draft until you lock {month} again. Your reason is kept in the audit log."
+		confirmLabel="Unlock {month}"
+		danger
+		inputLabel="Why? One line for the audit log"
+		inputPlaceholder="e.g. A vendor credit note arrived late"
+		inputRequired
+		onconfirm={async (reason) => {
+			await attempt(() => db.unlockPeriod(period.id, reason), `${month} is unlocked. Lock it again when the corrections are in.`);
 		}}
 	/>
 {/if}

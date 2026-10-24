@@ -33,7 +33,7 @@
 	],
 	"bankMatches": [
 		{ "id": "bm01", "bankTransactionId": "bt01", "targetKind": "journal_entry", "targetId": "je-0901", "scoreBp": 9950, "bucket": "exact" },
-		{ "id": "bm02", "bankTransactionId": "bt02", "targetKind": "invoice", "targetId": "i12", "scoreBp": 9800, "bucket": "exact" },
+		{ "id": "bm02", "bankTransactionId": "bt02", "targetKind": "invoice", "targetId": "i12", "scoreBp": 9800, "bucket": "exact", "proposalId": "pr-01", "paymentJeId": "je-0914" },
 		{ "id": "bm03", "bankTransactionId": "bt03", "targetKind": "invoice", "targetId": "i17", "scoreBp": 9600, "bucket": "exact" },
 		{ "id": "bm04", "bankTransactionId": "bt04", "targetKind": "invoice", "targetId": "i13", "scoreBp": 9600, "bucket": "exact" },
 		{ "id": "bm05", "bankTransactionId": "bt05", "targetKind": "bill", "targetId": "b05", "scoreBp": 9900, "bucket": "exact" },

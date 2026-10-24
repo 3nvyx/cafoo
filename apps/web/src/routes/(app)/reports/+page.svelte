@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
-	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, balanceSheet, periodEnd, periodLabel, profitAndLoss } from '#lib/data/derive.js';
+	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, balanceSheet, periodEnd, periodLabel, profitAndLoss, quarterRange } from '#lib/data/derive.js';
+	import type { AccountType } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
 	import Pill from '#lib/components/Pill.svelte';
@@ -37,6 +38,18 @@
 
 	const fmt = (m: string) => formatMoney(m, { whole: true });
 	const pid = $derived(period?.id ?? '');
+
+	// Every ledger figure drills to exactly the lines it sums: the month, the quarter's months, or the books through this
+	// month. ARR (from contracts) and aging (from invoices) are not ledger sums: aging links to the customers whose
+	// invoices make it up, and ARR links nowhere.
+	const qtd = $derived(quarterRange(db.periods(), pid));
+	const through = $derived({ to: pid });
+	/** A group of accounts by type: named one by one when there are a few (Subscription and Usage Revenue), else by type. */
+	const group = (t: AccountType) => {
+		const codes = db.accounts().filter((a) => a.type === t).map((a) => a.code);
+		return codes.length <= 3 ? { account: codes } : { type: [t] };
+	};
+	const PL: AccountType[] = ['revenue', 'expense'];
 </script>
 
 <svelte:head><title>Board Pack · Cafoo</title></svelte:head>
@@ -56,18 +69,20 @@
 	</div>
 
 	<section class="mt-6 grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Headline numbers">
-		<a href={drill({ account: '4000' }, pid)} class="group flex flex-col gap-1 py-5 sm:pr-6">
+		<a href={drill(group('revenue'), pid)} class="group flex flex-col gap-1 py-5 sm:pr-6">
 			<span class="eyebrow">Revenue this month</span>
 			<span class="text-[28px] font-medium group-hover:text-accent-ink"><CountUp minor={pnl.totalRevenue.month} /></span>
 		</a>
-		<a href="/ledger?period={pid}" class="group flex flex-col gap-1 py-5 sm:px-6">
+		<a href={drill({ type: PL }, pid)} class="group flex flex-col gap-1 py-5 sm:px-6">
 			<span class="eyebrow">Net income this month</span>
 			<span class="text-[28px] font-medium group-hover:text-accent-ink {toBig(pnl.netIncome.month) < 0n ? 'text-neg' : ''}"><CountUp minor={pnl.netIncome.month} /></span>
 		</a>
-		<a href={drill({ account: '4000' }, pid)} class="group flex flex-col gap-1 py-5 sm:pl-6">
+		<!-- ARR comes from the contracts, not the ledger, so there are no journal lines to drill to. -->
+		<div class="flex flex-col gap-1 py-5 sm:pl-6">
 			<span class="eyebrow">ARR at month end</span>
-			<span class="text-[28px] font-medium group-hover:text-accent-ink"><CountUp minor={arr.end} /></span>
-		</a>
+			<span class="text-[28px] font-medium"><CountUp minor={arr.end} /></span>
+			<span class="text-sm text-ink-3">from the active contracts</span>
+		</div>
 	</section>
 
 	<div class="mt-10 grid gap-12 xl:grid-cols-2">
@@ -77,30 +92,30 @@
 				<thead class="text-left text-sm text-ink-3">
 					<tr class="border-b border-line">
 						<th class="py-2 font-medium">Account</th>
-						<th class="w-[34%] py-2 text-right font-medium">{periodLabel(period).split(' ')[0].slice(0, 3)}</th>
-						<th class="w-[30%] py-2 text-right font-medium">Quarter to date</th>
+						<th class="w-[34%] py-2 pl-3 text-right font-medium">{periodLabel(period).split(' ')[0].slice(0, 3)}</th>
+						<th class="w-[30%] py-2 pl-3 text-right font-medium">Quarter to date</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each [{ title: 'Revenue', rows: pnl.revenue, total: pnl.totalRevenue }, { title: 'Expenses', rows: pnl.expenses, total: pnl.totalExpenses }] as g (g.title)}
+					{#each [{ title: 'Revenue', type: 'revenue' as const, rows: pnl.revenue, total: pnl.totalRevenue }, { title: 'Expenses', type: 'expense' as const, rows: pnl.expenses, total: pnl.totalExpenses }] as g (g.title)}
 						<tr><th colspan="3" class="pt-4 pb-1 text-left text-sm font-medium text-ink-2">{g.title}</th></tr>
 						{#each g.rows as r (r.account.id)}
 							<tr class="border-b border-line">
 								<td class="py-2 pr-2">{#if ui.expert}<span class="num mr-2 text-ink-3">{r.account.code}</span>{/if}{r.account.name}</td>
-								<td class="num py-2 text-right"><a class="drill" href={drill({ account: r.account.code }, pid)}>{fmt(r.month)}</a></td>
-								<td class="num py-2 text-right"><a class="drill" href={drill({ account: r.account.code }, 'all')}>{fmt(r.qtd)}</a></td>
+								<td class="num py-2 pl-3 text-right"><a class="drill" href={drill({ account: r.account.code }, pid)}>{fmt(r.month)}</a></td>
+								<td class="num py-2 pl-3 text-right"><a class="drill" href={drill({ account: r.account.code }, qtd)}>{fmt(r.qtd)}</a></td>
 							</tr>
 						{/each}
 						<tr class="border-b border-line-strong font-medium">
 							<td class="py-2">Total {g.title.toLowerCase()}</td>
-							<td class="num py-2 text-right">{fmt(g.total.month)}</td>
-							<td class="num py-2 text-right">{fmt(g.total.qtd)}</td>
+							<td class="num py-2 pl-3 text-right"><a class="drill" href={drill(group(g.type), pid)}>{fmt(g.total.month)}</a></td>
+							<td class="num py-2 pl-3 text-right"><a class="drill" href={drill(group(g.type), qtd)}>{fmt(g.total.qtd)}</a></td>
 						</tr>
 					{/each}
 					<tr class="font-medium">
 						<td class="pt-3">Net income</td>
-						<td class="num pt-3 text-right {toBig(pnl.netIncome.month) < 0n ? 'text-neg' : ''}">{fmt(pnl.netIncome.month)}</td>
-						<td class="num pt-3 text-right {toBig(pnl.netIncome.qtd) < 0n ? 'text-neg' : ''}">{fmt(pnl.netIncome.qtd)}</td>
+						<td class="num pt-3 pl-3 text-right {toBig(pnl.netIncome.month) < 0n ? 'text-neg' : ''}"><a class="drill" href={drill({ type: PL }, pid)}>{fmt(pnl.netIncome.month)}</a></td>
+						<td class="num pt-3 pl-3 text-right {toBig(pnl.netIncome.qtd) < 0n ? 'text-neg' : ''}"><a class="drill" href={drill({ type: PL }, qtd)}>{fmt(pnl.netIncome.qtd)}</a></td>
 					</tr>
 				</tbody>
 			</table>
@@ -119,7 +134,7 @@
 							<tr class="border-b border-line">
 								<td class="py-2 pr-2">{#if ui.expert && r.account}<span class="num mr-2 text-ink-3">{r.account.code}</span>{/if}{r.label}</td>
 								<td class="num w-[40%] py-2 text-right">
-									{#if r.account}<a class="drill" href={drill({ account: r.account.code }, 'all')}>{fmt(r.amount)}</a>{:else}<a class="drill" href={drill({ account: '4000' }, 'all')}>{fmt(r.amount)}</a>{/if}
+									{#if r.account}<a class="drill" href={drill({ account: r.account.code }, through)}>{fmt(r.amount)}</a>{:else}<a class="drill" href={drill({ type: PL }, r.periods ?? through)}>{fmt(r.amount)}</a>{/if}
 								</td>
 							</tr>
 						{/each}
@@ -134,18 +149,18 @@
 
 		<section aria-labelledby="arr-h">
 			<h2 id="arr-h" class="text-2xl">ARR this quarter</h2>
-			<p class="mt-1 text-sm text-ink-3">From {quarterStart} to {asOf}. Click a bar for the revenue lines.</p>
-			<div class="mt-4"><ArrWaterfall w={arr} href={drill({ account: '4000' }, 'all')} /></div>
+			<p class="mt-1 text-sm text-ink-3">From {quarterStart} to {asOf}, from the active contracts. ARR is not a ledger figure, so it has no journal lines.</p>
+			<div class="mt-4"><ArrWaterfall w={arr} /></div>
 		</section>
 
 		<section aria-labelledby="aging-h">
 			<h2 id="aging-h" class="text-2xl">Receivables aging</h2>
-			<p class="mt-1 text-sm text-ink-3">Unpaid invoices as of {asOf}, {fmt(ag.total.toString())} in total.</p>
+			<p class="mt-1 text-sm text-ink-3">Unpaid invoices as of {asOf}, {fmt(ag.total.toString())} in total. Each customer's page lists the invoices behind their amounts.</p>
 			<ul class="mt-4 flex flex-col gap-3">
 				{#each AGING_BUCKETS as b (b)}
 					<li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1">
 						<span class="text-[15px]">{AGING_LABEL[b]}</span>
-						<a class="drill num text-right" href={drill({ account: '1100' }, 'all')}>{fmt(ag.totals[b].toString())}</a>
+						<span class="num text-right">{fmt(ag.totals[b].toString())}</span>
 						<span class="col-span-2 h-2 overflow-hidden rounded-full bg-subtle">
 							<span
 								class="block h-full rounded-full transition-[width] duration-500"
@@ -164,8 +179,8 @@
 					{#each agingRows as r (r.id)}
 						<tr class="border-b border-line">
 							<td class="py-2 pr-2"><a class="drill" href="/customers/{r.id}">{r.name}</a></td>
-							<td class="num py-2 text-right {r.late > 0n ? 'text-neg' : 'text-ink-3'}"><a class="drill" href={drill({ customer: r.id }, 'all')}>{fmt(r.late.toString())}</a></td>
-							<td class="num py-2 text-right"><a class="drill" href={drill({ customer: r.id }, 'all')}>{fmt(r.total.toString())}</a></td>
+							<td class="num py-2 text-right {r.late > 0n ? 'text-neg' : 'text-ink-3'}"><a class="drill" href="/customers/{r.id}">{fmt(r.late.toString())}</a></td>
+							<td class="num py-2 text-right"><a class="drill" href="/customers/{r.id}">{fmt(r.total.toString())}</a></td>
 						</tr>
 					{/each}
 				</tbody>

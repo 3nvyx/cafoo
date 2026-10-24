@@ -1,17 +1,21 @@
 <script lang="ts">
 	// One Proposal. Simple mode: plain summary, amount, Approve / Send back.
-	// Expert mode adds journal lines, the Red Team critique verbatim, raw payload and transcript.
+	// Expert mode adds what the payload would change (journal lines, a Revenue Schedule's months, a Bank Match's links),
+	// the Red Team critique verbatim, the raw payload and the transcript.
 	import { db } from '#lib/data/index.js';
 	import { formatMoney } from '#lib/data/money.js';
 	import type { Proposal } from '#lib/data/types.js';
 	import { KIND, STATUS, drill, dateTime, roleName } from '#lib/labels.js';
 	import { arrive, reveal } from '#lib/motion.js';
+	import { confirmEffect, journalLinesOf, matchesOf, parsePayload, scheduleLinesOf } from '#lib/proposals.js';
 	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import DebateMessage from './DebateMessage.svelte';
 	import JournalLines, { type LineView } from './JournalLines.svelte';
+	import MatchTable from './MatchTable.svelte';
 	import Pill from './Pill.svelte';
 	import RoleAvatar from './RoleAvatar.svelte';
+	import ScheduleTable from './ScheduleTable.svelte';
 
 	let { proposal: p, focused = false, onfocus }: { proposal: Proposal; focused?: boolean; onfocus?: () => void } = $props();
 
@@ -27,36 +31,30 @@
 	const status = $derived(STATUS[p.status]);
 	const accounts = $derived(new Map(db.accounts().map((a) => [a.code, a])));
 
-	const payload = $derived.by(() => {
-		try {
-			// Live payloads use accountCode; the mock's use account. Money is minor units as a string or number.
-			return JSON.parse(p.payloadJson) as { lines?: { accountCode?: string; account?: string; debitMinor: string | number; creditMinor: string | number; memo?: string }[] };
-		} catch {
-			return null;
-		}
-	});
-
+	const payload = $derived(parsePayload(p.payloadJson));
+	// A payload's `lines` are journal lines (debit or credit on an account) or, for a Revenue Schedule, month amounts.
 	const lines = $derived<LineView[]>(
-		(payload?.lines ?? []).map((l, i) => {
-			const code = l.accountCode ?? l.account ?? '';
-			return {
-				key: `${i}`,
-				code,
-				name: accounts.get(code)?.name ?? (l.memo || code),
-				debitMinor: String(l.debitMinor ?? '0'),
-				creditMinor: String(l.creditMinor ?? '0')
-			};
-		})
+		journalLinesOf(payload).map((l, i) => ({
+			key: `${i}`,
+			code: l.code,
+			name: accounts.get(l.code)?.name ?? (l.memo || l.code),
+			debitMinor: l.debitMinor,
+			creditMinor: l.creditMinor
+		}))
 	);
+	const schedule = $derived(scheduleLinesOf(payload));
+	const matches = $derived(matchesOf(payload));
 
 	const prettyPayload = $derived(payload ? JSON.stringify(payload, null, 2) : p.payloadJson);
-	const amountLabel = $derived(p.kind === 'credit_decision' ? 'Credit at stake' : p.kind === 'vendor_block' ? 'Payments held' : 'Amount');
+	const amountLabel = $derived(p.kind === 'credit_decision' ? 'Credit at stake' : p.kind === 'vendor_block' ? 'Payments held' : p.kind === 'vendor_verify' ? 'Bills released' : 'Amount');
 
 	/** CFO confirms the Advisor's approval (glossary: the Advisor approves, the CFO confirms). */
 	export async function confirm() {
 		if (p.status !== 'awaiting_cfo' || busy) return;
 		busy = true;
-		await attempt(() => db.cfoConfirm(p.id), lines.length ? 'Confirmed. The entry is posted.' : 'Confirmed.');
+		// Say what the confirmation did: only journal entries, accruals and Bank Match payments post an entry.
+		const done = confirmEffect(p, db).message;
+		await attempt(() => db.cfoConfirm(p.id), done);
 		busy = false;
 	}
 
@@ -85,7 +83,7 @@
 	tabindex={ui.expert ? 0 : undefined}
 	onfocusin={onfocus}
 	aria-labelledby="proposal-{p.id}-summary"
-	class="card flex flex-col gap-4 p-4 transition-[border-color,box-shadow] duration-300 sm:p-5 {p.status === 'awaiting_cfo'
+	class="card flex scroll-mt-24 flex-col gap-4 p-4 transition-[border-color,box-shadow] duration-300 sm:p-5 {p.status === 'awaiting_cfo'
 		? 'border-2 border-focus'
 		: ''} {focused && ui.expert ? 'ring-2 ring-focus ring-offset-2 ring-offset-canvas' : ''}"
 >
@@ -149,6 +147,18 @@
 
 	{#if ui.expert}
 		<div class="flex flex-col gap-4 border-t border-line pt-4" transition:reveal>
+			{#if matches.length}
+				<section aria-label="Bank matches">
+					<p class="eyebrow mb-2">{matches.length === 1 ? 'Bank match' : `${matches.length} bank matches`}</p>
+					<MatchTable {matches} />
+				</section>
+			{/if}
+			{#if schedule.length}
+				<section aria-label="Revenue Schedule">
+					<p class="eyebrow mb-2">Revenue Schedule</p>
+					<ScheduleTable lines={schedule} periodId={p.periodId || undefined} />
+				</section>
+			{/if}
 			{#if lines.length}
 				<section aria-label="Journal lines">
 					<p class="eyebrow mb-2">Journal lines</p>

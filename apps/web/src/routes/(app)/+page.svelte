@@ -4,7 +4,7 @@
 	import type { Proposal } from '#lib/data/types.js';
 	import { lockGate } from '#lib/close.js';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
-	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import ConfirmAll from '#lib/components/ConfirmAll.svelte';
 	import CountUp from '#lib/components/CountUp.svelte';
 	import DebateMessage from '#lib/components/DebateMessage.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -12,7 +12,7 @@
 	import ProposalList from '#lib/components/ProposalList.svelte';
 	import { drill } from '#lib/labels.js';
 	import { arrive } from '#lib/motion.js';
-	import { attempt, toasts } from '#lib/toast.svelte.js';
+	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
@@ -47,29 +47,6 @@
 		starting = true;
 		await attempt(() => db.startClose(period.id));
 		starting = false;
-	}
-
-	let confirmAllOpen = $state(false);
-	let confirmingAll = $state(false);
-	async function confirmAll() {
-		const ids = awaiting.map((p) => p.id);
-		if (!ids.length) return;
-		confirmingAll = true;
-		const tid = toasts.push(`Confirming 0 of ${ids.length}…`, 'info', 0);
-		let done = 0;
-		const failed: string[] = [];
-		for (const id of ids) {
-			try {
-				await db.cfoConfirm(id);
-				done++;
-			} catch (err) {
-				failed.push(err instanceof Error ? err.message : String(err));
-			}
-			toasts.update(tid, `Confirming ${done + failed.length} of ${ids.length}…`);
-		}
-		confirmingAll = false;
-		if (failed.length) toasts.update(tid, `Confirmed ${done} of ${ids.length}. ${failed.length} failed: ${failed[0]}`, 'error', 8000);
-		else toasts.update(tid, `Confirmed all ${done}. The entries are posted.`, 'success', 4200);
 	}
 
 	const headline = $derived.by(() => {
@@ -113,12 +90,13 @@
 	</section>
 
 	<section aria-label="Key numbers" class="grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-		{#each [{ label: 'Cash', minor: cash, href: drill({ account: '1000' }, 'all'), hint: `in the bank at the end of ${month}` }, { label: 'ARR', minor: arr, href: drill({ account: '4000' }, period.id), hint: 'annual recurring revenue' }, { label: 'Open receivables', minor: openAr, href: drill({ account: '1100' }, 'all'), hint: 'owed to us by customers' }] as k (k.label)}
-			<a href={k.href} class="group flex flex-col gap-1 py-5 sm:px-6 sm:first:pl-0">
+		<!-- Balances as of the month end drill through that month; ARR comes from the contracts, not the ledger, so it has no drill. -->
+		{#each [{ label: 'Cash', minor: cash, href: drill({ account: '1000' }, { to: period.id }), hint: `in the bank at the end of ${month}` }, { label: 'ARR', minor: arr, href: '', hint: 'annual recurring revenue, from the contracts' }, { label: 'Open receivables', minor: openAr, href: drill({ account: '1100' }, { to: period.id }), hint: 'owed to us by customers' }] as k (k.label)}
+			<svelte:element this={k.href ? 'a' : 'div'} href={k.href || undefined} class="group flex flex-col gap-1 py-5 sm:px-6 sm:first:pl-0">
 				<span class="eyebrow">{k.label}</span>
-				<span class="text-[28px] leading-9 font-medium group-hover:text-accent-ink sm:text-[32px]"><CountUp minor={k.minor} /></span>
+				<span class="text-[28px] leading-9 font-medium sm:text-[32px] {k.href ? 'group-hover:text-accent-ink' : ''}"><CountUp minor={k.minor} /></span>
 				<span class="text-sm text-ink-3">{k.hint}</span>
-			</a>
+			</svelte:element>
 		{/each}
 	</section>
 
@@ -127,11 +105,7 @@
 			<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
 				<h2 id="queue-h" class="text-2xl">Needs your OK</h2>
 				<div class="flex items-center gap-3">
-					{#if awaiting.length > 1}
-						<button class="btn btn-primary" disabled={confirmingAll} onclick={() => (confirmAllOpen = true)}>
-							<Icon name="check" size={18} />{confirmingAll ? 'Confirming…' : `Confirm all ${awaiting.length}`}
-						</button>
-					{/if}
+					<ConfirmAll proposals={awaiting} />
 					<a href="/proposals" class="drill text-sm text-ink-2">All Proposals</a>
 				</div>
 			</div>
@@ -155,14 +129,4 @@
 			</ul>
 		</aside>
 	</div>
-
-	<ConfirmDialog
-		bind:open={confirmAllOpen}
-		title="Confirm all {awaiting.length}?"
-		body="Confirm all {awaiting.length} items the Advisor already approved?"
-		confirmLabel="Confirm all {awaiting.length}"
-		onconfirm={() => {
-			void confirmAll();
-		}}
-	/>
 {/if}
