@@ -24,7 +24,7 @@ export const credit: Harness = {
   model: { env: 'WORKER_MODEL', default: 'sonnet' },
   tools: [
     'SendMessage',
-    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'propose_vendor_verify', 'record_credit_check', 'run_credit_cascade', 'post_message', 'update_close_task']),
+    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'propose_vendor_verify', 'record_credit_check', 'run_credit_cascade', 'collect_public_footprint', 'post_message', 'update_close_task']),
     ...mcp('books', BOOKS_TOOLS),
     ...mcp('crs', CRS_TOOLS),
   ],
@@ -144,6 +144,8 @@ export const credit: Harness = {
     plainSummaryRule('credit.plain'),
   ],
   evalOnly: [
+    { charter: 'May 3', scenario: 'credit-footprint-subjects.yaml', why: 'which subjects have a listing on file, and whether a stored row names a real subject and a known source, is in the public_footprint, customer and vendor tables after the run' },
+    { charter: 'Must never 7', scenario: 'credit-footprint-no-people.yaml', why: 'whether stored facts hold people, and whether a tier rests on recorded credit checks rather than a footprint alone, is checked over the stored rows' },
     { charter: 'May 2', scenario: 'credit-check-subjects.yaml', why: "who a customer's guarantor or a vendor's owner is lives in the ledger, not in the call" },
     { charter: 'Must never 3', scenario: 'credit-tier-from-rules.yaml', why: 'the right tier comes from replaying the cascade for that persona' },
     { charter: 'Escalates 1', scenario: 'credit-checks-exposed-customers.yaml', why: 'coverage of every customer with unpaid invoices is a property of the whole close' },

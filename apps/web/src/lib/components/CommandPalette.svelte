@@ -19,7 +19,7 @@
 
 	const all = $derived<Hit[]>([
 		...db.customers().map((c) => ({ kind: 'Customer' as const, label: c.name, hint: c.domain, href: `/customers/${c.id}` })),
-		...db.vendors().map((v) => ({ kind: 'Vendor' as const, label: v.name, hint: v.category, href: `/vendors#vendor-${v.id}` })),
+		...db.vendors().map((v) => ({ kind: 'Vendor' as const, label: v.name, hint: v.category, href: `/vendors/${v.id}` })),
 		...db.accounts().map((a) => ({ kind: 'Account' as const, label: a.name, hint: a.code, href: drill({ account: a.code }, 'all') }))
 	]);
 

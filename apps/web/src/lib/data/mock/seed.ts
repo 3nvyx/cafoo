@@ -5,6 +5,7 @@ import vendors from './seed/vendors.json';
 import bank from './seed/bank.json';
 import journal from './seed/journal.json';
 import governance from './seed/governance.json';
+import footprint from './seed/footprint.json';
 import type {
 	Account,
 	AgentMessage,
@@ -22,6 +23,7 @@ import type {
 	JournalLine,
 	Period,
 	Proposal,
+	PublicFootprint,
 	Settings,
 	Subsidiary,
 	Vendor
@@ -46,6 +48,7 @@ export interface Tables {
 	close_task: CloseTask[];
 	credit_check: CreditCheck[];
 	audit_event: AuditEvent[];
+	public_footprint: PublicFootprint[];
 	settings: Settings;
 }
 
@@ -103,6 +106,7 @@ export function loadSeed(): Tables {
 		close_task: governance.closeTasks as CloseTask[],
 		credit_check: customers.creditChecks as CreditCheck[],
 		audit_event: governance.auditEvents as AuditEvent[],
+		public_footprint: footprint.publicFootprints as PublicFootprint[],
 		settings: { ...reference.settings }
 	});
 }

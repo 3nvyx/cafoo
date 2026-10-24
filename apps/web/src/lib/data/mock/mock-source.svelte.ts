@@ -5,7 +5,7 @@
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
 // CFO locks it.
 import type { ChangeEvent, ConnectionState, DataSource } from '../source';
-import type { AgentMessage, AgentRole, BankMatch, CloseTaskStatus, JournalLine, LiveActivity, Minor, Proposal, ProviderStatus, TableName } from '../types';
+import type { AgentMessage, AgentRole, BankMatch, CloseTaskStatus, FootprintSource, FootprintSubject, JournalLine, Listings, LiveActivity, Minor, Proposal, ProviderStatus, PublicFootprint, TableName } from '../types';
 import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
 import { accountIdFor, loadSeed, type Tables } from './seed';
@@ -20,6 +20,7 @@ const PROVIDERS: ProviderStatus[] = [
 	{ id: 'redteam-model', name: 'Red Team model', purpose: 'Critiques on a second model', mode: 'demo', detail: 'Recorded critiques' },
 	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '30 September transactions from fixtures' },
 	{ id: 'credit-cascade', name: 'Credit check cascade', purpose: 'Identity, fraud, credit report, public records', mode: 'demo', detail: 'Sandbox personas, stored request ids' },
+	{ id: 'public-web', name: 'Public web data', purpose: 'What a logged-out visitor sees about a customer or vendor', mode: 'demo', detail: 'Recorded Yelp, job board and LinkedIn pages' },
 	{ id: 'email', name: 'Email delivery', purpose: 'Board Pack and dunning emails', mode: 'demo', detail: 'Emails are written to the audit log, not sent' }
 ];
 
@@ -38,6 +39,7 @@ export class MockDataSource implements DataSource {
 	#timers: ReturnType<typeof setTimeout>[] = [];
 	#boot = Date.now();
 	#seq = 0;
+	#collecting = new Set<string>();
 
 	// Reads
 	subsidiaries = () => this.#t.subsidiary;
@@ -58,6 +60,7 @@ export class MockDataSource implements DataSource {
 	closeTasks = () => this.#t.close_task;
 	creditChecks = () => this.#t.credit_check;
 	auditEvents = () => this.#t.audit_event;
+	publicFootprints = () => this.#t.public_footprint;
 	settings = () => this.#t.settings;
 	providers = () => PROVIDERS;
 	liveActivity = () => this.#activity;
@@ -220,12 +223,73 @@ export class MockDataSource implements DataSource {
 		this.#audit('cfo', 'period.unlock', 'period', periodId, { reason });
 	}
 
+	/**
+	 * Scripted collection: each listing on file "fetches" in turn from about 3 s, replaying the recorded page when the
+	 * seed has one (Bansho Ramen's Yelp page, Stripe's LinkedIn and job board) and failing in plain words otherwise.
+	 */
+	async collectFootprint(subjectKind: FootprintSubject, subjectId: string): Promise<void> {
+		const subject = subjectKind === 'customer' ? this.#t.customer.find((c) => c.id === subjectId) : this.#t.vendor.find((v) => v.id === subjectId);
+		if (!subject) throw new Error(`Unknown ${subjectKind} ${subjectId}`);
+		const key = `${subjectKind}:${subjectId}`;
+		if (this.#collecting.has(key)) throw new Error('A collection is already running for this business.');
+		const wanted: { source: FootprintSource; url: string }[] = [];
+		if (subject.yelpUrl) wanted.push({ source: 'yelp', url: subject.yelpUrl });
+		if (subject.jobBoard) wanted.push({ source: 'jobs', url: subject.jobBoard });
+		if (subject.linkedinUrl) wanted.push({ source: 'linkedin', url: subject.linkedinUrl });
+		if (!wanted.length) throw new Error('No public listing on file. Add a Yelp page, job board or LinkedIn page first.');
+		this.#collecting.add(key);
+		this.#audit('cfo', 'footprint.collect', 'public_footprint', key, { sources: wanted.map((w) => w.source) });
+		wanted.forEach((w, i) =>
+			this.#later(3000 + i * 1400, () => {
+				const recorded = this.#t.public_footprint.findLast((r) => r.subjectKind === subjectKind && r.subjectId === subjectId && r.source === w.source && r.status === 'ok' && !r.id.includes('-live-'));
+				const row: PublicFootprint = recorded
+					? { ...recorded, id: this.#id('fp'), sourceUrl: recorded.sourceUrl, fetchedAt: this.#now(), live: false }
+					: {
+						id: this.#id('fp'),
+						subjectKind,
+						subjectId,
+						source: w.source,
+						sourceUrl: /^https?:/.test(w.url) ? w.url : '',
+						fetchedAt: this.#now(),
+						status: 'failed',
+						error: 'Demo mode has no recorded copy of this page, so nothing was fetched. Connect the live agents to look it up.',
+						summaryPlain: '',
+						factsJson: '{}',
+						ratingTenths: 0,
+						reviewCount: 0,
+						isClosed: false,
+						isClaimed: false,
+						yearEstablished: 0,
+						openRoles: 0,
+						employees: 0,
+						followers: 0,
+						live: false
+					};
+				this.#t.public_footprint.push(row);
+				this.#emit('public_footprint', 'insert', row);
+				if (i === wanted.length - 1) this.#collecting.delete(key);
+			})
+		);
+	}
+
+	async setListings(subjectKind: FootprintSubject, subjectId: string, l: Listings): Promise<void> {
+		const subject = subjectKind === 'customer' ? this.#t.customer.find((c) => c.id === subjectId) : this.#t.vendor.find((v) => v.id === subjectId);
+		if (!subject) throw new Error(`Unknown ${subjectKind} ${subjectId}`);
+		const clean = (v: string | undefined) => (v && v.trim() ? v.trim() : undefined);
+		subject.yelpUrl = clean(l.yelpUrl);
+		subject.jobBoard = clean(l.jobBoard);
+		subject.linkedinUrl = clean(l.linkedinUrl);
+		this.#emit(subjectKind, 'update', subject);
+		this.#audit('cfo', 'set_listings', subjectKind, subjectId, { yelpUrl: subject.yelpUrl, jobBoard: subject.jobBoard, linkedinUrl: subject.linkedinUrl });
+	}
+
 	/** Demo only: put every table back to the seed. */
 	resetDemo(): void {
 		for (const t of this.#timers) clearTimeout(t);
 		this.#timers = [];
 		this.#activity = null;
 		this.#closes = [];
+		this.#collecting.clear();
 		this.#t = loadSeed();
 		this.#boot = Date.now();
 	}

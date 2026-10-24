@@ -261,6 +261,10 @@ const customer = table(
     creditTier: t.option(t.string()),
     paymentTermsDays: t.u16(),
     allowanceMinor: t.i64(),
+    // Public listings used for the public footprint (optional, editable by the CFO).
+    yelpUrl: t.option(t.string()),
+    jobBoard: t.option(t.string()),
+    linkedinUrl: t.option(t.string()),
   }
 );
 
@@ -329,6 +333,38 @@ const vendor = table(
     ownerPersonaId: t.option(t.string()),
     verification: Verification,
     verificationNote: t.string(),
+    yelpUrl: t.option(t.string()),
+    jobBoard: t.option(t.string()),
+    linkedinUrl: t.option(t.string()),
+  }
+);
+
+/**
+ * One run of one public source for a customer or vendor: what a logged-out visitor can see, with the fetch time,
+ * so the CFO sees change between runs. Signals for a person, never a decision.
+ */
+const publicFootprint = table(
+  { name: 'public_footprint', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    subjectKind: SubjectKind,
+    subjectId: t.u64().index('btree'),
+    source: t.string(),
+    sourceUrl: t.string(),
+    fetchedAt: t.timestamp(),
+    status: t.string(),
+    error: t.string(),
+    summaryPlain: t.string(),
+    factsJson: t.string(),
+    ratingTenths: t.u16(),
+    reviewCount: t.u32(),
+    isClosed: t.bool(),
+    isClaimed: t.bool(),
+    yearEstablished: t.u16(),
+    openRoles: t.u32(),
+    employees: t.u32(),
+    followers: t.u32(),
+    live: t.bool(),
   }
 );
 
@@ -588,6 +624,7 @@ const spacetimedb = schema({
   journalLine,
   fxRate,
   customer,
+  publicFootprint,
   contract,
   contractItem,
   revenueScheduleLine,

@@ -3,6 +3,7 @@
 	import { db } from '#lib/data/index.js';
 	import { ALLOWANCE_RATE_BP, allowanceFor, bucketOf, contractArr, openReceivable, periodEnd, AGING_LABEL } from '#lib/data/derive.js';
 	import { formatMoney } from '#lib/data/money.js';
+	import FootprintPanel from '#lib/components/FootprintPanel.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import { STATUS, TIER, dateTime, drill, shortDate } from '#lib/labels.js';
@@ -65,7 +66,7 @@
 		</div>
 	</dl>
 
-	<div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+	<div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:items-start">
 		<section aria-labelledby="cc-h">
 			<h2 id="cc-h" class="text-2xl">Guarantor Credit Check</h2>
 			{#if latest && summary}
@@ -99,6 +100,12 @@
 				</ul>
 			{/if}
 		</section>
+
+		<div class="lg:row-span-2">
+			{#key c.id}
+				<FootprintPanel kind="customer" id={c.id} listings={{ yelpUrl: c.yelpUrl, jobBoard: c.jobBoard, linkedinUrl: c.linkedinUrl }} />
+			{/key}
+		</div>
 
 		<section aria-labelledby="inv-h">
 			<h2 id="inv-h" class="text-2xl">Invoices</h2>

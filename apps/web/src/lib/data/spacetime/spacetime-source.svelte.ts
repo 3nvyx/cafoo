@@ -35,6 +35,7 @@ const ACCESSORS = {
 	closeTask: 'close_task',
 	creditCheck: 'credit_check',
 	auditEvent: 'audit_event',
+	publicFootprint: 'public_footprint',
 	settings: 'settings'
 } as const satisfies Record<string, U.TableName>;
 
@@ -59,6 +60,7 @@ interface Mirror {
 	close_task: U.CloseTask[];
 	credit_check: U.CreditCheck[];
 	audit_event: U.AuditEvent[];
+	public_footprint: U.PublicFootprint[];
 	settings: U.Settings;
 }
 
@@ -81,6 +83,7 @@ const empty = (): Mirror => ({
 	close_task: [],
 	credit_check: [],
 	audit_event: [],
+	public_footprint: [],
 	settings: { materialityThresholdMinor: '1000000' }
 });
 
@@ -147,6 +150,7 @@ export class SpacetimeDataSource implements DataSource {
 	closeTasks = () => this.#t.close_task;
 	creditChecks = () => this.#t.credit_check;
 	auditEvents = () => this.#t.audit_event;
+	publicFootprints = () => this.#t.public_footprint;
 	settings = () => this.#t.settings;
 	liveActivity = () => null;
 	now = () => new Date().toISOString();
@@ -212,6 +216,32 @@ export class SpacetimeDataSource implements DataSource {
 
 	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
 		await this.#call('Could not unlock this Period.', (c) => c.reducers.unlockPeriod({ periodYm: periodId, rationale: reasonPlain }));
+	}
+
+	/** Public web lookups run in the agent gateway (it holds the scraping credentials); never from the browser. */
+	async collectFootprint(subjectKind: U.FootprintSubject, subjectId: string): Promise<void> {
+		let res: Response;
+		try {
+			res = await fetch(`${this.#cfg.gateway}/footprint`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ subjectKind, subjectId })
+			});
+		} catch {
+			this.#conn.agents = 'offline';
+			throw new Error('The agents are offline. Start the agent gateway, then try again.');
+		}
+		this.#conn.agents = 'online';
+		if (res.ok) return;
+		const body = (await res.json().catch(() => null)) as { error?: string } | null;
+		throw new Error(body?.error || (res.status === 409 ? 'A collection is already running for this business.' : `The agents could not start the collection (${res.status}).`));
+	}
+
+	async setListings(subjectKind: U.FootprintSubject, subjectId: string, l: U.Listings): Promise<void> {
+		const clean = (v: string | undefined) => (v && v.trim() ? v.trim() : undefined);
+		await this.#call('Could not save the public listings.', (c) =>
+			c.reducers.setListings({ subjectKind, subjectId: BigInt(subjectId), yelpUrl: clean(l.yelpUrl), jobBoard: clean(l.jobBoard), linkedinUrl: clean(l.linkedinUrl) })
+		);
 	}
 
 	/**
@@ -332,6 +362,7 @@ export class SpacetimeDataSource implements DataSource {
 		if (d.has('agentMessage')) t.agent_message = all(c.db.agentMessage.iter()).map(M.agentMessage).sort(byTime('createdAt'));
 		if (d.has('closeTask') || periodsChanged) t.close_task = all(c.db.closeTask.iter()).map((r) => M.closeTask(r, ym)).sort((a, b) => a.order - b.order);
 		if (d.has('creditCheck')) t.credit_check = all(c.db.creditCheck.iter()).map(M.creditCheck);
+		if (d.has('publicFootprint')) t.public_footprint = all(c.db.publicFootprint.iter()).map(M.publicFootprint).sort(byTime('fetchedAt'));
 		if (d.has('auditEvent')) t.audit_event = all(c.db.auditEvent.iter()).map(M.auditEvent).sort(byTime('at'));
 		if (d.has('settings')) {
 			const row = all(c.db.settings.iter()).find((s) => s.key === 'materiality_threshold_minor');

@@ -24,7 +24,11 @@
 		slides: 'M3.5 5h17v11h-17zM12 16v4M8 20h8',
 		tag: 'M4 4h7.5l8.5 8.5-7.5 7.5L4 11.5zM8 8.01V8',
 		undo: 'M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-2',
-		panel: 'M4 5h16v14H4zM9 5v14'
+		panel: 'M4 5h16v14H4zM9 5v14',
+		arrowUp: 'M12 19V5M6 11l6-6 6 6',
+		arrowDown: 'M12 5v14M6 13l6 6 6-6',
+		external: 'M14 4h6v6M20 4l-9 9M19 14v5H5V5h5',
+		globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z'
 	} as const;
 	export type IconName = keyof typeof PATHS;
 </script>

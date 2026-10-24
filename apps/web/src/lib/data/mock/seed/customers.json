@@ -18,7 +18,7 @@
 		{ "id": "c16", "name": "Oakhaven Bookshop", "domain": "oakhavenbooks.example", "guarantorPersonaId": "per-16", "guarantorName": "Owen Fisher", "creditTier": "A", "paymentTermsDays": 30 },
 		{ "id": "c17", "name": "Riverside Tutoring", "domain": "riversidetutoring.example", "guarantorPersonaId": "per-17", "guarantorName": "Mei Chen", "creditTier": "B", "paymentTermsDays": 30 },
 		{ "id": "c18", "name": "Foxglove Catering", "domain": "foxglovecatering.example", "guarantorPersonaId": "per-18", "guarantorName": "Hugo Laurent", "paymentTermsDays": 30 },
-		{ "id": "c19", "name": "Granite Peak Climbing", "domain": "granitepeak.example", "guarantorPersonaId": "per-19", "guarantorName": "Zoe Adams", "creditTier": "A", "paymentTermsDays": 30 },
+		{ "id": "c19", "name": "Bansho Ramen", "domain": "banshoramen.com", "guarantorPersonaId": "per-19", "guarantorName": "Zoe Adams", "creditTier": "A", "paymentTermsDays": 30, "yelpUrl": "https://www.yelp.com/biz/bansho-ramen-berkeley-3" },
 		{ "id": "c20", "name": "Velvet Hour Salon", "domain": "velvethour.example", "guarantorPersonaId": "per-20", "guarantorName": "Imani Brooks", "paymentTermsDays": 30 }
 	],
 	"contracts": [

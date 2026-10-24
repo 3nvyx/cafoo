@@ -20,4 +20,7 @@ export default __t.row({
   creditTier: __t.option(__t.string()).name("credit_tier"),
   paymentTermsDays: __t.u16().name("payment_terms_days"),
   allowanceMinor: __t.i64().name("allowance_minor"),
+  yelpUrl: __t.option(__t.string()).name("yelp_url"),
+  jobBoard: __t.option(__t.string()).name("job_board"),
+  linkedinUrl: __t.option(__t.string()).name("linkedin_url"),
 });

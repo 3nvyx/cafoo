@@ -1,0 +1,25 @@
+{
+  "_about": "Trimmed real LinkedIn company record (2026-10-19) from the hackpack sample; update text and poster names dropped.",
+  "source": "linkedin",
+  "sourceUrl": "https://www.linkedin.com/company/stripe",
+  "facts": {
+    "name": "Stripe",
+    "industries": "Technology, Information and Internet",
+    "company_size": "5,001-10,000 employees",
+    "employees_in_linkedin": 16694,
+    "followers": 1776107,
+    "headquarters": "South San Francisco, California",
+    "website": "https://stripe.com/",
+    "founded": 2010,
+    "organization_type": "Privately Held",
+    "locations": [
+      "354 Oyster Point Blvd South San Francisco, California 94080, US"
+    ],
+    "recentUpdates": [
+      {
+        "date": "2026-10-15T16:14:02.797Z",
+        "likes": 26
+      }
+    ]
+  }
+}

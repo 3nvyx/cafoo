@@ -19,6 +19,9 @@ import type {
 	Period,
 	Proposal,
 	ProviderStatus,
+	PublicFootprint,
+	FootprintSubject,
+	Listings,
 	Settings,
 	Subsidiary,
 	TableName,
@@ -80,6 +83,8 @@ export interface DataSource {
 	closeTasks(): CloseTask[];
 	creditChecks(): CreditCheck[];
 	auditEvents(): AuditEvent[];
+	/** Every public footprint fetch, all subjects and sources, in fetch order. */
+	publicFootprints(): PublicFootprint[];
 	settings(): Settings;
 	providers(): ProviderStatus[];
 	/** What an agent is doing right now, or null when idle. */
@@ -110,6 +115,14 @@ export interface DataSource {
 	lockPeriod(periodId: string): Promise<void>;
 	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */
 	unlockPeriod(periodId: string, reasonPlain: string): Promise<void>;
+	/**
+	 * Ask the agents to look the business up on the public web (one fetch per listing on file). Resolves once the job
+	 * is accepted; results arrive later as new `publicFootprints()` rows. Throws a plain-English error if the agents are
+	 * offline or refuse (e.g. a collection is already running for this subject).
+	 */
+	collectFootprint(subjectKind: FootprintSubject, subjectId: string): Promise<void>;
+	/** CFO sets where the business is listed publicly. Replaces all three; blank clears one. */
+	setListings(subjectKind: FootprintSubject, subjectId: string, listings: Listings): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
 	/** Live mode only: take the CFO seat with the one-time bootstrap secret from the claim link. */

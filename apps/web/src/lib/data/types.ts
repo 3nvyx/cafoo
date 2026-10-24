@@ -70,6 +70,10 @@ export interface Customer {
 	guarantorName: string;
 	creditTier?: RiskTier;
 	paymentTermsDays: number;
+	yelpUrl?: string;
+	/** "board:org", e.g. "greenhouse:stripe" or "ashby:snowflake". */
+	jobBoard?: string;
+	linkedinUrl?: string;
 }
 
 export interface Contract {
@@ -104,6 +108,50 @@ export interface Vendor {
 	category: string;
 	verification: VendorVerification;
 	notePlain?: string;
+	yelpUrl?: string;
+	/** "board:org", e.g. "greenhouse:stripe" or "ashby:snowflake". */
+	jobBoard?: string;
+	linkedinUrl?: string;
+}
+
+/** Where a business can be looked up publicly. Set by the CFO; empty means "no public listing on file". */
+export interface Listings {
+	yelpUrl?: string;
+	jobBoard?: string;
+	linkedinUrl?: string;
+}
+
+export type FootprintSubject = 'customer' | 'vendor';
+export type FootprintSource = 'yelp' | 'jobs' | 'linkedin' | 'search';
+
+/**
+ * One fetch of one public source about a Customer or Vendor: what a logged-out visitor could see at `fetchedAt`.
+ * Read-only signals for the CFO; nothing here touches the books. Numeric facts are 0 when the source has none.
+ */
+export interface PublicFootprint {
+	id: string;
+	subjectKind: FootprintSubject;
+	subjectId: string;
+	source: FootprintSource;
+	sourceUrl: string;
+	fetchedAt: Iso;
+	status: 'ok' | 'failed';
+	error: string;
+	summaryPlain: string;
+	/** The source's facts as fetched (JSON text). */
+	factsJson: string;
+	/** 41 = 4.1 stars; 0 = no rating. */
+	ratingTenths: number;
+	reviewCount: number;
+	isClosed: boolean;
+	isClaimed: boolean;
+	/** 0 = unknown. */
+	yearEstablished: number;
+	openRoles: number;
+	employees: number;
+	followers: number;
+	/** Fetched live, as opposed to replayed from a recorded fixture. */
+	live: boolean;
 }
 
 export interface Bill {
@@ -268,6 +316,7 @@ export type TableName =
 	| 'close_task'
 	| 'credit_check'
 	| 'audit_event'
+	| 'public_footprint'
 	| 'settings';
 
 /** What an agent is doing right now (drives the "is writing" indicator). */

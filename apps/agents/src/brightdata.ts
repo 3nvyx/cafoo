@@ -11,8 +11,12 @@ const API = 'https://api.brightdata.com';
 
 /** Accept the MCP's name (API_TOKEN) and the SDK / hackpack names. */
 export function brightDataToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const v = env.BRIGHTDATA_API_TOKEN ?? env.BRIGHTDATA_API_KEY ?? env.API_TOKEN;
-  return v?.trim() || undefined;
+  // First non-empty value wins (an empty BRIGHTDATA_API_TOKEN="" in .env must not hide API_TOKEN).
+  for (const name of ['BRIGHTDATA_API_TOKEN', 'BRIGHTDATA_API_KEY', 'API_TOKEN']) {
+    const v = env[name]?.trim();
+    if (v) return v;
+  }
+  return undefined;
 }
 
 export const brightDataLive = (env: NodeJS.ProcessEnv = process.env) => Boolean(brightDataToken(env)) && env.DEMO_MODE !== '1';
@@ -28,15 +32,22 @@ let zonePromise: Promise<string> | null = null;
 
 /** The Web Unlocker zone to use: WEB_UNLOCKER_ZONE / BRIGHTDATA_ZONE, else the account's first "unblocker" zone. */
 export function unlockerZone(): Promise<string> {
-  const configured = (process.env.WEB_UNLOCKER_ZONE ?? process.env.BRIGHTDATA_ZONE)?.trim();
-  if (configured) return Promise.resolve(configured);
+  const configured = (process.env.WEB_UNLOCKER_ZONE?.trim() || process.env.BRIGHTDATA_ZONE?.trim()) || undefined;
   if (zonePromise) return zonePromise;
   zonePromise = (async () => {
     const res = await fetch(`${API}/zone/get_active_zones`, { headers: { Authorization: `Bearer ${brightDataToken()}` } });
     if (!res.ok) throw new BrightDataError(`Could not list Bright Data zones (HTTP ${res.status}).`, res.status);
     const zones = (await res.json()) as { name: string; type?: string }[];
+    // A configured name must exist on the account; otherwise the first Web Unlocker (or SERP) zone.
+    if (configured && zones.some(z => z.name === configured)) return configured;
     const z = zones.find(x => x.type === 'unblocker') ?? zones.find(x => x.type === 'serp');
-    if (!z) throw new BrightDataError('The Bright Data account has no Web Unlocker zone. Add one in the control panel (Proxies & Scraping → Add → Web Unlocker API).');
+    if (!z) {
+      throw new BrightDataError(
+        configured
+          ? `Zone "${configured}" does not exist on this Bright Data account. Add a Web Unlocker zone in the control panel (Proxies & Scraping → Add → Web Unlocker API).`
+          : 'The Bright Data account has no Web Unlocker zone. Add one in the control panel (Proxies & Scraping → Add → Web Unlocker API).'
+      );
+    }
     return z.name;
   })();
   zonePromise.catch(() => (zonePromise = null));
@@ -89,4 +100,28 @@ export function recordedLookup(counterparty: string): string | null {
   const slug = counterparty.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const p = join(repoRoot, 'fixtures', 'brightdata', `${slug}.md`);
   return existsSync(p) ? readFileSync(p, 'utf8').trim().split('\n').slice(0, 3).join(' ') : null;
+}
+
+/**
+ * Web Scraper API, synchronous form: structured records for a few inputs. A 202 means the job is still running;
+ * then poll progress and download the snapshot. Records can carry `error` / `error_code` inside a 200.
+ */
+export async function scrapeDataset(datasetId: string, input: Record<string, unknown>[], timeoutMs = 240_000): Promise<Record<string, any>[]> {
+  const headers = { Authorization: `Bearer ${brightDataToken()}`, 'Content-Type': 'application/json' };
+  const res = await fetch(`${API}/datasets/v3/scrape?dataset_id=${encodeURIComponent(datasetId)}&format=json&include_errors=true`, { method: 'POST', headers, body: JSON.stringify({ input }) });
+  if (res.status === 200) return (await res.json()) as Record<string, any>[];
+  if (res.status !== 202) throw new BrightDataError(`Web Scraper API answered HTTP ${res.status}.`, res.status);
+  const { snapshot_id: snapshotId } = (await res.json()) as { snapshot_id: string };
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, 7000));
+    const p = await fetch(`${API}/datasets/v3/progress/${snapshotId}`, { headers });
+    const status = ((await p.json()) as { status?: string }).status;
+    if (status === 'failed') throw new BrightDataError('The scraper job failed.');
+    if (status === 'ready') {
+      const d = await fetch(`${API}/datasets/v3/snapshot/${snapshotId}?format=json`, { headers });
+      if (d.status === 200) return (await d.json()) as Record<string, any>[];
+    }
+  }
+  throw new BrightDataError('The scraper job did not finish in time.');
 }

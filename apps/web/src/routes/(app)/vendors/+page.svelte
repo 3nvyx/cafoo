@@ -2,6 +2,7 @@
 	import { db } from '#lib/data/index.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import { normId, parsePayload } from '#lib/data/payload.js';
+	import FootprintChip from '#lib/components/FootprintChip.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { STATUS, VERIFICATION, drill } from '#lib/labels.js';
@@ -37,9 +38,10 @@
 				<div class="min-w-0">
 					<p class="flex items-center gap-2 font-medium">
 						{#if v.verification === 'blocked'}<Icon name="alert" size={18} class="shrink-0 text-neg" />{/if}
-						<span class="truncate">{v.name}</span>
+						<a class="drill -my-2.5 truncate py-2.5" href="/vendors/{v.id}">{v.name}</a>
 					</p>
 					<p class="text-sm text-ink-3">{v.category}{#if ui.expert}<span class="num"> · {v.id}</span>{/if}</p>
+					<FootprintChip kind="vendor" id={v.id} class="max-w-full" />
 				</div>
 				<span class="justify-self-end md:justify-self-start"><Pill tone={VERIFICATION[v.verification].tone}>{VERIFICATION[v.verification].label}</Pill></span>
 				<span class="text-sm text-ink-2 md:text-[15px]">{openCount} open bill{openCount === 1 ? '' : 's'}</span>
