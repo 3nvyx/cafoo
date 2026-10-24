@@ -1,0 +1,8 @@
+id: ledger-bank-match-payment-entries
+agent: ledger
+severity: block
+description: Ledger integrity, across all agents. Every invoice or bill bank match carries the payment entry it posted, and no match outlives the reversal of its payment entry.
+assertions:
+  - type: check
+    label: bank matches keep a live payment entry
+    name: bank_match_payment_entries

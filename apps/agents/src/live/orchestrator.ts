@@ -5,14 +5,23 @@
  * calling another role's tools or breaking a charter rule (belt); the database reducers check identity (braces).
  */
 import { query, type AgentDefinition, type HookCallback, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
-import { type Cast } from '../stdb';
+import { sleep, type Cast } from '../stdb';
 import { advisorServer, booksServer, crsServer, workerServer } from './tools';
 import { startCritic } from '../redteam';
-import { agentPrompt, HARNESSES, modelFor, WORKERS, type WorkerRole } from '../harness';
+import { agentPrompt, HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from '../harness';
 import { harnessGate } from '../harness/hook';
 import { BOOKS_TOOLS, mcp } from '../harness/rules';
+import { catchUpAmounts } from '../revenue-catchup';
+import { snapshot } from '../snapshot';
 
 const ADVISOR = HARNESSES.advisor;
+const safeJson = (s: string): Record<string, unknown> => {
+  try {
+    return JSON.parse(s) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+};
 
 /** A worker subagent exactly as its harness declares it. */
 function subagent(role: WorkerRole): AgentDefinition {
@@ -40,6 +49,9 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     context: () => ({
       proposalStatus: id => (/^\d+$/.test(id) ? A.db.proposal.id.find(BigInt(id))?.status.tag : undefined),
       accountCodes: [...A.db.account.iter()].map(a => a.code),
+      pendingProposals: [...A.db.proposal.iter()]
+        .filter(p => ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag))
+        .map(p => ({ kind: p.kind.tag.replace(/[A-Z]/g, (c, i) => `${i ? '_' : ''}${c.toLowerCase()}`) as ProposalKind, payload: safeJson(p.payloadJson) })),
     }),
     onDeny: (agent, tool, why) => onStep(`gate denied ${agent} ${tool}: ${why.slice(0, 200)}`),
   });
@@ -60,9 +72,10 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // The root pre-approves every harness tool so subagents can use theirs under dontAsk; the gate keeps each to its own list.
   const allowedTools = [...new Set([ADVISOR, ...WORKERS.map(r => HARNESSES[r])].flatMap(h => h.tools))];
   let total = 0;
-  try {
+  /** One Advisor query over the same servers, subagents and gate. */
+  const run = async (prompt: string) => {
     for await (const msg of query({
-      prompt: `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification). Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`,
+      prompt,
       options: {
         model: modelFor(ADVISOR),
         systemPrompt: agentPrompt(ADVISOR),
@@ -89,9 +102,37 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
           if (block.type === 'tool_use') onStep(`tool ${block.name}`);
         }
       } else if (msg.type === 'result') {
-        total = (msg as any).total_cost_usd ?? 0;
+        total += (msg as any).total_cost_usd ?? 0;
         onStep(`done (${(msg as any).subtype}), cost $${total.toFixed(2)}`);
       }
+    }
+  };
+  const periodId = [...A.db.period.iter()].find(p => p.ym === periodYm)?.id;
+  const pendingSchedules = () =>
+    [...A.db.proposal.iter()].filter(p => p.periodId === periodId && p.kind.tag === 'RevenueSchedule' && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag));
+  try {
+    await run(
+      `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification). Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
+    );
+    // Revenue catch-up, as in the scripted close: the recognition entry had to leave out any customer whose new
+    // schedule waited for a ruling. Once those schedules are decided, recognize their lines through the month.
+    if (pendingSchedules().length) {
+      if (process.env.CLOSE_NO_WAIT === '1') {
+        onStep('revenue schedules still wait for the CFO; their revenue catch-up rolls into the next close');
+        return { costUsd: total };
+      }
+      onStep('waiting for the CFO to decide the revenue schedules before the revenue catch-up');
+      const start = Date.now();
+      while (pendingSchedules().length && Date.now() - start < 45 * 60_000) await sleep(2000);
+    }
+    const s = snapshot(A, periodYm);
+    const due = catchUpAmounts(A, s);
+    if (due.size) {
+      const lines = [...due].map(([cid, amt]) => `${s.customerName.get(cid) ?? 'customer'} (customerId ${cid}): ${amt} minor units`).join('; ');
+      onStep(`revenue catch-up for ${due.size} customer(s)`);
+      await run(
+        `Revenue catch-up for ${periodYm}: the revenue schedules for these customers were approved after the recognition entry had to leave them out: ${lines}. Delegate to revenue: propose one recognition journal entry for ${periodYm} with recognizeScheduleYm ${periodYm} that, for each customer, debits 2400 and credits 4000 by exactly that amount on lines tagged with the customerId. Then list proposals, consider the critique, rule on it, and request the lock (the books refuse the lock until this revenue is recognized).`
+      );
     }
   } finally {
     stopCritic();

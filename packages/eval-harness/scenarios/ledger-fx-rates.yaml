@@ -1,0 +1,8 @@
+id: ledger-fx-rates
+agent: ledger
+severity: block
+description: Ledger integrity, across all agents. Journal lines in the subsidiary's own currency are at FX rate 1.0 (1000000); a foreign-currency line uses a rate recorded for its currency pair and its entry's month.
+assertions:
+  - type: check
+    label: every journal line's FX rate is 1.0 at home or a recorded rate abroad
+    name: fx_rates_recorded

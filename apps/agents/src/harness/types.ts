@@ -9,7 +9,7 @@ export type Role = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam';
 export type WorkerRole = 'bookkeeper' | 'revenue' | 'credit';
 
 /** Proposal kinds as the module stores them. */
-export type ProposalKind = 'journal_entry' | 'accrual' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'vendor_block';
+export type ProposalKind = 'journal_entry' | 'accrual' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'vendor_block' | 'vendor_verify';
 
 /** A numbered charter line ("May 2", "Must never 3", "Escalates 1") or the Plain summary rule. */
 export type CharterLine = `May ${number}` | `Must never ${number}` | `Escalates ${number}` | 'Plain summary';
@@ -29,8 +29,10 @@ export interface RuleContext {
   proposalStatus?: (proposalId: string) => string | undefined;
   /** Chart-of-accounts codes, for the Plain summary rule. Falls back to a code-shaped pattern when absent. */
   accountCodes?: readonly string[];
-  /** Earlier calls this agent made in the same run that the gate let through, oldest first. */
+  /** Earlier calls this agent made in the same run that succeeded, oldest first. */
   history?: readonly ToolCall[];
+  /** Proposals still waiting for a ruling or the CFO (open, awaiting the CFO, sent back), with their payloads. */
+  pendingProposals?: readonly { kind: ProposalKind; payload: Record<string, unknown> }[];
 }
 
 export type Verdict = { allow: true } | { allow: false; reason: string };

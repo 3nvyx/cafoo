@@ -1,0 +1,9 @@
+id: advisor-material-entries-confirmed
+agent: advisor
+charter_line: "Never post anything at or above the materiality threshold yourself: it waits for the CFO."
+severity: block
+description: Every agent-proposed entry whose raw debits, raw credits or converted debits reach the materiality threshold posted with the CFO's confirmation on its Approval.
+assertions:
+  - type: check
+    label: material entries carry a CFO confirmation
+    name: material_entries_confirmed

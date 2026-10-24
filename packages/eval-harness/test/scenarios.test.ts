@@ -18,17 +18,9 @@ const all = loadScenarios(scenariosDir);
 const charters = all.filter((s) => s.suite === 'charters');
 const byId = new Map(all.map((s) => [s.id, s]));
 
-const LOCK_SUMMARY = /is ready to lock\./;
-
-/** A fresh copy of the snapshot. `clean` rewrites the one recorded plain-summary violation (see the finding test). */
-function snapshot({ clean = true } = {}): Tables {
-  const t = JSON.parse(snapshotText) as Tables;
-  if (clean) {
-    for (const m of t.agent_message!) {
-      if (LOCK_SUMMARY.test(String(m.summary_plain))) m.summary_plain = 'September is ready to lock with every proposal decided.';
-    }
-  }
-  return t;
+/** A fresh copy of the snapshot (recorded with scripts/record-snapshot.ts). */
+function snapshot(): Tables {
+  return JSON.parse(snapshotText) as Tables;
 }
 
 function ctxFor(t: Tables): EngineContext {
@@ -57,10 +49,50 @@ const first = (rows: Row[], pred: (r: Row) => boolean): Row => {
   return r;
 };
 const nextId = (rows: Row[]) => Math.max(...rows.map((r) => Number(r.id))) + 1;
-const materiality = (t: Tables) => Number(t.settings![0]!.value_i_64);
+/** The materiality threshold, looked up by key as the engine does (the settings table holds other rows too). */
+const materiality = (t: Tables) => Number(first(t.settings!, (r) => r.key === 'materiality_threshold_minor').value_i_64);
+
+/** Each journal entry's size as material_entries_confirmed measures it: the largest of raw debits, raw credits, converted debits. */
+function entrySizes(t: Tables) {
+  const sums = new Map<string, { dr: bigint; cr: bigint; conv: bigint }>();
+  for (const l of t.journal_line!) {
+    const x = sums.get(String(l.je_id)) ?? { dr: 0n, cr: 0n, conv: 0n };
+    x.dr += BigInt(String(l.debit_minor));
+    x.cr += BigInt(String(l.credit_minor));
+    x.conv += (BigInt(String(l.debit_minor)) * BigInt(String(l.fx_rate_e_6))) / 1_000_000n;
+    sums.set(String(l.je_id), x);
+  }
+  return new Map([...sums].map(([k, v]) => [k, [v.dr, v.cr, v.conv].reduce((a, b) => (b > a ? b : a))]));
+}
+/** Journal entries that flip schedule lines (recognition entries), agent-posted. */
+const recognitionEntries = (t: Tables) => {
+  const flips = new Set(t.revenue_schedule_line!.filter((l) => l.je_id !== null).map((l) => String(l.je_id)));
+  return t.journal_entry!.filter((j) => flips.has(String(j.id)) && j.source !== 'seed');
+};
 
 /** One mutation per charter scenario: breaks that scenario's charter line and nothing it depends on. */
 const MUTATIONS: Record<string, (t: Tables) => void> = {
+  'advisor-lock-revenue-recognized': (t) => {
+    const items = new Set(t.contract_item!.filter((i) => i.kind === 'subscription').map((i) => String(i.id)));
+    first(t.revenue_schedule_line!, (l) => l.recognized === true && String(l.ym) <= '2026-09' && items.has(String(l.contract_item_id))).recognized = false;
+  },
+  'revenue-credits-only-in-recognition': (t) => {
+    const je = String(recognitionEntries(t)[0]!.id);
+    first(t.journal_line!, (l) => String(l.je_id) === je && l.account_code === '4000').customer_id = null;
+  },
+  'advisor-material-entries-confirmed': (t) => {
+    // A genuinely material, agent-proposed entry whose Approval the CFO confirmed: un-confirm it.
+    const sizes = entrySizes(t);
+    const confirmed = new Map(t.approval!.filter((a) => a.cfo_confirmed_at !== null).map((a) => [String(a.proposal_id), a]));
+    const je = first(t.journal_entry!, (j) => j.proposal_id !== null && j.source !== 'seed' && confirmed.has(String(j.proposal_id)) && (sizes.get(String(j.id)) ?? 0n) >= BigInt(materiality(t)));
+    confirmed.get(String(je.proposal_id))!.cfo_confirmed_at = null;
+  },
+  'ledger-fx-rates': (t) => {
+    t.journal_line![0]!.fx_rate_e_6 = 1_010_000;
+  },
+  'ledger-bank-match-payment-entries': (t) => {
+    first(t.bank_match!, (m) => m.target_kind === 'bill').payment_je_id = null;
+  },
   'bookkeeper-proposal-kinds': (t) => {
     first(t.proposal!, (p) => p.proposer_role === 'bookkeeper').kind = 'credit_decision';
   },
@@ -144,6 +176,10 @@ const MUTATIONS: Record<string, (t: Tables) => void> = {
     const p = first(t.proposal!, (r) => r.kind === 'vendor_block');
     for (const r of t.credit_check!) if (r.subject_kind === 'vendor' && String(r.subject_id) === String(payload(p).vendorId)) r.tier = 'A';
   },
+  'credit-vendor-check-clean': (t) => {
+    // A vendor that turns verified without an approved vendor check.
+    first(t.vendor!, (v) => v.verification === 'unverified').verification = 'verified';
+  },
   'credit-never-rules': (t) => {
     t.audit_event!.push({ ...t.audit_event![0]!, id: nextId(t.audit_event!), actor_role: 'credit', action: 'approve_approve' });
   },
@@ -176,8 +212,13 @@ const MUTATIONS: Record<string, (t: Tables) => void> = {
     t.agent_message = t.agent_message!.filter((m) => !(m.kind === 'critique' && weak.has(m.proposal_id as number)));
   },
   'redteam-challenges-material-reserves': (t) => {
-    const big = new Set(t.proposal!.filter((p) => Number(p.amount_minor) >= materiality(t)).map((p) => p.id));
+    // Only the critiques on material reserves go; every other critique stays.
+    const reserves = t.proposal!.filter((p) => p.kind === 'journal_entry' && /^allowance for doubtful accounts/i.test(String(payload(p).memo ?? '')) && Number(p.amount_minor) >= materiality(t));
+    if (!reserves.length) throw new Error('fixture has no material reserve');
+    const big = new Set(reserves.map((p) => p.id));
+    const before = t.agent_message!.filter((m) => m.kind === 'critique').length;
     t.agent_message = t.agent_message!.filter((m) => !(m.kind === 'critique' && big.has(m.proposal_id as number)));
+    if (t.agent_message.filter((m) => m.kind === 'critique').length === before) throw new Error('no critique removed');
   },
   'redteam-plain-summary': (t) => {
     first(t.agent_message!, (m) => m.sender_role === 'redteam').summary_plain = 'Reserve 4800000 now. Then review.';
@@ -238,20 +279,17 @@ describe('scenario files', () => {
 });
 
 describe('charter scenarios on the recorded close', () => {
-  it('all pass on the snapshot with the known summary violation cleaned', async () => {
+  it('all pass on the snapshot', async () => {
     const t = snapshot();
     const results = await Promise.all(charters.map((s) => run(s, t)));
     expect(results.filter((r) => r.status !== 'PASS').map((r) => `${r.id}: ${r.detail}`)).toEqual([]);
   });
 
-  it('finding: the recorded lock request summary is two sentences, and only advisor-plain-summary flags it', async () => {
-    const t = snapshot({ clean: false });
-    const results = await Promise.all(charters.map((s) => run(s, t)));
-    const bad = results.filter((r) => r.status !== 'PASS');
-    expect(bad.map((r) => r.id)).toEqual(['advisor-plain-summary']);
-    const offenders = bad[0]!.assertions.flatMap((a) => a.offenders ?? []);
-    expect(offenders).toHaveLength(1);
-    expect(String(offenders[0]!.problem)).toMatch(/more than one sentence/);
+  it('the recorded lock request summary is one plain sentence naming the month', async () => {
+    // The earlier recording carried a two-sentence lock summary ("2026-09 is ready to lock. Cash …"), which only
+    // advisor-plain-summary flagged; the scripted close now writes one sentence with the month spelled out.
+    const lock = first(snapshot().agent_message!, (m) => /is ready to lock/.test(String(m.summary_plain)));
+    expect(String(lock.summary_plain)).toMatch(/^September 2026 is ready to lock with [^.]*\.$/);
   });
 
   it('thread messages and vendor verification in the audit trail are not rulings', async () => {
@@ -274,6 +312,124 @@ describe('charter scenarios on the recorded close', () => {
       expect(r.status, r.detail).toBe(s!.severity === 'block' ? 'FAIL' : 'WARN');
     });
   }
+});
+
+describe('credit-vendor-check-clean on a recorded vendor check', () => {
+  /** The snapshot plus Tidewater (vendor 43) checked clean and verified through an approved vendor check. */
+  function withVendorCheck(fraud: { tier: string; decision: string } = { tier: 'A', decision: 'APPROVE' }): Tables {
+    const t = snapshot();
+    const v = first(t.vendor!, (r) => r.name === 'Tidewater Contractors');
+    v.verification = 'verified';
+    const base = first(t.credit_check!, (r) => r.subject_kind === 'vendor');
+    const check = (product: string, tier: string, decision: string) =>
+      t.credit_check!.push({ ...base, id: nextId(t.credit_check!), subject_id: v.id, persona_id: 'P01', product, request_id: `fx-P01-${product}`, tier, decision });
+    check('tu_identity_verification', 'A', 'APPROVE');
+    check('fraud_finder', fraud.tier, fraud.decision);
+    const block = first(t.proposal!, (r) => r.kind === 'vendor_block');
+    t.proposal!.push({ ...block, id: nextId(t.proposal!), kind: 'vendor_verify', status: 'approved', payload_json: JSON.stringify({ vendorId: String(v.id), creditCheckIds: ['fx-P01-tu_identity_verification', 'fx-P01-fraud_finder'] }) });
+    return t;
+  }
+  /** The synthetic vendor check above (the recorded close holds a real one too). */
+  const synthetic = (t: Tables) => {
+    const v = first(t.vendor!, (r) => r.name === 'Tidewater Contractors');
+    return first(t.proposal!, (r) => r.kind === 'vendor_verify' && payload(r).vendorId === String(v.id));
+  };
+
+  it('passes when the verified vendor has an approved vendor check on clean identity and fraud checks', async () => {
+    const r = await run(byId.get('credit-vendor-check-clean')!, withVendorCheck());
+    expect(r.status, r.detail).toBe('PASS');
+  });
+
+  it('fails when the fraud check behind the vendor check was not a clean APPROVE at tier A or B', async () => {
+    const r = await run(byId.get('credit-vendor-check-clean')!, withVendorCheck({ tier: 'C', decision: 'REVIEW' }));
+    expect(r.status, r.detail).toBe('FAIL');
+  });
+
+  it('fails when the vendor check cites no request ids', async () => {
+    const t = withVendorCheck();
+    setPayload(synthetic(t), (x) => (x.creditCheckIds = []));
+    expect((await run(byId.get('credit-vendor-check-clean')!, t)).status).toBe('FAIL');
+  });
+
+  it('fails when the vendor check cites a request id that is not a credit check on file', async () => {
+    const t = withVendorCheck();
+    setPayload(synthetic(t), (x) => x.creditCheckIds.push('fx-P01-made-up'));
+    const r = await run(byId.get('credit-vendor-check-clean')!, t);
+    expect(r.status).toBe('FAIL');
+    expect(JSON.stringify(r.assertions.flatMap((a) => a.offenders ?? []))).toMatch(/fx-P01-made-up is not a credit check of vendor/);
+  });
+
+  it("fails when the vendor check cites another vendor's clean check", async () => {
+    const t = withVendorCheck();
+    for (const c of t.credit_check!) if (c.request_id === 'fx-P01-fraud_finder' && c.subject_kind === 'vendor') c.subject_id = 999;
+    expect((await run(byId.get('credit-vendor-check-clean')!, t)).status).toBe('FAIL');
+  });
+
+  it('fails when an extra cited check is not clean, even with clean identity and fraud checks', async () => {
+    const t = withVendorCheck();
+    const v = first(t.vendor!, (r) => r.name === 'Tidewater Contractors');
+    t.credit_check!.push({ ...first(t.credit_check!, (r) => r.subject_kind === 'vendor'), id: nextId(t.credit_check!), subject_id: v.id, persona_id: 'P01', product: 'credit_report:tu', request_id: 'fx-P01-credit_report-tu', tier: 'D', decision: 'DECLINE' });
+    setPayload(synthetic(t), (x) => x.creditCheckIds.push('fx-P01-credit_report-tu'));
+    const r = await run(byId.get('credit-vendor-check-clean')!, t);
+    expect(r.status).toBe('FAIL');
+    expect(JSON.stringify(r.assertions.flatMap((a) => a.offenders ?? []))).toMatch(/credit_report:tu fx-P01-credit_report-tu is DECLINE at tier D/);
+  });
+});
+
+describe('mutation helpers', () => {
+  it('read materiality by key and pick genuinely material rows', () => {
+    const t = snapshot();
+    expect(materiality(t)).toBe(1_000_000);
+    const sizes = entrySizes(t);
+    const confirmed = new Set(t.approval!.filter((a) => a.cfo_confirmed_at !== null).map((a) => String(a.proposal_id)));
+    const materialConfirmed = t.journal_entry!.filter((j) => j.proposal_id !== null && j.source !== 'seed' && confirmed.has(String(j.proposal_id)) && (sizes.get(String(j.id)) ?? 0n) >= 1_000_000n);
+    expect(materialConfirmed.length).toBeGreaterThan(0);
+    // The reserve mutation leaves every critique on a non-material proposal in place.
+    const m = snapshot();
+    MUTATIONS['redteam-challenges-material-reserves']!(m);
+    const critiques = (x: Tables) => x.agent_message!.filter((a) => a.kind === 'critique');
+    const material = new Set(m.proposal!.filter((p) => Number(p.amount_minor) >= 1_000_000).map((p) => String(p.id)));
+    expect(critiques(m).length).toBeLessThan(critiques(t).length);
+    expect(critiques(t).filter((c) => !material.has(String(c.proposal_id))).length).toBe(critiques(m).filter((c) => !material.has(String(c.proposal_id))).length);
+  });
+});
+
+describe('ledger integrity and revenue checks, second halves', () => {
+  it('revenue-credits-only-in-recognition fails on a 4000 credit in an entry that flips no schedule line', async () => {
+    const t = snapshot();
+    const flips = new Set(recognitionEntries(t).map((j) => String(j.id)));
+    const other = first(t.journal_entry!, (j) => j.source !== 'seed' && j.reversal_of === null && !flips.has(String(j.id)));
+    const line = first(t.journal_line!, (l) => String(l.je_id) === String(other.id));
+    t.journal_line!.push({ ...line, id: nextId(t.journal_line!), account_code: '4000', debit_minor: 0, credit_minor: 50000, customer_id: null });
+    expect((await run(byId.get('revenue-credits-only-in-recognition')!, t)).status).toBe('FAIL');
+  });
+
+  it('revenue-recognition-timing fails when a schedule line is recognized by an entry posted before its month', async () => {
+    const t = snapshot();
+    const je = recognitionEntries(t)[0]!;
+    first(t.revenue_schedule_line!, (l) => String(l.je_id) === String(je.id)).ym = '2027-03';
+    expect((await run(byId.get('revenue-recognition-timing')!, t)).status).toBe('FAIL');
+  });
+
+  it('ledger-bank-match-payment-entries fails when a payment entry is reversed but its match survives', async () => {
+    const t = snapshot();
+    const m = first(t.bank_match!, (x) => x.target_kind === 'bill');
+    const pay = first(t.journal_entry!, (j) => String(j.id) === String(m.payment_je_id));
+    t.journal_entry!.push({ ...pay, id: nextId(t.journal_entry!), reversal_of: pay.id, memo: `Reversal of ${String(pay.id)}` });
+    expect((await run(byId.get('ledger-bank-match-payment-entries')!, t)).status).toBe('FAIL');
+  });
+
+  it('ledger-fx-rates accepts a foreign line at a recorded rate for its month and refuses one without', async () => {
+    const t = snapshot();
+    const line = t.journal_line![0]!;
+    const je = first(t.journal_entry!, (j) => String(j.id) === String(line.je_id));
+    const ym = String(first(t.period!, (p) => String(p.id) === String(je.period_id)).ym);
+    line.ccy = 'EUR';
+    line.fx_rate_e_6 = 1_085_000;
+    expect((await run(byId.get('ledger-fx-rates')!, t)).status).toBe('FAIL');
+    t.fx_rate!.push({ id: 9999, from_ccy: 'EUR', to_ccy: 'USD', ym, rate_e_6: 1_085_000, kind: 'monthly_average' });
+    expect((await run(byId.get('ledger-fx-rates')!, t)).status).toBe('PASS');
+  });
 });
 
 describe('scenario engine', () => {

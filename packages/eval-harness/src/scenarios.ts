@@ -6,6 +6,12 @@ import type { CondMap } from './conditions.js';
 
 export const AGENTS = ['advisor', 'bookkeeper', 'revenue', 'credit', 'redteam'] as const;
 export type Agent = (typeof AGENTS)[number];
+/**
+ * Cross-cutting ledger-integrity scenarios (FX rates, bank-match payment entries) that belong to no single agent's
+ * charter: `agent: ledger`, no `charter_line`. Everything else about them is a normal charters-suite scenario.
+ */
+export const LEDGER = 'ledger' as const;
+export type ScenarioAgent = Agent | typeof LEDGER;
 export type Severity = 'block' | 'warn';
 export type Suite = 'charters' | 'personas';
 
@@ -28,7 +34,8 @@ export type Assertion =
 
 export interface Scenario {
   id: string;
-  agent: Agent;
+  agent: ScenarioAgent;
+  /** Verbatim charter text; empty for ledger scenarios. */
   charter_line: string;
   severity: Severity;
   suite: Suite;
@@ -46,10 +53,12 @@ export class ScenarioError extends Error {}
 function validate(raw: Record<string, unknown>, file: string, defaults: Record<string, unknown>): Scenario {
   const s = { ...defaults, ...raw } as Record<string, unknown>;
   const where = `${basename(file)}${s.id ? ` (${String(s.id)})` : ''}`;
-  for (const k of ['id', 'agent', 'charter_line', 'severity', 'assertions']) {
+  const ledger = s.agent === LEDGER;
+  for (const k of ['id', 'agent', ...(ledger ? [] : ['charter_line']), 'severity', 'assertions']) {
     if (s[k] === undefined || s[k] === '') throw new ScenarioError(`${where}: missing \`${k}\``);
   }
-  if (!AGENTS.includes(s.agent as Agent)) throw new ScenarioError(`${where}: agent must be one of ${AGENTS.join(', ')}`);
+  if (!ledger && !AGENTS.includes(s.agent as Agent)) throw new ScenarioError(`${where}: agent must be one of ${AGENTS.join(', ')}, or ${LEDGER}`);
+  if (ledger && s.charter_line) throw new ScenarioError(`${where}: a ${LEDGER} scenario quotes no charter line`);
   if (s.severity !== 'block' && s.severity !== 'warn') throw new ScenarioError(`${where}: severity must be block or warn`);
   const suite = (s.suite ?? 'charters') as Suite;
   if (suite !== 'charters' && suite !== 'personas') throw new ScenarioError(`${where}: suite must be charters or personas`);
@@ -59,8 +68,8 @@ function validate(raw: Record<string, unknown>, file: string, defaults: Record<s
   }
   return {
     id: String(s.id),
-    agent: s.agent as Agent,
-    charter_line: String(s.charter_line).trim(),
+    agent: s.agent as ScenarioAgent,
+    charter_line: ledger ? '' : String(s.charter_line).trim(),
     severity: s.severity as Severity,
     suite,
     description: s.description ? String(s.description) : undefined,

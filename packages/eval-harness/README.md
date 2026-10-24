@@ -32,10 +32,11 @@ Never weaken an assertion to make a run pass; a failing charter scenario means a
 Add the rule to the agent's charter first; write charters as instructions to the agent (they are live-mode prompts too).
 Create `scenarios/<agent>-<rule>.yaml` with `id` (unique, same as the file stem), `agent` (advisor, bookkeeper, revenue, credit, redteam), `charter_line`, `severity` (block or warn), optional `description`, and `assertions`.
 `charter_line` must be a verbatim substring of the charter file (whitespace and list numbers ignored); otherwise the scenario errors.
+A cross-cutting ledger-integrity rule that belongs to no agent's charter (FX rates, bank-match payment entries) uses `agent: ledger` and no `charter_line`; name the file `ledger-<rule>.yaml`. It is a charters-suite scenario in every other way, mutation included.
 Use `severity: warn` only when the rule depends on what the seed happens to contain.
 A file may instead hold `scenarios:` (a list) plus shared top-level defaults, as `personas.yaml` does; set `suite: personas` for DB-free cascade scenarios (default `charters`).
 Add a mutation for the new id to `MUTATIONS` in `test/scenarios.test.ts` that breaks exactly that rule on the recorded snapshot; the test suite fails if a charter scenario has none.
-Refresh `test/fixtures/ledger-snapshot.json` only from a clean scripted close, then make sure the baseline test still passes.
+Refresh `test/fixtures/ledger-snapshot.json` only from a clean scripted close, with `node --conditions=source --import tsx scripts/record-snapshot.ts --db <name>` from this package: it reseeds that database, runs the waiting-mode close with the demo CFO stand-in (`apps/agents/src/demo-cfo.ts`) confirming material rulings until the lock is requested, and dumps the tables the scenarios read. `--db` is required because the database is reset, and the demo CFO takes that database's CFO seat. Then make sure the baseline test still passes.
 
 ## SQL the endpoint accepts
 
@@ -54,7 +55,7 @@ Tables and columns are snake_case. Rows are decoded from `--format json`: enums 
 `sql_anti_join {left: {sql, where?, key}, right: side or list of sides, expect_rows (default 0)}`: left rows with no matching key on any right side are offenders.
 `sql_semi_join {...same}`: left rows that do have a matching key are offenders.
 `cascade_decision {persona, expect, expect_tier?, subject_kind?, as_of?}`: runs `runCascade` in forced replay mode (never live, whatever `CRS_*` says); `expect` must also equal the dataset's `expected_decision`.
-`check {name, params?}`: a named check in `src/checks.ts` for rules needing several tables, payload arithmetic, time order, or the cascade: `revenue_schedule_sums`, `revenue_schedule_within_term`, `no_early_recognition`, `annual_contracts_scheduled`, `credit_full_cascade`, `credit_request_ids_cited`, `credit_tier_matches_cascade`, `critique_before_ruling`, `plain_summary_clean {sql, where?, column}`, `single_ruling_per_proposal`, `done_tasks_ruled`.
+`check {name, params?}`: a named check in `src/checks.ts` for rules needing several tables, payload arithmetic, time order, or the cascade: `revenue_schedule_sums`, `revenue_schedule_within_term`, `no_early_recognition`, `annual_contracts_scheduled`, `credit_full_cascade`, `credit_request_ids_cited`, `credit_tier_matches_cascade`, `vendor_check_cites_clean_checks`, `critique_before_ruling`, `plain_summary_clean {sql, where?, column}`, `single_ruling_per_proposal`, `done_tasks_ruled`, `lock_revenue_recognized`, `revenue_credits_only_in_recognition`, `material_entries_confirmed`, `fx_rates_recorded`, `bank_match_payment_entries`.
 Every assertion takes an optional `label` for the report.
 
 ## Conditions (`where`, `require`, join sides)

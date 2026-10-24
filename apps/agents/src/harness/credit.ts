@@ -1,5 +1,5 @@
-/** Credit & Risk harness: credit decisions, reserves and vendor blocks from persona-only cascades with request ids. */
-import { PLAIN_RULE, BOOKS_TOOLS, CRS_TOOLS, allow, arr, baseName, deny, kindAllowed, mcp, noPosting, noRulings, obj, plainSummaryRule, rule, str } from './rules';
+/** Credit & Risk harness: credit decisions, reserves, vendor blocks and vendor checks from persona-only cascades with request ids. */
+import { PLAIN_RULE, BOOKS_TOOLS, CRS_TOOLS, allow, arr, baseName, deny, idKey, kindAllowed, mcp, noPosting, noRulings, obj, plainSummaryRule, rule, str } from './rules';
 import type { Harness, ToolCall } from './types';
 
 /** The CRS sandbox personas, as packages/crs-mcp accepts them (either case). */
@@ -12,9 +12,6 @@ const RESERVE_MEMO = /^allowance for doubtful accounts/i;
 const RESERVE_ACCOUNTS = new Set(['5700', '1150']);
 const PERSONA_TOOLS = new Set(['run_credit_cascade', 'record_credit_check', ...CRS_TOOLS]);
 
-/** A row id as the module stores it (u64): digits only, compared without leading zeros. Undefined when not an id. */
-const idKey = (v: unknown) => (/^\d+$/.test(str(v)) ? BigInt(str(v)).toString() : undefined);
-
 /** Credit checks this agent recorded earlier in the run for one subject. */
 const recorded = (history: readonly ToolCall[], subjectKind: 'customer' | 'vendor', subjectId: string) =>
   history.filter(c => baseName(c.tool) === 'record_credit_check' && str(c.input.subjectKind) === subjectKind && idKey(c.input.subjectId) === subjectId).map(c => c.input);
@@ -22,16 +19,16 @@ const recorded = (history: readonly ToolCall[], subjectKind: 'customer' | 'vendo
 export const credit: Harness = {
   role: 'credit',
   charterFile: 'credit.md',
-  fallbackPrompt: `You are Credit & Risk. For every customer with open receivables, run run_credit_cascade on the guarantor persona, record each evidence row with record_credit_check, propose a credit_decision (tier and terms), and use allowance_target to propose an allowance journal entry (Dr 5700 Bad Debt Expense / Cr 1150 Allowance) for the delta when it is not zero. For every unverified vendor with an owner persona, run the cascade as vendor_owner and propose a vendor_block when the tier is BLOCK. Only persona ids are ever sent to the credit API. You never post; you only propose. ${PLAIN_RULE}`,
-  description: 'Guarantor and vendor credit cascades, risk tiers, allowances, vendor blocks. Proposes only.',
+  fallbackPrompt: `You are Credit & Risk. For every customer with open receivables, run run_credit_cascade on the guarantor persona, record each evidence row with record_credit_check, propose a credit_decision (tier and terms), and use allowance_target to propose an allowance journal entry (Dr 5700 Bad Debt Expense / Cr 1150 Allowance) for the delta when it is not zero. For every unverified vendor with an owner persona, run the cascade as vendor_owner and propose a vendor_block when the tier is BLOCK, or a vendor check (propose_vendor_verify, citing the identity and fraud request ids) when it comes back APPROVE at tier A or B. Only persona ids are ever sent to the credit API. You never post; you only propose. ${PLAIN_RULE}`,
+  description: 'Guarantor and vendor credit cascades, risk tiers, allowances, vendor blocks and vendor checks. Proposes only.',
   model: { env: 'WORKER_MODEL', default: 'sonnet' },
   tools: [
     'SendMessage',
-    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'record_credit_check', 'run_credit_cascade', 'post_message', 'update_close_task']),
+    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'propose_vendor_verify', 'record_credit_check', 'run_credit_cascade', 'post_message', 'update_close_task']),
     ...mcp('books', BOOKS_TOOLS),
     ...mcp('crs', CRS_TOOLS),
   ],
-  proposalKinds: ['credit_decision', 'journal_entry', 'vendor_block'],
+  proposalKinds: ['credit_decision', 'journal_entry', 'vendor_block', 'vendor_verify'],
   maxTurns: 60,
   rules: [
     rule(
@@ -44,7 +41,7 @@ export const credit: Harness = {
         const reserve = RESERVE_MEMO.test(str(call.input.memo)) && lines.length > 0 && lines.every(l => RESERVE_ACCOUNTS.has(str(l.accountCode)));
         return reserve ? allow : deny('Credit & Risk journal entries are reserves only: memo "Allowance for doubtful accounts: ..." on accounts 5700 and 1150');
       },
-      { format: 'Propose only credit decisions, reserves and vendor blocks; a reserve is a propose_journal_entry with memo "Allowance for doubtful accounts: <customer> (tier <T>)" and lines on 5700 and 1150 only.' }
+      { format: 'Propose only credit decisions, reserves, vendor blocks and vendor checks (propose_vendor_verify); a reserve is a propose_journal_entry with memo "Allowance for doubtful accounts: <customer> (tier <T>)" and lines on 5700 and 1150 only.' }
     ),
     noPosting('credit.never.1', 'Must never 1'),
     rule(
@@ -107,6 +104,31 @@ export const credit: Harness = {
       }
     ),
     noRulings('credit.never.5', 'Must never 5'),
+    rule(
+      'credit.never.6',
+      'Must never 6',
+      (call, ctx) => {
+        if (baseName(call.tool) !== 'propose_vendor_verify') return allow;
+        const vendorId = idKey(call.input.vendorId);
+        if (!vendorId) return deny(`vendorId must be the numeric vendor id; got "${str(call.input.vendorId)}"`);
+        const ids = arr(call.input.creditCheckRequestIds).map(str);
+        if (!ids.length || ids.some(id => !id.trim())) return deny("a vendor check cites the request ids of the owner's identity and fraud checks (creditCheckRequestIds)");
+        if (!ctx.history) return allow;
+        const cited = recorded(ctx.history, 'vendor', vendorId).filter(c => ids.includes(str(c.requestId)));
+        const foreign = ids.filter(id => !cited.some(c => str(c.requestId) === id));
+        if (foreign.length) return deny(`cite only request ids you recorded with record_credit_check for vendor ${vendorId}; not recorded: ${foreign.join(', ')}`);
+        const clean = (c: Record<string, unknown>) => str(c.decision).toUpperCase() === 'APPROVE' && ['A', 'B'].includes(str(c.tier));
+        const dirty = cited.filter(c => !clean(c)).map(c => `${str(c.product)} ${str(c.decision)} at tier ${str(c.tier)}`);
+        if (dirty.length) return deny(`a vendor check stands only on APPROVE at tier A or B; cited ${dirty.join(', ')}`);
+        const missing = GATE_PRODUCTS.filter(p => !cited.some(c => str(c.product) === p));
+        return missing.length ? deny(`a vendor check cites the owner's identity and fraud checks; missing ${missing.join(', ')} for vendor ${vendorId}`) : allow;
+      },
+      {
+        format:
+          "propose_vendor_verify (a vendor check) only after record_credit_check stored that vendor owner's tu_identity_verification and fraud_finder checks with APPROVE at tier A or B; creditCheckRequestIds lists those request ids, and every cited check is such a clean APPROVE.",
+        partial: { scenario: 'credit-vendor-check-clean.yaml', rest: 'a vendor turns verified only through an approved vendor check standing on clean checks on file' },
+      }
+    ),
     rule(
       'credit.escalates.2',
       'Escalates 2',

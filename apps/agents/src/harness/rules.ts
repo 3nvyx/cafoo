@@ -23,6 +23,7 @@ export const PROPOSE_TOOLS: Record<string, ProposalKind> = {
   propose_revenue_schedule: 'revenue_schedule',
   propose_credit_decision: 'credit_decision',
   propose_vendor_block: 'vendor_block',
+  propose_vendor_verify: 'vendor_verify',
 };
 
 /** approve_proposal is the only tool call that can post a Journal Entry (below the Materiality threshold). */
@@ -46,6 +47,8 @@ export const rule = (id: string, charter: CharterLine, check: Rule['check'], ext
 export const str = (v: unknown) => (typeof v === 'string' ? v : v === undefined || v === null ? '' : String(v));
 export const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 export const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+/** A row id as the module stores it (u64): digits only, compared without leading zeros. Undefined when not an id. */
+export const idKey = (v: unknown) => (/^\d+$/.test(str(v)) ? BigInt(str(v)).toString() : undefined);
 
 /** The Proposal kind a call would create, or undefined for any other tool. */
 export const proposalKindOf = (call: ToolCall): ProposalKind | undefined => PROPOSE_TOOLS[baseName(call.tool)];
@@ -57,6 +60,7 @@ const kindWords: Record<ProposalKind, string> = {
   revenue_schedule: 'revenue schedules',
   credit_decision: 'credit decisions',
   vendor_block: 'vendor blocks',
+  vendor_verify: 'vendor checks',
 };
 
 /** Shared check behind every "You may propose X, and nothing else" line. */
@@ -134,7 +138,7 @@ export function plainSummaryProblems(text: string, accountCodes?: readonly strin
   return problems;
 }
 
-/** Fields that carry plain English for the CFO: every summary, and a vendor block's reason. */
+/** Fields that carry plain English for the CFO: every summary, and the reason on a vendor block or vendor check. */
 const PLAIN_FIELDS = ['summaryPlain', 'reasonPlain'] as const;
 
 /** The Plain summary rule over every call that carries a plain field. */

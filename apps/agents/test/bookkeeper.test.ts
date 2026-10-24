@@ -24,6 +24,7 @@ const accrual = (rationale: string) =>
     ...base,
     memo: 'Accrue Northwind work for 2026-09',
     amountMinor: '820000',
+    reversesInYm: '2026-10',
     lines: [
       { accountCode: '5600', debitMinor: '820000', creditMinor: '0' },
       { accountCode: '2100', debitMinor: '0', creditMinor: '820000' },
@@ -47,6 +48,8 @@ ruleSuite(h, {
     deny: [
       { call: call('mcp__bookkeeper__propose_revenue_schedule', { ...base, contractItemId: '1', customerId: '1', lines: [], totalMinor: '0' }), why: /nothing else, not revenue schedules/ },
       { call: call('mcp__bookkeeper__propose_vendor_block', { ...base, vendorId: '3', reasonPlain: 'x', exposureMinor: '0' }), why: /vendor blocks/ },
+      { call: { ...accrual('bill NW-311 covers September'), input: { ...accrual('bill NW-311 covers September').input, reversesInYm: '2026-09' } }, why: /reverses in a later month than 2026-09/ },
+      { call: { ...accrual('bill NW-311 covers September'), input: { ...accrual('bill NW-311 covers September').input, reversesInYm: undefined } }, why: /reversesInYm is ""/ },
     ],
   },
   'bookkeeper.may.2': {
@@ -81,11 +84,13 @@ ruleSuite(h, {
     allow: [
       { call: batch([9000, 8000]) },
       { call: entry({}) },
+      { call: entry({ lines: [{ accountCode: '2000', debitMinor: '4500', creditMinor: '0', vendorId: '12' }, { accountCode: '1000', debitMinor: '0', creditMinor: '4500' }] }) },
       { call: accrual("Northwind's bill NW-311 covers September work but is dated October.") },
       { call: accrual('Bill TWC-202609 covers September work but is dated after month end.') },
     ],
     deny: [
       { call: entry({ bankTxIds: undefined }), why: /bankTxIds/ },
+      { call: entry({ lines: [{ accountCode: '2000', debitMinor: '4500', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '4500' }] }), why: /2000 Accounts Payable names its vendor/ },
       { call: entry({ bankTxIds: [] }), why: /bankTxIds/ },
       { call: accrual('Work done in September, billed later.'), why: /bill <reference>/ },
       { call: call('mcp__bookkeeper__propose_bank_match', { ...base, matches: [{ bankTxId: '', targetKind: 'bill', targetId: '4', scoreBp: 9000 }] }), why: /bankTxId/ },

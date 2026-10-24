@@ -114,7 +114,7 @@ function renderMarkdown(results: ScenarioResult[], meta: Record<string, unknown>
   if (bad.length) {
     out.push('', '## Failures', '');
     for (const r of bad) {
-      out.push(`### ${r.id} (${r.status})`, '', `Charter line (${r.agent}): "${r.charter_line}"`, '', `File: \`${relative(repoRoot, r.file)}\``, '');
+      out.push(`### ${r.id} (${r.status})`, '', r.charter_line ? `Charter line (${r.agent}): "${r.charter_line}"` : 'Ledger integrity (no single charter line)', '', `File: \`${relative(repoRoot, r.file)}\``, '');
       if (r.error) out.push(`Error: ${r.error}`, '');
       for (const a of r.assertions.filter((x) => !x.pass)) {
         out.push(`- **${a.label}**: ${a.detail}`);

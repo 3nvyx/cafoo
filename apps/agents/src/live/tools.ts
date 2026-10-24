@@ -16,16 +16,22 @@ import {
   type RiskTier,
 } from '@cafoo/ledger-core';
 import { CrsClient, createCrsMcpServer, runCascade } from '@cafoo/crs-mcp';
-import { snapshot } from '../snapshot';
+import { exactAmount, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
 const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 const readOnly = { annotations: { readOnlyHint: true } };
+/**
+ * A row id as the module stores it: "012" becomes "12". Payloads are compared as strings downstream (evals, the web
+ * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id.
+ */
+const id = (v: string) => BigInt(v).toString();
+const optId = (v: string | undefined) => (v ? id(v) : undefined);
 
 const lineSchema = z.object({
-  accountCode: z.string().describe('Chart of accounts code, e.g. 1000 Cash, 1100 Accounts Receivable, 2400 Deferred Revenue, 4000 Subscription Revenue'),
+  accountCode: z.string().describe('Chart of accounts code, e.g. 1000 Cash, 1100 Accounts Receivable, 2000 Accounts Payable (the line needs vendorId), 2400 Deferred Revenue, 4000 Subscription Revenue (credited only in a recognition entry, the line needs customerId), 4100 Usage Revenue'),
   debitMinor: z.string().describe('Debit in minor units (cents) as a decimal string, "0" if credit'),
   creditMinor: z.string().describe('Credit in minor units as a decimal string, "0" if debit'),
   customerId: z.string().optional(),
@@ -107,14 +113,16 @@ export function booksServer(cast: Cast) {
       ),
       tool(
         'score_bank_matches',
-        'Score every unmatched bank transaction of the month against open invoices and bills. Returns candidates with confidence in basis points and bucket: auto (>=7500), review (5000-7499), unmatched.',
+        'Score every unmatched bank transaction of the month against open invoices and bills. Returns candidates with confidence in basis points and bucket: auto (>=7500), review (5000-7499), unmatched. Only candidates whose bank amount equals the invoice or bill exactly are listed as candidates (a bank match must be exact); near-amount ones are listed separately for a journal entry or a human.',
         { periodYm: z.string() },
         async ({ periodYm }) => {
           const s = snapshot(A, periodYm);
           const txs = s.bankTxs.filter(t => !t.matched && s.bankTxRows.find(r => r.id === t.id)?.ym === periodYm);
-          const c = scoreBankMatches(txs, s.invoices, s.bills, { customers: s.customerName, vendors: s.vendorName });
+          const scored = scoreBankMatches(txs, s.invoices, s.bills, { customers: s.customerName, vendors: s.vendorName });
+          const c = scored.filter(x => x.bucket === 'unmatched' || exactAmount(x, s));
+          const nearAmount = scored.filter(x => x.bucket !== 'unmatched' && !exactAmount(x, s));
           const dups = findDuplicatePayments(txs, s.bills);
-          return ok({ candidates: c, duplicatePayments: dups, unexplained: txs.filter(t => !c.some(x => x.bankTxId === t.id && x.bucket !== 'unmatched')).map(t => ({ id: t.id, amountMinor: t.amountMinor, description: t.description, counterparty: t.counterparty })) });
+          return ok({ candidates: c, nearAmount, duplicatePayments: dups, unexplained: txs.filter(t => !scored.some(x => x.bankTxId === t.id && x.bucket !== 'unmatched')).map(t => ({ id: t.id, amountMinor: t.amountMinor, description: t.description, counterparty: t.counterparty })) });
         },
         readOnly
       ),
@@ -179,11 +187,11 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
     tool(
       name,
       desc,
-      { ...common, memo: z.string(), lines: z.array(lineSchema).min(2), amountMinor: z.string().describe('Total of the debits, minor units'), bankTxIds: z.array(z.string()).optional().describe('Bank transactions this entry explains; they get marked matched'), recognizeScheduleYm: z.string().optional(), reversesInYm: z.string().optional() },
+      { ...common, memo: z.string(), lines: z.array(lineSchema).min(2), amountMinor: z.string().describe('Total of the debits, minor units'), bankTxIds: z.array(z.string()).optional().describe('Bank transactions this entry explains; they get marked matched'), recognizeScheduleYm: z.string().optional().describe("Recognition entries only, and required for any net credit to 4000: the month (no later than periodYm) whose unrecognized subscription schedule lines this entry flips. Credit 4000 for each customer exactly that customer's unrecognized subscription lines through this month, tag every 4000 line with customerId, and leave out any customer whose revenue schedule proposal is still waiting for a ruling."), reversesInYm: z.string().optional().describe('Accruals only: a later open month in which the accrual reverses') },
       async a => {
         try {
           const s = snapshot(A, a.periodYm);
-          const p = await propose(worker, A, { kind, payload: { subsidiaryId: s.subsidiary.id.toString(), periodYm: a.periodYm, memo: a.memo, lines: a.lines.map(l => ({ ...l, ccy: 'USD', fxRateE6: '1000000' })), bankTxIds: a.bankTxIds, recognizeScheduleYm: a.recognizeScheduleYm, reversesInYm: a.reversesInYm }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.amountMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          const p = await propose(worker, A, { kind, payload: { subsidiaryId: s.subsidiary.id.toString(), periodYm: a.periodYm, memo: a.memo, lines: a.lines.map(l => ({ ...l, customerId: optId(l.customerId), vendorId: optId(l.vendorId), ccy: 'USD', fxRateE6: '1000000' })), bankTxIds: a.bankTxIds?.map(id), recognizeScheduleYm: a.recognizeScheduleYm, reversesInYm: a.reversesInYm }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.amountMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
           return ok({ proposalId: p.id, status: p.status.tag });
         } catch (e) {
           return fail((e as Error).message);
@@ -191,15 +199,15 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       }
     );
   const tools = [
-    kindTool('journal_entry', 'propose_journal_entry', 'Propose a balanced journal entry. It never posts by itself: the Advisor rules, and material amounts wait for the CFO.'),
-    kindTool('accrual', 'propose_accrual', 'Propose an accrual entry for work done this month but billed later; reversesInYm is the following month.'),
+    kindTool('journal_entry', 'propose_journal_entry', 'Propose a balanced journal entry for an open month (periodYm). It never posts by itself: the Advisor rules, and material amounts wait for the CFO. Every 2000 line names vendorId; a net credit to 4000 only in a recognition entry (recognizeScheduleYm); usage revenue goes to 4100; nothing may pay or settle a blocked vendor.'),
+    kindTool('accrual', 'propose_accrual', 'Propose an accrual entry for work done this month but billed later; reversesInYm is a later open month, usually the following one. Every 2000 line names vendorId.'),
     tool(
       'propose_bank_match',
-      'Propose matches between bank transactions and invoices or bills. Put all auto-confidence matches in one proposal; put each review-confidence match in its own proposal.',
+      'Propose matches between bank transactions and invoices or bills. Each match pays its invoice or bill to the cent, never a blocked vendor\'s bill; a bank transaction in another currency needs a recorded rate for its month first. Put all auto-confidence matches in one proposal; put each review-confidence match in its own proposal.',
       { ...common, matches: z.array(z.object({ bankTxId: z.string(), targetKind: z.enum(['invoice', 'bill']), targetId: z.string(), scoreBp: z.number().int() })).min(1) },
       async a => {
         try {
-          const p = await propose(worker, A, { kind: 'bank_match', payload: { matches: a.matches }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: 0n, periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          const p = await propose(worker, A, { kind: 'bank_match', payload: { matches: a.matches.map(m => ({ ...m, bankTxId: id(m.bankTxId), targetId: id(m.targetId) })) }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: 0n, periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
           return ok({ proposalId: p.id });
         } catch (e) {
           return fail((e as Error).message);
@@ -208,11 +216,11 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
     ),
     tool(
       'propose_revenue_schedule',
-      'Propose recognition schedule lines for a contract item (from build_revenue_schedule).',
+      "Propose recognition schedule lines for a contract item (from build_revenue_schedule): the customer's own subscription item, and never a month that item already has a line for.",
       { ...common, contractItemId: z.string(), customerId: z.string(), lines: z.array(z.object({ ym: z.string(), amountMinor: z.string() })).min(1), totalMinor: z.string() },
       async a => {
         try {
-          const p = await propose(worker, A, { kind: 'revenue_schedule', payload: { lines: a.lines.map(l => ({ contractItemId: a.contractItemId, customerId: a.customerId, ym: l.ym, amountMinor: l.amountMinor })) }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.totalMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          const p = await propose(worker, A, { kind: 'revenue_schedule', payload: { lines: a.lines.map(l => ({ contractItemId: id(a.contractItemId), customerId: id(a.customerId), ym: l.ym, amountMinor: l.amountMinor })) }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.totalMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
           return ok({ proposalId: p.id });
         } catch (e) {
           return fail((e as Error).message);
@@ -225,7 +233,7 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       { ...common, customerId: z.string(), tier: z.enum(['A', 'B', 'C', 'D', 'BLOCK']), paymentTermsDays: z.number().int(), creditCheckRequestIds: z.array(z.string()).optional() },
       async a => {
         try {
-          const p = await propose(worker, A, { kind: 'credit_decision', payload: { customerId: a.customerId, tier: a.tier, paymentTermsDays: a.paymentTermsDays, creditCheckIds: a.creditCheckRequestIds ?? [] }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: 0n, periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          const p = await propose(worker, A, { kind: 'credit_decision', payload: { customerId: id(a.customerId), tier: a.tier, paymentTermsDays: a.paymentTermsDays, creditCheckIds: a.creditCheckRequestIds ?? [] }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: 0n, periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
           return ok({ proposalId: p.id });
         } catch (e) {
           return fail((e as Error).message);
@@ -238,7 +246,26 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       { ...common, vendorId: z.string(), reasonPlain: z.string(), exposureMinor: z.string().describe('Open bills at risk, minor units') },
       async a => {
         try {
-          const p = await propose(worker, A, { kind: 'vendor_block', payload: { vendorId: a.vendorId, reasonPlain: a.reasonPlain }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.exposureMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          const p = await propose(worker, A, { kind: 'vendor_block', payload: { vendorId: id(a.vendorId), reasonPlain: a.reasonPlain }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.exposureMinor), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
+          return ok({ proposalId: p.id });
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      }
+    ),
+    tool(
+      'propose_vendor_verify',
+      "Propose a vendor check: mark a vendor verified so its bills can be paid, citing the request ids of its owner's identity (tu_identity_verification) and fraud (fraud_finder) checks recorded with APPROVE at tier A or B.",
+      {
+        ...common,
+        vendorId: z.string(),
+        creditCheckRequestIds: z.array(z.string()).min(1).describe("Request ids of the owner's recorded checks"),
+        reasonPlain: z.string().optional().describe('One plain sentence on why the vendor can be paid'),
+        exposureMinor: z.string().optional().describe('Unpaid bills this releases, minor units (the module computes it either way)'),
+      },
+      async a => {
+        try {
+          const p = await propose(worker, A, { kind: 'vendor_verify', payload: { vendorId: id(a.vendorId), creditCheckIds: a.creditCheckRequestIds, ...(a.reasonPlain ? { reasonPlain: a.reasonPlain } : {}) }, rationale: a.rationale, summaryPlain: a.summaryPlain, amountMinor: BigInt(a.exposureMinor ?? '0'), periodYm: a.periodYm, closeTaskId: a.closeTaskId ? BigInt(a.closeTaskId) : undefined });
           return ok({ proposalId: p.id });
         } catch (e) {
           return fail((e as Error).message);

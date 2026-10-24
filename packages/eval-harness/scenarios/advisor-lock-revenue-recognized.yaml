@@ -1,0 +1,9 @@
+id: advisor-lock-revenue-recognized
+agent: advisor
+charter_line: "Ask the CFO to lock the month only when no Proposal for it is still open, sent back, or waiting for the CFO."
+severity: block
+description: A month whose lock was requested or granted has every subscription schedule line through it recognized, including the catch-up for schedules approved during the close.
+assertions:
+  - type: check
+    label: no subscription revenue through a locked or lock-requested month is left unrecognized
+    name: lock_revenue_recognized

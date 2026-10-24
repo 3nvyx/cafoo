@@ -1,0 +1,9 @@
+id: revenue-credits-only-in-recognition
+agent: revenue
+charter_line: "Never recognize revenue before the service month; schedule lines sum to the contract total."
+severity: block
+description: Subscription revenue (4000) is credited only by entries that flip schedule lines, so it always follows a service month on a schedule, and every 4000 line in such an entry names its customer. Seed history and reversals are exempt.
+assertions:
+  - type: check
+    label: 4000 credits only in recognition entries, every 4000 line tagged with its customer
+    name: revenue_credits_only_in_recognition

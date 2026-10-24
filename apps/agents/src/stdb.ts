@@ -10,6 +10,8 @@ import { DbConnection } from '@cafoo/stdb-bindings';
 import { STDB_DB, STDB_URI } from './env';
 
 export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam';
+/** A connection's role: an agent, or the CFO seat (only the demo CFO stand-in in src/demo-cfo.ts connects as it). */
+export type ConnRole = AgentRole | 'cfo';
 export const ROLE_TAG: Record<AgentRole, 'Advisor' | 'Bookkeeper' | 'Revenue' | 'Credit' | 'Redteam'> = {
   advisor: 'Advisor',
   bookkeeper: 'Bookkeeper',
@@ -29,10 +31,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = join(here, '..', '..', '..');
 const secretsDir = join(repoRoot, '.secrets');
 
-function tokenPath(role: AgentRole) {
+function tokenPath(role: ConnRole) {
   return join(secretsDir, `${role}.token`);
 }
-function loadToken(role: AgentRole) {
+function loadToken(role: ConnRole) {
   try {
     const p = tokenPath(role);
     return existsSync(p) ? readFileSync(p, 'utf8').trim() || undefined : undefined;
@@ -40,7 +42,7 @@ function loadToken(role: AgentRole) {
     return undefined;
   }
 }
-function saveToken(role: AgentRole, token: string) {
+function saveToken(role: ConnRole, token: string) {
   mkdirSync(secretsDir, { recursive: true });
   writeFileSync(tokenPath(role), token, 'utf8');
 }
@@ -57,7 +59,7 @@ export async function waitFor(pred: () => boolean, what: string, timeoutMs = 150
 
 export class RoleConn {
   private constructor(
-    readonly role: AgentRole,
+    readonly role: ConnRole,
     readonly conn: DbConnection,
     readonly identity: Identity
   ) {}
@@ -70,7 +72,7 @@ export class RoleConn {
   }
 
   /** Connect with the role's persisted token (or mint a new identity), subscribe to all tables, wait for the cache. */
-  static connect(role: AgentRole): Promise<RoleConn> {
+  static connect(role: ConnRole): Promise<RoleConn> {
     return new Promise((resolve, reject) => {
       let settled = false;
       DbConnection.builder()
@@ -143,11 +145,12 @@ export class Cast {
       (['bookkeeper', 'revenue', 'credit', 'redteam'] as AgentRole[]).map(r => RoleConn.connect(r))
     );
     for (const w of [bookkeeper, revenue, credit, redteam]) {
+      const role = w.role as AgentRole;
       await advisor.reducers.grantRole({
         identity: w.identity,
-        role: { tag: ROLE_TAG[w.role] },
-        displayName: ROLE_DISPLAY[w.role],
-        model: models[w.role] ?? (w.role === 'redteam' ? 'grok-4.7' : 'claude-sonnet-5-5'),
+        role: { tag: ROLE_TAG[role] },
+        displayName: ROLE_DISPLAY[role],
+        model: models[role] ?? (role === 'redteam' ? 'grok-4.7' : 'claude-sonnet-5-5'),
       });
     }
     await waitFor(() => roster().length >= 5, 'agent roster');
@@ -164,7 +167,7 @@ export async function propose(
   worker: RoleConn,
   reader: RoleConn,
   args: {
-    kind: 'journal_entry' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'accrual' | 'vendor_block';
+    kind: 'journal_entry' | 'bank_match' | 'revenue_schedule' | 'credit_decision' | 'accrual' | 'vendor_block' | 'vendor_verify';
     payload: unknown;
     rationale: string;
     summaryPlain: string;

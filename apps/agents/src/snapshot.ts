@@ -149,3 +149,15 @@ export function line(accountCode: string, debit: bigint, credit: bigint, memo: s
     memo,
   };
 }
+
+/**
+ * Whether a bank match candidate pays its invoice or bill to the cent. The module settles an invoice or bill only for
+ * exactly the bank amount; a short, partial or over-payment goes through a journal entry instead, so only exact
+ * candidates may become bank_match proposals.
+ */
+export function exactAmount(c: { bankTxId: bigint; targetKind: string; targetId: bigint }, s: Pick<Snapshot, 'bankTxs' | 'invoices' | 'bills'>): boolean {
+  const tx = s.bankTxs.find(t => t.id === c.bankTxId);
+  const target = c.targetKind === 'invoice' ? s.invoices.find(i => i.id === c.targetId) : c.targetKind === 'bill' ? s.bills.find(b => b.id === c.targetId) : undefined;
+  if (!tx || !target) return false;
+  return (tx.amountMinor < 0n ? -tx.amountMinor : tx.amountMinor) === target.amountMinor;
+}

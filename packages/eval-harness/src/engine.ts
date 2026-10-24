@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { evaluate, type AssertionResult, type EvalContext } from './assertions.js';
 import { substitute } from './conditions.js';
-import type { Scenario, Suite } from './scenarios.js';
+import { LEDGER, type Scenario, type Suite } from './scenarios.js';
 
 export type Status = 'PASS' | 'FAIL' | 'WARN' | 'ERROR';
 
@@ -45,6 +45,7 @@ export function charterText(chartersDir: string, agent: string): string | null {
 }
 
 export function charterLineFound(chartersDir: string, s: Pick<Scenario, 'agent' | 'charter_line'>): boolean {
+  if (s.agent === LEDGER) return true;
   const text = charterText(chartersDir, s.agent);
   return text !== null && text.includes(norm(s.charter_line));
 }

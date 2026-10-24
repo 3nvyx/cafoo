@@ -128,6 +128,19 @@ describe('harnessGate', () => {
     expect(reasonOf(await run(gate, pre('mcp__credit__propose_credit_decision', { ...decision, customerId: '07', creditCheckRequestIds: ['R-1'] }, 'credit')))?.permissionDecisionReason).toMatch(/missing fraud_finder for customer 7/);
   });
 
+  it('keeps at most 256 calls waiting for a result, dropping the oldest', async () => {
+    const gate = harnessGate();
+    const check = (requestId: string) => ({ subjectKind: 'customer', subjectId: '7', personaId: 'P03', product: 'fraud_finder', requestId, summaryJson: JSON.stringify({ requestId }), tier: 'C', decision: 'REVIEW' });
+    const first = pre('mcp__credit__record_credit_check', check('R-old'), 'credit');
+    expect(await run(gate, first)).toEqual({});
+    for (let i = 0; i < 256; i++) await run(gate, pre('mcp__credit__record_credit_check', check(`R-${i}`), 'credit'));
+    // The oldest was dropped, so its late result teaches the gate nothing.
+    const { hook_event_name: _e, ...rest } = first;
+    await run(gate, { ...rest, hook_event_name: 'PostToolUse', tool_response: { content: [] } });
+    const decision = { periodYm: '2026-09', rationale: 'Tier C from a thin file.', summaryPlain: 'Shorten the customer\'s payment terms to fifteen days.', customerId: '7', tier: 'C', paymentTermsDays: 15, creditCheckRequestIds: ['R-old'] };
+    expect(reasonOf(await run(gate, pre('mcp__credit__propose_credit_decision', decision, 'credit')))?.permissionDecisionReason).toMatch(/not recorded: R-old/);
+  });
+
   it('passes account codes from context to the Plain summary rule', async () => {
     const gate = harnessGate({ context: () => ({ accountCodes: ['1000', '6000'] }) });
     const input = { threadId: 'close:2026-09', body: 'Matching the feed now.', summaryPlain: 'Started on the 2026 bank feed.' };

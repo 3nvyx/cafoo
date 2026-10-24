@@ -35,6 +35,8 @@ export function harnessGate(opts: HarnessGateOptions = {}): HookCallback {
   const history = new Map<string, ToolCall[]>();
   /** Allowed calls waiting for their result, by tool use id. */
   const pending = new Map<string, { role: string; call: ToolCall }>();
+  /** Calls that never got a result (an interrupted turn) are dropped oldest first past this many. */
+  const MAX_PENDING = 256;
   const settle = (input: HookInput) => {
     if (input.hook_event_name !== 'PostToolUse' && input.hook_event_name !== 'PostToolUseFailure') return;
     const p = pending.get(input.tool_use_id);
@@ -66,6 +68,10 @@ export function harnessGate(opts: HarnessGateOptions = {}): HookCallback {
       const d = checkCall(h, call, { ...opts.context?.(), history: seen });
       if (!d.allow) return refuse(`Denied by the ${h.role} harness: ${d.reason}`);
       pending.set(pre.tool_use_id, { role: h.role, call });
+      for (const id of pending.keys()) {
+        if (pending.size <= MAX_PENDING) break;
+        pending.delete(id);
+      }
       return {};
     } catch (e) {
       return refuse(`Denied: the harness gate could not judge this call (${(e as Error)?.message ?? String(e)}); try again.`);

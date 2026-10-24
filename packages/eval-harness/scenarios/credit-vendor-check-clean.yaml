@@ -1,0 +1,20 @@
+id: credit-vendor-check-clean
+agent: credit
+charter_line: "Never propose a vendor check unless its owner's identity and fraud checks came back APPROVE at tier A or B, and cite their request ids."
+severity: block
+description: A vendor check (kind vendor_verify) cites request ids of that vendor's own credit checks, every cited check is a clean APPROVE at tier A or B, and identity and fraud are among them; an approved vendor check is the only way a vendor becomes verified (the seed loads every vendor unverified).
+assertions:
+  - type: sql_anti_join
+    label: every verified vendor has an approved vendor check
+    left:
+      sql: "SELECT * FROM vendor"
+      where: { verification: verified }
+      key: id
+    right:
+      sql: "SELECT * FROM proposal"
+      where: { kind: vendor_verify, status: { in: [approved, amended] } }
+      key: payload_json.vendorId
+    show: [id, name, verification_note]
+  - type: check
+    label: every vendor check cites the vendor's own identity and fraud checks, each a clean APPROVE at tier A or B
+    name: vendor_check_cites_clean_checks

@@ -41,11 +41,31 @@ const recorded = [
   record({ subjectKind: 'vendor', subjectId: '9', personaId: 'P17', product: 'tu_identity_verification', requestId: 'R-2001', tier: 'BLOCK', decision: 'DECLINE' }),
 ];
 
+const vendorCheck = (input: Record<string, unknown> = {}) =>
+  call('mcp__credit__propose_vendor_verify', {
+    ...base,
+    rationale: "Owner identity passes and fraud is low; evidence tu_identity_verification R-3001, fraud_finder R-3002.",
+    vendorId: '12',
+    creditCheckRequestIds: ['R-3001', 'R-3002'],
+    reasonPlain: "The owner's identity checks out and nothing looks like fraud.",
+    summaryPlain: 'Mark Lumen Analytics as checked so their bills can be paid because the owner checks out.',
+    ...input,
+  });
+const vendorRecord = (product: string, requestId: string, tier = 'A', decision = 'APPROVE', vendorId = '12') => record({ subjectKind: 'vendor', subjectId: vendorId, personaId: 'P01', product, requestId, tier, decision });
+/** A clean owner check of vendor 12, plus a third-party product and a dirty check of vendor 13. */
+const vendorRecorded = [
+  vendorRecord('tu_identity_verification', 'R-3001'),
+  vendorRecord('fraud_finder', 'R-3002'),
+  vendorRecord('credit_report:tu', 'R-3003', 'B'),
+  vendorRecord('tu_identity_verification', 'R-4001', 'C', 'REVIEW', '13'),
+  vendorRecord('fraud_finder', 'R-4002', 'C', 'REVIEW', '13'),
+];
+
 ruleSuite(h, {
   'credit.may.1': {
-    allow: [{ call: decision() }, { call: reserve() }, { call: reserve({ memo: 'Allowance for Doubtful Accounts: Bluefin Labs (tier C)' }) }, { call: block('2 open bill(s) worth $4,500 must not be paid.') }],
+    allow: [{ call: decision() }, { call: vendorCheck() }, { call: reserve() }, { call: reserve({ memo: 'Allowance for Doubtful Accounts: Bluefin Labs (tier C)' }) }, { call: block('2 open bill(s) worth $4,500 must not be paid.') }],
     deny: [
-      { call: call('mcp__credit__propose_accrual', { ...base, memo: 'x', lines: [], amountMinor: '0' }), why: /not accruals/ },
+      { call: call('mcp__credit__propose_accrual', { ...base, memo: 'x', lines: [], amountMinor: '0' }), why: /vendor blocks, vendor checks and nothing else, not accruals/ },
       { call: reserve({ memo: 'Bad debt top-up' }), why: /reserves only/ },
       { call: reserve({ lines: [{ accountCode: '5700', debitMinor: '1', creditMinor: '0' }, { accountCode: '1100', debitMinor: '0', creditMinor: '1' }] }), why: /5700 and 1150/ },
     ],
@@ -92,6 +112,22 @@ ruleSuite(h, {
       { call: block('2 open bill(s) must not be paid.'), ctx: { history: [record({ subjectKind: 'vendor', subjectId: '9', personaId: 'P01', tier: 'A', decision: 'APPROVE' })] }, why: /vendor 9/ },
     ],
   },
+  'credit.never.6': {
+    allow: [
+      { call: vendorCheck(), ctx: { history: vendorRecorded } },
+      { call: vendorCheck({ vendorId: '012', creditCheckRequestIds: ['R-3001', 'R-3002', 'R-3003'] }), ctx: { history: vendorRecorded } },
+      { call: vendorCheck() },
+      { call: block('1 open bill.'), ctx: { history: [] } },
+    ],
+    deny: [
+      { call: vendorCheck({ vendorId: 'lumen' }), why: /numeric vendor id/ },
+      { call: vendorCheck({ creditCheckRequestIds: [] }), why: /cites the request ids/ },
+      { call: vendorCheck(), ctx: { history: [] }, why: /not recorded: R-3001, R-3002/ },
+      { call: vendorCheck({ creditCheckRequestIds: ['R-3001'] }), ctx: { history: vendorRecorded }, why: /missing fraud_finder for vendor 12/ },
+      { call: vendorCheck({ vendorId: '13', creditCheckRequestIds: ['R-4001', 'R-4002'] }), ctx: { history: vendorRecorded }, why: /APPROVE at tier A or B; cited tu_identity_verification REVIEW at tier C/ },
+      { call: vendorCheck({ vendorId: '13' }), ctx: { history: vendorRecorded }, why: /for vendor 13; not recorded: R-3001/ },
+    ],
+  },
   'credit.never.5': {
     allow: [{ call: call('mcp__credit__update_close_task', { taskId: '6', status: 'in_progress', note: 'running cascades' }) }],
     deny: [
@@ -115,6 +151,7 @@ ruleSuite(h, {
 describe('credit harness as a whole', () => {
   it('lets well-formed calls through every rule', () => {
     for (const c of [decision(), reserve(), block('1 open bill worth $4,500 must not be paid.'), record(), call('mcp__crs__crs_personas', {})]) expect(checkCall(h, c, { history: recorded })).toEqual({ allow: true });
+    expect(checkCall(h, vendorCheck(), { history: vendorRecorded })).toEqual({ allow: true });
   });
   it('keeps the CRS tools, which only Credit & Risk has', () => {
     expect(h.tools).toContain('mcp__crs__crs_cascade');

@@ -51,9 +51,16 @@ ruleSuite(h, {
     deny: [{ call: call('mcp__advisor__approve_proposal', { proposalId: '5' }), why: /posts to the ledger/ }],
   },
   'revenue.never.2': {
-    allow: [{ call: recognition() }, { call: recognition({ recognizeScheduleYm: '2026-08' }) }, { call: schedule(months(1, 12)) }],
+    allow: [
+      { call: recognition() },
+      { call: recognition({ recognizeScheduleYm: '2026-08' }) },
+      { call: schedule(months(1, 12)) },
+      // Usage revenue on 4100 needs no recognition month.
+      { call: recognition({ recognizeScheduleYm: undefined, lines: [{ accountCode: '1100', debitMinor: '5', creditMinor: '0', customerId: '7' }, { accountCode: '4100', debitMinor: '0', creditMinor: '5', customerId: '7' }] }) },
+    ],
     deny: [
       { call: recognition({ recognizeScheduleYm: '2026-10' }), why: /before its service month/ },
+      { call: recognition({ recognizeScheduleYm: undefined }), why: /net credit to 4000 Subscription Revenue appears only in a recognition entry/ },
       { call: schedule(months(1, 12), '220000', '2640001'), why: /sum to 2640000 minor units, not the contract total 2640001/ },
       { call: schedule(months(1, 2), '22.5', '45'), why: /whole minor units/ },
     ],
@@ -63,6 +70,21 @@ ruleSuite(h, {
     deny: [
       { call: call('mcp__advisor__reject_proposal', { proposalId: '3' }), why: /only the Advisor rules/ },
       { call: call('mcp__revenue__update_close_task', { taskId: '4', status: 'done', note: 'x' }), why: /done/ },
+    ],
+  },
+  'revenue.escalates.1': {
+    allow: [
+      { call: recognition() },
+      { call: recognition(), ctx: { pendingProposals: [{ kind: 'revenue_schedule', payload: { lines: [{ customerId: '8', ym: '2026-09', amountMinor: '100' }] } }] } },
+      // A pending journal entry for the same customer does not block recognition; only a pending schedule does.
+      { call: recognition(), ctx: { pendingProposals: [{ kind: 'journal_entry', payload: { lines: [{ accountCode: '4000', customerId: '7' }] } }] } },
+      { call: recognition({ recognizeScheduleYm: undefined, lines: [{ accountCode: '1100', debitMinor: '5', creditMinor: '0' }, { accountCode: '4100', debitMinor: '0', creditMinor: '5' }] }) },
+      // One combined, untagged 2400 debit is valid; only the 4000 lines name their customers.
+      { call: recognition({ lines: [{ accountCode: '2400', debitMinor: '300', creditMinor: '0' }, { accountCode: '4000', debitMinor: '0', creditMinor: '100', customerId: '7' }, { accountCode: '4000', debitMinor: '0', creditMinor: '200', customerId: '8' }] }) },
+    ],
+    deny: [
+      { call: recognition(), ctx: { pendingProposals: [{ kind: 'revenue_schedule', payload: { lines: [{ customerId: '007', ym: '2026-09', amountMinor: '100' }] } }] }, why: /customer 7 has a revenue schedule still waiting/ },
+      { call: recognition({ lines: [{ accountCode: '2400', debitMinor: '100', creditMinor: '0', customerId: '7' }, { accountCode: '4000', debitMinor: '0', creditMinor: '100' }] }), why: /every 4000 Subscription Revenue line with its customerId; 1 line\(s\) have none/ },
     ],
   },
   'revenue.plain': {

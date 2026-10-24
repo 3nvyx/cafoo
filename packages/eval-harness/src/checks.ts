@@ -28,6 +28,9 @@ const json = <T>(s: unknown): T | null => {
 const byId = (rows: Row[], key = 'id') => new Map(rows.map((r) => [String(r[key]), r]));
 const big = (v: unknown): bigint => BigInt(String(v ?? '0'));
 const RULING_ACTIONS = new Set(['approve_approve', 'approve_amend', 'approve_awaiting_cfo', 'reject']);
+/** Owner checks a vendor check (vendor_verify) must cite, as the module requires. */
+const VENDOR_CHECK_PRODUCTS = ['tu_identity_verification', 'fraud_finder'];
+const cleanCheck = (c: Row) => String(c.decision).toUpperCase() === 'APPROVE' && (c.tier === 'A' || c.tier === 'B');
 
 type ScheduleLine = { contractItemId: string; customerId: string; ym: string; amountMinor: string };
 
@@ -196,6 +199,36 @@ export const CHECKS: Record<string, CheckFn> = {
     return { checked: checks.length + decisions.length, unit: 'credit checks and credit decisions', offenders };
   },
 
+  /**
+   * Every vendor check (vendor_verify proposal) cites request ids of credit checks recorded for that same vendor, every
+   * cited check is a clean APPROVE at tier A or B, and the owner's identity and fraud checks are among them.
+   */
+  vendor_check_cites_clean_checks(db) {
+    const checks = db.query('SELECT * FROM credit_check').filter((c) => c.subject_kind === 'vendor');
+    const props = db.query('SELECT * FROM proposal').filter((p) => p.kind === 'vendor_verify');
+    const offenders: Row[] = [];
+    for (const p of props) {
+      const pay = json<{ vendorId?: string; creditCheckIds?: (string | null)[] }>(p.payload_json);
+      const vendorId = String(pay?.vendorId);
+      const own = checks.filter((c) => String(c.subject_id) === vendorId);
+      const ids = pay?.creditCheckIds ?? [];
+      const cited: Row[] = [];
+      const problems: string[] = [];
+      if (ids.length === 0) problems.push('cites no request ids');
+      for (const id of ids) {
+        const row = id ? own.find((c) => String(c.request_id) === String(id)) : undefined;
+        if (!row) problems.push(`request id ${String(id)} is not a credit check of vendor ${vendorId}`);
+        else {
+          cited.push(row);
+          if (!cleanCheck(row)) problems.push(`${String(row.product)} ${String(id)} is ${String(row.decision)} at tier ${String(row.tier)}, not a clean APPROVE at tier A or B`);
+        }
+      }
+      if (ids.length > 0) for (const prod of VENDOR_CHECK_PRODUCTS) if (!cited.some((c) => c.product === prod)) problems.push(`cites no ${prod} check`);
+      if (problems.length) offenders.push({ proposal_id: p.id, vendor_id: vendorId, problem: problems.join('; ') });
+    }
+    return { checked: props.length, unit: 'vendor checks', offenders };
+  },
+
   /** The tier on file (credit checks and credit decision proposals) equals the replayed cascade for that persona. */
   async credit_tier_matches_cascade(db) {
     const checks = db.query('SELECT * FROM credit_check');
@@ -275,6 +308,120 @@ export const CHECKS: Record<string, CheckFn> = {
       if (problems.length) offenders.push({ id: r.id, problem: problems.join('; '), [column]: text });
     }
     return { checked: rows.length, unit: 'summaries', offenders };
+  },
+
+  /**
+   * A month whose lock was requested or granted (period closing or closed) has every subscription schedule line through
+   * that month recognized: no revenue the contracts earned by then is left in deferred revenue.
+   */
+  lock_revenue_recognized(db) {
+    const items = byId(db.query('SELECT * FROM contract_item'));
+    const months = db.query('SELECT * FROM period').filter((p) => p.status === 'closing' || p.status === 'closed').map((p) => String(p.ym));
+    const latest = months.sort().pop();
+    const lines = db.query('SELECT * FROM revenue_schedule_line').filter((l) => items.get(String(l.contract_item_id))?.kind === 'subscription');
+    const offenders: Row[] = [];
+    if (latest) {
+      for (const l of lines) {
+        if (String(l.ym) <= latest && l.recognized !== true) offenders.push({ schedule_line: l.id, customer_id: l.customer_id, ym: l.ym, amount_minor: l.amount_minor, problem: `unrecognized, but ${latest} is locked or waiting for its lock` });
+      }
+    }
+    return { checked: latest ? lines.filter((l) => String(l.ym) <= latest).length : 0, unit: 'subscription schedule lines through a locked month', offenders };
+  },
+
+  /**
+   * Subscription revenue (4000) is credited only by entries that flip schedule lines, and every 4000 line in such an
+   * entry names its customer. Seed history and reversals are exempt (a reversal undoes an entry that already passed).
+   */
+  revenue_credits_only_in_recognition(db) {
+    const flips = new Set(db.query('SELECT * FROM revenue_schedule_line').filter((l) => l.je_id !== null).map((l) => String(l.je_id)));
+    const jes = byId(db.query('SELECT * FROM journal_entry'));
+    const byJe = new Map<string, Row[]>();
+    for (const l of db.query('SELECT * FROM journal_line')) {
+      if (String(l.account_code) !== '4000') continue;
+      byJe.set(String(l.je_id), [...(byJe.get(String(l.je_id)) ?? []), l]);
+    }
+    const offenders: Row[] = [];
+    for (const [jeId, lines] of byJe) {
+      const je = jes.get(jeId);
+      if (!je || je.source === 'seed' || je.reversal_of !== null) continue;
+      if (flips.has(jeId)) {
+        for (const l of lines) if (l.customer_id === null) offenders.push({ je_id: jeId, line: l.id, problem: 'a 4000 line in a recognition entry names no customer' });
+      } else {
+        const net = lines.reduce((a, l) => a + big(l.credit_minor) - big(l.debit_minor), 0n);
+        if (net > 0n) offenders.push({ je_id: jeId, memo: je.memo, net_credit_minor: net.toString(), problem: 'credits 4000 without flipping any schedule line' });
+      }
+    }
+    return { checked: byJe.size, unit: 'entries on 4000', offenders };
+  },
+
+  /**
+   * Journal lines in the subsidiary's own currency are at FX rate 1.0 (1000000); a foreign-currency line uses a rate
+   * recorded for its currency pair and its entry's month.
+   */
+  fx_rates_recorded(db) {
+    const functional = new Map(db.query('SELECT * FROM subsidiary').map((x) => [String(x.id), String(x.functional_ccy)]));
+    const periods = byId(db.query('SELECT * FROM period'));
+    const jes = byId(db.query('SELECT * FROM journal_entry'));
+    const rates = new Set(db.query('SELECT * FROM fx_rate').map((r) => `${String(r.from_ccy)}|${String(r.to_ccy)}|${String(r.ym)}|${String(r.rate_e_6)}`));
+    const lines = db.query('SELECT * FROM journal_line');
+    const offenders: Row[] = [];
+    for (const l of lines) {
+      const je = jes.get(String(l.je_id));
+      const own = functional.get(String(je?.subsidiary_id));
+      const ym = String(periods.get(String(je?.period_id))?.ym ?? '');
+      if (!je || !own) offenders.push({ line: l.id, je_id: l.je_id, problem: 'line of an unknown entry or subsidiary' });
+      else if (String(l.ccy) === own) {
+        if (big(l.fx_rate_e_6) !== 1_000_000n) offenders.push({ line: l.id, je_id: l.je_id, ccy: l.ccy, fx_rate_e_6: l.fx_rate_e_6, problem: `own currency ${own} must be at 1000000` });
+      } else if (!rates.has(`${String(l.ccy)}|${own}|${ym}|${String(l.fx_rate_e_6)}`)) {
+        offenders.push({ line: l.id, je_id: l.je_id, ccy: l.ccy, fx_rate_e_6: l.fx_rate_e_6, ym, problem: `no recorded ${String(l.ccy)}/${own} rate ${String(l.fx_rate_e_6)} for ${ym}` });
+      }
+    }
+    return { checked: lines.length, unit: 'journal lines', offenders };
+  },
+
+  /**
+   * An agent-proposed entry at or above materiality (by its raw debits, raw credits, or debits converted at their FX
+   * rates, whichever is largest) posted only with the CFO's confirmation on its Approval.
+   */
+  material_entries_confirmed(db, _params, ctx) {
+    const materiality = big(ctx.vars.materiality ?? 1_000_000);
+    const approvals = new Map(db.query('SELECT * FROM approval').map((a) => [String(a.proposal_id), a]));
+    const sums = new Map<string, { dr: bigint; cr: bigint; conv: bigint }>();
+    for (const l of db.query('SELECT * FROM journal_line')) {
+      const t = sums.get(String(l.je_id)) ?? { dr: 0n, cr: 0n, conv: 0n };
+      t.dr += big(l.debit_minor);
+      t.cr += big(l.credit_minor);
+      t.conv += (big(l.debit_minor) * big(l.fx_rate_e_6)) / 1_000_000n;
+      sums.set(String(l.je_id), t);
+    }
+    const jes = db.query('SELECT * FROM journal_entry').filter((j) => j.proposal_id !== null && j.source !== 'seed');
+    const offenders: Row[] = [];
+    let material = 0;
+    for (const j of jes) {
+      const t = sums.get(String(j.id)) ?? { dr: 0n, cr: 0n, conv: 0n };
+      const size = [t.dr, t.cr, t.conv].reduce((a, b) => (b > a ? b : a), 0n);
+      if (size < materiality) continue;
+      material++;
+      const a = approvals.get(String(j.proposal_id));
+      if (!a || a.cfo_confirmed_at === null) offenders.push({ je_id: j.id, proposal_id: j.proposal_id, size_minor: size.toString(), memo: j.memo, problem: 'material entry posted without a CFO confirmation' });
+    }
+    return { checked: material, unit: 'material entries', offenders };
+  },
+
+  /**
+   * Every invoice or bill bank match carries the payment entry it posted (payment_je_id), and no match outlives the
+   * reversal of its payment entry (for a match to an entry, that entry).
+   */
+  bank_match_payment_entries(db) {
+    const reversed = new Set(db.query('SELECT * FROM journal_entry').filter((j) => j.reversal_of !== null).map((j) => String(j.reversal_of)));
+    const matches = db.query('SELECT * FROM bank_match');
+    const offenders: Row[] = [];
+    for (const m of matches) {
+      const payment = m.target_kind === 'je' ? m.target_id : m.payment_je_id;
+      if (m.target_kind !== 'je' && payment === null) offenders.push({ bank_match: m.id, target: `${String(m.target_kind)} ${String(m.target_id)}`, problem: 'no payment entry (payment_je_id)' });
+      else if (payment !== null && reversed.has(String(payment))) offenders.push({ bank_match: m.id, payment_je_id: payment, problem: 'its payment entry was reversed but the match survives' });
+    }
+    return { checked: matches.length, unit: 'bank matches', offenders };
   },
 
   /** At most one ruling per proposal, plus one more for each time the CFO sent it back. */
