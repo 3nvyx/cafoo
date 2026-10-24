@@ -98,6 +98,7 @@ import FxRateRow from "./fx_rate_table";
 import InvoiceRow from "./invoice_table";
 import JournalEntryRow from "./journal_entry_table";
 import JournalLineRow from "./journal_line_table";
+import MyAgentIdentityRow from "./my_agent_identity_table";
 import PeriodRow from "./period_table";
 import PeriodLockRow from "./period_lock_table";
 import ProposalRow from "./proposal_table";
@@ -505,6 +506,13 @@ const tablesSchema = __schema({
       { name: 'vendor_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, VendorRow),
+  myAgentIdentity: __table({
+    name: 'my_agent_identity',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAgentIdentityRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */

@@ -1,7 +1,9 @@
 import { SenderError, t, type InferSchema, type ReducerCtx } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
-import spacetimedb, { ContractItemArg, ItemKind, LineArg, overdueSweep, Plan, Role } from './tables';
+import spacetimedb, { agentIdentity, ContractItemArg, ItemKind, LineArg, overdueSweep, Plan, Role } from './tables';
 import { sha256HexOfString, utf8 } from './sha256';
+// The Risk Tier rules, shared with the Credit & Risk agent's cascade: one pure file with no imports, I/O or clock.
+import { deriveTier, POLICY as CREDIT_POLICY, TIERS as CREDIT_TIERS, type Tier } from '../../../packages/crs-mcp/src/tiers';
 
 export { default } from './tables';
 
@@ -766,6 +768,28 @@ function checkBankMatch(ctx: Ctx, m: BankMatchPayload['matches'][number]) {
   return { ...base, rate, converted, inv: undefined, bill };
 }
 
+type CreditCheckRow = NonNullable<ReturnType<Ctx['db']['creditCheck']['id']['find']>>;
+
+/** The recorded credit checks on one customer (its guarantor) or one vendor (its owner). */
+function checksOf(ctx: Ctx, kind: 'customer' | 'vendor', subjectId: bigint): CreditCheckRow[] {
+  return [...ctx.db.creditCheck.subjectId.filter(subjectId)].filter(r => r.subjectKind.tag === kind);
+}
+
+/** The newest of some recorded checks (by recording time, then id). `rows` must not be empty. */
+function latestCheck(rows: CreditCheckRow[]): CreditCheckRow {
+  return rows.reduce((a, b) => {
+    const at = a.createdAt.microsSinceUnixEpoch;
+    const bt = b.createdAt.microsSinceUnixEpoch;
+    return bt > at || (bt === at && b.id > a.id) ? b : a;
+  });
+}
+
+/** Every cited request id must name one of `rows` (a row recorded without a request id can never be cited). */
+function refuseForeignCitations(cited: Set<string>, rows: CreditCheckRow[], subject: string) {
+  const foreign = [...cited].filter(id => !rows.some(r => r.requestId !== '' && r.requestId === id));
+  if (foreign.length > 0) throw new SenderError(`Request id(s) ${foreign.join(', ')} are not recorded credit checks for ${subject}.`);
+}
+
 /**
  * A vendor_verify proposal holds only if, for each owner check in VERIFY_PRODUCTS, the vendor's latest recorded row is a
  * clean APPROVE at tier A or B and is cited. A later failing check therefore blocks verification even when the
@@ -778,19 +802,14 @@ function checkVendorVerify(ctx: Ctx, payload: VendorVerifyPayload) {
   if (v.verification.tag === 'verified') throw new SenderError(`Vendor ${v.name} is already verified.`);
   const cited = new Set(listOf<unknown>(payload.creditCheckIds, 'creditCheckIds').map(x => String(x).trim()));
   if (cited.size === 0) throw new SenderError('A vendor verification must cite the request ids of the owner checks it relies on.');
-  const rows = [...ctx.db.creditCheck.subjectId.filter(v.id)].filter(c => c.subjectKind.tag === 'vendor');
-  const foreign = [...cited].filter(id => !rows.some(c => c.requestId !== '' && c.requestId === id));
-  if (foreign.length > 0) throw new SenderError(`Request id(s) ${foreign.join(', ')} are not recorded credit checks for vendor ${v.id}.`);
+  const rows = checksOf(ctx, 'vendor', v.id);
+  refuseForeignCitations(cited, rows, `vendor ${v.id}`);
   const clean = (c: (typeof rows)[number]) => c.decision.toUpperCase() === 'APPROVE' && (c.tier === 'A' || c.tier === 'B');
   const latest: (typeof rows)[number][] = [];
   for (const prod of VERIFY_PRODUCTS) {
     const ofProduct = rows.filter(c => c.product === prod);
     if (ofProduct.length === 0) throw new SenderError(`Vendor ${v.name} has no recorded ${prod} check.`);
-    const last = ofProduct.reduce((a, b) => {
-      const at = a.createdAt.microsSinceUnixEpoch;
-      const bt = b.createdAt.microsSinceUnixEpoch;
-      return bt > at || (bt === at && b.id > a.id) ? b : a;
-    });
+    const last = latestCheck(ofProduct);
     if (!clean(last)) throw new SenderError(`Vendor ${v.name}'s latest ${prod} check (request ${last.requestId || 'n/a'}) is ${last.decision} at tier ${last.tier}, not a clean APPROVE at tier A or B.`);
     if (!cited.has(last.requestId)) throw new SenderError(`Cite vendor ${v.name}'s latest ${prod} check (request ${last.requestId || 'n/a'}).`);
     latest.push(last);
@@ -799,6 +818,44 @@ function checkVendorVerify(ctx: Ctx, payload: VendorVerifyPayload) {
   const tiers = [...new Set(latest.map(c => c.tier))].join('/');
   const note = payload.reasonPlain?.trim() || `Owner identity and fraud checks passed (tier ${tiers}; requests ${latest.map(c => c.requestId).join(', ')}).`;
   return { v, note };
+}
+
+/**
+ * A credit_decision holds only if its evidence supports it: the tier is one of A, B, C, D or BLOCK and is the tier the
+ * books derived for every cited check (recordCreditCheck derives it from the recorded facts) and for the customer's
+ * latest check, so a newer, worse check cannot be passed over for an older, cleaner one; and the payment terms are no
+ * longer than the tier allows (a BLOCK gets none). Tighter terms are allowed. The latest check need not be cited
+ * itself: a provider call can come back without a request id, and such a row can never be cited. Because the rule is
+ * on its tier, a newer check at the same tier also leaves a decision that is waiting for its ruling valid.
+ */
+function checkCreditDecision(ctx: Ctx, payload: CreditDecisionPayload) {
+  const c = ctx.db.customer.id.find(idOf(payload.customerId, 'customerId'));
+  if (!c) throw new SenderError(`Unknown customer ${payload.customerId}`);
+  const tier = payload.tier as Tier;
+  if (typeof tier !== 'string' || !CREDIT_TIERS.includes(tier)) throw new SenderError(`tier must be one of ${CREDIT_TIERS.join(', ')}; got ${JSON.stringify(payload.tier ?? null)}.`);
+  const terms = payload.paymentTermsDays;
+  if (typeof terms !== 'number' || !Number.isInteger(terms) || terms < 0 || terms > 65535) {
+    throw new SenderError(`paymentTermsDays must be a whole number of days; got ${JSON.stringify(terms ?? null)}.`);
+  }
+  const maxTerms = CREDIT_POLICY.paymentTermsDays[tier] ?? 0;
+  if (terms > maxTerms) throw new SenderError(`Tier ${tier} allows at most ${maxTerms}-day payment terms; got ${terms}.`);
+  if (payload.allowanceMinor !== undefined && payload.allowanceMinor !== null) minorOf(payload.allowanceMinor, 'allowanceMinor');
+  const ids = listOf<unknown>(payload.creditCheckIds, 'creditCheckIds');
+  const cited = new Set<string>();
+  for (const x of ids) {
+    if (typeof x !== 'string' || x.trim() === '') throw new SenderError(`creditCheckIds lists request ids; got ${JSON.stringify(x ?? null)}.`);
+    cited.add(x.trim());
+  }
+  if (cited.size === 0) throw new SenderError(`A credit decision must cite the request ids of the credit checks it rests on (creditCheckIds).`);
+  const rows = checksOf(ctx, 'customer', c.id);
+  refuseForeignCitations(cited, rows, `customer ${c.id}`);
+  const latest = latestCheck(rows);
+  if (latest.tier !== tier) {
+    throw new SenderError(`${c.name}'s latest credit check (request ${latest.requestId || 'n/a'}, ${latest.product}) derives tier ${latest.tier}, not ${tier}; a decision rests on the newest evidence.`);
+  }
+  const off = rows.find(r => cited.has(r.requestId) && r.tier !== tier);
+  if (off) throw new SenderError(`Credit check ${off.requestId} (${off.product}) on ${c.name}'s guarantor derives tier ${off.tier}, not ${tier}: a credit decision takes the tier its evidence derives.`);
+  return { c, tier };
 }
 
 
@@ -1151,14 +1208,7 @@ function validateProposalShapeAndState(ctx: Ctx, kind: string, payloadJson: stri
   } else if (kind === 'vendor_verify') {
     checkVendorVerify(ctx, parseJson<VendorVerifyPayload>(payloadJson, kind));
   } else if (kind === 'credit_decision') {
-    const payload = parseJson<CreditDecisionPayload>(payloadJson, kind);
-    if (!ctx.db.customer.id.find(idOf(payload.customerId, 'customerId'))) throw new SenderError(`Unknown customer ${payload.customerId}`);
-    if (typeof payload.tier !== 'string' || payload.tier.trim() === '') throw new SenderError('A credit decision needs a tier.');
-    if (typeof payload.paymentTermsDays !== 'number' || !Number.isInteger(payload.paymentTermsDays) || payload.paymentTermsDays < 0 || payload.paymentTermsDays > 65535) {
-      throw new SenderError(`paymentTermsDays must be a whole number of days; got ${JSON.stringify(payload.paymentTermsDays ?? null)}.`);
-    }
-    if (payload.allowanceMinor !== undefined && payload.allowanceMinor !== null) minorOf(payload.allowanceMinor, 'allowanceMinor');
-    listOf<unknown>(payload.creditCheckIds, 'creditCheckIds');
+    checkCreditDecision(ctx, parseJson<CreditDecisionPayload>(payloadJson, kind));
   } else if (kind === 'vendor_block') {
     const payload = parseJson<VendorBlockPayload>(payloadJson, kind);
     if (!ctx.db.vendor.id.find(idOf(payload.vendorId, 'vendorId'))) throw new SenderError(`Unknown vendor ${payload.vendorId}`);
@@ -1435,6 +1485,16 @@ function postMessage(
   });
 }
 
+/**
+ * No identity approves or confirms a Proposal it proposed. Roles hold one identity each, but the CFO can promote a
+ * worker to Advisor or CFO, and that identity's own earlier Proposals would otherwise pass the gate on its word alone.
+ */
+function refuseOwnProposal(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['proposal']['id']['find']>>, what: 'approve' | 'confirm') {
+  if (p.proposedBy.isEqual(ctx.sender)) {
+    throw new SenderError(`Proposal ${p.id} was proposed by this identity (as ${p.proposerRole}); no identity may ${what} its own Proposal. Another ${what === 'approve' ? 'Advisor' : 'CFO'} must decide it.`);
+  }
+}
+
 // ---------- lifecycle ----------
 
 export const init = spacetimedb.init(ctx => {
@@ -1478,6 +1538,12 @@ export const overdueSweepTick = spacetimedb.reducer(
 );
 
 // ---------- identities and roles ----------
+
+/**
+ * The caller's own agent_identity row, if it has one. agent_identity stays private (it maps every identity to a role);
+ * this view lets a client see only its own role, so the CFO app can tell whether it holds the seat.
+ */
+export const myAgentIdentity = spacetimedb.view({ name: 'my_agent_identity', public: true }, t.option(agentIdentity.rowType), ctx => ctx.db.agentIdentity.identity.find(ctx.sender) ?? undefined);
 
 export const registerAgent = spacetimedb.reducer(
   { role: Role, displayName: t.string(), model: t.string() },
@@ -1540,7 +1606,9 @@ export const propose = spacetimedb.reducer(
     closeTaskId: t.option(t.u64()),
   },
   (ctx, { kind, payloadJson, rationale, summaryPlain, amountMinor, periodYm, closeTaskId }) => {
-    const role = requireRole(ctx, ['bookkeeper', 'revenue', 'credit', 'consolidation', 'advisor'], 'propose');
+    // Worker agents only. The Advisor rules on Proposals and never authors one, so no Proposal is ever ruled on by the
+    // identity that wrote it (approveProposal and cfoConfirm also refuse that outright).
+    const role = requireRole(ctx, ['bookkeeper', 'revenue', 'credit', 'consolidation'], 'propose');
     const kinds = ['journal_entry', 'bank_match', 'revenue_schedule', 'credit_decision', 'accrual', 'vendor_block', 'vendor_verify', 'fx_revaluation', 'ic_elimination'];
     if (!kinds.includes(kind)) throw new SenderError(`Unknown proposal kind ${kind}`);
     const allowedKinds: Record<string, string[]> = {
@@ -1548,7 +1616,6 @@ export const propose = spacetimedb.reducer(
       revenue: ['journal_entry', 'revenue_schedule'],
       credit: ['journal_entry', 'credit_decision', 'vendor_block', 'vendor_verify'],
       consolidation: ['fx_revaluation', 'ic_elimination'],
-      advisor: kinds,
     };
     if (!allowedKinds[role]?.includes(kind)) throw new SenderError(`The ${role} does not propose ${kind}.`);
     if (summaryPlain.trim().length < 10) throw new SenderError('Every proposal needs a plain-English summary.');
@@ -1624,6 +1691,7 @@ export const approveProposal = spacetimedb.reducer(
     requireRole(ctx, ['advisor'], 'approve proposals');
     const p = ctx.db.proposal.id.find(proposalId);
     if (!p) throw new SenderError(`Unknown proposal ${proposalId}`);
+    refuseOwnProposal(ctx, p, 'approve');
     if (p.status.tag !== 'open' && p.status.tag !== 'sent_back') {
       throw new SenderError(`Proposal ${proposalId} is ${p.status.tag}, not open.`);
     }
@@ -1693,6 +1761,12 @@ export const rejectProposal = spacetimedb.reducer(
   }
 );
 
+/**
+ * Record one row of a Credit Check: the evidence of one product call, with the cascade's facts in summaryJson.facts.
+ * The tier and decision on the row are derived here from those facts by the shared tier rules (deriveTier, as of the
+ * moment of recording), never taken from the caller, and a check is evidence only about the customer's own guarantor or
+ * the vendor's own owner.
+ */
 export const recordCreditCheck = spacetimedb.reducer(
   {
     subjectKind: t.string(),
@@ -1701,15 +1775,42 @@ export const recordCreditCheck = spacetimedb.reducer(
     product: t.string(),
     requestId: t.string(),
     summaryJson: t.string(),
-    tier: t.string(),
-    decision: t.string(),
   },
   (ctx, a) => {
     // Recording evidence is the Credit & Risk agent's job; the Advisor rules on proposals that cite it.
     const role = requireRole(ctx, ['credit'], 'record credit checks');
-    if (a.subjectKind !== 'customer' && a.subjectKind !== 'vendor') throw new SenderError('subjectKind must be customer or vendor');
-    if (a.subjectKind === 'customer' && !ctx.db.customer.id.find(a.subjectId)) throw new SenderError(`Unknown customer ${a.subjectId}`);
-    if (a.subjectKind === 'vendor' && !ctx.db.vendor.id.find(a.subjectId)) throw new SenderError(`Unknown vendor ${a.subjectId}`);
+    let subject: string;
+    let persona: string | undefined;
+    if (a.subjectKind === 'customer') {
+      const c = ctx.db.customer.id.find(a.subjectId);
+      if (!c) throw new SenderError(`Unknown customer ${a.subjectId}`);
+      subject = `customer ${c.id} (${c.name})`;
+      persona = c.guarantorPersonaId;
+      if (a.personaId !== persona) throw new SenderError(`The guarantor of ${subject} is ${persona}; a check on ${a.personaId} is not evidence about them.`);
+    } else if (a.subjectKind === 'vendor') {
+      const v = ctx.db.vendor.id.find(a.subjectId);
+      if (!v) throw new SenderError(`Unknown vendor ${a.subjectId}`);
+      subject = `vendor ${v.id} (${v.name})`;
+      persona = v.ownerPersonaId;
+      if (!persona) throw new SenderError(`${subject} has no owner on file, so there is no one to check.`);
+      if (a.personaId !== persona) throw new SenderError(`The owner of ${subject} is ${persona}; a check on ${a.personaId} is not evidence about them.`);
+    } else {
+      throw new SenderError('subjectKind must be customer or vendor');
+    }
+    let summary: unknown;
+    try {
+      summary = JSON.parse(a.summaryJson);
+    } catch {
+      throw new SenderError('summaryJson is not valid JSON.');
+    }
+    if (summary === null || typeof summary !== 'object' || Array.isArray(summary)) throw new SenderError('summaryJson must be the evidence row as a JSON object.');
+    let derived: ReturnType<typeof deriveTier>;
+    try {
+      // Lookback windows run to the moment of recording: the module's clock, never a date the caller picks.
+      derived = deriveTier((summary as { facts?: unknown }).facts, new Date(Number(ctx.timestamp.microsSinceUnixEpoch / 1000n)));
+    } catch (e) {
+      throw new SenderError(`The ${a.product} check on ${subject} cannot be recorded: ${e instanceof Error ? e.message : String(e)}. Record the cascade's facts with each evidence row (summaryJson.facts); the books derive the tier from them.`);
+    }
     const row = ctx.db.creditCheck.insert({
       id: 0n,
       subjectKind: { tag: a.subjectKind },
@@ -1718,12 +1819,13 @@ export const recordCreditCheck = spacetimedb.reducer(
       product: a.product,
       requestId: a.requestId,
       summaryJson: a.summaryJson,
-      tier: a.tier,
-      decision: a.decision,
+      tier: derived.tier,
+      decision: derived.decision,
       createdAt: ctx.timestamp,
     });
     // Evidence only: a vendor becomes verified through a ruled vendor_verify proposal, never from a recorded check.
-    audit(ctx, role, 'record_credit_check', 'credit_check', row.id, `${a.subjectKind} ${a.subjectId} ${a.product} → ${a.tier}`);
+    const why = derived.reasons.map(r => r.code).join(', ') || 'no negative reason';
+    audit(ctx, role, 'record_credit_check', 'credit_check', row.id, `${a.subjectKind} ${a.subjectId} ${a.product} → ${derived.tier}/${derived.decision} (derived: ${why})`);
   }
 );
 
@@ -1807,6 +1909,7 @@ export const cfoConfirm = spacetimedb.reducer(
     requireRole(ctx, ['cfo'], 'confirm material rulings');
     const p = ctx.db.proposal.id.find(proposalId);
     if (!p) throw new SenderError(`Unknown proposal ${proposalId}`);
+    refuseOwnProposal(ctx, p, 'confirm');
     if (p.status.tag !== 'awaiting_cfo') throw new SenderError(`Proposal ${proposalId} is not waiting for the CFO.`);
     const appr = ctx.db.approval.proposalId.find(proposalId);
     if (!appr) throw new SenderError('No advisor ruling found for this proposal.');

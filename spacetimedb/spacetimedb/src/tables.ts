@@ -424,7 +424,7 @@ const settings = table(
 );
 
 // Private: which identity holds which role. Clients never see tokens or identities of others.
-const agentIdentity = table(
+export const agentIdentity = table(
   { name: 'agent_identity' },
   {
     identity: t.identity().primaryKey(),
