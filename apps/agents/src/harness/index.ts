@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { advisor } from './advisor';
 import { bookkeeper } from './bookkeeper';
+import { consolidation } from './consolidation';
 import { credit } from './credit';
 import { redteam } from './redteam';
 import { revenue } from './revenue';
@@ -14,8 +15,8 @@ import type { Harness, Role, RuleContext, ToolCall, WorkerRole } from './types';
 
 export type { CharterLine, EvalOnly, Harness, ProposalKind, Role, Rule, RuleContext, ToolCall, Verdict, WorkerRole } from './types';
 
-export const HARNESSES: Record<Role, Harness> = { advisor, bookkeeper, revenue, credit, redteam };
-export const WORKERS: readonly WorkerRole[] = ['bookkeeper', 'revenue', 'credit'];
+export const HARNESSES: Record<Role, Harness> = { advisor, bookkeeper, revenue, credit, redteam, consolidation };
+export const WORKERS: readonly WorkerRole[] = ['bookkeeper', 'revenue', 'credit', 'consolidation'];
 
 export const chartersDir = fileURLToPath(new URL('../charters/', import.meta.url));
 

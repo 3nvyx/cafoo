@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { allowanceProposal, dateMicros, detectMissingAccruals, plainSummary, specificReserveReasons } from '../src/index.js';
-import type { BankTransaction, PlainContext, ProposalPayload } from '../src/index.js';
+import {
+  allowanceProposal, dateMicros, detectMissingAccruals, eliminations, fxRevaluationPayload, icEliminationPayload, plainSummary, revaluation,
+  specificReserveReasons,
+} from '../src/index.js';
+import type { BankTransaction, FxRevaluationPayload, IcEliminationPayload, PlainContext, ProposalPayload } from '../src/index.js';
 import { ACCOUNTS, ACCRUED, ALLOW, BAD_DEBT, CASH, cr, dr, HOSTING, SUB } from './fixtures.js';
+import * as G from './group.js';
+
+const GROUP_LINES = G.groupLines();
+const REVAL = fxRevaluationPayload(
+  revaluation({ entity: G.UK_ENTITY, lines: GROUP_LINES, accountsById: G.ACCOUNTS_BY_ID, rates: G.RATES, ym: G.SEP, periodId: 9n, fxGainLossAccountId: G.A.ukFx.id }),
+)!;
+const ELIMS = eliminations({ entities: G.ENTITIES, accounts: G.ACCOUNTS, lines: GROUP_LINES, rates: G.RATES, reportingCcy: 'USD', ym: G.SEP, periodId: 9n });
+const BALANCE_ELIM = icEliminationPayload(ELIMS.balance)!;
+const ACTIVITY_ELIM = icEliminationPayload(ELIMS.activity)!;
+const LOSS: FxRevaluationPayload = { ...REVAL, items: REVAL.items.map((i) => ({ ...i, deltaMinor: -i.deltaMinor })) };
+const OWED_TO_US: FxRevaluationPayload = { ...REVAL, items: REVAL.items.map((i) => ({ ...i, txnBalanceMinor: -i.txnBalanceMinor })) };
+const MIXED: FxRevaluationPayload = { ...REVAL, items: [REVAL.items[0]!, { ...REVAL.items[1]!, ccy: 'EUR' }] };
+const TWO_WAY: IcEliminationPayload = {
+  ...ACTIVITY_ELIM,
+  pairs: [...ACTIVITY_ELIM.pairs, { ...ACTIVITY_ELIM.pairs[0]!, label: 'Royalties', sourceSubsidiaryId: G.UK, counterSubsidiaryId: G.US }],
+};
 
 const tx: BankTransaction = { id: 55n, bookedAt: dateMicros(2026, 9, 14), amountMinor: 125_000n, ccy: 'USD', description: 'INV 1042', counterparty: 'ACME CO', matched: false };
 const ctx: PlainContext = {
@@ -10,6 +29,11 @@ const ctx: PlainContext = {
   accounts: ACCOUNTS,
   bankTxs: new Map([[55n, tx]]),
   periods: new Map([[9n, { year: 2026, month: 9 }]]),
+  subsidiaries: new Map([
+    [G.US, { name: 'Cafoo Inc', functionalCcy: 'USD' }],
+    [G.UK, { name: 'Cafoo Ltd', functionalCcy: 'GBP', parentId: G.US }],
+    [G.ELIM, { name: 'Group eliminations', functionalCcy: 'USD', parentId: G.US, isElimination: true }],
+  ]),
 };
 const allowAccounts = { subsidiaryId: SUB, periodId: 9n, badDebtExpenseAccountId: BAD_DEBT.id, allowanceAccountId: ALLOW.id };
 
@@ -35,6 +59,13 @@ describe('plainSummary', () => {
     ['credit decision block', { kind: 'credit_decision', customerId: 99n, tier: 'BLOCK', paymentTermsDays: 0, summaryPlain: 'The owner is in an active bankruptcy plan.' }],
     ['vendor block', { kind: 'vendor_block', vendorId: 7n, reasonPlain: 'their bank details changed twice this week.' }],
     ['vendor verify', { kind: 'vendor_verify', vendorId: 7n, creditCheckIds: ['req_tu_7', 'req_ff_7'], reasonPlain: 'the owner passed identity and fraud checks.' }],
+    ['fx revaluation gain', REVAL],
+    ['fx revaluation loss', LOSS],
+    ['fx revaluation owed to the subsidiary', OWED_TO_US],
+    ['fx revaluation in two currencies', MIXED],
+    ['balance elimination', BALANCE_ELIM],
+    ['activity elimination', ACTIVITY_ELIM],
+    ['activity elimination both ways', TWO_WAY],
   ];
 
   for (const [name, p] of cases) {
@@ -46,6 +77,19 @@ describe('plainSummary', () => {
       expect(s).not.toMatch(/\b(1000|1200|1250|2000|2100|2400|4000|6100|6900)\b/);
     });
   }
+
+  it('speaks the plan sentences for the September consolidation', () => {
+    expect(plainSummary(REVAL, ctx)).toBe("Restate the $245,000 Cafoo Ltd owes Cafoo Inc at September's closing rate, a £4,404.78 gain.");
+    expect(plainSummary(BALANCE_ELIM, ctx)).toBe("Remove the $245,000 Cafoo Inc and Cafoo Ltd owe each other from the group's combined balance sheet; it reverses in October.");
+    expect(plainSummary(ACTIVITY_ELIM, ctx)).toBe("Remove the $15,000 of service fees Cafoo Inc charged Cafoo Ltd in September from the group's combined results.");
+  });
+
+  it('names no counterparty when it cannot tell which company is meant', () => {
+    const noFlags: PlainContext = { subsidiaries: new Map([[G.US, { name: 'Cafoo Inc', functionalCcy: 'USD' }], [G.UK, { name: 'Cafoo Ltd', functionalCcy: 'GBP' }], [G.ELIM, { name: 'Group eliminations', functionalCcy: 'USD' }]]) };
+    expect(plainSummary(REVAL, noFlags)).toBe("Restate Cafoo Ltd's $245,000 of dollar balances at September's closing rate, a £4,404.78 gain.");
+    expect(plainSummary(REVAL)).toBe("Restate subsidiary 2's $245,000 of dollar balances at September's closing rate, a £4,404.78 gain.");
+    expect(plainSummary(BALANCE_ELIM)).toBe("Remove the $245,000 subsidiary 1 and subsidiary 2 owe each other from the group's combined balance sheet; it reverses in October.");
+  });
 
   it('falls back to ids without context', () => {
     expect(plainSummary({ kind: 'vendor_block', vendorId: 7n, reasonPlain: '' })).toBe('Stop all payments to supplier 7.');

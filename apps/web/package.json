@@ -27,6 +27,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
+		"@cafoo/ledger-core": "workspace:*",
 		"spacetimedb": "^2.13.0"
 	}
 }

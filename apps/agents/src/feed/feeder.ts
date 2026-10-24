@@ -1,0 +1,211 @@
+/**
+ * The live feed, run by the gateway: once the CFO switches it on, bank lines and invoices for the first open month
+ * after a locked month (October once September is locked) arrive one by one, as a bank and a billing system would send
+ * them. The events come from the deterministic plan in @cafoo/seed/feed and enter the books only through the module's
+ * two ingest reducers under the `feed` identity, which may never propose or commit. The continuous Bookkeeper
+ * (src/continuous/bookkeeper.ts) reacts to what lands.
+ *
+ * The feed stops for a month once that month's close has started; the module refuses ingest when the feed is off, the
+ * month is not open, or the month before it is not locked.
+ */
+import { feedPlan, type FeedContext, type FeedEvent } from '@cafoo/seed/feed';
+import { closeOpened, lockedByCfo, previousYm } from '../close-state';
+import { json, type Route } from '../http';
+import { rootSubsidiary } from '../snapshot';
+import type { Cast, RoleConn } from '../stdb';
+
+export interface FeedStatus {
+  enabled: boolean;
+  /** The month the feed fills, when there is one. */
+  ym?: string;
+  planned: number;
+  ingested: number;
+  /** ISO time of the month's latest ingested event. */
+  lastEventAt?: string;
+  /** Why nothing is arriving right now, in plain words; absent while the feed runs or once the month is complete. */
+  blockedReason?: string;
+}
+
+const lower = (tag: string) => tag.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+const monthName = (ym: string) => ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(ym.slice(5, 7)) - 1] ?? ym;
+
+export const feedEnabled = (c: RoleConn) => c.db.settings.key.find('feed_enabled')?.valueI64 === 1n;
+
+/**
+ * The first open month whose previous month the CFO locked, or undefined. The seed locks the history months itself, so a
+ * fresh database has no such month until the CFO locks the close month (October once September is locked).
+ */
+export function feedCandidateYm(c: RoleConn): string | undefined {
+  return [...c.db.period.iter()]
+    .filter(p => p.status.tag === 'Open' && lockedByCfo(c, previousYm(p.ym)))
+    .sort((a, b) => a.ym.localeCompare(b.ym))[0]?.ym;
+}
+
+/** The month the feed fills: the candidate month, unless its own close has been opened. */
+export function feedTargetYm(c: RoleConn): string | undefined {
+  const ym = feedCandidateYm(c);
+  return ym && !closeOpened(c, ym) ? ym : undefined;
+}
+
+/** The root company's books as the feed plan reads them. */
+export function feedContext(c: RoleConn, ym: string): FeedContext {
+  const db = c.db;
+  const sub = rootSubsidiary(c);
+  const customers = [...db.customer.iter()].filter(x => x.subsidiaryId === sub.id);
+  const customerIds = new Set(customers.map(x => x.id));
+  const vendors = [...db.vendor.iter()].filter(x => x.subsidiaryId === sub.id);
+  const vendorIds = new Set(vendors.map(x => x.id));
+  const contracts = [...db.contract.iter()].filter(k => customerIds.has(k.customerId));
+  const codeOf = new Map(contracts.map(k => [k.id, k.code]));
+  const items = [...db.contractItem.iter()];
+  return {
+    ym,
+    subsidiaryCode: sub.code,
+    ccy: sub.functionalCcy,
+    customers: customers.map(x => ({ id: x.id, name: x.name })),
+    vendors: vendors.map(v => ({ id: v.id, name: v.name, verification: lower(v.verification.tag) })),
+    contracts: contracts.map(k => ({ code: k.code, customerId: k.customerId, plan: lower(k.plan.tag), unitPriceMinor: items.find(i => i.contractId === k.id && i.kind.tag === 'Usage')?.priceMinor ?? 0n })),
+    invoices: [...db.invoice.iter()]
+      .filter(i => customerIds.has(i.customerId))
+      .map(i => ({ number: i.number, customerId: i.customerId, contractCode: i.contractId === undefined ? undefined : codeOf.get(i.contractId), ym: i.ym, amountMinor: i.amountMinor, dueAtMicros: i.dueAt.microsSinceUnixEpoch, status: lower(i.status.tag) })),
+    bills: [...db.bill.iter()].filter(b => vendorIds.has(b.vendorId)).map(b => ({ externalRef: b.externalRef, vendorId: b.vendorId, ym: b.ym, amountMinor: b.amountMinor, dueAtMicros: b.dueAt.microsSinceUnixEpoch, status: lower(b.status.tag) })),
+    bankTransactions: [...db.bankTransaction.iter()].filter(t => t.subsidiaryId === sub.id).map(t => ({ description: t.description, amountMinor: t.amountMinor })),
+    materialityMinor: db.settings.key.find('materiality_threshold_minor')?.valueI64 ?? 1_000_000n,
+  };
+}
+
+export interface FeederOptions {
+  /** Milliseconds between events (FEED_INTERVAL_MS); 0 sends the month's events back to back. */
+  intervalMs: number;
+  /** How often to look again while the feed is off or has nothing to send. Default max(intervalMs, 1000). */
+  idleMs?: number;
+  /** Start the timer (default true); false leaves stepping to tick(), for tests and the smoke test. */
+  autoStart?: boolean;
+  onStep?: (m: string) => void;
+  /** Plan seed (default the plan's own). */
+  seed?: number;
+}
+
+export interface Feeder {
+  status(): FeedStatus;
+  /** Send the next event if the feed may run; true when one was sent. */
+  tick(): Promise<boolean>;
+  /** Send every remaining event of the month now; returns how many were sent. */
+  drain(): Promise<number>;
+  /** The month's plan (built once per month). */
+  plan(): FeedEvent[];
+  stop(): void;
+}
+
+export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
+  const A = cast.advisor;
+  const log = (m: string) => {
+    opts.onStep?.(m);
+    console.log(`[feed] ${m}`);
+  };
+  const idleMs = opts.idleMs ?? Math.max(opts.intervalMs, 1000);
+  const plans = new Map<string, FeedEvent[]>();
+  /** Events the module accepted in this process (an invoice whose number already exists leaves no feed_event row). */
+  const sent = new Set<string>();
+  let lastError: string | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
+  let busy = false;
+
+  const ingestedIds = () => new Set([...A.db.feedEvent.iter()].map(e => e.externalId));
+  const planFor = (ym: string) => {
+    let p = plans.get(ym);
+    if (!p) {
+      p = feedPlan(feedContext(A, ym), opts.seed === undefined ? {} : { seed: opts.seed });
+      plans.set(ym, p);
+      log(`planned ${p.length} event(s) for ${ym}`);
+    }
+    return p;
+  };
+  /** Why the feed cannot send right now, or the month and its next event. */
+  const state = (): { blocked: string; ym?: string } | { ym: string; next?: FeedEvent; events: FeedEvent[] } => {
+    if (!feedEnabled(A)) return { blocked: 'The live feed is switched off; the CFO can switch it on.', ym: feedCandidateYm(A) };
+    const ym = feedCandidateYm(A);
+    if (!ym) return { blocked: 'No open month follows a month the CFO locked yet; the feed starts once the CFO locks the close month.' };
+    if (closeOpened(A, ym)) return { blocked: `The ${monthName(ym)} close has started, so the feed waits for the next month.`, ym };
+    const events = planFor(ym);
+    const done = ingestedIds();
+    return { ym, events, next: events.find(e => !done.has(e.externalId) && !sent.has(e.externalId)) };
+  };
+
+  const tick = async (): Promise<boolean> => {
+    if (busy) return false;
+    busy = true;
+    try {
+      const st = state();
+      if ('blocked' in st || !st.next) return false;
+      const e = st.next;
+      try {
+        if (e.kind === 'bank_tx') await cast.feed.reducers.ingestBankTransactions({ subsidiaryCode: e.subsidiaryCode, txs: [e.tx] });
+        else await cast.feed.reducers.ingestInvoices({ invoices: [e.invoice] });
+        sent.add(e.externalId);
+        lastError = undefined;
+        log(`${e.externalId}: ${e.notePlain}`);
+        return true;
+      } catch (err) {
+        lastError = `The books refused ${e.externalId}: ${(err as Error).message}`;
+        log(lastError);
+        return false;
+      }
+    } finally {
+      busy = false;
+    }
+  };
+
+  const loop = async () => {
+    if (stopped) return;
+    const sentOne = await tick().catch(e => {
+      log(`feed tick failed: ${(e as Error).message}`);
+      return false;
+    });
+    if (!stopped) timer = setTimeout(() => void loop(), sentOne ? opts.intervalMs : idleMs);
+  };
+  if (opts.autoStart ?? true) timer = setTimeout(() => void loop(), 0);
+
+  return {
+    status(): FeedStatus {
+      const enabled = feedEnabled(A);
+      let st: ReturnType<typeof state>;
+      try {
+        st = state();
+      } catch (e) {
+        return { enabled, planned: 0, ingested: 0, blockedReason: `The feed cannot plan this month: ${(e as Error).message}` };
+      }
+      const ym = st.ym;
+      const events = ym ? (plans.get(ym) ?? ('events' in st ? st.events : [])) : [];
+      const done = ingestedIds();
+      const rows = ym ? [...A.db.feedEvent.iter()].filter(r => r.ym === ym) : [];
+      const last = rows.reduce<bigint | undefined>((m, r) => (m === undefined || r.ingestedAt.microsSinceUnixEpoch > m ? r.ingestedAt.microsSinceUnixEpoch : m), undefined);
+      const out: FeedStatus = { enabled, planned: events.length, ingested: events.filter(e => done.has(e.externalId) || sent.has(e.externalId)).length };
+      if (ym) out.ym = ym;
+      if (last !== undefined) out.lastEventAt = new Date(Number(last / 1000n)).toISOString();
+      const blocked = 'blocked' in st ? st.blocked : lastError;
+      if (blocked) out.blockedReason = blocked;
+      return out;
+    },
+    tick,
+    async drain() {
+      let n = 0;
+      while (!stopped && (await tick())) n++;
+      return n;
+    },
+    plan() {
+      const ym = feedTargetYm(A);
+      return ym ? planFor(ym) : [];
+    },
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
+/** GET /feed/status: what the live feed is doing (read-only). */
+export function feedRoutes(feeder: Pick<Feeder, 'status'>): Route[] {
+  return [{ method: 'GET', pattern: /^\/feed\/status$/, handle: ({ res }) => json(res, 200, feeder.status()) }];
+}

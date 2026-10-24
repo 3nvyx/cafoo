@@ -15,4 +15,5 @@ export default {
   name: __t.string(),
   functionalCcy: __t.string(),
   parentCode: __t.option(__t.string()),
+  isElimination: __t.bool(),
 };

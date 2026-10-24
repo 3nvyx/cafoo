@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { request, type Server } from 'node:http';
 import { createGateway, isLoopback, MAX_BODY_BYTES, taskReply, textOf, type GatewayOptions } from '../src/gateway';
 import type { Cast } from '../src/stdb';
+import { BadRequest, json, readJson, type Route } from '../src/http';
 
 let server: Server | undefined;
 afterEach(() => new Promise<void>(r => (server ? server.close(() => r()) : r())));
@@ -212,5 +213,92 @@ describe('POST /close and CORS', () => {
     const { base } = await gateway({ env: { GATEWAY_ALLOWED_ORIGINS: 'http://cfo.local:8080, http://localhost:3001/' } });
     expect((await fetch(`${base}/status`, { headers: { origin: 'http://localhost:3001' } })).headers.get('access-control-allow-origin')).toBe('http://localhost:3001');
     expect((await fetch(`${base}/status`, { headers: { origin: 'http://localhost:5173' } })).headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
+describe('added routes (src/http.ts)', () => {
+  const web = 'http://localhost:5173';
+  const routes = (seen: string[][]): Route[] => [
+    { method: 'GET', pattern: /^\/things\/(\d+)$/, handle: ({ res, params }) => json(res, 200, { id: params[0], n: 1n }) },
+    {
+      method: 'POST',
+      pattern: /^\/things\/([^/]+)\/run$/,
+      handle: async ({ req, res, params }) => {
+        const body = await readJson(req);
+        if (body.mode !== undefined && body.mode !== 'dry_run') throw new BadRequest('mode must be dry_run');
+        seen.push(params);
+        json(res, 202, { started: true, id: params[0] });
+      },
+    },
+    { method: 'GET', pattern: /^\/things\/secret$/, changesState: true, handle: ({ res }) => json(res, 200, { ok: true }) },
+  ];
+  const post = (base: string, path: string, body: unknown, headers: Record<string, string> = {}) =>
+    fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+
+  it('serves a GET route with CORS for an allowed origin, decoded params and bigint-safe JSON', async () => {
+    const { base } = await gateway({ routes: routes([]) });
+    const r = await fetch(`${base}/things/42`, { headers: { origin: web } });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('access-control-allow-origin')).toBe(web);
+    expect(await r.json()).toEqual({ id: '42', n: '1' });
+    expect((await fetch(`${base}/things/abc`)).status).toBe(404);
+  });
+
+  it('runs a POST route from this machine and refuses it from elsewhere without the key', async () => {
+    const seen: string[][] = [];
+    const local = await gateway({ routes: routes(seen) });
+    const r = await post(local.base, '/things/a%20b/run', {}, { origin: web });
+    expect(r.status).toBe(202);
+    expect(r.headers.get('access-control-allow-origin')).toBe(web);
+    expect(seen).toEqual([['a b']]);
+    await new Promise<void>(res => server!.close(() => res()));
+    const remote = await gateway({ routes: routes(seen), isLocal: () => false });
+    expect((await post(remote.base, '/things/x/run', {})).status).toBe(403);
+    expect((await fetch(`${remote.base}/things/secret`)).status).toBe(403);
+    expect((await fetch(`${remote.base}/things/7`)).status).toBe(200);
+    await new Promise<void>(res => server!.close(() => res()));
+    const keyed = await gateway({ routes: routes(seen), isLocal: () => false, env: { GATEWAY_API_KEY: 'sekret' } });
+    expect((await post(keyed.base, '/things/x/run', {})).status).toBe(401);
+    expect((await post(keyed.base, '/things/x/run', {}, { authorization: 'Bearer sekret' })).status).toBe(202);
+    expect(seen).toEqual([['a b'], ['x']]);
+  });
+
+  it('puts added routes behind the Host, Origin, JSON and size guards', async () => {
+    const seen: string[][] = [];
+    const { base } = await gateway({ routes: routes(seen) });
+    const port = new URL(base).port;
+    expect(await raw(base, '/things/1', { host: `evil.example:${port}` })).toBe(403);
+    expect((await post(base, '/things/x/run', {}, { origin: 'https://evil.example' })).status).toBe(403);
+    expect((await fetch(`${base}/things/x/run`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' })).status).toBe(415);
+    expect((await fetch(`${base}/things/x/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '[1]' })).status).toBe(400);
+    expect((await post(base, '/things/x/run', { mode: 'live' })).status).toBe(400);
+    expect((await post(base, '/things/x/run', { pad: 'x'.repeat(MAX_BODY_BYTES) })).status).toBe(413);
+    expect(seen).toEqual([]);
+  });
+
+  it('merges status extras into GET /status', async () => {
+    const { base } = await gateway({ status: () => ({ feed: { enabled: false }, providers: 'not overridden' }) });
+    const body = (await (await fetch(`${base}/status`)).json()) as { feed: unknown; providers: unknown };
+    expect(body.feed).toEqual({ enabled: false });
+    expect(Array.isArray(body.providers)).toBe(true);
+  });
+});
+
+describe('starting a close after the continuous Bookkeeper', () => {
+  it('marks the month closing at once and starts the close only when the in-flight batch is done', async () => {
+    let release!: () => void;
+    const batch = new Promise<void>(r => (release = r));
+    const closes = new Map();
+    const order: string[] = [];
+    const { base, runClose } = await gateway({ closes, beforeClose: async () => { order.push('wait'); await batch; order.push('idle'); } });
+    const r = await fetch(`${base}/close`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ periodYm: '2026-10' }) });
+    expect(r.status).toBe(202);
+    expect(closes.get('2026-10')?.status).toBe('running');
+    await new Promise(res => setTimeout(res, 30));
+    expect(runClose).not.toHaveBeenCalled();
+    release();
+    await new Promise(res => setTimeout(res, 30));
+    expect(order).toEqual(['wait', 'idle']);
+    expect(runClose).toHaveBeenCalledTimes(1);
   });
 });

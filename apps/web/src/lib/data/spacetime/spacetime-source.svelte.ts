@@ -351,17 +351,37 @@ export class SpacetimeDataSource implements DataSource {
 				this.#conn.cfoSeat = 'mine';
 				return true;
 			}
+			if (/bootstrap secret|Claim the CFO seat/i.test(text)) {
+				// Nobody has claimed the seat from this browser. The seed loader printed a one-time claim link
+				// (also saved in .secrets/cfo-bootstrap.<db>.txt); opening it here takes the seat.
+				this.#conn.cfoSeat = this.#conn.cfoSeat === 'mine' ? 'mine' : 'unclaimed';
+				this.#conn.message = 'This browser is not the CFO yet. Open the claim link printed by the seed loader (saved in .secrets/cfo-bootstrap.<db>.txt).';
+				return false;
+			}
 			this.#conn.cfoSeat = 'held';
-			this.#conn.message = 'Another browser holds the CFO seat. Close that tab (the seat frees when it disconnects), then retry.';
+			this.#conn.message = 'Another browser holds the CFO seat. Ask the advisor to release it, then retry.';
 			return false;
 		}
+	}
+
+	async claimCfo(secret: string): Promise<void> {
+		if (!this.#db) throw new Error('Not connected to the ledger database yet.');
+		try {
+			await this.#db.reducers.claimCfo({ secret: secret.trim(), displayName: 'CFO' });
+		} catch (err) {
+			const text = err instanceof Error ? err.message : String(err);
+			// Already the CFO (claiming twice from the same browser) is fine.
+			if (!/registered as cfo|already/i.test(text)) throw plain(err, 'Could not claim the CFO seat.');
+		}
+		this.#conn.cfoSeat = 'mine';
+		this.#conn.message = undefined;
 	}
 
 	async #call(fallback: string, fn: (c: DbConnection) => Promise<unknown>) {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
 		if (this.#conn.cfoSeat !== 'mine') {
 			const ok = await this.#claimCfoSeat(this.#db);
-			if (!ok) throw new Error('Another browser holds the CFO seat. Close that tab, wait a moment, and try again.');
+			if (!ok) throw new Error(this.#conn.message ?? 'This browser does not hold the CFO seat.');
 		}
 		try {
 			await fn(this.#db);
@@ -378,7 +398,7 @@ export class SpacetimeDataSource implements DataSource {
 						throw plain(again, fallback);
 					}
 				}
-				throw new Error('Another browser holds the CFO seat. Close that tab, wait a moment, and try again.');
+				throw new Error(this.#conn.message ?? 'This browser does not hold the CFO seat.');
 			}
 			throw plain(err, fallback);
 		}

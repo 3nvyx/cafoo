@@ -1,7 +1,8 @@
-// In-memory stand-in for the SpacetimeDB SQL endpoint, over decoded rows. Supports exactly the subset the
-// scenarios use: SELECT * | SELECT COUNT(*) AS n, one table, WHERE with =, !=, <, <=, >, >= joined by AND / OR.
+// In-memory stand-in for the SpacetimeDB SQL endpoint, over decoded rows: the harness's own tests and snapshot-mode
+// charter evals (snapshotDb in api.ts) run scenarios on it. Supports exactly the subset the scenarios use:
+// SELECT * | SELECT COUNT(*) AS n, one table, WHERE with =, !=, <, <=, >, >= joined by AND / OR.
 // Anything else throws, so a scenario that starts using unsupported SQL fails here as it would live.
-import type { Db, Row } from '../src/db.js';
+import type { Db, Row } from './db.js';
 
 export type Tables = Record<string, Row[]>;
 

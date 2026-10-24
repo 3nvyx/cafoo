@@ -1,16 +1,21 @@
 import { SenderError, t, type InferSchema, type ReducerCtx } from 'spacetimedb/server';
 import { ScheduleAt, Timestamp } from 'spacetimedb';
 import spacetimedb, { ContractItemArg, ItemKind, LineArg, overdueSweep, Plan, Role } from './tables';
+import { sha256HexOfString, utf8 } from './sha256';
 
 export { default } from './tables';
 
 type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
-type RoleTag = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'cfo' | 'ui';
+type RoleTag = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'cfo' | 'ui' | 'consolidation' | 'feed';
 
 const MATERIALITY_KEY = 'materiality_threshold_minor';
 const DEFAULT_MATERIALITY_MINOR = 1_000_000n; // $10,000.00
 const MICROS_PER_DAY = 86_400_000_000n;
 const OWNER_KEY = 'database_owner';
+const REPORTING_KEY = 'reporting_ccy';
+const DEFAULT_REPORTING_CCY = 'USD';
+const FEED_KEY = 'feed_enabled';
+const FX_SCALE = 1_000_000n;
 
 // ---------- helpers (not exported: only SpacetimeDB registrations may be exported) ----------
 
@@ -87,6 +92,20 @@ type LineIn = {
   memo: string;
 };
 
+/** n / d rounded half away from zero (the same rounding as ledger-core's divRound). */
+function divRound(n: bigint, d: bigint): bigint {
+  const neg = n < 0n !== d < 0n;
+  const an = n < 0n ? -n : n;
+  const ad = d < 0n ? -d : d;
+  const q = (an * 2n + ad) / (ad * 2n);
+  return neg ? -q : q;
+}
+
+/** A transaction-currency amount in functional currency at a rate scaled by 1e6, rounded half away from zero like ledger-core's applyFx. */
+function applyFx(amountMinor: bigint, rateE6: bigint): bigint {
+  return divRound(amountMinor * (rateE6 === 0n ? FX_SCALE : rateE6), FX_SCALE);
+}
+
 function assertBalanced(lines: LineIn[]) {
   if (lines.length < 2) throw new SenderError('A journal entry needs at least two lines.');
   let dr = 0n;
@@ -99,9 +118,8 @@ function assertBalanced(lines: LineIn[]) {
     }
     if (l.debitMinor < 0n || l.creditMinor < 0n) throw new SenderError('Amounts cannot be negative.');
     if (l.fxRateE6 < 0n) throw new SenderError('FX rates must be positive.');
-    const rate = l.fxRateE6 === 0n ? 1_000_000n : l.fxRateE6;
-    dr += (l.debitMinor * rate) / 1_000_000n;
-    cr += (l.creditMinor * rate) / 1_000_000n;
+    dr += applyFx(l.debitMinor, l.fxRateE6);
+    cr += applyFx(l.creditMinor, l.fxRateE6);
   }
   if (dr !== cr) {
     throw new SenderError(`Entry does not balance: debits ${dr} vs credits ${cr} (minor units).`);
@@ -153,6 +171,94 @@ function assertRates(ctx: Ctx, subsidiaryId: bigint, periodId: bigint, lines: Li
   }
 }
 
+/** The reporting currency of the group (settings.reporting_ccy; USD when the row is missing). */
+function reportingCcy(ctx: Ctx): string {
+  return ccyKey(ctx.db.settings.key.find(REPORTING_KEY)?.valueText || DEFAULT_REPORTING_CCY);
+}
+
+/** The group code of an account code: the text before the first "-" ('2950-UK' is 2950). */
+function groupCode(code: string): string {
+  const i = code.indexOf('-');
+  return i < 0 ? code : code.slice(0, i);
+}
+
+/** A group account's code in one subsidiary: bare for the root company, '<base>-<SUB>' for any company with a parent. */
+function codeFor(ctx: Ctx, subsidiaryId: bigint, base: string): string {
+  const sub = ctx.db.subsidiary.id.find(subsidiaryId);
+  if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  return sub.parentId === undefined ? base : `${base}-${sub.code}`;
+}
+
+/**
+ * The closing rate of one currency into another for a month, scaled by 1e6: 1.0 for the same currency, else the
+ * recorded closing rate, else the reciprocal of the recorded reverse closing rate (as ledger-core's fxRate).
+ */
+function closingRate(ctx: Ctx, fromCcy: string, toCcy: string, ym: string): bigint | undefined {
+  const from = ccyKey(fromCcy);
+  const to = ccyKey(toCcy);
+  if (from === to) return FX_SCALE;
+  const rows = [...ctx.db.fxRate.ym.filter(ym)].filter(r => r.kind.tag === 'closing' && r.rateE6 > 0n);
+  const direct = rows.find(r => ccyKey(r.fromCcy) === from && ccyKey(r.toCcy) === to);
+  if (direct) return direct.rateE6;
+  const inverse = rows.find(r => ccyKey(r.fromCcy) === to && ccyKey(r.toCcy) === from);
+  return inverse ? divRound(FX_SCALE * FX_SCALE, inverse.rateE6) : undefined;
+}
+
+/**
+ * The closing rate that sizes a functional-currency amount in the reporting currency for a month: that month's, else
+ * the latest recorded before it (a schedule line or bill can fall in a month whose rates are not recorded yet). 1.0 in
+ * the reporting currency itself; undefined when no closing rate exists at or before the month.
+ */
+function reportingRate(ctx: Ctx, functionalCcy: string, ym: string): bigint | undefined {
+  const reporting = reportingCcy(ctx);
+  const from = ccyKey(functionalCcy);
+  if (from === reporting) return FX_SCALE;
+  const exact = closingRate(ctx, from, reporting, ym);
+  if (exact !== undefined) return exact;
+  let latest: string | undefined;
+  for (const r of ctx.db.fxRate.iter()) {
+    if (r.kind.tag !== 'closing' || r.rateE6 <= 0n || r.ym >= ym) continue;
+    const a = ccyKey(r.fromCcy);
+    const b = ccyKey(r.toCcy);
+    if (((a === from && b === reporting) || (a === reporting && b === from)) && (latest === undefined || r.ym > latest)) latest = r.ym;
+  }
+  return latest === undefined ? undefined : closingRate(ctx, from, reporting, latest);
+}
+
+function missingReportingRate(ctx: Ctx, functionalCcy: string, ym: string): string {
+  return `no ${ccyKey(functionalCcy)}/${reportingCcy(ctx)} closing rate is recorded for ${ym} or any month before it; record one so its size in ${reportingCcy(ctx)} is known`;
+}
+
+/**
+ * A subsidiary's functional-currency amount in the reporting currency (reportingRate), so every proposal.amountMinor
+ * and the materiality test use one currency. Never 1:1 for another currency: without a rate the proposal is refused.
+ */
+function toReporting(ctx: Ctx, subsidiaryId: bigint, amountMinor: bigint, ym: string): bigint {
+  const sub = ctx.db.subsidiary.id.find(subsidiaryId);
+  if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  const rate = reportingRate(ctx, sub.functionalCcy, ym);
+  if (rate === undefined) throw new SenderError(`An amount of ${sub.code} in ${ym} cannot be sized: ${missingReportingRate(ctx, sub.functionalCcy, ym)}.`);
+  return applyFx(amountMinor, rate);
+}
+
+/** A proposal of a subsidiary outside the reporting currency needs a closing rate so its size is known. */
+function assertReportingRate(ctx: Ctx, subsidiaryId: bigint, ym: string, what: string) {
+  const functional = functionalCcyOf(ctx, subsidiaryId);
+  if (reportingRate(ctx, functional, ym) === undefined) throw new SenderError(`${what}: ${missingReportingRate(ctx, functional, ym)}.`);
+}
+
+/** Every line must sit on an account of the entry's own subsidiary. */
+function assertAccountsOf(ctx: Ctx, subsidiaryId: bigint, lines: { accountCode: string }[]) {
+  for (const l of lines) {
+    const acct = accountByCode(ctx, l.accountCode);
+    if (acct.subsidiaryId !== subsidiaryId) {
+      const own = ctx.db.subsidiary.id.find(subsidiaryId)?.code ?? String(subsidiaryId);
+      const other = ctx.db.subsidiary.id.find(acct.subsidiaryId)?.code ?? String(acct.subsidiaryId);
+      throw new SenderError(`Account ${acct.code} belongs to ${other}, not ${own}: an entry posts only to its own company's accounts.`);
+    }
+  }
+}
+
 function postEntry(
   ctx: Ctx,
   args: {
@@ -169,6 +275,7 @@ function postEntry(
   assertPeriodOpen(ctx, args.periodId);
   const total = assertBalanced(args.lines);
   assertRates(ctx, args.subsidiaryId, args.periodId, args.lines, args.reversalOf !== undefined);
+  assertAccountsOf(ctx, args.subsidiaryId, args.lines);
   const je = ctx.db.journalEntry.insert({
     id: 0n,
     subsidiaryId: args.subsidiaryId,
@@ -304,10 +411,13 @@ function guarded<T>(kind: string, f: () => T): T {
   }
 }
 
-/** Unpaid bills of a vendor: the payments a vendor block holds or a vendor verification releases. */
+/** Unpaid bills of a vendor in the reporting currency: the payments a vendor block holds or a vendor verification releases. */
 function openBillsMinor(ctx: Ctx, vendorId: bigint): bigint {
+  const vendor = ctx.db.vendor.id.find(vendorId);
   let total = 0n;
-  for (const b of ctx.db.bill.vendorId.filter(vendorId)) if (b.status.tag !== 'paid') total += abs(b.amountMinor);
+  for (const b of ctx.db.bill.vendorId.filter(vendorId)) {
+    if (b.status.tag !== 'paid') total += vendor ? toReporting(ctx, vendor.subsidiaryId, abs(b.amountMinor), b.ym) : abs(b.amountMinor);
+  }
   return total;
 }
 
@@ -325,37 +435,66 @@ function rateFor(ctx: Ctx, fromCcy: string, toCcy: string, ym: string): bigint |
 }
 
 /**
- * Amount a proposal really moves or puts at stake, derived from its payload and the ledger so a proposer cannot
- * understate it and slip under the materiality threshold. A journal entry counts at the largest of its raw and
- * converted debits and credits (the ledger and the app sum raw minor units, and a foreign line on either side can be
- * the big one); a revenue schedule at the revenue it plans; a bank match at the cash it settles; a vendor block or
- * verification at the vendor's unpaid bills. A credit decision moves nothing by itself (its allowance arrives as a
- * journal entry).
+ * Amount a proposal really moves or puts at stake, in the reporting currency, derived from its payload and the ledger
+ * so a proposer cannot understate it and slip under the materiality threshold. A journal entry counts at the largest of
+ * its raw and converted debits and credits (the ledger and the app sum raw minor units, and a foreign line on either
+ * side can be the big one); a revenue schedule at the revenue it plans; a bank match at the cash it settles; a vendor
+ * block or verification at the vendor's unpaid bills; a revaluation or elimination at the sum of its functional debits.
+ * A credit decision moves nothing by itself (its allowance arrives as a journal entry). A subsidiary outside the
+ * reporting currency converts at the month's closing rate.
  */
 function computedAmount(ctx: Ctx, kind: string, payloadJson: string): bigint {
   const max = (...xs: bigint[]) => xs.reduce((a, b) => (b > a ? b : a), 0n);
+  // The new kinds are validated before this runs, so a failure here is a refusal, never a silent zero.
+  if (kind === 'fx_revaluation' || kind === 'ic_elimination') {
+    return guarded(kind, () => {
+      const payload = parseJson<{ subsidiaryId: string; periodYm: string; lines: JsonLine[] }>(payloadJson, kind);
+      const subsidiaryId = idOf(payload.subsidiaryId, 'subsidiaryId');
+      let debits = 0n;
+      for (const l of parseLines(payload.lines)) debits += applyFx(l.debitMinor, l.fxRateE6);
+      assertReportingRate(ctx, subsidiaryId, payload.periodYm, `The ${kind.replace('_', ' ')} for ${payload.periodYm}`);
+      return toReporting(ctx, subsidiaryId, debits, payload.periodYm);
+    });
+  }
   try {
     if (kind === 'journal_entry' || kind === 'accrual') {
       const payload = JSON.parse(payloadJson) as JournalPayload;
+      const subsidiaryId = BigInt(payload.subsidiaryId);
+      const reporting = reportingCcy(ctx);
+      const inReportingBooks = functionalCcyOf(ctx, subsidiaryId) === reporting;
       let rawDr = 0n;
       let rawCr = 0n;
       let convDr = 0n;
       let convCr = 0n;
+      let repDr = 0n;
+      let repCr = 0n;
       for (const l of payload.lines ?? []) {
         const dr = abs(BigInt(l.debitMinor || '0'));
         const cr = abs(BigInt(l.creditMinor || '0'));
         const rate = abs(BigInt(l.fxRateE6 || '1000000')) || 1_000_000n;
         rawDr += dr;
         rawCr += cr;
-        convDr += (dr * rate) / 1_000_000n;
-        convCr += (cr * rate) / 1_000_000n;
+        convDr += applyFx(dr, rate);
+        convCr += applyFx(cr, rate);
+        if (!inReportingBooks) {
+          // Each line from its own currency: one already in the reporting currency as it is, any other through the
+          // subsidiary's currency at the closing rate.
+          const own = ccyKey(l.ccy || 'USD') === reporting;
+          repDr += own ? dr : toReporting(ctx, subsidiaryId, applyFx(dr, rate), payload.periodYm);
+          repCr += own ? cr : toReporting(ctx, subsidiaryId, applyFx(cr, rate), payload.periodYm);
+        }
       }
-      return max(rawDr, rawCr, convDr, convCr);
+      return inReportingBooks ? max(rawDr, rawCr, convDr, convCr) : max(repDr, repCr);
     }
     if (kind === 'revenue_schedule') {
       const payload = JSON.parse(payloadJson) as RevenueSchedulePayload;
       let total = 0n;
-      for (const l of payload.lines ?? []) total += abs(BigInt(l.amountMinor ?? '0'));
+      for (const l of payload.lines ?? []) {
+        const amount = abs(BigInt(l.amountMinor ?? '0'));
+        const customer = ctx.db.customer.id.find(BigInt(l.customerId));
+        if (!customer) throw new SenderError(`Unknown customer ${l.customerId}`);
+        total += toReporting(ctx, customer.subsidiaryId, amount, l.ym);
+      }
       return total;
     }
     if (kind === 'bank_match') {
@@ -365,8 +504,9 @@ function computedAmount(ctx: Ctx, kind: string, payloadJson: string): bigint {
         const tx = ctx.db.bankTransaction.id.find(BigInt(m.bankTxId));
         if (!tx) continue;
         const raw = abs(tx.amountMinor);
-        const rate = ccyKey(tx.ccy) === functionalCcyOf(ctx, tx.subsidiaryId) ? 1_000_000n : rateFor(ctx, tx.ccy, functionalCcyOf(ctx, tx.subsidiaryId), tx.ym) ?? 1_000_000n;
-        total += max(raw, (raw * rate) / 1_000_000n);
+        const functional = functionalCcyOf(ctx, tx.subsidiaryId);
+        const rate = ccyKey(tx.ccy) === functional ? 1_000_000n : rateFor(ctx, tx.ccy, functional, tx.ym) ?? 1_000_000n;
+        total += toReporting(ctx, tx.subsidiaryId, max(raw, applyFx(raw, rate)), tx.ym);
       }
       return total;
     }
@@ -374,8 +514,10 @@ function computedAmount(ctx: Ctx, kind: string, payloadJson: string): bigint {
       const payload = JSON.parse(payloadJson) as { vendorId?: string };
       return payload.vendorId ? openBillsMinor(ctx, BigInt(payload.vendorId)) : 0n;
     }
-  } catch {
-    /* fall through: a malformed payload is refused by validateProposal */
+  } catch (e) {
+    // A refusal (e.g. no rate to size a foreign amount) stands; anything else is a malformed payload that
+    // validateProposal has already refused.
+    if (e instanceof SenderError) throw e;
   }
   return 0n;
 }
@@ -385,6 +527,38 @@ const PENDING_STATUSES = ['open', 'awaiting_cfo', 'sent_back'];
 /** Bank counterparties are free text; a blocked vendor is recognized by its name. */
 function sameParty(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/**
+ * Bank lines cited by Proposals still waiting (open, awaiting the CFO, or sent back), other than `selfId`: line id →
+ * the first such Proposal. A bank match cites its matches' lines; a journal entry or accrual its bankTxIds. Two waiting
+ * Proposals must never explain the same bank line (e.g. the continuous Bookkeeper and a close racing each other).
+ * A sent-back Proposal is resubmitted by ruling on it again, which passes its own id here, so it never blocks itself.
+ */
+function pendingBankCitations(ctx: Ctx, selfId: bigint | undefined): Map<string, bigint> {
+  const cited = new Map<string, bigint>();
+  for (const p of ctx.db.proposal.iter()) {
+    if (p.id === selfId || !PENDING_STATUSES.includes(p.status.tag)) continue;
+    const kind = p.kind.tag;
+    if (kind !== 'bank_match' && kind !== 'journal_entry' && kind !== 'accrual') continue;
+    let ids: unknown[] = [];
+    try {
+      const payload = JSON.parse(p.payloadJson) as { matches?: unknown; bankTxIds?: unknown } | null;
+      if (kind === 'bank_match') ids = Array.isArray(payload?.matches) ? payload.matches.map(m => (m && typeof m === 'object' ? (m as { bankTxId?: unknown }).bankTxId : undefined)) : [];
+      else ids = Array.isArray(payload?.bankTxIds) ? payload.bankTxIds : [];
+    } catch {
+      continue;
+    }
+    for (const x of ids) {
+      try {
+        const id = idOf(x, 'bankTxId').toString();
+        if (!cited.has(id)) cited.set(id, p.id);
+      } catch {
+        /* a malformed id in an old payload cites nothing */
+      }
+    }
+  }
+  return cited;
 }
 
 /**
@@ -398,20 +572,24 @@ function sameParty(a: string, b: string): boolean {
  *   month), whose 4000 lines all name their customer and tie out per customer to the schedule lines it flips, and
  *   which waits while a schedule for one of its customers covering those months is still undecided.
  */
-function checkJournal(ctx: Ctx, kind: string, payloadJson: string) {
+function checkJournal(ctx: Ctx, kind: string, payloadJson: string, selfId: bigint | undefined) {
   const payload = parseJson<JournalPayload>(payloadJson, kind);
   const subsidiaryId = idOf(payload.subsidiaryId, 'subsidiaryId');
-  if (!ctx.db.subsidiary.id.find(subsidiaryId)) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  const sub = ctx.db.subsidiary.id.find(subsidiaryId);
+  if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  // Anything posted there by hand would distort or pre-empt the group's eliminations.
+  if (sub.isElimination) throw new SenderError(`${sub.code} is the elimination company; it takes only ic_elimination proposals.`);
   if (!isYm(payload.periodYm)) throw new SenderError(`periodYm must be a month written YYYY-MM; got ${JSON.stringify(payload.periodYm ?? null)}.`);
   const period = periodByYm(ctx, payload.periodYm);
   assertPeriodOpen(ctx, period.id, `An entry for ${period.ym} cannot post.`);
   const lines = parseLines(payload.lines);
   assertBalanced(lines);
   assertRates(ctx, subsidiaryId, period.id, lines, false);
+  assertAccountsOf(ctx, subsidiaryId, lines);
   for (const l of lines) {
-    accountByCode(ctx, l.accountCode);
-    if (l.accountCode === '2000' && l.vendorId === undefined) throw new SenderError('Every line on 2000 Accounts Payable must name its vendor (vendorId).');
+    if (groupCode(l.accountCode) === '2000' && l.vendorId === undefined) throw new SenderError(`Every line on ${l.accountCode} Accounts Payable must name its vendor (vendorId).`);
   }
+  assertReportingRate(ctx, subsidiaryId, period.ym, `An entry for ${period.ym}`);
   let next: ReturnType<typeof periodByYm> | undefined;
   if (kind === 'accrual' && payload.reversesInYm) {
     if (!isYm(payload.reversesInYm)) throw new SenderError(`reversesInYm must be a month written YYYY-MM; got ${JSON.stringify(payload.reversesInYm)}.`);
@@ -422,13 +600,21 @@ function checkJournal(ctx: Ctx, kind: string, payloadJson: string) {
 
   const txs: NonNullable<ReturnType<Ctx['db']['bankTransaction']['id']['find']>>[] = [];
   const seenTx = new Set<string>();
-  for (const raw of listOf<unknown>(payload.bankTxIds, 'bankTxIds')) {
+  const rawTxIds = listOf<unknown>(payload.bankTxIds, 'bankTxIds');
+  const citedBy = rawTxIds.length > 0 ? pendingBankCitations(ctx, selfId) : new Map<string, bigint>();
+  for (const raw of rawTxIds) {
     const txId = idOf(raw, 'bankTxIds entry');
     if (seenTx.has(txId.toString())) throw new SenderError(`Bank transaction ${txId} is listed twice.`);
     seenTx.add(txId.toString());
     const tx = ctx.db.bankTransaction.id.find(txId);
     if (!tx) throw new SenderError(`Unknown bank transaction ${txId}`);
+    if (tx.subsidiaryId !== subsidiaryId) {
+      const owner = ctx.db.subsidiary.id.find(tx.subsidiaryId)?.code ?? String(tx.subsidiaryId);
+      throw new SenderError(`Bank transaction ${txId} is ${owner}'s; an entry for ${sub.code} cannot reconcile another company's bank line.`);
+    }
     if (tx.matched || ctx.db.bankMatch.bankTxId.find(txId)) throw new SenderError(`Bank transaction ${txId} is already matched.`);
+    const other = citedBy.get(txId.toString());
+    if (other !== undefined) throw new SenderError(`Bank transaction ${txId} is already cited by pending proposal ${other}.`);
     const txPeriod = ctx.db.period.ym.find(tx.ym);
     if (!txPeriod) throw new SenderError(`No period ${tx.ym} for bank transaction ${txId}`);
     assertPeriodOpen(ctx, txPeriod.id, `Bank transaction ${txId} cannot be marked matched.`);
@@ -439,7 +625,7 @@ function checkJournal(ctx: Ctx, kind: string, payloadJson: string) {
   // stays possible.
   // A cited bank line pays out only when money went out; a refund coming in from a blocked vendor is fine.
   const outflows = txs.filter(t => t.amountMinor < 0n);
-  const paysOut = outflows.length > 0 || lines.some(l => l.accountCode === '1000' && l.creditMinor > 0n);
+  const paysOut = outflows.length > 0 || lines.some(l => groupCode(l.accountCode) === '1000' && l.creditMinor > 0n);
   if (paysOut) {
     const blocked = [...ctx.db.vendor.iter()].filter(v => v.verification.tag === 'blocked');
     const byTag = blocked.find(v => lines.some(l => l.vendorId === v.id));
@@ -449,8 +635,8 @@ function checkJournal(ctx: Ctx, kind: string, payloadJson: string) {
   }
 
   // Subscription revenue comes only from the revenue schedule.
-  const toFunctional = (l: LineIn, amount: bigint) => (amount * (l.fxRateE6 === 0n ? 1_000_000n : l.fxRateE6)) / 1_000_000n;
-  const revenueLines = lines.filter(l => l.accountCode === '4000');
+  const toFunctional = (l: LineIn, amount: bigint) => applyFx(amount, l.fxRateE6);
+  const revenueLines = lines.filter(l => groupCode(l.accountCode) === '4000');
   const net4000 = revenueLines.reduce((a, l) => a + toFunctional(l, l.creditMinor - l.debitMinor), 0n);
   const flips: NonNullable<ReturnType<Ctx['db']['revenueScheduleLine']['id']['find']>>[] = [];
   const upTo = payload.recognizeScheduleYm;
@@ -524,6 +710,7 @@ function checkBankMatch(ctx: Ctx, m: BankMatchPayload['matches'][number]) {
   const txPeriod = ctx.db.period.ym.find(tx.ym);
   if (!txPeriod) throw new SenderError(`No period ${tx.ym} for bank transaction ${txId}`);
   assertPeriodOpen(ctx, txPeriod.id, `Bank transaction ${txId} cannot be matched.`);
+  assertReportingRate(ctx, tx.subsidiaryId, tx.ym, `Bank transaction ${txId}`);
   const targetId = idOf(m.targetId, 'targetId');
   const amt = abs(tx.amountMinor);
   const txCcy = ccyKey(tx.ccy);
@@ -534,7 +721,12 @@ function checkBankMatch(ctx: Ctx, m: BankMatchPayload['matches'][number]) {
   const paidTo = tx.amountMinor < 0n ? blocked.find(v => sameParty(tx.counterparty, v.name)) : undefined;
   if (paidTo) throw new SenderError(`Bank transaction ${txId} paid ${paidTo.name}, which is blocked; it cannot be matched until the block is lifted.`);
   if (m.targetKind === 'je') {
-    if (!ctx.db.journalEntry.id.find(targetId)) throw new SenderError(`Unknown journal entry ${targetId}`);
+    const target = ctx.db.journalEntry.id.find(targetId);
+    if (!target) throw new SenderError(`Unknown journal entry ${targetId}`);
+    if (target.subsidiaryId !== tx.subsidiaryId) {
+      const code = (id: bigint) => ctx.db.subsidiary.id.find(id)?.code ?? String(id);
+      throw new SenderError(`Journal entry ${targetId} is ${code(target.subsidiaryId)}'s, but bank transaction ${txId} is ${code(tx.subsidiaryId)}'s; a bank line is reconciled only by its own company's entry.`);
+    }
     const tagged = blocked.find(v => [...ctx.db.journalLine.jeId.filter(targetId)].some(l => l.vendorId === v.id));
     if (tagged) throw new SenderError(`Journal entry ${targetId} is tagged with ${tagged.name}, which is blocked; no bank line can be matched to it until the block is lifted.`);
     return { ...base, inv: undefined, bill: undefined };
@@ -546,11 +738,14 @@ function checkBankMatch(ctx: Ctx, m: BankMatchPayload['matches'][number]) {
     if (r === undefined) throw new SenderError(`Bank transaction ${txId} is in ${txCcy}; record a ${txCcy}/${functional} rate for ${tx.ym} before matching it to an ${m.targetKind}.`);
     rate = r;
   }
-  const converted = (amt * rate) / 1_000_000n;
+  const converted = applyFx(amt, rate);
   const shown = txCcy === functional ? `${amt}` : `${amt} ${txCcy} = ${converted} ${functional}`;
+  const companyOf = (id: bigint) => ctx.db.subsidiary.id.find(id)?.code ?? String(id);
   if (m.targetKind === 'invoice') {
     const inv = ctx.db.invoice.id.find(targetId);
     if (!inv) throw new SenderError(`Unknown invoice ${targetId}`);
+    const owner = ctx.db.customer.id.find(inv.customerId)?.subsidiaryId;
+    if (owner !== undefined && owner !== tx.subsidiaryId) throw new SenderError(`Invoice ${inv.number} belongs to ${companyOf(owner)}, but bank transaction ${txId} is ${companyOf(tx.subsidiaryId)}'s; a bank line settles only its own company's invoices.`);
     if (inv.status.tag === 'paid') throw new SenderError(`Invoice ${inv.number} is already paid; bank transaction ${txId} cannot settle it again.`);
     if (tx.amountMinor <= 0n) throw new SenderError(`Bank transaction ${txId} is money going out; an invoice is paid by money coming in.`);
     if (converted !== inv.amountMinor) {
@@ -562,6 +757,7 @@ function checkBankMatch(ctx: Ctx, m: BankMatchPayload['matches'][number]) {
   if (!bill) throw new SenderError(`Unknown bill ${targetId}`);
   if (bill.status.tag === 'paid') throw new SenderError(`Bill ${bill.externalRef} is already paid; bank transaction ${txId} cannot settle it again.`);
   const vendor = ctx.db.vendor.id.find(bill.vendorId);
+  if (vendor && vendor.subsidiaryId !== tx.subsidiaryId) throw new SenderError(`Bill ${bill.externalRef} belongs to ${companyOf(vendor.subsidiaryId)}, but bank transaction ${txId} is ${companyOf(tx.subsidiaryId)}'s; a bank line settles only its own company's bills.`);
   if (vendor && vendor.verification.tag === 'blocked') throw new SenderError(`Bill ${bill.externalRef} is owed to ${vendor.name}, which is blocked; it cannot be settled until the block is lifted.`);
   if (tx.amountMinor >= 0n) throw new SenderError(`Bank transaction ${txId} is money coming in; a bill is paid by money going out.`);
   if (converted !== bill.amountMinor) {
@@ -606,24 +802,336 @@ function checkVendorVerify(ctx: Ctx, payload: VendorVerifyPayload) {
 }
 
 
+// ---------- consolidation: revaluation and elimination proposals ----------
+
+type JournalLineRow = NonNullable<ReturnType<Ctx['db']['journalLine']['id']['find']>>;
+
+/** A calendar month n months after ym (n may be negative). */
+function ymAdd(ym: string, n: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const i = y! * 12 + (m! - 1) + n;
+  return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
+}
+
+/** A posted line in its entry's functional currency, signed debit-positive, converted per line like ledger-core. */
+function functionalOf(l: JournalLineRow): bigint {
+  return applyFx(l.debitMinor, l.fxRateE6) - applyFx(l.creditMinor, l.fxRateE6);
+}
+
+/** Posted lines on one account in months up to and including ym ('through'), or in ym only ('in'). */
+function accountLines(ctx: Ctx, accountId: bigint, ym: string, mode: 'through' | 'in'): JournalLineRow[] {
+  const entryYm = new Map<bigint, string>();
+  const out: JournalLineRow[] = [];
+  for (const l of ctx.db.journalLine.accountId.filter(accountId)) {
+    let lym = entryYm.get(l.jeId);
+    if (lym === undefined) {
+      const je = ctx.db.journalEntry.id.find(l.jeId);
+      lym = (je && ctx.db.period.id.find(je.periodId)?.ym) || '';
+      entryYm.set(l.jeId, lym);
+    }
+    if (lym === '' || (mode === 'through' ? lym > ym : lym !== ym)) continue;
+    out.push(l);
+  }
+  return out;
+}
+
+/** Net (debit − credit) per account code of some proposed lines. */
+function netByAccount(lines: LineIn[]): Map<string, bigint> {
+  const net = new Map<string, bigint>();
+  for (const l of lines) net.set(l.accountCode, (net.get(l.accountCode) ?? 0n) + l.debitMinor - l.creditMinor);
+  return net;
+}
+
+/** The proposed lines must net exactly to what the ledger implies, account by account, and touch nothing else. */
+function assertNets(lines: LineIn[], expected: Map<string, bigint>, what: string, basis: string) {
+  const actual = netByAccount(lines);
+  for (const code of new Set([...expected.keys(), ...actual.keys()])) {
+    const want = expected.get(code) ?? 0n;
+    const got = actual.get(code) ?? 0n;
+    if (want !== got) {
+      throw new SenderError(
+        expected.has(code)
+          ? `The ${what} lines net ${got} on ${code}, but ${basis} gives ${want} (minor units, debit positive).`
+          : `The ${what} lines post ${got} to ${code}, which ${basis} does not involve.`
+      );
+    }
+  }
+}
+
+/** Every line in the subsidiary's own currency at rate 1.0. */
+function assertFunctionalLines(lines: LineIn[], functional: string, code: string, what: string) {
+  for (const l of lines) {
+    if (ccyKey(l.ccy) !== functional || (l.fxRateE6 === 0n ? FX_SCALE : l.fxRateE6) !== FX_SCALE) {
+      throw new SenderError(`${what} lines post in ${code}'s own currency (${functional}) at rate 1000000; the line on ${l.accountCode} is ${ccyKey(l.ccy)} at ${l.fxRateE6}.`);
+    }
+  }
+}
+
+/** Another proposal of this kind still waiting (open, awaiting the CFO or sent back) that the predicate matches. */
+function pendingTwin(ctx: Ctx, kind: string, selfId: bigint | undefined, same: (payload: Record<string, unknown>) => boolean): bigint | undefined {
+  for (const p of ctx.db.proposal.iter()) {
+    if (p.kind.tag !== kind || !PENDING_STATUSES.includes(p.status.tag) || p.id === selfId) continue;
+    try {
+      const other = JSON.parse(p.payloadJson) as Record<string, unknown>;
+      if (other && typeof other === 'object' && same(other)) return p.id;
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+}
+
+const sameId = (a: unknown, b: bigint) => {
+  try {
+    return idOf(a, 'id') === b;
+  } catch {
+    return false;
+  }
+};
+
+type FxRevaluationItem = {
+  accountCode: string;
+  ccy: string;
+  txnBalanceMinor: string;
+  closingRateE6: string;
+  bookedFunctionalMinor: string;
+  targetFunctionalMinor: string;
+  deltaMinor: string;
+};
+type FxRevaluationPayload = { subsidiaryId: string; periodYm: string; rateYm?: string; memo?: string; items: FxRevaluationItem[]; lines: JsonLine[] };
+
+/**
+ * A revaluation restates one subsidiary's foreign-currency asset and liability balances at the month's closing rate.
+ * Every figure is recomputed from the posted ledger and fx_rate and must equal the payload: per item the balance in
+ * the item's currency, the booked functional balance, the closing rate, the target (balance at that rate) and the
+ * delta (target − booked). The lines move each item account by its delta and post the opposite to the subsidiary's
+ * 7100 FX gain or loss, in its own currency, and touch nothing else.
+ */
+function checkFxRevaluation(ctx: Ctx, payloadJson: string, selfId: bigint | undefined) {
+  const payload = parseJson<FxRevaluationPayload>(payloadJson, 'fx_revaluation');
+  const subsidiaryId = idOf(payload.subsidiaryId, 'subsidiaryId');
+  const sub = ctx.db.subsidiary.id.find(subsidiaryId);
+  if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  if (sub.isElimination) throw new SenderError(`${sub.code} is the elimination company; it holds only eliminations and has no foreign balances to revalue.`);
+  if (!isYm(payload.periodYm)) throw new SenderError(`periodYm must be a month written YYYY-MM; got ${JSON.stringify(payload.periodYm ?? null)}.`);
+  const period = periodByYm(ctx, payload.periodYm);
+  assertPeriodOpen(ctx, period.id, `A revaluation for ${period.ym} cannot post.`);
+  const ym = period.ym;
+  if (payload.rateYm !== undefined && payload.rateYm !== null && payload.rateYm !== '' && payload.rateYm !== ym) {
+    throw new SenderError(`rateYm must be the revaluation month ${ym}, not ${JSON.stringify(payload.rateYm)}: a month's balances are restated at that month's closing rate.`);
+  }
+  const functional = ccyKey(sub.functionalCcy);
+  assertReportingRate(ctx, sub.id, ym, `A revaluation of ${sub.code} for ${ym}`);
+  const items = objectsOf<FxRevaluationItem>(payload.items, 'items');
+  if (items.length === 0) throw new SenderError('A revaluation needs at least one item.');
+  const expected = new Map<string, bigint>();
+  let gain = 0n;
+  let moved = 0n;
+  for (const it of items) {
+    const acct = accountByCode(ctx, String(it.accountCode ?? '').trim());
+    if (acct.subsidiaryId !== sub.id) throw new SenderError(`Item account ${acct.code} does not belong to ${sub.code}.`);
+    if (expected.has(acct.code)) throw new SenderError(`Account ${acct.code} appears twice in this revaluation; revalue each account once.`);
+    if (acct.accountType.tag !== 'asset' && acct.accountType.tag !== 'liability') {
+      throw new SenderError(`Account ${acct.code} is ${acct.accountType.tag}; only asset and liability balances are revalued (income and expense stay at the month's average rate).`);
+    }
+    const ccy = ccyKey(String(it.ccy ?? ''));
+    if (!/^[A-Z]{3}$/.test(ccy)) throw new SenderError(`Item ${acct.code} needs a three-letter currency; got ${JSON.stringify(it.ccy ?? null)}.`);
+    if (ccy === functional) throw new SenderError(`Item ${acct.code} is in ${ccy}, ${sub.code}'s own currency; only foreign-currency balances are revalued.`);
+    const rate = closingRate(ctx, ccy, functional, ym);
+    if (rate === undefined) throw new SenderError(`No ${ccy}/${functional} closing rate is recorded for ${ym}; record it before revaluing ${acct.code}.`);
+    let txn = 0n;
+    let booked = 0n;
+    for (const l of accountLines(ctx, acct.id, ym, 'through')) {
+      if (ccyKey(l.ccy) === ccy) txn += l.debitMinor - l.creditMinor;
+      booked += functionalOf(l);
+    }
+    const target = applyFx(txn, rate);
+    const delta = target - booked;
+    const figures: [keyof FxRevaluationItem, bigint, string][] = [
+      ['txnBalanceMinor', txn, `its ${ccy} balance through ${ym}`],
+      ['closingRateE6', rate, `the ${ccy}/${functional} closing rate for ${ym}`],
+      ['bookedFunctionalMinor', booked, `its booked ${functional} balance through ${ym}`],
+      ['targetFunctionalMinor', target, `its ${ccy} balance at the ${ym} closing rate`],
+      ['deltaMinor', delta, 'target minus booked'],
+    ];
+    for (const [field, actual, meaning] of figures) {
+      const stated = minorOf(it[field], `Item ${acct.code} ${field}`);
+      if (stated !== actual) throw new SenderError(`Item ${acct.code}: ${field} is ${stated}, but ${meaning} is ${actual}.`);
+    }
+    expected.set(acct.code, delta);
+    gain += delta;
+    moved += abs(delta);
+  }
+  if (moved === 0n) throw new SenderError(`Every item already stands at the ${ym} closing rate; there is nothing to revalue.`);
+  const offset = codeFor(ctx, sub.id, '7100');
+  if (expected.has(offset)) throw new SenderError(`${offset} is the FX gain or loss account; it cannot also be revalued.`);
+  expected.set(offset, -gain);
+  const lines = parseLines(payload.lines);
+  assertBalanced(lines);
+  assertFunctionalLines(lines, functional, sub.code, 'Revaluation');
+  assertAccountsOf(ctx, sub.id, lines);
+  assertNets(lines, expected, 'revaluation', `the revaluation of ${sub.code} at the ${ym} closing rate`);
+  const twin = pendingTwin(ctx, 'fx_revaluation', selfId, o => sameId(o.subsidiaryId, sub.id) && o.periodYm === ym);
+  if (twin !== undefined) throw new SenderError(`Revaluation proposal ${twin} for ${sub.code} in ${ym} is still waiting; decide it before proposing another.`);
+  return { payload, sub, period, lines };
+}
+
+type IcPair = {
+  label?: string;
+  sourceSubsidiaryId: string;
+  sourceAccountCode: string;
+  counterSubsidiaryId: string;
+  counterAccountCode: string;
+  amountMinor: string;
+  counterTranslatedMinor?: string;
+  differenceMinor?: string;
+};
+type IcEliminationPayload = { subsidiaryId: string; periodYm: string; memo?: string; basis: string; reversesInYm?: string; pairs: IcPair[]; lines: JsonLine[] };
+
+/** The group's intercompany pairs by source group code (the same pairs as ledger-core's IC_PAIRS). */
+const IC_GROUP_PAIRS: Record<string, { counter: string; basis: 'balance' | 'activity' }> = {
+  '1900': { counter: '2900', basis: 'balance' },
+  '1950': { counter: '2950', basis: 'balance' },
+  '4900': { counter: '5900', basis: 'activity' },
+};
+/** The account type the other company books the mirror of a balance or charge in. */
+const MIRROR_TYPE: Record<string, string> = { asset: 'liability', liability: 'asset', revenue: 'expense', expense: 'revenue' };
+
+/**
+ * An elimination removes balances (basis 'balance', cumulative, reversed the next month) or one month's income and
+ * expense (basis 'activity') that group companies have with each other, by posting to the elimination company. Each
+ * pair's amount must equal the source account's balance or month activity in its reporting-currency company; the lines
+ * move <source group>-ELIM by minus that amount and <counter group>-ELIM by plus it, on intercompany accounts of the
+ * elimination company, and nothing else. A month already eliminated on that basis, or still waiting for a ruling, is
+ * refused.
+ */
+function checkIcElimination(ctx: Ctx, payloadJson: string, selfId: bigint | undefined) {
+  const payload = parseJson<IcEliminationPayload>(payloadJson, 'ic_elimination');
+  const subsidiaryId = idOf(payload.subsidiaryId, 'subsidiaryId');
+  const sub = ctx.db.subsidiary.id.find(subsidiaryId);
+  if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryId}`);
+  if (!sub.isElimination) throw new SenderError(`${sub.code} is not the elimination company; eliminations post only to the group's elimination company.`);
+  const reporting = reportingCcy(ctx);
+  const functional = ccyKey(sub.functionalCcy);
+  if (functional !== reporting) throw new SenderError(`The elimination company keeps its books in ${functional}, not the reporting currency ${reporting}.`);
+  if (!isYm(payload.periodYm)) throw new SenderError(`periodYm must be a month written YYYY-MM; got ${JSON.stringify(payload.periodYm ?? null)}.`);
+  const period = periodByYm(ctx, payload.periodYm);
+  assertPeriodOpen(ctx, period.id, `An elimination for ${period.ym} cannot post.`);
+  const ym = period.ym;
+  const basis = payload.basis;
+  if (basis !== 'balance' && basis !== 'activity') throw new SenderError(`basis must be "balance" or "activity"; got ${JSON.stringify(basis ?? null)}.`);
+  const rev = payload.reversesInYm;
+  const hasRev = rev !== undefined && rev !== null && rev !== '';
+  let next: ReturnType<typeof periodByYm> | undefined;
+  if (basis === 'balance') {
+    if (!hasRev) throw new SenderError(`A balance elimination reverses the next month (reversesInYm ${ymAdd(ym, 1)}), because the next close eliminates the balance again.`);
+    if (rev !== ymAdd(ym, 1)) throw new SenderError(`A balance elimination for ${ym} reverses in ${ymAdd(ym, 1)}, not ${JSON.stringify(rev)}.`);
+    next = periodByYm(ctx, rev);
+    assertPeriodOpen(ctx, next.id, `The elimination's automatic reversal in ${next.ym} cannot post.`);
+  } else if (hasRev) {
+    throw new SenderError(`An activity elimination removes ${ym}'s intercompany income and expense only; it does not reverse (drop reversesInYm).`);
+  }
+  const pairs = objectsOf<IcPair>(payload.pairs, 'pairs');
+  if (pairs.length === 0) throw new SenderError('An elimination needs at least one pair.');
+  const where = basis === 'balance' ? `balance through ${ym}` : `activity in ${ym}`;
+  const expected = new Map<string, bigint>();
+  const used = new Set<string>();
+  let total = 0n;
+  for (const [i, pair] of pairs.entries()) {
+    const label = String(pair.label ?? `pair ${i + 1}`);
+    const company = (raw: unknown, side: string) => {
+      const id = idOf(raw, `Pair "${label}" ${side}SubsidiaryId`);
+      const c = ctx.db.subsidiary.id.find(id);
+      if (!c) throw new SenderError(`Pair "${label}": unknown ${side} subsidiary ${id}.`);
+      if (c.isElimination) throw new SenderError(`Pair "${label}": the ${side} side cannot be the elimination company.`);
+      return c;
+    };
+    const src = company(pair.sourceSubsidiaryId, 'source');
+    const cnt = company(pair.counterSubsidiaryId, 'counter');
+    if (src.id === cnt.id) throw new SenderError(`Pair "${label}": source and counter are both ${src.code}; an elimination pairs two different companies.`);
+    if (ccyKey(src.functionalCcy) !== reporting) {
+      throw new SenderError(`Pair "${label}": the source side must be a ${reporting} company so its amount needs no translation; ${src.code} keeps ${ccyKey(src.functionalCcy)} books.`);
+    }
+    const account = (code: unknown, owner: typeof src, side: string) => {
+      const a = accountByCode(ctx, String(code ?? '').trim());
+      if (a.subsidiaryId !== owner.id) throw new SenderError(`Pair "${label}": ${side} account ${a.code} does not belong to ${owner.code}.`);
+      if (!a.isIntercompany) throw new SenderError(`Pair "${label}": ${side} account ${a.code} is not an intercompany account.`);
+      return a;
+    };
+    const srcAcct = account(pair.sourceAccountCode, src, 'source');
+    const cntAcct = account(pair.counterAccountCode, cnt, 'counter');
+    for (const a of [srcAcct, cntAcct]) {
+      if (used.has(a.code)) throw new SenderError(`Pair "${label}": ${a.code} already appears in another pair; each intercompany account is eliminated once.`);
+      used.add(a.code);
+    }
+    const def = IC_GROUP_PAIRS[groupCode(srcAcct.code)];
+    const known = Object.entries(IC_GROUP_PAIRS).map(([s, d]) => `${s} with ${d.counter}`).join(', ');
+    if (!def) throw new SenderError(`Pair "${label}": ${srcAcct.code} is not the source side of an intercompany pair (${known}).`);
+    if (groupCode(cntAcct.code) !== def.counter) throw new SenderError(`Pair "${label}": ${srcAcct.code} pairs with group code ${def.counter}, not ${cntAcct.code}.`);
+    if (def.basis !== basis) throw new SenderError(`Pair "${label}": ${groupCode(srcAcct.code)} with ${def.counter} is eliminated on the ${def.basis} basis, not ${basis}.`);
+    if (MIRROR_TYPE[srcAcct.accountType.tag] !== cntAcct.accountType.tag) {
+      throw new SenderError(`Pair "${label}": ${cntAcct.code} is ${cntAcct.accountType.tag}, but it must mirror ${srcAcct.code} (${srcAcct.accountType.tag}) as ${MIRROR_TYPE[srcAcct.accountType.tag] ?? 'its opposite'}.`);
+    }
+    const pnl = (t: string) => t === 'revenue' || t === 'expense';
+    if (basis === 'balance' && pnl(srcAcct.accountType.tag)) throw new SenderError(`Pair "${label}": ${srcAcct.code} is ${srcAcct.accountType.tag}; a balance elimination pairs asset and liability balances (use basis "activity").`);
+    if (basis === 'activity' && !pnl(srcAcct.accountType.tag)) throw new SenderError(`Pair "${label}": ${srcAcct.code} is ${srcAcct.accountType.tag}; an activity elimination pairs income and expense (use basis "balance").`);
+    let signed = 0n;
+    for (const l of accountLines(ctx, srcAcct.id, ym, basis === 'balance' ? 'through' : 'in')) signed += functionalOf(l);
+    const stated = minorOf(pair.amountMinor, `Pair "${label}" amountMinor`);
+    if (stated !== abs(signed)) throw new SenderError(`Pair "${label}": amountMinor is ${stated}, but ${srcAcct.code} in ${src.code} shows ${abs(signed)} (${where}).`);
+    for (const f of ['counterTranslatedMinor', 'differenceMinor'] as const) {
+      if (pair[f] !== undefined && pair[f] !== null) minorOf(pair[f], `Pair "${label}" ${f}`);
+    }
+    const srcElim = codeFor(ctx, sub.id, groupCode(srcAcct.code));
+    const cntElim = codeFor(ctx, sub.id, groupCode(cntAcct.code));
+    expected.set(srcElim, (expected.get(srcElim) ?? 0n) - signed);
+    expected.set(cntElim, (expected.get(cntElim) ?? 0n) + signed);
+    total += abs(signed);
+  }
+  if (total === 0n) throw new SenderError(`Every pair is zero; there is nothing to eliminate (${where}).`);
+  const lines = parseLines(payload.lines);
+  assertBalanced(lines);
+  assertFunctionalLines(lines, functional, sub.code, 'Elimination');
+  assertAccountsOf(ctx, sub.id, lines);
+  for (const l of lines) {
+    if (!accountByCode(ctx, l.accountCode).isIntercompany) throw new SenderError(`Elimination lines post only to intercompany accounts; ${l.accountCode} is not one.`);
+  }
+  assertNets(lines, expected, 'elimination', `the pairs' ${where}`);
+  const twin = pendingTwin(ctx, 'ic_elimination', selfId, o => sameId(o.subsidiaryId, sub.id) && o.periodYm === ym && o.basis === basis);
+  if (twin !== undefined) throw new SenderError(`Elimination proposal ${twin} (${basis}, ${ym}) is still waiting; decide it before proposing another.`);
+  for (const code of expected.keys()) {
+    const acct = ctx.db.account.code.find(code);
+    if (!acct) continue;
+    let carried = 0n;
+    for (const l of accountLines(ctx, acct.id, ym, basis === 'balance' ? 'through' : 'in')) carried += functionalOf(l);
+    if (carried !== 0n) throw new SenderError(`${code} already carries ${carried} (${where}): ${ym} is already eliminated on the ${basis} basis. Reverse that elimination first.`);
+  }
+  return { payload, sub, period, next, lines };
+}
+
 /**
  * Refuse a proposal that could never apply. Runs at proposal time, before a ruling (so an unusable proposal never
  * reaches the CFO's queue) and again when applyProposal applies it, including at the CFO's confirmation, so a conflict
  * that arose meanwhile is reported instead of skipped.
  */
-function validateProposal(ctx: Ctx, kind: string, payloadJson: string) {
-  guarded(kind, () => validateProposalShapeAndState(ctx, kind, payloadJson));
+function validateProposal(ctx: Ctx, kind: string, payloadJson: string, selfId?: bigint) {
+  guarded(kind, () => validateProposalShapeAndState(ctx, kind, payloadJson, selfId));
 }
 
-function validateProposalShapeAndState(ctx: Ctx, kind: string, payloadJson: string) {
+function validateProposalShapeAndState(ctx: Ctx, kind: string, payloadJson: string, selfId: bigint | undefined) {
   if (kind === 'journal_entry' || kind === 'accrual') {
-    checkJournal(ctx, kind, payloadJson);
+    checkJournal(ctx, kind, payloadJson, selfId);
+  } else if (kind === 'fx_revaluation') {
+    checkFxRevaluation(ctx, payloadJson, selfId);
+  } else if (kind === 'ic_elimination') {
+    checkIcElimination(ctx, payloadJson, selfId);
   } else if (kind === 'bank_match') {
     const payload = parseJson<BankMatchPayload>(payloadJson, kind);
     payload.matches = objectsOf<BankMatchPayload['matches'][number]>(payload.matches, 'matches');
     if (payload.matches.length === 0) throw new SenderError('A bank match proposal needs at least one match.');
     const txs = new Set<string>();
     const targets = new Set<string>();
+    const citedBy = pendingBankCitations(ctx, selfId);
     for (const m of payload.matches) {
       if (typeof m.scoreBp !== 'number' || !Number.isInteger(m.scoreBp) || m.scoreBp < 0 || m.scoreBp > 10000) {
         throw new SenderError(`scoreBp must be a whole number from 0 to 10000; got ${JSON.stringify(m.scoreBp ?? null)}.`);
@@ -631,6 +1139,8 @@ function validateProposalShapeAndState(ctx: Ctx, kind: string, payloadJson: stri
       const txKey = idOf(m.bankTxId, 'bankTxId').toString();
       if (txs.has(txKey)) throw new SenderError(`Bank transaction ${txKey} appears twice in this proposal.`);
       txs.add(txKey);
+      const other = citedBy.get(txKey);
+      if (other !== undefined) throw new SenderError(`Bank transaction ${txKey} is already cited by pending proposal ${other}.`);
       if (m.targetKind !== 'je') {
         const key = `${m.targetKind}:${idOf(m.targetId, 'targetId')}`;
         if (targets.has(key)) throw new SenderError(`The ${m.targetKind} ${idOf(m.targetId, 'targetId')} is matched twice in this proposal; one payment settles it.`);
@@ -688,7 +1198,7 @@ function applyProposal(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['proposal']
 function applyProposalChecked(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['proposal']['id']['find']>>, payloadJson: string, role: string) {
   const kind = p.kind.tag;
   if (kind === 'journal_entry' || kind === 'accrual') {
-    const { payload, subsidiaryId, period, lines, next, txs, flips } = checkJournal(ctx, kind, payloadJson);
+    const { payload, subsidiaryId, period, lines, next, txs, flips } = checkJournal(ctx, kind, payloadJson, p.id);
     const je = postEntry(ctx, {
       subsidiaryId,
       periodId: period.id,
@@ -720,25 +1230,42 @@ function applyProposalChecked(ctx: Ctx, p: NonNullable<ReturnType<Ctx['db']['pro
     }
     return;
   }
-  validateProposal(ctx, kind, payloadJson);
+  if (kind === 'fx_revaluation') {
+    const { payload, sub, period, lines } = checkFxRevaluation(ctx, payloadJson, p.id);
+    postEntry(ctx, { subsidiaryId: sub.id, periodId: period.id, memo: String(payload.memo ?? `Revaluation at the ${period.ym} closing rate`), lines, source: 'agent', proposalId: p.id, reversalOf: undefined, role });
+    return;
+  }
+  if (kind === 'ic_elimination') {
+    const { payload, sub, period, next, lines } = checkIcElimination(ctx, payloadJson, p.id);
+    const memo = String(payload.memo ?? `Intercompany elimination for ${period.ym}`);
+    const je = postEntry(ctx, { subsidiaryId: sub.id, periodId: period.id, memo, lines, source: 'agent', proposalId: p.id, reversalOf: undefined, role });
+    if (next) {
+      // A balance elimination reverses next month, as an accrual does, because the next close eliminates the then-current balance.
+      const reversed = lines.map(l => ({ ...l, debitMinor: l.creditMinor, creditMinor: l.debitMinor, memo: `Reverse elimination: ${l.memo}` }));
+      postEntry(ctx, { subsidiaryId: sub.id, periodId: next.id, memo: `Reversal of elimination: ${memo}`, lines: reversed, source: 'agent', proposalId: p.id, reversalOf: je.id, role });
+    }
+    return;
+  }
+  validateProposal(ctx, kind, payloadJson, p.id);
   if (kind === 'bank_match') {
     const payload = parseJson<BankMatchPayload>(payloadJson, kind);
     for (const m of payload.matches) {
       // Checked against the state as each match applies, so a second match to an invoice the first one paid is refused.
       const { tx, txId, targetId, amt, txPeriod, txCcy, functional, rate, converted, inv, bill } = checkBankMatch(ctx, m);
       const base = { id: 0n, bankTxId: txId, targetId, scoreBp: m.scoreBp, proposalId: p.id };
+      const cash = codeFor(ctx, tx.subsidiaryId, '1000');
       // The cash line carries the bank line's currency and rate; the receivable or payable settles in our own currency.
       if (inv) {
         const je = postEntry(ctx, { subsidiaryId: tx.subsidiaryId, periodId: txPeriod.id, memo: `Payment received ${inv.number}: ${tx.description}`, lines: [
-          { accountCode: '1000', debitMinor: amt, creditMinor: 0n, ccy: txCcy, fxRateE6: rate, customerId: inv.customerId, vendorId: undefined, memo: 'Bank receipt' },
-          { accountCode: '1100', debitMinor: 0n, creditMinor: converted, ccy: functional, fxRateE6: 1_000_000n, customerId: inv.customerId, vendorId: undefined, memo: `Settle ${inv.number}` },
+          { accountCode: cash, debitMinor: amt, creditMinor: 0n, ccy: txCcy, fxRateE6: rate, customerId: inv.customerId, vendorId: undefined, memo: 'Bank receipt' },
+          { accountCode: codeFor(ctx, tx.subsidiaryId, '1100'), debitMinor: 0n, creditMinor: converted, ccy: functional, fxRateE6: 1_000_000n, customerId: inv.customerId, vendorId: undefined, memo: `Settle ${inv.number}` },
         ], source: 'agent', proposalId: p.id, reversalOf: undefined, role });
         ctx.db.bankMatch.insert({ ...base, targetKind: { tag: 'invoice' }, paymentJeId: je.id });
         ctx.db.invoice.id.update({ ...inv, status: { tag: 'paid' } });
       } else if (bill) {
         const je = postEntry(ctx, { subsidiaryId: tx.subsidiaryId, periodId: txPeriod.id, memo: `Payment ${bill.externalRef}: ${tx.description}`, lines: [
-          { accountCode: '2000', debitMinor: converted, creditMinor: 0n, ccy: functional, fxRateE6: 1_000_000n, customerId: undefined, vendorId: bill.vendorId, memo: `Settle ${bill.externalRef}` },
-          { accountCode: '1000', debitMinor: 0n, creditMinor: amt, ccy: txCcy, fxRateE6: rate, customerId: undefined, vendorId: bill.vendorId, memo: 'Bank payment' },
+          { accountCode: codeFor(ctx, tx.subsidiaryId, '2000'), debitMinor: converted, creditMinor: 0n, ccy: functional, fxRateE6: 1_000_000n, customerId: undefined, vendorId: bill.vendorId, memo: `Settle ${bill.externalRef}` },
+          { accountCode: cash, debitMinor: 0n, creditMinor: amt, ccy: txCcy, fxRateE6: rate, customerId: undefined, vendorId: bill.vendorId, memo: 'Bank payment' },
         ], source: 'agent', proposalId: p.id, reversalOf: undefined, role });
         ctx.db.bankMatch.insert({ ...base, targetKind: { tag: 'bill' }, paymentJeId: je.id });
         ctx.db.bill.id.update({ ...bill, status: { tag: 'paid' } });
@@ -921,6 +1448,14 @@ export const init = spacetimedb.init(ctx => {
     ctx.db.settings.insert({ key: MATERIALITY_KEY, valueI64: DEFAULT_MATERIALITY_MINOR, valueText: '' });
     done.push(`materiality ${DEFAULT_MATERIALITY_MINOR}`);
   }
+  if (!ctx.db.settings.key.find(REPORTING_KEY)) {
+    ctx.db.settings.insert({ key: REPORTING_KEY, valueI64: 0n, valueText: DEFAULT_REPORTING_CCY });
+    done.push(`reporting currency ${DEFAULT_REPORTING_CCY}`);
+  }
+  if (!ctx.db.settings.key.find(FEED_KEY)) {
+    ctx.db.settings.insert({ key: FEED_KEY, valueI64: 0n, valueText: '' });
+    done.push('live feed off');
+  }
   if (ctx.db.overdueSweep.count() === 0n) {
     ctx.db.overdueSweep.insert({ scheduledId: 0n, scheduledAt: ScheduleAt.interval(60_000_000n) });
     done.push('overdue sweep scheduled');
@@ -959,20 +1494,6 @@ function releaseCfoSeat(ctx: Ctx, why: string, actor: string) {
   return released;
 }
 
-/**
- * The CFO seat belongs to a browser. When that browser disconnects, the seat is freed, so a closed or stale tab
- * never locks the next one out. Agent roles are unaffected: the orchestrator re-grants them on every boot.
- */
-export const onDisconnect = spacetimedb.clientDisconnected(ctx => {
-  const row = ctx.db.agentIdentity.identity.find(ctx.sender);
-  if (row && row.role.tag === 'cfo') {
-    ctx.db.agentIdentity.identity.delete(ctx.sender);
-    const roster = ctx.db.agentRoster.role.find('cfo');
-    if (roster) ctx.db.agentRoster.role.delete('cfo');
-    audit(ctx, 'cfo', 'release_cfo_seat', 'agent_identity', 0n, 'The CFO browser disconnected; the seat is free.');
-  }
-});
-
 /** Force-free the CFO seat (advisor, database owner, or the CFO itself), e.g. after a tab was lost. */
 export const releaseCfo = spacetimedb.reducer(ctx => {
   const role = roleOf(ctx);
@@ -994,8 +1515,12 @@ export const registerAgent = spacetimedb.reducer(
       ctx.db.agentIdentity.identity.update({ ...existing, displayName });
     } else if (tag === 'ui') {
       ctx.db.agentIdentity.insert({ identity: ctx.sender, role, displayName, registeredAt: ctx.timestamp });
-    } else if (tag === 'advisor' || tag === 'cfo') {
-      // Bootstrap: the first connection to claim advisor or cfo gets it. Later claims need a grant.
+    } else if (tag === 'cfo') {
+      // The CFO seat is a person's. It is claimed with the one-time secret the database owner armed (claimCfo), or
+      // granted by the CFO; never taken by whichever connection asks first.
+      throw new SenderError('Claim the CFO seat with the one-time bootstrap secret printed at setup.');
+    } else if (tag === 'advisor') {
+      // Bootstrap: the first connection to claim advisor gets it. Later claims need a grant.
       const taken = [...ctx.db.agentIdentity.iter()].some(r => r.role.tag === tag);
       if (taken) throw new SenderError(`The ${tag} role is already held. Ask the advisor to grant it.`);
       ctx.db.agentIdentity.insert({ identity: ctx.sender, role, displayName, registeredAt: ctx.timestamp });
@@ -1041,13 +1566,14 @@ export const propose = spacetimedb.reducer(
     closeTaskId: t.option(t.u64()),
   },
   (ctx, { kind, payloadJson, rationale, summaryPlain, amountMinor, periodYm, closeTaskId }) => {
-    const role = requireRole(ctx, ['bookkeeper', 'revenue', 'credit', 'advisor'], 'propose');
-    const kinds = ['journal_entry', 'bank_match', 'revenue_schedule', 'credit_decision', 'accrual', 'vendor_block', 'vendor_verify'];
+    const role = requireRole(ctx, ['bookkeeper', 'revenue', 'credit', 'consolidation', 'advisor'], 'propose');
+    const kinds = ['journal_entry', 'bank_match', 'revenue_schedule', 'credit_decision', 'accrual', 'vendor_block', 'vendor_verify', 'fx_revaluation', 'ic_elimination'];
     if (!kinds.includes(kind)) throw new SenderError(`Unknown proposal kind ${kind}`);
     const allowedKinds: Record<string, string[]> = {
       bookkeeper: ['journal_entry', 'bank_match', 'accrual'],
       revenue: ['journal_entry', 'revenue_schedule'],
       credit: ['journal_entry', 'credit_decision', 'vendor_block', 'vendor_verify'],
+      consolidation: ['fx_revaluation', 'ic_elimination'],
       advisor: kinds,
     };
     if (!allowedKinds[role]?.includes(kind)) throw new SenderError(`The ${role} does not propose ${kind}.`);
@@ -1106,7 +1632,7 @@ export const critique = spacetimedb.reducer(
 export const postAgentMessage = spacetimedb.reducer(
   { threadId: t.string(), kind: t.string(), body: t.string(), summaryPlain: t.string(), proposalId: t.option(t.u64()) },
   (ctx, { threadId, kind, body, summaryPlain, proposalId }) => {
-    const role = requireRole(ctx, ['advisor', 'bookkeeper', 'revenue', 'credit', 'redteam', 'cfo'], 'post messages');
+    const role = requireRole(ctx, ['advisor', 'bookkeeper', 'revenue', 'credit', 'consolidation', 'redteam', 'cfo'], 'post messages');
     const k = kind as 'statement' | 'critique' | 'question' | 'ruling';
     if (!['statement', 'critique', 'question', 'ruling'].includes(k)) throw new SenderError(`Unknown message kind ${kind}`);
     if (k === 'ruling' && role !== 'advisor') throw new SenderError('Only the advisor posts rulings.');
@@ -1131,7 +1657,7 @@ export const approveProposal = spacetimedb.reducer(
     const payloadJson = amendedPayloadJson ?? p.payloadJson;
     const decision = amendedPayloadJson !== undefined ? 'amend' : 'approve';
     // Checked before the materiality split, so the Advisor cannot send an unusable proposal to the CFO.
-    validateProposal(ctx, p.kind.tag, payloadJson);
+    validateProposal(ctx, p.kind.tag, payloadJson, p.id);
     const computed = computedAmount(ctx, p.kind.tag, payloadJson);
     const amountMinor = computed > p.amountMinor ? computed : p.amountMinor;
     const material = amountMinor >= materiality(ctx);
@@ -1230,7 +1756,7 @@ export const recordCreditCheck = spacetimedb.reducer(
 export const updateCloseTask = spacetimedb.reducer(
   { taskId: t.u64(), status: t.string(), note: t.string() },
   (ctx, { taskId, status, note }) => {
-    const role = requireRole(ctx, ['advisor', 'cfo', 'bookkeeper', 'revenue', 'credit'], 'update close tasks');
+    const role = requireRole(ctx, ['advisor', 'cfo', 'bookkeeper', 'revenue', 'credit', 'consolidation'], 'update close tasks');
     const task = ctx.db.closeTask.id.find(taskId);
     if (!task) throw new SenderError(`Unknown close task ${taskId}`);
     const s = status as 'todo' | 'in_progress' | 'blocked' | 'done';
@@ -1376,11 +1902,12 @@ export const cfoReverse = spacetimedb.reducer(
     }
     // An approved accrual posts its own next-month reversal: source agent, the accrual's proposal, reversalOf the
     // accrual. Every other reversal (the CFO's) is posted manually with no proposal, so only those block a reversal.
+    // A balance elimination (ic_elimination) posts its next-month reversal the same way.
     const isAutoAccrualReversal = (x: JournalEntryRow) =>
       x.source.tag === 'agent' &&
       x.proposalId != null &&
       x.proposalId === je.proposalId &&
-      ctx.db.proposal.id.find(x.proposalId)?.kind.tag === 'accrual';
+      ['accrual', 'ic_elimination'].includes(ctx.db.proposal.id.find(x.proposalId)?.kind.tag ?? '');
     const reversals = reversalsOf.get(jeId) ?? [];
     if (reversals.some(x => !isAutoAccrualReversal(x))) throw new SenderError(`Entry ${jeId} was already reversed.`);
     // Reversing an accrual must cancel it in both months: the accrual itself, and its automatic reversal in the
@@ -1522,13 +2049,15 @@ export const sealSetup = spacetimedb.reducer((ctx) => {
 });
 
 export const seedSubsidiary = spacetimedb.reducer(
-  { code: t.string(), name: t.string(), functionalCcy: t.string(), parentCode: t.option(t.string()) },
-  (ctx, { code, name, functionalCcy, parentCode }) => {
+  { code: t.string(), name: t.string(), functionalCcy: t.string(), parentCode: t.option(t.string()), isElimination: t.bool() },
+  (ctx, { code, name, functionalCcy, parentCode, isElimination }) => {
     const role = requireSeeder(ctx);
     if (ctx.db.subsidiary.code.find(code)) return;
     const parent = parentCode ? ctx.db.subsidiary.code.find(parentCode) : null;
-    const sub = ctx.db.subsidiary.insert({ id: 0n, code, name, functionalCcy: ccyKey(functionalCcy), parentId: parent?.id });
-    audit(ctx, role, 'seed_subsidiary', 'subsidiary', sub.id, `${code} ${name} (${functionalCcy})`);
+    if (parentCode && !parent) throw new SenderError(`Unknown parent subsidiary ${parentCode}; seed it first.`);
+    if (isElimination && !parent) throw new SenderError('An elimination subsidiary sits under the group parent; name its parentCode.');
+    const sub = ctx.db.subsidiary.insert({ id: 0n, code, name, functionalCcy: ccyKey(functionalCcy), parentId: parent?.id, isElimination });
+    audit(ctx, role, 'seed_subsidiary', 'subsidiary', sub.id, `${code} ${name} (${functionalCcy})${isElimination ? ', elimination company' : ''}`);
   }
 );
 
@@ -1834,6 +2363,7 @@ export const seedJournalEntry = spacetimedb.reducer(
     // Seed entries may land in already-closed periods (opening balances), so bypass the lock check.
     const total = assertBalanced(lines as LineIn[]);
     assertRates(ctx, sub.id, period.id, lines as LineIn[], false);
+    assertAccountsOf(ctx, sub.id, lines);
     const je = ctx.db.journalEntry.insert({
       id: 0n,
       subsidiaryId: sub.id,
@@ -1914,20 +2444,438 @@ export const resetDemo = spacetimedb.reducer(
     }
     if (confirm !== 'RESET') throw new SenderError('Pass confirm = "RESET".');
     if (sealedRow) ctx.db.settings.key.update({ ...sealedRow, valueI64: 0n });
+    // A reseeded close month would qualify as a feed month (its previous month is locked), so the feed goes off.
+    const feedRow = ctx.db.settings.key.find(FEED_KEY);
+    if (feedRow) ctx.db.settings.key.update({ ...feedRow, valueI64: 0n });
+    // Charter versions and evals, identities and the armed CFO claim survive a reset; the books and the feed log do not.
     const tables: Array<keyof Ctx['db']> = [
       'journalLine', 'journalEntry', 'bankMatch', 'bankTransaction', 'revenueScheduleLine', 'contractItem', 'contract',
       'invoice', 'bill', 'vendor', 'customer', 'periodLock', 'period', 'account', 'fxRate', 'subsidiary',
-      'proposal', 'approval', 'agentMessage', 'closeTask', 'creditCheck', 'auditEvent',
+      'proposal', 'approval', 'agentMessage', 'closeTask', 'creditCheck', 'auditEvent', 'feedEvent',
     ];
     for (const name of tables) {
       const table = ctx.db[name] as any;
       for (const row of [...table.iter()]) {
-        const pk = 'id' in row ? 'id' : 'key' in row ? 'key' : null;
+        const pk = 'id' in row ? 'id' : 'key' in row ? 'key' : 'externalId' in row ? 'externalId' : null;
         if (pk) table[pk].delete(row[pk]);
       }
     }
     audit(ctx, role ?? (isOwner ? 'owner' : 'cfo'), 'reset_demo', 'all', 0n, 'Demo data cleared.');
     if (role !== 'cfo') releaseCfoSeat(ctx, 'Demo reset.', role ?? 'owner');
+  }
+);
+
+// ---------- CFO seat bootstrap ----------
+
+const BOOTSTRAP_KEY = 'cfo';
+const MAX_BOOTSTRAP_TTL_MINUTES = 7 * 24 * 60;
+
+function cfoExists(ctx: Ctx): boolean {
+  return [...ctx.db.agentIdentity.iter()].some(r => r.role.tag === 'cfo');
+}
+
+function isDatabaseOwner(ctx: Ctx): boolean {
+  const owner = ctx.db.settings.key.find(OWNER_KEY)?.valueText;
+  return !!owner && owner === ctx.sender.toHexString();
+}
+
+function isoOf(ts: Timestamp): string {
+  return new Date(Number(ts.microsSinceUnixEpoch / 1000n)).toISOString();
+}
+
+/**
+ * The database owner (whoever published it; in practice the seed loader through the spacetime CLI) arms a one-time
+ * claim for the CFO seat by storing only the SHA-256 of a random secret. The secret itself never reaches the module
+ * until someone claims with it.
+ */
+export const armCfoBootstrap = spacetimedb.reducer(
+  { secretSha256: t.string(), ttlMinutes: t.u32() },
+  (ctx, { secretSha256, ttlMinutes }) => {
+    if (!isDatabaseOwner(ctx)) {
+      throw new SenderError('Only the database owner can arm the CFO bootstrap (run `pnpm cfo:bootstrap`, which calls it through the spacetime CLI as the publisher).');
+    }
+    if (cfoExists(ctx)) throw new SenderError('The CFO seat is already claimed; nothing to arm.');
+    const hash = secretSha256.trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(hash)) throw new SenderError('secretSha256 must be the 64-character hex SHA-256 of the secret.');
+    if (ttlMinutes < 1 || ttlMinutes > MAX_BOOTSTRAP_TTL_MINUTES) throw new SenderError(`ttlMinutes must be between 1 and ${MAX_BOOTSTRAP_TTL_MINUTES} (a week).`);
+    const expiresAt = new Timestamp(ctx.timestamp.microsSinceUnixEpoch + BigInt(ttlMinutes) * 60_000_000n);
+    const row = { key: BOOTSTRAP_KEY, secretSha256: hash, createdAt: ctx.timestamp, expiresAt };
+    if (ctx.db.cfoBootstrap.key.find(BOOTSTRAP_KEY)) ctx.db.cfoBootstrap.key.update(row);
+    else ctx.db.cfoBootstrap.insert(row);
+    audit(ctx, 'owner', 'arm_cfo_bootstrap', 'cfo_bootstrap', 0n, `CFO claim armed until ${isoOf(expiresAt)}.`);
+  }
+);
+
+/** Claim the CFO seat with the one-time secret. A wrong or expired secret is refused; the claim is single-use. */
+export const claimCfo = spacetimedb.reducer(
+  { secret: t.string(), displayName: t.string() },
+  (ctx, { secret, displayName }) => {
+    if (cfoExists(ctx)) throw new SenderError('The CFO seat is already claimed. Ask the CFO for a grant, or reset the database to claim it again.');
+    const armed = ctx.db.cfoBootstrap.key.find(BOOTSTRAP_KEY);
+    if (!armed) throw new SenderError('No CFO claim is armed for this database. Run `pnpm cfo:bootstrap` for a new claim link.');
+    if (armed.expiresAt.microsSinceUnixEpoch <= ctx.timestamp.microsSinceUnixEpoch) {
+      throw new SenderError(`The CFO claim link expired at ${isoOf(armed.expiresAt)}. Run \`pnpm cfo:bootstrap\` for a new one.`);
+    }
+    if (sha256HexOfString(secret.trim()) !== armed.secretSha256) throw new SenderError('That is not the claim secret armed for this database.');
+    const existing = ctx.db.agentIdentity.identity.find(ctx.sender);
+    if (existing && existing.role.tag !== 'ui') {
+      throw new SenderError(`This connection is registered as ${existing.role.tag}; claim the CFO seat from a fresh connection.`);
+    }
+    const name = displayName.trim() || 'CFO';
+    const row = { identity: ctx.sender, role: { tag: 'cfo' as const }, displayName: name, registeredAt: ctx.timestamp };
+    if (existing) ctx.db.agentIdentity.identity.update(row);
+    else ctx.db.agentIdentity.insert(row);
+    const roster = ctx.db.agentRoster.role.find('cfo');
+    if (roster) ctx.db.agentRoster.role.update({ ...roster, displayName: name, model: 'human', registeredAt: ctx.timestamp });
+    else ctx.db.agentRoster.insert({ role: 'cfo', displayName: name, registeredAt: ctx.timestamp, model: 'human' });
+    ctx.db.cfoBootstrap.key.delete(BOOTSTRAP_KEY);
+    audit(ctx, 'cfo', 'claim_cfo', 'agent_identity', 0n, `${name} claimed the CFO seat with the bootstrap secret.`);
+  }
+);
+
+// ---------- live feed (bank and invoice rows from the gateway's feeder) ----------
+
+const FeedBankTxArg = t.object('FeedBankTxArg', {
+  externalId: t.string(),
+  bookedAtMicros: t.i64(),
+  amountMinor: t.i64(),
+  ccy: t.string(),
+  description: t.string(),
+  counterparty: t.string(),
+});
+
+const FeedInvoiceArg = t.object('FeedInvoiceArg', {
+  externalId: t.string(),
+  customerId: t.u64(),
+  contractCode: t.option(t.string()),
+  number: t.string(),
+  issuedAtMicros: t.i64(),
+  dueAtMicros: t.i64(),
+  amountMinor: t.i64(),
+});
+
+/** The UTC calendar month (YYYY-MM) of a timestamp in microseconds, without relying on the runtime's Date. */
+function ymOfMicros(micros: bigint): string {
+  let days = micros / MICROS_PER_DAY;
+  if (micros < 0n && micros % MICROS_PER_DAY !== 0n) days -= 1n;
+  // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).
+  const z = Number(days) + 719468;
+  const era = Math.floor(z / 146097);
+  const doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+  const m = mp < 10 ? mp + 3 : mp - 9;
+  const y = yoe + era * 400 + (m <= 2 ? 1 : 0);
+  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}`;
+}
+
+function feedEnabled(ctx: Ctx): boolean {
+  return (ctx.db.settings.key.find(FEED_KEY)?.valueI64 ?? 0n) === 1n;
+}
+
+/** The feed may book only as the feed role, while the CFO has it switched on. */
+function requireFeed(ctx: Ctx) {
+  requireRole(ctx, ['feed'], 'ingest feed rows');
+  if (!feedEnabled(ctx)) throw new SenderError('The live feed is off; the CFO turns it on in Settings.');
+}
+
+/**
+ * The feed books only into an open month whose previous month exists and was locked by the CFO (a seeded lock does
+ * not count, so on fresh demo data the close month is never a feed month): October once the CFO locks September. It
+ * stops once the month's own close has started (any of its close tasks has left todo; a Proposal filed against a close
+ * task moves it to in progress), and it never books into the first month of the books.
+ */
+function feedPeriod(ctx: Ctx, ym: string, what: string) {
+  const p = ctx.db.period.ym.find(ym);
+  if (!p) throw new SenderError(`${what}: the books have no ${ym} period.`);
+  if (p.status.tag !== 'open' || periodLocked(ctx, p.id)) throw new SenderError(`${what}: ${ym} is ${p.status.tag}; the feed books only into the open month.`);
+  const prevYm = ymAdd(ym, -1);
+  const prev = ctx.db.period.ym.find(prevYm);
+  if (!prev) throw new SenderError(`${what}: the books have no ${prevYm} period before ${ym}; the feed runs only in the first open month after a locked month.`);
+  const lock = ctx.db.periodLock.periodId.find(prev.id);
+  if (!lock || !periodLocked(ctx, prev.id)) {
+    throw new SenderError(`${what}: ${prev.ym} is not locked yet; the feed runs only in the first open month after a locked month.`);
+  }
+  if (lock.lockedByRole !== 'cfo') {
+    throw new SenderError(`${what}: ${prev.ym} was locked by the ${lock.lockedByRole === 'seed' ? 'seed data' : lock.lockedByRole}, not closed by the CFO; the feed starts only in the month after one the CFO locked.`);
+  }
+  const started = [...ctx.db.closeTask.periodId.filter(p.id)].find(t => t.status.tag !== 'todo');
+  if (started) {
+    throw new SenderError(`${what}: the ${ym} close has started (close task "${started.title}" is ${started.status.tag.replace('_', ' ')}); the feed stops once a month's close opens.`);
+  }
+  return p;
+}
+
+function feedExternalId(raw: string, what: string): string {
+  const id = raw.trim();
+  if (id === '' || id.length > 200) throw new SenderError(`${what}: externalId must be 1 to 200 characters.`);
+  return id;
+}
+
+export const setFeedEnabled = spacetimedb.reducer(
+  { enabled: t.bool() },
+  (ctx, { enabled }) => {
+    requireRole(ctx, ['cfo'], 'switch the live feed');
+    const row = ctx.db.settings.key.find(FEED_KEY);
+    const v = enabled ? 1n : 0n;
+    if (row) ctx.db.settings.key.update({ ...row, valueI64: v });
+    else ctx.db.settings.insert({ key: FEED_KEY, valueI64: v, valueText: '' });
+    audit(ctx, 'cfo', 'set_feed_enabled', 'settings', 0n, enabled ? 'The CFO turned the live feed on.' : 'The CFO turned the live feed off.');
+  }
+);
+
+export const ingestBankTransactions = spacetimedb.reducer(
+  { subsidiaryCode: t.string(), txs: t.array(FeedBankTxArg) },
+  (ctx, { subsidiaryCode, txs }) => {
+    requireFeed(ctx);
+    const sub = ctx.db.subsidiary.code.find(subsidiaryCode);
+    if (!sub) throw new SenderError(`Unknown subsidiary ${subsidiaryCode}`);
+    if (sub.isElimination) throw new SenderError(`${sub.code} is the elimination company; it has no bank account.`);
+    let added = 0;
+    let skipped = 0;
+    const yms = new Set<string>();
+    for (const x of txs) {
+      const externalId = feedExternalId(x.externalId, 'Bank line');
+      if (ctx.db.feedEvent.externalId.find(externalId)) {
+        skipped++;
+        continue;
+      }
+      const what = `Bank line ${externalId}`;
+      if (x.amountMinor === 0n) throw new SenderError(`${what}: the amount cannot be zero.`);
+      const ccy = ccyKey(x.ccy);
+      if (!/^[A-Z]{3}$/.test(ccy)) throw new SenderError(`${what}: currency must be a three-letter code; got ${JSON.stringify(x.ccy)}.`);
+      if (x.description.trim() === '') throw new SenderError(`${what}: a bank line needs its description.`);
+      const ym = ymOfMicros(x.bookedAtMicros);
+      feedPeriod(ctx, ym, what);
+      const tx = ctx.db.bankTransaction.insert({
+        id: 0n,
+        subsidiaryId: sub.id,
+        bookedAt: new Timestamp(x.bookedAtMicros),
+        ym,
+        amountMinor: x.amountMinor,
+        ccy,
+        description: x.description,
+        counterparty: x.counterparty,
+        matched: false,
+      });
+      ctx.db.feedEvent.insert({ externalId, kind: { tag: 'bank_tx' }, rowId: tx.id, subsidiaryId: sub.id, ym, ingestedAt: ctx.timestamp });
+      added++;
+      yms.add(ym);
+    }
+    if (added > 0 || skipped > 0) {
+      audit(ctx, 'feed', 'ingest_bank_transactions', 'bank_transaction', sub.id, `${added} bank line(s) booked for ${sub.code}${yms.size ? ` in ${[...yms].join(', ')}` : ''}; ${skipped} already ingested and skipped.`);
+    }
+  }
+);
+
+export const ingestInvoices = spacetimedb.reducer(
+  { invoices: t.array(FeedInvoiceArg) },
+  (ctx, { invoices }) => {
+    requireFeed(ctx);
+    let added = 0;
+    let skipped = 0;
+    const numbers: string[] = [];
+    for (const a of invoices) {
+      const externalId = feedExternalId(a.externalId, 'Invoice');
+      const number = a.number.trim();
+      if (ctx.db.feedEvent.externalId.find(externalId) || (number !== '' && ctx.db.invoice.number.find(number))) {
+        skipped++;
+        continue;
+      }
+      const what = `Invoice ${number || externalId}`;
+      if (number === '') throw new SenderError(`${what}: an invoice needs its number.`);
+      const customer = ctx.db.customer.id.find(a.customerId);
+      if (!customer) throw new SenderError(`${what}: unknown customer ${a.customerId}.`);
+      let contractId: bigint | undefined;
+      if (a.contractCode) {
+        const contract = ctx.db.contract.code.find(a.contractCode);
+        if (!contract) throw new SenderError(`${what}: unknown contract ${a.contractCode}.`);
+        if (contract.customerId !== customer.id) throw new SenderError(`${what}: contract ${a.contractCode} belongs to another customer.`);
+        contractId = contract.id;
+      }
+      if (a.amountMinor <= 0n) throw new SenderError(`${what}: the amount must be above zero.`);
+      if (a.dueAtMicros < a.issuedAtMicros) throw new SenderError(`${what}: it cannot fall due before it is issued.`);
+      const ym = ymOfMicros(a.issuedAtMicros);
+      feedPeriod(ctx, ym, what);
+      const inv = ctx.db.invoice.insert({
+        id: 0n,
+        customerId: customer.id,
+        contractId,
+        number,
+        ym,
+        issuedAt: new Timestamp(a.issuedAtMicros),
+        dueAt: new Timestamp(a.dueAtMicros),
+        amountMinor: a.amountMinor,
+        status: { tag: 'open' },
+      });
+      ctx.db.feedEvent.insert({ externalId, kind: { tag: 'invoice' }, rowId: inv.id, subsidiaryId: customer.subsidiaryId, ym, ingestedAt: ctx.timestamp });
+      added++;
+      numbers.push(number);
+    }
+    if (added > 0 || skipped > 0) {
+      audit(ctx, 'feed', 'ingest_invoices', 'invoice', 0n, `${added} invoice(s) booked${numbers.length ? `: ${numbers.join(', ')}` : ''}; ${skipped} already ingested and skipped.`);
+    }
+  }
+);
+
+// ---------- charters (versions, evals, publishing) ----------
+
+const CHARTER_ROLES = ['advisor', 'bookkeeper', 'revenue', 'credit', 'redteam', 'consolidation'];
+const MAX_CHARTER_BYTES = 20 * 1024;
+const MAX_MAPPING_BYTES = 128 * 1024;
+const MAX_EVAL_RESULTS_BYTES = 512 * 1024;
+const CHARTER_MODES = ['dry_run', 'snapshot'];
+
+type CharterRow = NonNullable<ReturnType<Ctx['db']['charterVersion']['id']['find']>>;
+
+function charterRole(role: string): string {
+  const r = role.trim().toLowerCase();
+  if (!CHARTER_ROLES.includes(r)) throw new SenderError(`Charters exist for ${CHARTER_ROLES.join(', ')}; not for ${JSON.stringify(role)}.`);
+  return r;
+}
+
+function charterById(ctx: Ctx, id: bigint): CharterRow {
+  const v = ctx.db.charterVersion.id.find(id);
+  if (!v) throw new SenderError(`Unknown charter version ${id}`);
+  return v;
+}
+
+function liveCharter(ctx: Ctx, role: string): CharterRow | undefined {
+  return [...ctx.db.charterVersion.role.filter(role)].find(v => v.status.tag === 'live');
+}
+
+/** Save an edited charter as a new draft version. Drafts change nothing until the CFO publishes one that passed its eval. */
+export const saveCharterDraft = spacetimedb.reducer(
+  { role: t.string(), bodyMd: t.string(), mappingJson: t.string(), summaryPlain: t.string(), basedOnVersionId: t.option(t.u64()) },
+  (ctx, { role, bodyMd, mappingJson, summaryPlain, basedOnVersionId }) => {
+    const author = requireRole(ctx, ['cfo', 'ui'], 'save charter drafts');
+    const r = charterRole(role);
+    if (bodyMd.trim() === '') throw new SenderError('A charter needs its text.');
+    const bytes = utf8(bodyMd).length;
+    if (bytes > MAX_CHARTER_BYTES) throw new SenderError(`A charter is at most 20 KB; this one is ${Math.ceil(bytes / 1024)} KB.`);
+    if (utf8(mappingJson).length > MAX_MAPPING_BYTES) throw new SenderError('The line mapping is at most 128 KB.');
+    let mapping: unknown;
+    try {
+      mapping = JSON.parse(mappingJson);
+    } catch {
+      throw new SenderError('mappingJson is not valid JSON.');
+    }
+    if (!Array.isArray(mapping)) throw new SenderError('mappingJson must be a JSON list of line mappings.');
+    if (mapping.some(m => m === null || typeof m !== 'object' || Array.isArray(m))) throw new SenderError('Every entry of mappingJson must be an object.');
+    if (summaryPlain.trim().length < 10) throw new SenderError('Every charter draft needs a plain-English summary of the change.');
+    if (basedOnVersionId !== undefined) {
+      const base = charterById(ctx, basedOnVersionId);
+      if (base.role !== r) throw new SenderError(`Charter version ${basedOnVersionId} is a ${base.role} charter, not ${r}.`);
+    }
+    const version = [...ctx.db.charterVersion.role.filter(r)].reduce((a, v) => (v.version > a ? v.version : a), 0) + 1;
+    const row = ctx.db.charterVersion.insert({
+      id: 0n,
+      role: r,
+      version,
+      status: { tag: 'draft' },
+      bodyMd,
+      mappingJson,
+      summaryPlain: summaryPlain.trim(),
+      basedOnVersionId,
+      authoredBy: ctx.sender,
+      authoredByRole: author,
+      createdAt: ctx.timestamp,
+      publishedBy: undefined,
+      publishedAt: undefined,
+    });
+    audit(ctx, author, 'save_charter_draft', 'charter_version', row.id, `${r} charter draft v${version}: ${summaryPlain.trim()}`);
+  }
+);
+
+/** The gateway's eval runner records each run's result; publishing needs the latest run of that version to pass. */
+export const recordCharterEval = spacetimedb.reducer(
+  { charterVersionId: t.u64(), passed: t.bool(), mode: t.string(), resultsJson: t.string(), summaryPlain: t.string() },
+  (ctx, { charterVersionId, passed, mode, resultsJson, summaryPlain }) => {
+    requireRole(ctx, ['advisor'], 'record charter evals');
+    const v = charterById(ctx, charterVersionId);
+    if (v.status.tag === 'live') throw new SenderError(`Version ${v.version} of the ${v.role} charter is already live; evaluate a draft.`);
+    if (!CHARTER_MODES.includes(mode)) throw new SenderError(`mode must be ${CHARTER_MODES.join(' or ')}; got ${JSON.stringify(mode)}.`);
+    if (utf8(resultsJson).length > MAX_EVAL_RESULTS_BYTES) throw new SenderError('Eval results are at most 512 KB.');
+    try {
+      JSON.parse(resultsJson);
+    } catch {
+      throw new SenderError('resultsJson is not valid JSON.');
+    }
+    if (summaryPlain.trim().length < 10) throw new SenderError('Every eval result needs a plain-English summary.');
+    const row = ctx.db.charterEval.insert({
+      id: 0n,
+      charterVersionId,
+      passed,
+      mode,
+      resultsJson,
+      summaryPlain: summaryPlain.trim(),
+      ranBy: ctx.sender,
+      ranByRole: 'advisor',
+      ranAt: ctx.timestamp,
+    });
+    audit(ctx, 'advisor', 'record_charter_eval', 'charter_eval', row.id, `${v.role} charter v${v.version} ${mode} eval ${passed ? 'passed' : 'failed'}: ${summaryPlain.trim()}`);
+  }
+);
+
+/** Publish a charter version as the role's live charter. CFO only, and only when its latest eval was a passing dry run. */
+export const publishCharter = spacetimedb.reducer(
+  { charterVersionId: t.u64(), notePlain: t.string() },
+  (ctx, { charterVersionId, notePlain }) => {
+    requireRole(ctx, ['cfo'], 'publish charters');
+    const v = charterById(ctx, charterVersionId);
+    if (v.status.tag === 'live') throw new SenderError(`Version ${v.version} of the ${v.role} charter is already live.`);
+    const evals = [...ctx.db.charterEval.charterVersionId.filter(v.id)];
+    const latest = evals.reduce<(typeof evals)[number] | undefined>((a, b) => {
+      if (!a) return b;
+      const at = a.ranAt.microsSinceUnixEpoch;
+      const bt = b.ranAt.microsSinceUnixEpoch;
+      return bt > at || (bt === at && b.id > a.id) ? b : a;
+    }, undefined);
+    if (!latest) throw new SenderError(`Run an eval of version ${v.version} of the ${v.role} charter first; a charter publishes only after its latest eval passes.`);
+    if (!latest.passed) throw new SenderError(`The latest eval of version ${v.version} of the ${v.role} charter failed: ${latest.summaryPlain}`);
+    // A snapshot run only replays the recorded ledger; publishing needs the full close the draft would actually run.
+    if (latest.mode !== 'dry_run') {
+      throw new SenderError(`The latest eval of version ${v.version} of the ${v.role} charter was a ${latest.mode} run; a charter publishes only after a passing dry run (a full close on a scratch database).`);
+    }
+    const prior = liveCharter(ctx, v.role);
+    if (prior) ctx.db.charterVersion.id.update({ ...prior, status: { tag: 'retired' } });
+    ctx.db.charterVersion.id.update({ ...v, status: { tag: 'live' }, publishedBy: ctx.sender, publishedAt: ctx.timestamp });
+    const note = notePlain.trim();
+    const replaced = prior ? `version ${prior.version}` : 'the built-in charter';
+    postMessage(
+      ctx,
+      'cfo',
+      `charter:${v.role}`,
+      'statement',
+      `Published version ${v.version} of the ${v.role} charter, replacing ${replaced}${note ? `: ${note}` : '.'}`,
+      `The CFO published version ${v.version} of the ${v.role} charter: ${note || v.summaryPlain}`,
+      undefined
+    );
+    audit(ctx, 'cfo', 'publish_charter', 'charter_version', v.id, `${v.role} v${v.version} live (replaces ${replaced}; ${latest.mode} eval ${latest.id} passed)${note ? `: ${note}` : ''}`);
+  }
+);
+
+/** Retire a role's live charter; the shipped built-in charter (version 0) applies again. CFO only. */
+export const retireLiveCharter = spacetimedb.reducer(
+  { role: t.string(), notePlain: t.string() },
+  (ctx, { role, notePlain }) => {
+    requireRole(ctx, ['cfo'], 'retire charters');
+    const r = charterRole(role);
+    const live = liveCharter(ctx, r);
+    if (!live) throw new SenderError(`The ${r} has no published charter; the built-in charter already applies.`);
+    ctx.db.charterVersion.id.update({ ...live, status: { tag: 'retired' } });
+    const note = notePlain.trim();
+    postMessage(
+      ctx,
+      'cfo',
+      `charter:${r}`,
+      'statement',
+      `Retired version ${live.version} of the ${r} charter; the built-in charter applies again${note ? `: ${note}` : '.'}`,
+      `The CFO restored the built-in ${r} charter${note ? `: ${note}` : '.'}`,
+      undefined
+    );
+    audit(ctx, 'cfo', 'retire_live_charter', 'charter_version', live.id, `${r} v${live.version} retired; built-in applies${note ? `: ${note}` : ''}`);
   }
 );
 

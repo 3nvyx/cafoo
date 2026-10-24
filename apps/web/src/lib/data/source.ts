@@ -34,8 +34,11 @@ export interface ConnectionState {
 	/** Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working. */
 	closes: { periodYm: string; status: 'running' | 'done' }[];
 	message?: string;
-	/** Live mode only: whether this browser holds the CFO seat. 'held' means another browser has it. */
-	cfoSeat?: 'mine' | 'held' | 'unknown';
+	/**
+	 * Live mode only: whether this browser holds the CFO seat. 'unclaimed' means nobody does and the one-time claim
+	 * link (printed by the seed loader) must be opened in this browser; 'held' means another browser has it.
+	 */
+	cfoSeat?: 'mine' | 'unclaimed' | 'held' | 'unknown';
 }
 
 export interface ChangeEvent<T = unknown> {
@@ -109,4 +112,6 @@ export interface DataSource {
 	unlockPeriod(periodId: string, reasonPlain: string): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
+	/** Live mode only: take the CFO seat with the one-time bootstrap secret from the claim link. */
+	claimCfo?(secret: string): Promise<void>;
 }

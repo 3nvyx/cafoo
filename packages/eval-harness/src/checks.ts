@@ -34,6 +34,92 @@ const cleanCheck = (c: Row) => String(c.decision).toUpperCase() === 'APPROVE' &&
 
 type ScheduleLine = { contractItemId: string; customerId: string; ym: string; amountMinor: string };
 
+// ---- Consolidation (payload wire form: packages/ledger-core proposals, module validation in spacetimedb) ----
+
+type PayloadLine = { accountCode: string; debitMinor: string; creditMinor: string; ccy: string; fxRateE6: string };
+type FxRevaluationPayload = {
+  subsidiaryId: string;
+  periodYm: string;
+  rateYm?: string;
+  items: { accountCode: string; ccy: string; txnBalanceMinor: string; closingRateE6: string; bookedFunctionalMinor: string; targetFunctionalMinor: string; deltaMinor: string }[];
+  lines: PayloadLine[];
+};
+type IcEliminationPayload = {
+  subsidiaryId: string;
+  periodYm: string;
+  basis: string;
+  reversesInYm?: string;
+  pairs: { label: string; sourceSubsidiaryId: string; sourceAccountCode: string; counterSubsidiaryId: string; counterAccountCode: string; amountMinor: string; counterTranslatedMinor: string; differenceMinor: string }[];
+  lines: PayloadLine[];
+};
+
+const E6 = 1_000_000n;
+const abs = (n: bigint) => (n < 0n ? -n : n);
+/** a / b rounded half away from zero, as ledger-core rounds. */
+function divRound(a: bigint, b: bigint): bigint {
+  const q = a / b;
+  const r = a % b;
+  if (r === 0n || abs(r) * 2n < abs(b)) return q;
+  return (a < 0n) !== (b < 0n) ? q - 1n : q + 1n;
+}
+/** An amount converted at a rate ×1e6, rounded half away from zero (ledger-core applyFx). */
+const applyFx = (amount: bigint, rateE6: bigint) => divRound(amount * rateE6, E6);
+/** The group account code, the text before the first '-': '2950-UK' -> '2950'; a root subsidiary's bare code is its own. */
+const groupCode = (code: string) => code.split('-')[0]!;
+
+/** One journal line with what consolidation checks need from its entry and period. */
+type LedgerLine = { code: string; subsidiaryId: string; ym: string; ccy: string; txn: bigint; functional: bigint; proposalId: string | null };
+
+function ledgerLines(db: Db): LedgerLine[] {
+  const jes = byId(db.query('SELECT * FROM journal_entry'));
+  const periods = byId(db.query('SELECT * FROM period'));
+  return db.query('SELECT * FROM journal_line').flatMap((l) => {
+    const je = jes.get(String(l.je_id));
+    if (!je) return [];
+    const rate = big(l.fx_rate_e_6);
+    return [{
+      code: String(l.account_code),
+      subsidiaryId: String(je.subsidiary_id),
+      ym: String(periods.get(String(je.period_id))?.ym ?? ''),
+      ccy: String(l.ccy),
+      txn: big(l.debit_minor) - big(l.credit_minor),
+      // Per line, each side converted on its own, as the module books it.
+      functional: applyFx(big(l.debit_minor), rate) - applyFx(big(l.credit_minor), rate),
+      proposalId: je.proposal_id === null || je.proposal_id === undefined ? null : String(je.proposal_id),
+    }];
+  });
+}
+
+/**
+ * The books a Proposal was computed from: entries posted from it or from any later Proposal are left out, so a
+ * Proposal that has since been applied is judged against the ledger it saw.
+ */
+const before = (lines: LedgerLine[], proposalId: unknown) => lines.filter((l) => l.proposalId === null || big(l.proposalId) < big(proposalId));
+
+/** Closing rate ×1e6 from one currency into another for a month: 1e6 for the same currency, direct, else 1e12 / inverse. */
+function closingRate(rates: Row[], from: string, to: string, ym: string): bigint | undefined {
+  if (from === to) return E6;
+  const find = (f: string, t: string) => rates.find((r) => r.kind === 'closing' && r.from_ccy === f && r.to_ccy === t && String(r.ym) === ym);
+  const direct = find(from, to);
+  if (direct) return big(direct.rate_e_6);
+  const inverse = find(to, from);
+  return inverse && big(inverse.rate_e_6) !== 0n ? divRound(E6 * E6, big(inverse.rate_e_6)) : undefined;
+}
+
+/** Net debit-positive effect of payload lines per account code. */
+function netByCode(lines: PayloadLine[], key: (code: string) => string = (c) => c): Map<string, bigint> {
+  const out = new Map<string, bigint>();
+  for (const l of lines) out.set(key(l.accountCode), (out.get(key(l.accountCode)) ?? 0n) + big(l.debitMinor) - big(l.creditMinor));
+  return out;
+}
+const sumOf = (lines: PayloadLine[], f: 'debitMinor' | 'creditMinor') => lines.reduce((a, l) => a + big(l[f]), 0n);
+
+/** Settings value_text by key (reporting_ccy), or undefined. */
+const settingText = (db: Db, key: string) => {
+  const v = db.query('SELECT * FROM settings').find((r) => r.key === key)?.value_text;
+  return typeof v === 'string' && v ? v : undefined;
+};
+
 function scheduleProposals(db: Db, params: Record<string, unknown>): Row[] {
   return db.query('SELECT * FROM proposal').filter((p) => p.kind === 'revenue_schedule' && matchRow(p, params.where as CondMap | undefined));
 }
@@ -440,6 +526,190 @@ export const CHECKS: Record<string, CheckFn> = {
       if (n > allowed) offenders.push({ proposal_id: k, rulings: n, cfo_send_backs: sendBacks.get(k) ?? 0 });
     }
     return { checked: rulings.size, unit: 'ruled proposals', offenders };
+  },
+
+  /**
+   * Every revaluation (fx_revaluation proposal) restates only foreign-currency balances, at the recorded closing rate
+   * of its own month, by the right amount: per item the account is an asset or liability of the subsidiary, the item
+   * currency is not the subsidiary's own, the rate is fx_rate's closing rate (item currency into the subsidiary's) for
+   * periodYm, and the transaction balance, booked balance, target and delta agree with the journal lines through
+   * periodYm. Its lines are in the subsidiary's currency at 1.0, move each item account by exactly its delta, put the
+   * offset on the subsidiary's 7100 account, and balance. A foreign balance it leaves out is an offender too.
+   */
+  fx_revaluation_rates(db, params) {
+    const props = db.query('SELECT * FROM proposal').filter((p) => p.kind === 'fx_revaluation' && matchRow(p, params.where as CondMap | undefined));
+    const subs = byId(db.query('SELECT * FROM subsidiary'));
+    const accounts = byId(db.query('SELECT * FROM account'), 'code');
+    const rates = db.query('SELECT * FROM fx_rate');
+    const all = ledgerLines(db);
+    const offenders: Row[] = [];
+    let checked = 0;
+    for (const p of props) {
+      const pay = json<FxRevaluationPayload>(p.payload_json);
+      const flag = (problem: string, account_code?: string) => offenders.push({ proposal_id: p.id, ...(account_code ? { account_code } : {}), problem });
+      const sub = pay ? subs.get(String(pay.subsidiaryId)) : undefined;
+      if (!pay || !sub) {
+        flag(pay ? `unknown subsidiary ${String(pay.subsidiaryId)}` : 'payload is not JSON');
+        continue;
+      }
+      const subId = String(sub.id);
+      const functional = String(sub.functional_ccy);
+      const ym = String(pay.periodYm);
+      if (pay.rateYm !== undefined && String(pay.rateYm) !== ym) flag(`rates of ${String(pay.rateYm)} used for a ${ym} revaluation`);
+      const books = before(all, p.id).filter((l) => l.subsidiaryId === subId && l.ym <= ym);
+      const items = pay.items ?? [];
+      const lines = pay.lines ?? [];
+      for (const it of items) {
+        checked++;
+        const code = String(it.accountCode);
+        const acct = accounts.get(code);
+        if (!acct || String(acct.subsidiary_id) !== subId) {
+          flag(`account is not one of ${String(sub.code)}'s`, code);
+          continue;
+        }
+        if (acct.account_type !== 'asset' && acct.account_type !== 'liability') flag(`revalues a ${String(acct.account_type)} account; only assets and liabilities are restated`, code);
+        if (it.ccy === functional) flag(`revalues a ${functional} balance, the subsidiary's own currency`, code);
+        const rate = closingRate(rates, String(it.ccy), functional, ym);
+        if (rate === undefined) flag(`no closing ${String(it.ccy)}/${functional} rate recorded for ${ym}`, code);
+        else if (big(it.closingRateE6) !== rate) flag(`rate ${String(it.closingRateE6)} is not the ${ym} closing rate ${rate}`, code);
+        const onAccount = books.filter((l) => l.code === code);
+        const txn = onAccount.filter((l) => l.ccy === it.ccy).reduce((a, l) => a + l.txn, 0n);
+        const booked = onAccount.reduce((a, l) => a + l.functional, 0n);
+        const target = applyFx(txn, rate ?? big(it.closingRateE6));
+        if (big(it.txnBalanceMinor) !== txn) flag(`${String(it.ccy)} balance ${String(it.txnBalanceMinor)} but the books hold ${txn}`, code);
+        if (big(it.bookedFunctionalMinor) !== booked) flag(`booked ${functional} balance ${String(it.bookedFunctionalMinor)} but the books hold ${booked}`, code);
+        if (big(it.targetFunctionalMinor) !== target) flag(`target ${String(it.targetFunctionalMinor)} but the balance at the closing rate is ${target}`, code);
+        if (big(it.deltaMinor) !== target - booked) flag(`delta ${String(it.deltaMinor)} but target minus booked is ${target - booked}`, code);
+      }
+      // Every foreign balance on an asset or liability of the subsidiary is restated.
+      const foreign = new Map<string, bigint>();
+      for (const l of books) {
+        const t = accounts.get(l.code)?.account_type;
+        if (l.ccy === functional || (t !== 'asset' && t !== 'liability')) continue;
+        foreign.set(`${l.code}|${l.ccy}`, (foreign.get(`${l.code}|${l.ccy}`) ?? 0n) + l.txn);
+      }
+      for (const [k, bal] of foreign) {
+        const [code, ccy] = k.split('|') as [string, string];
+        if (bal !== 0n && !items.some((it) => it.accountCode === code && it.ccy === ccy)) flag(`${ccy} balance ${bal} is not revalued`, code);
+      }
+      // The entry: functional currency at 1.0, each item account moved by its delta, the offset on 7100, balanced.
+      for (const l of lines) {
+        if (l.ccy !== functional || big(l.fxRateE6) !== E6) flag(`line in ${String(l.ccy)} at ${String(l.fxRateE6)}; revaluation lines are in ${functional} at 1000000`, String(l.accountCode));
+      }
+      const net = netByCode(lines);
+      const deltas = new Map<string, bigint>();
+      for (const it of items) deltas.set(String(it.accountCode), (deltas.get(String(it.accountCode)) ?? 0n) + big(it.deltaMinor));
+      for (const [code, d] of deltas) if ((net.get(code) ?? 0n) !== d) flag(`lines move the account by ${net.get(code) ?? 0n}, not its delta ${d}`, code);
+      for (const [code, n] of net) {
+        if (deltas.has(code) || n === 0n) continue;
+        const acct = accounts.get(code);
+        if (groupCode(code) !== '7100' || String(acct?.subsidiary_id) !== subId) flag(`offset line on ${code}; the gain or loss goes to ${String(sub.code)}'s 7100 account`, code);
+      }
+      if (sumOf(lines, 'debitMinor') !== sumOf(lines, 'creditMinor')) flag('the entry does not balance');
+    }
+    return { checked: checked + props.length, unit: 'revaluations and their items', offenders };
+  },
+
+  /**
+   * Every elimination (ic_elimination proposal) removes exactly the intercompany balance the books hold: it posts to
+   * the elimination subsidiary on its intercompany accounts in the reporting currency at 1.0 and balances; basis
+   * `balance` reverses in a later month and `activity` never does; per pair the amount is the source account's
+   * balance through periodYm (`balance`) or its periodYm activity (`activity`) in the source subsidiary, which keeps its
+   * books in the reporting currency; and the lines take that amount off the source group code and the counter group
+   * code (source side by the opposite of the source balance, counter side by the source balance).
+   */
+  ic_elimination_amounts(db, params) {
+    const props = db.query('SELECT * FROM proposal').filter((p) => p.kind === 'ic_elimination' && matchRow(p, params.where as CondMap | undefined));
+    const subs = byId(db.query('SELECT * FROM subsidiary'));
+    const accounts = byId(db.query('SELECT * FROM account'), 'code');
+    const reporting = String(params.reporting_ccy ?? settingText(db, 'reporting_ccy') ?? 'USD');
+    const all = ledgerLines(db);
+    const offenders: Row[] = [];
+    let checked = 0;
+    for (const p of props) {
+      const pay = json<IcEliminationPayload>(p.payload_json);
+      const flag = (problem: string, extra: Row = {}) => offenders.push({ proposal_id: p.id, ...extra, problem });
+      const sub = pay ? subs.get(String(pay.subsidiaryId)) : undefined;
+      if (!pay || !sub) {
+        flag(pay ? `unknown subsidiary ${String(pay.subsidiaryId)}` : 'payload is not JSON');
+        continue;
+      }
+      const subId = String(sub.id);
+      const ym = String(pay.periodYm);
+      if (sub.is_elimination !== true) flag(`posts to ${String(sub.code)}, which is not the elimination subsidiary`);
+      if (pay.basis === 'balance') {
+        if (!pay.reversesInYm || !(String(pay.reversesInYm) > ym)) flag(`a balance elimination reverses in a later month than ${ym}; reversesInYm is "${String(pay.reversesInYm ?? '')}"`);
+      } else if (pay.basis === 'activity') {
+        if (pay.reversesInYm) flag("an activity elimination covers one month's results and never reverses");
+      } else flag(`basis "${String(pay.basis)}" is neither balance nor activity`);
+      const lines = pay.lines ?? [];
+      for (const l of lines) {
+        const acct = accounts.get(String(l.accountCode));
+        if (!acct || String(acct.subsidiary_id) !== subId || acct.is_intercompany !== true) flag(`line on ${String(l.accountCode)}, not an intercompany account of ${String(sub.code)}`, { account_code: l.accountCode });
+        if (l.ccy !== reporting || big(l.fxRateE6) !== E6) flag(`line in ${String(l.ccy)} at ${String(l.fxRateE6)}; eliminations are in ${reporting} at 1000000`, { account_code: l.accountCode });
+      }
+      if (sumOf(lines, 'debitMinor') !== sumOf(lines, 'creditMinor')) flag('the entry does not balance');
+      const books = before(all, p.id);
+      const want = new Map<string, bigint>();
+      for (const pair of pay.pairs ?? []) {
+        checked++;
+        const at = { pair: pair.label, account_code: pair.sourceAccountCode };
+        const src = accounts.get(String(pair.sourceAccountCode));
+        const srcSub = subs.get(String(pair.sourceSubsidiaryId));
+        if (!src || !srcSub || String(src.subsidiary_id) !== String(srcSub.id)) {
+          flag(`source account is not one of subsidiary ${String(pair.sourceSubsidiaryId)}'s`, at);
+          continue;
+        }
+        const wantTypes = pay.basis === 'activity' ? ['revenue', 'expense'] : ['asset', 'liability'];
+        if (!wantTypes.includes(String(src.account_type))) flag(`a ${String(pay.basis)} elimination's source is ${wantTypes.join(' or ')}, not ${String(src.account_type)}`, at);
+        if (String(srcSub.functional_ccy) !== reporting) flag(`source subsidiary ${String(srcSub.code)} keeps its books in ${String(srcSub.functional_ccy)}, not the reporting currency ${reporting}`, at);
+        const counter = accounts.get(String(pair.counterAccountCode));
+        if (!counter || String(counter.subsidiary_id) !== String(pair.counterSubsidiaryId)) flag(`counter account ${String(pair.counterAccountCode)} is not one of subsidiary ${String(pair.counterSubsidiaryId)}'s`, at);
+        const onSource = books.filter((l) => l.code === src.code && l.subsidiaryId === String(srcSub.id) && (pay.basis === 'activity' ? l.ym === ym : l.ym <= ym));
+        const signed = onSource.reduce((a, l) => a + l.functional, 0n);
+        if (big(pair.amountMinor) !== abs(signed)) flag(`eliminates ${String(pair.amountMinor)} but the books hold ${abs(signed)}${pay.basis === 'activity' ? ` of ${ym} activity` : ` through ${ym}`}`, at);
+        if (abs(big(pair.differenceMinor)) !== abs(big(pair.amountMinor) - big(pair.counterTranslatedMinor))) flag(`difference ${String(pair.differenceMinor)} is not the amount less the counter side`, at);
+        const s = groupCode(String(src.code));
+        const c = groupCode(String(pair.counterAccountCode));
+        want.set(s, (want.get(s) ?? 0n) - signed);
+        want.set(c, (want.get(c) ?? 0n) + signed);
+      }
+      const have = netByCode(lines, groupCode);
+      for (const code of new Set([...want.keys(), ...have.keys()])) {
+        if ((want.get(code) ?? 0n) !== (have.get(code) ?? 0n)) flag(`lines move group account ${code} by ${have.get(code) ?? 0n}; the books call for ${want.get(code) ?? 0n}`, { account_code: code });
+      }
+    }
+    return { checked: checked + props.length, unit: 'eliminations and their pairs', offenders };
+  },
+
+  /**
+   * Every intercompany pair whose two sides differ by more than the tolerance (params.tolerance_minor, default the
+   * ic_difference_tolerance_minor variable, else 100 = $1) is raised in the close thread: a message from the
+   * consolidation agent (params.sender_role) in close:<periodYm> that names the pair label and says the books differ
+   * (differ, difference, disagree or mismatch, as the consolidation harness's Escalates 1 rule asks).
+   */
+  ic_difference_escalated(db, params, ctx) {
+    const tolerance = big(params.tolerance_minor ?? ctx.vars.ic_difference_tolerance_minor ?? 100);
+    const role = String(params.sender_role ?? 'consolidation');
+    const props = db.query('SELECT * FROM proposal').filter((p) => p.kind === 'ic_elimination' && matchRow(p, params.where as CondMap | undefined));
+    const msgs = db.query('SELECT * FROM agent_message').filter((m) => m.sender_role === role);
+    const offenders: Row[] = [];
+    let checked = 0;
+    for (const p of props) {
+      const pay = json<IcEliminationPayload>(p.payload_json);
+      for (const pair of pay?.pairs ?? []) {
+        const diff = [abs(big(pair.differenceMinor)), abs(big(pair.amountMinor) - big(pair.counterTranslatedMinor))].reduce((a, b) => (b > a ? b : a));
+        if (diff <= tolerance) continue;
+        checked++;
+        const label = String(pair.label).toLowerCase();
+        const raised = msgs.some((m) => {
+          const text = `${String(m.body ?? '')} ${String(m.summary_plain ?? '')}`.toLowerCase();
+          return m.thread_id === `close:${String(pay!.periodYm)}` && text.includes(label) && /\b(differ|disagree|mismatch)/.test(text);
+        });
+        if (!raised) offenders.push({ proposal_id: p.id, pair: pair.label, difference_minor: diff.toString(), problem: `a ${diff} difference is not raised by ${role} in close:${String(pay!.periodYm)}` });
+      }
+    }
+    return { checked, unit: 'intercompany differences over the tolerance', offenders };
   },
 
   /** A close task marked done has no evidence proposal still open or sent back. */

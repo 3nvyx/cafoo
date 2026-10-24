@@ -6,22 +6,33 @@
  */
 import {
   buildRevenueSchedule,
+  consolidate,
   detectMissingAccruals,
+  divRound,
   findDuplicatePayments,
   formatMinor,
   scoreBankMatches,
   specificReserveReasons,
   targetAllowanceMinor,
   ymAdd,
+  ymFromString,
+  ymLabel,
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
 import { CrsClient, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { STEP_MS } from '../env';
-import { exactAmount, line, snapshot, type Snapshot } from '../snapshot';
+import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
 import { monthLabel } from '../advisor-chat';
 import { catchUpAmounts } from '../revenue-catchup';
 import { Cast, propose, say, sleep, type RoleConn } from '../stdb';
+import { ruleOpen, type Refusal } from './rulings';
+import { citedBankTxIds, closeHasWork, closeOpenedAt, openingMarker, pendingBankTxIds } from '../close-state';
+import { classifyOutflow, dayLabel, vendorLookup } from '../bookkeeping';
+import { activeCharter } from '../charter/active';
+import { CAPPED_KINDS } from '../charter/library';
+import { alreadyDoneRefusal, runConsolidationStep } from './consolidate';
+import { usageInvoices as usageOf } from '../usage';
 
 export type CloseEvents = {
   onStep?: (msg: string) => void;
@@ -49,11 +60,17 @@ function creditDecisionSummary(customer: string, summary: string): string {
 /** The dataset's persona names are upper case ("KAYLA BRENNAN"); summaries use "Kayla Brennan". */
 const titleCase = (name: string) => name.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_m, sep: string, c: string) => sep + c.toUpperCase());
 
-/** "September 15" for a bank booking time in microseconds. */
-const dayLabel = (micros: bigint) => new Date(Number(micros / 1000n)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
-
 async function pause(mult = 1) {
   await sleep(STEP_MS * mult);
+}
+
+/**
+ * Is this Proposal over the amount cap its proposer's charter sets? Only the kinds whose amount is the money they move
+ * (CAPPED_KINDS: entries, accruals, schedules, revaluations, eliminations) are capped: a bank match is filed at zero
+ * and the module measures vendor kinds and credit decisions differently, so those are never left for a human by a cap.
+ */
+export function overCharterCap(kind: string, amountMinor: bigint, cap: bigint | undefined): boolean {
+  return cap !== undefined && (CAPPED_KINDS as readonly string[]).includes(kind) && amountMinor > cap;
 }
 
 export async function runScriptedClose(cast: Cast, closeYm: string, events: CloseEvents = {}) {
@@ -63,19 +80,37 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   };
   const thread = `close:${closeYm}`;
   const A = cast.advisor;
-  const roleName: Record<string, string> = { bookkeeper: 'Bookkeeper', revenue: 'Revenue agent', credit: 'Credit & Risk agent' };
+  const roleName: Record<string, string> = { bookkeeper: 'Bookkeeper', revenue: 'Revenue agent', credit: 'Credit & Risk agent', consolidation: 'Consolidation agent' };
   const month = monthLabel(closeYm);
   /** Proposals the module refused: their close task stays open and the month is not offered for locking. */
-  const refused: { kind: string; summaryPlain: string; why: string; closeTaskId?: bigint }[] = [];
+  const refused: Refusal[] = [];
+  /** Proposals this run filed: the rulings cover these, plus those already open when the close opened. */
+  const mine = new Set<bigint>();
+  /** When this run opened the close (server time); undefined on a resume, which rules every open Proposal. */
+  let openedAt: bigint | undefined;
   /**
    * Propose through a worker. When the module refuses one (a bank match that is no longer exact or unpaid, a vendor
    * check whose evidence does not hold), say so in the close thread and carry on instead of aborting the close.
    */
   const file = async (who: RoleConn, args: Parameters<typeof propose>[2]) => {
+    // A charter may cap what a worker proposes; a larger amount is left for a human, not filed.
+    const cap = caps.get(who.role);
+    if (cap !== undefined && overCharterCap(args.kind, args.amountMinor, cap)) {
+      log(`${who.role} proposal over its ${money(cap)} cap left for a human: ${args.summaryPlain}`);
+      await say(who, thread, `"${args.summaryPlain}" is ${money(args.amountMinor)}, over the ${money(cap)} my charter lets me propose, so I am leaving it for a human instead of filing it.`, `The ${roleName[who.role] ?? who.role} left one item over its limit for a person to handle.`).catch(() => undefined);
+      return undefined;
+    }
     try {
-      return await propose(who, A, args);
+      const p = await propose(who, A, args);
+      mine.add(p.id);
+      return p;
     } catch (e) {
       const why = (e as Error).message;
+      // A revaluation or elimination the books already hold (a repeated close) is done, not refused.
+      if (alreadyDoneRefusal(args.kind, why)) {
+        log(`${who.role} ${args.kind} already done: ${why}`);
+        return undefined;
+      }
       log(`${who.role} proposal refused: ${why}`);
       refused.push({ kind: args.kind, summaryPlain: args.summaryPlain, why, closeTaskId: args.closeTaskId });
       await say(who, thread, `The books refused my ${args.kind.replace(/_/g, ' ')} proposal "${args.summaryPlain}": ${why} Leaving it for a person to review; the close continues.`, `The ${roleName[who.role] ?? who.role} could not file one proposal and left it for a person to review.`).catch(() => undefined);
@@ -84,6 +119,21 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   };
   let s = snapshot(A, closeYm);
   const task = (n: number) => s.closeTasks[n - 1]?.id;
+  /** The "Consolidate subsidiaries" task, by owner: a single-company database has none, and task 6 is the board pack. */
+  const consolidationTask = s.closeTasks.find(t => t.ownerRole === 'consolidation')?.id;
+  /** A group (another trading company and an elimination subsidiary) also gets the Consolidation step. */
+  const isGroup = (() => {
+    const entities = groupSnapshot(A).entities;
+    return entities.filter(e => !e.isElimination).length > 1 && entities.some(e => e.isElimination);
+  })();
+  // Thresholds the active charters set (built-in: batch at 75%, no amount cap, $1 intercompany tolerance).
+  const bookkeeperParams = activeCharter(A, 'bookkeeper').params;
+  const batchMin = bookkeeperParams.batchMinScoreBp;
+  const caps = new Map<string, bigint>();
+  for (const r of ['bookkeeper', 'revenue', 'credit', 'consolidation'] as const) {
+    const cap = activeCharter(A, r).params.maxProposalMinor;
+    if (cap !== undefined) caps.set(r, cap);
+  }
   const subId = s.subsidiary.id.toString();
   const period = s.period;
   const noWait = process.env.CLOSE_NO_WAIT === '1';
@@ -127,7 +177,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
       log(`lock not requested: ${n} blocked task(s)`);
       return false;
     }
-    const summary = boardSummary(snapshot(A, closeYm));
+    const summary = boardSummary(snapshot(A, closeYm), A);
     try {
       await A.reducers.requestPeriodLock({ periodYm: closeYm, rationale: `${rationale} ${summary.technical}`, summaryPlain: `${month} is ready to lock ${summary.plain}.` });
       log('lock requested; CFO confirms in the app');
@@ -184,75 +234,24 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     return A.db.proposal.id.find(p.id)?.status.tag === 'AwaitingCfo';
   };
   /**
-   * The Red Team critiques every open Proposal of the month and the Advisor rules on each: the same logic whether the
-   * close runs fresh or resumes. A ruling the books refuse is recorded as a refusal (task blocked, no lock request).
-   * Returns how many Proposals were ruled.
+   * The Red Team critiques the month's open Proposals and the Advisor rules on each: the same logic whether the close
+   * runs fresh or resumes (scripted/rulings.ts). A fresh run rules what it filed itself plus what was already open when
+   * it opened (a feed Proposal its Bookkeeper left to the close), never a Proposal someone else filed meanwhile, which
+   * that filer rules. A ruling the books refuse is recorded as a refusal (task blocked, no lock request). Returns how
+   * many Proposals were ruled.
    */
   const ruleOpenProposals = async (): Promise<number> => {
     s = snapshot(A, closeYm);
-    const open = [...A.db.proposal.iter()].filter(p => p.periodId === period.id && p.status.tag === 'Open').sort((a, b) => Number(a.id - b.id));
-    const RT = cast.redteam;
-    await say(RT, thread, `Reviewing ${open.length} proposals before the Advisor rules. I will challenge anything that leans on a weak match, an assumed rate, or a single data source.`, `The Red Team is reviewing ${open.length} proposals.`);
-    const rulings: { id: bigint; action: 'approve' | 'reject'; rationale: string; plain: string }[] = [];
-    for (const p of open) {
-      const kind = p.kind.tag;
-      const payload = JSON.parse(p.payloadJson);
-      if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
-        await RT.reducers.critique({ proposalId: p.id, body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty name only partly overlaps. If this is wrong, a customer's invoice shows paid when it is not. Recommend asking the customer for a remittance advice instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` });
-        rulings.push({ id: p.id, action: 'reject', rationale: `The Red Team is right: at ${(payload.matches[0].scoreBp / 100).toFixed(0)}% confidence this match is a guess. Leave the transaction unmatched, request remittance detail, and revisit next week.`, plain: `Not matching this one yet; we will ask the customer what the payment was for.` });
-        continue;
-      }
-      if (kind === 'JournalEntry' && /Allowance for doubtful/.test(payload.memo) && p.amountMinor >= s.materiality) {
-        const bankruptcy = /bankruptcy/i.test(p.summaryPlain);
-        if (bankruptcy) {
-          await RT.reducers.critique({ proposalId: p.id, body: `A 100% reserve is the right default for an active bankruptcy plan, but confirm two things before posting: that none of the receivable is secured or prepaid, and that the bankruptcy is the guarantor's and not a same-name match. The evidence shows a public record tied to the same SSN, so the second concern is answered; the first is a question for the account owner.`, summaryPlain: `The Red Team asks whether any of this debt is secured before reserving all of it.` });
-          rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved. The bankruptcy record matches the guarantor's SSN across the bureau file and public records, and no collateral or prepayment is attached to the contract. Because the amount is material it goes to the CFO for confirmation.`, plain: `Approved: set aside the full amount; the CFO gets the final say because it is large.` });
-        } else {
-          await RT.reducers.critique({ proposalId: p.id, body: `The reserve rate follows the tier table, which is fine as a default. Two checks: the open balance should exclude anything already paid this month but not yet matched, and a 50% reserve on a customer who is still paying monthly may be high. Suggest the Advisor confirm the balance against the bank matches approved today.`, summaryPlain: `The Red Team asks to confirm the unpaid balance before reserving against it.` });
-          rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved at the tier rate. The open balance excludes invoices matched to payments earlier in this close. The rate is a policy default and can be revisited when payment history improves. Material, so it goes to the CFO.`, plain: `Approved at the standard rate for this risk level; the CFO gets the final say because it is large.` });
-        }
-        continue;
-      }
-      if (kind === 'RevenueSchedule') {
-        await RT.reducers.critique({ proposalId: p.id, body: `Straight-line is appropriate for a flat annual subscription. Check that the invoice date, not the signature date, starts the schedule, and that the term is 12 months inclusive.`, summaryPlain: `The Red Team agrees with straight-line and asks to confirm the start month.` });
-        rulings.push({ id: p.id, action: 'approve', rationale: `Schedule approved. The term runs from the invoice month for 12 months inclusive, which matches the contract.`, plain: `Approved: the schedule follows the contract's twelve months.` });
-        continue;
-      }
-      if (kind === 'VendorVerify') {
-        const vendor = s.vendorName.get(BigInt(payload.vendorId)) ?? 'this vendor';
-        await RT.reducers.critique({ proposalId: p.id, body: `The owner's identity and fraud checks are clean, so verification is reasonable. Before the first payment, confirm the bank account on the bill belongs to ${vendor} and not to a look-alike.`, summaryPlain: `The Red Team agrees and asks to confirm the bank details before the first payment.` });
-        rulings.push({ id: p.id, action: 'approve', rationale: `Vendor check approved. The cited identity and fraud checks on the owner came back APPROVE at tier A or B; the Red Team's bank-detail check goes to whoever releases the first payment.`, plain: `Approved: ${vendor} can be paid now that their owner checks out.` });
-        continue;
-      }
-      if (kind === 'VendorBlock') {
-        await RT.reducers.critique({ proposalId: p.id, body: `Agree with the block. One caution: notify procurement before the bill's due date so the engagement is cancelled, not just unpaid.`, summaryPlain: `The Red Team agrees and asks that procurement be told.` });
-        rulings.push({ id: p.id, action: 'approve', rationale: `Block approved. Identity and fraud checks fail on the owner; no payment leaves until a verified owner is on file. Procurement will be notified.`, plain: `Approved: no money goes to this vendor until a real owner is verified.` });
-        continue;
-      }
-      rulings.push({ id: p.id, action: 'approve', rationale: `Reviewed the evidence and the Red Team raised no objection. Approved as proposed.`, plain: `Approved as proposed.` });
-    }
-    await pause();
-
-    await say(A, thread, `Ruling on ${rulings.length} proposals. Anything at or above ${money(s.materiality)} waits for the CFO.`, `The Advisor is ruling on ${rulings.length} proposals.`, 'ruling');
-    for (const r of rulings) {
-      try {
-        if (r.action === 'approve') await A.reducers.approveProposal({ proposalId: r.id, rationale: r.rationale, summaryPlain: r.plain, amendedPayloadJson: undefined });
-        else await A.reducers.rejectProposal({ proposalId: r.id, rationale: r.rationale, summaryPlain: r.plain });
-      } catch (e) {
-        const why = (e as Error).message;
-        log(`ruling on ${r.id} failed: ${why}`);
-        const row = A.db.proposal.id.find(r.id);
-        refused.push({ kind: row ? row.kind.tag.replace(/[A-Z]/g, (c, i) => `${i ? '_' : ''}${c.toLowerCase()}`) : 'proposal', summaryPlain: row?.summaryPlain ?? `proposal ${r.id}`, why, closeTaskId: row?.closeTaskId });
-        await A.reducers.rejectProposal({ proposalId: r.id, rationale: `Could not apply this proposal: ${why}. Rejected so the close can continue; the proposer should resubmit.`, summaryPlain: `Not posted: the books refused this entry (${why.slice(0, 80)}).` }).catch(() => undefined);
-      }
-      await pause(0.25);
-    }
-    return rulings.length;
+    const ours = (p: { id: bigint; createdAt: { microsSinceUnixEpoch: bigint } }) => openedAt === undefined || mine.has(p.id) || p.createdAt.microsSinceUnixEpoch < openedAt;
+    const open = [...A.db.proposal.iter()].filter(p => p.periodId === period.id && p.status.tag === 'Open' && ours(p)).sort((a, b) => Number(a.id - b.id));
+    return ruleOpen(cast, open, { thread, snapshot: s, log, pause, refused });
   };
 
   if (period.status.tag === 'Closed') throw new Error(`${closeYm} is already closed.`);
   const already = [...A.db.proposal.iter()].filter(p => p.periodId === period.id);
-  if (already.length > 0) {
+  // Resume only a close with work of its own (src/close-state.ts): the continuous Bookkeeper files Proposals from the
+  // live bank feed during an open month, and a close that failed right after opening has nothing to resume.
+  if (closeHasWork(A, closeYm)) {
     // The close already ran for this month (or is mid-flight): do not propose twice. Resume at the CFO gate.
     // Open proposals get the same critique and ruling as in a fresh run (a weak bank match is still rejected).
     if (already.some(p => p.status.tag === 'Open')) await ruleOpenProposals();
@@ -266,22 +265,27 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     return { proposals: already.length, awaitingCfo: pending.length, refused: refused.length };
   }
 
-  await say(A, thread, `Opening the ${closeYm} close for ${s.subsidiary.name}. Bookkeeper, Revenue, and Credit & Risk: work your tasks and propose; nothing posts until I rule, and anything material waits for the CFO.`,
+  await say(A, thread, `${openingMarker(closeYm)} for ${s.subsidiary.name}. ${isGroup ? 'Bookkeeper, Revenue, Credit & Risk, and Consolidation' : 'Bookkeeper, Revenue, and Credit & Risk'}: work your tasks and propose; nothing posts until I rule, and anything material waits for the CFO.`,
     `The Advisor started the ${closeYm} close.`, 'ruling');
+  openedAt = closeOpenedAt(A, closeYm, 'last') ?? BigInt(Date.now()) * 1000n;
   for (const t of s.closeTasks) if (t.status.tag === 'Todo') await A.reducers.updateCloseTask({ taskId: t.id, status: 'in_progress', note: 'Close started' });
   await pause();
 
   // ---------------- Bookkeeper: bank reconciliation ----------------
   const B = cast.bookkeeper;
-  const closeTxs = s.bankTxs.filter(t => !t.matched && s.bankTxRows.find(r => r.id === t.id)?.ym === closeYm);
+  // A transaction already proposed is not proposed again: one still waiting (any month), or one the live feed's
+  // Bookkeeper filed during this month, whatever its ruling (a rejected weak match stays for a person).
+  const inFlight = new Set([...pendingBankTxIds(A), ...citedBankTxIds(A, { periodId: period.id })]);
+  const closeTxs = s.bankTxs.filter(t => !t.matched && !inFlight.has(t.id) && s.bankTxRows.find(r => r.id === t.id)?.ym === closeYm);
   await say(B, thread, `Reconciling ${closeTxs.length} bank transactions for ${closeYm}. Scoring each against open invoices and bills on amount, date, counterparty, and reference.`,
     `The Bookkeeper is matching ${closeTxs.length} bank transactions.`);
   const names = { customers: s.customerName, vendors: s.vendorName };
   const candidates = scoreBankMatches(closeTxs, s.invoices, s.bills, names);
   // A bank match must pay its invoice or bill to the cent (the module refuses anything else); a near-amount
-  // candidate is a short or partial payment, left for a person rather than matched.
-  const auto = candidates.filter(c => c.bucket === 'auto' && exactAmount(c, s));
-  const review = candidates.filter(c => c.bucket === 'review' && exactAmount(c, s));
+  // candidate is a short or partial payment, left for a person rather than matched. Exact matches at or above the
+  // Bookkeeper charter's batch threshold (75% built in, the auto bucket) go in one batch; each weaker one on its own.
+  const auto = candidates.filter(c => c.bucket !== 'unmatched' && c.scoreBp >= batchMin && exactAmount(c, s));
+  const review = candidates.filter(c => c.bucket !== 'unmatched' && c.scoreBp < batchMin && exactAmount(c, s));
   const near = candidates.filter(c => c.bucket !== 'unmatched' && !exactAmount(c, s));
   const matchedTxIds = new Set(candidates.filter(c => c.bucket !== 'unmatched').map(c => c.bankTxId));
   const txById = new Map(s.bankTxs.map(t => [t.id, t]));
@@ -301,7 +305,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     const p = await file(B, {
       kind: 'bank_match',
       payload: { matches: auto.map(c => ({ bankTxId: c.bankTxId.toString(), targetKind: c.targetKind, targetId: c.targetId.toString(), scoreBp: c.scoreBp })) },
-      rationale: `${auto.length} transactions matched at 75% confidence or better: ${inflows} customer payments to invoices and ${auto.length - inflows} vendor payments to bills. Scores combine amount, date proximity, counterparty name overlap, and invoice or bill references in the bank description. Each match is one-to-one; no invoice or bill is consumed twice.`,
+      rationale: `${auto.length} transactions matched at ${(batchMin / 100).toFixed(0)}% confidence or better: ${inflows} customer payments to invoices and ${auto.length - inflows} vendor payments to bills. Scores combine amount, date proximity, counterparty name overlap, and invoice or bill references in the bank description. Each match is one-to-one; no invoice or bill is consumed twice.`,
       summaryPlain: `Match ${what}; every match is at least ${minPct}% confident.`,
       amountMinor: 0n,
       periodYm: closeYm,
@@ -318,11 +322,14 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   for (const c of review) {
     const tx = txById.get(c.bankTxId)!;
     const target = c.targetKind === 'invoice' ? `invoice ${c.targetId} for ${s.customerName.get(invById.get(c.targetId)!.customerId)}` : `bill ${billById.get(c.targetId)?.externalRef} from ${s.vendorName.get(billById.get(c.targetId)!.vendorId)}`;
+    // The summary names a bill by its vendor and month: a bill reference ("NW-202609-7019") reads as a raw number.
+    const bill = c.targetKind === 'bill' ? billById.get(c.targetId) : undefined;
+    const targetPlain = bill ? `${s.vendorName.get(bill.vendorId) ?? 'a vendor'}'s ${ymLabel(bill.ym)} bill` : target;
     await file(B, {
       kind: 'bank_match',
       payload: { matches: [{ bankTxId: c.bankTxId.toString(), targetKind: c.targetKind, targetId: c.targetId.toString(), scoreBp: c.scoreBp }] },
-      rationale: `Likely match at ${(c.scoreBp / 100).toFixed(0)}% confidence between bank transaction "${tx.description}" and ${target}. Reasons: ${c.reasons.join('; ')}. Below the 75% auto threshold, so this needs a ruling.`,
-      summaryPlain: `Probably match the ${money(tx.amountMinor < 0n ? -tx.amountMinor : tx.amountMinor)} bank transaction from ${tx.counterparty} to ${target}; confidence ${(c.scoreBp / 100).toFixed(0)}%.`,
+      rationale: `Likely match at ${(c.scoreBp / 100).toFixed(0)}% confidence between bank transaction "${tx.description}" and ${target}. Reasons: ${c.reasons.join('; ')}. Below the ${(batchMin / 100).toFixed(0)}% auto threshold, so this needs a ruling.`,
+      summaryPlain: `Probably match the ${money(tx.amountMinor < 0n ? -tx.amountMinor : tx.amountMinor)} bank transaction from ${tx.counterparty} to ${targetPlain}; confidence ${(c.scoreBp / 100).toFixed(0)}%.`,
       amountMinor: 0n,
       periodYm: closeYm,
       closeTaskId: task(1),
@@ -358,19 +365,10 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
 
   // Quick entries for everything still unexplained (payroll runs, fees, card purchases, unknown subscriptions)
   const unexplained = closeTxs.filter(t => !matchedTxIds.has(t.id));
-  const classify = (t: (typeof unexplained)[number]): { code: string; label: string; needsLookup?: boolean } => {
-    const d = t.description.toUpperCase();
-    if (d.includes('PAYROLL')) return { code: '5300', label: 'Payroll' };
-    if (d.includes('SERVICE FEE') || d.includes('BANK')) return { code: '6000', label: 'Bank fees' };
-    if (d.includes('TRAVEL')) return { code: '5800', label: 'Travel' };
-    if (d.includes('COFFEE') || d.includes('OFFICE')) return { code: '5500', label: 'Office' };
-    if (d.includes('SUBSCRIPTION')) return { code: '5100', label: 'Software subscription', needsLookup: true };
-    return { code: t.amountMinor < 0n ? '5500' : '1100', label: 'Unclassified', needsLookup: true };
-  };
   for (const t of unexplained) {
     if (t.amountMinor >= 0n) continue; // unexplained inflows are left for a human
     const amt = -t.amountMinor;
-    const k = classify(t);
+    const k = classifyOutflow(t);
     let lookup = '';
     if (k.needsLookup) {
       lookup = await vendorLookup(t.counterparty);
@@ -492,7 +490,8 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     });
   }
   // Usage revenue for close-month usage invoices
-  const usageInvoices = [...A.db.invoice.iter()].filter(i => i.ym === closeYm && s.contractRows.find(k => k.id === i.contractId)?.plan.tag === 'Usage');
+  // Seed and feed invoices alike (src/usage.ts): the feed books no receivable at ingest, this entry does.
+  const usageInvoices = usageOf(A.db.invoice.iter(), s.contractRows, closeYm);
   const usageTotal = usageInvoices.reduce((a, i) => a + i.amountMinor, 0n);
   if (usageInvoices.length) {
     await file(R, {
@@ -607,10 +606,16 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   }
   await pause();
 
+  // ---------------- Consolidation ----------------
+  // Revalue the foreign subsidiary's balances and eliminate what the companies owe and charge each other.
+  if (isGroup) {
+    await runConsolidationStep(cast, closeYm, { log, pause, thread, taskId: consolidationTask, toleranceMinor: activeCharter(A, 'consolidation').params.icDifferenceToleranceMinor, file, refuse: r => refused.push(r) });
+    await pause();
+  }
+
   // ---------------- Red Team (scripted) then Advisor rulings ----------------
   const ruled = await ruleOpenProposals();
-  for (const n of [1, 2, 3, 4, 5]) {
-    const t = task(n);
+  for (const t of [...[1, 2, 3, 4, 5].map(task), consolidationTask]) {
     if (t === undefined) continue;
     const blocked = refused.filter(r => r.closeTaskId === t).length;
     await A.reducers.updateCloseTask(blocked ? { taskId: t, status: 'blocked', note: `${blocked} proposal(s) refused by the books; a person must fix and resubmit` } : { taskId: t, status: 'done', note: 'Rulings issued' });
@@ -666,36 +671,37 @@ function existingAllowance(s: Snapshot, customerId: bigint): bigint {
   return v;
 }
 
-function boardSummary(s: Snapshot) {
+function boardSummary(s: Snapshot, A: RoleConn) {
   const rev = -(s.balance('4000') + s.balance('4100'));
   const cash = s.balance('1000');
   const deferred = -s.balance('2400');
   const ar = s.balance('1100');
   const plain = `with ${money(cash)} in the bank, ${money(ar)} owed to us by customers, ${money(deferred)} of prepaid subscriptions still to earn, and ${money(rev)} of revenue so far this year`;
-  return { plain, technical: `Trial balance ties; cash ${money(cash)}, AR ${money(ar)}, deferred revenue ${money(deferred)}, cumulative revenue ${money(rev)}.` };
+  const technical = `Trial balance ties; cash ${money(cash)}, AR ${money(ar)}, deferred revenue ${money(deferred)}, cumulative revenue ${money(rev)}.`;
+  const group = groupSummary(A, s.closeYm);
+  return group ? { plain: `${plain}; ${group.plain}`, technical: `${technical} ${group.technical}` } : { plain, technical };
 }
 
-/** Bright Data lookup in live mode; recorded answer otherwise. */
-async function vendorLookup(counterparty: string): Promise<string> {
-  const token = process.env.API_TOKEN;
-  if (token && process.env.DEMO_MODE !== '1') {
-    try {
-      const res = await fetch('https://api.brightdata.com/request', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zone: process.env.WEB_UNLOCKER_ZONE ?? 'web_unlocker1', url: `https://www.google.com/search?q=${encodeURIComponent(counterparty + ' company')}`, format: 'raw' }),
-      });
-      const text = await res.text();
-      return `search results summarized: ${text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 240)}…`;
-    } catch (e) {
-      return `lookup failed (${(e as Error).message}); classifying from the bank description.`;
-    }
+/**
+ * The consolidated group in one clause (whole dollars, so the plain summary stays one sentence) and its technical
+ * figures; undefined on a single-company database or when the group's books cannot be consolidated.
+ */
+function groupSummary(A: RoleConn, closeYm: string): { plain: string; technical: string } | undefined {
+  try {
+    const g = groupSnapshot(A);
+    const trading = g.entities.filter(e => !e.isElimination);
+    if (trading.length < 2) return undefined;
+    const c = consolidate({ entities: g.entities, accounts: g.accounts, lines: g.lines, rates: g.rates, reportingCcy: g.reportingCcy, asOfYm: ymFromString(closeYm) });
+    const dollars = (n: bigint) => formatMinor(divRound(n, 100n) * 100n, g.reportingCcy, { trimZeroCents: true });
+    const cents = (n: bigint) => formatMinor(n, g.reportingCcy);
+    const groupCash = c.balanceSheet.rows.filter(r => r.groupCode === '1000').reduce((a, r) => a + r.consolidatedMinor, 0n);
+    const t = c.balanceSheet.totals;
+    return {
+      plain: `across ${trading.map(e => e.name).join(' and ')} together the group holds ${dollars(groupCash)} in the bank and its combined balance sheet ${c.balanceSheet.balanced ? 'balances' : 'does not balance yet'}`,
+      technical: `Consolidated in ${g.reportingCcy} at ${closeYm} closing rates: assets ${cents(t.assetsMinor)}, liabilities ${cents(t.liabilitiesMinor)}, equity ${cents(t.equityMinor)} including CTA ${cents(c.balanceSheet.ctaMinor)}; ${c.balanceSheet.balanced ? 'balanced' : 'NOT balanced'}; net income ${cents(c.incomeStatement.netIncomeMonthMinor)} for the month, ${cents(c.incomeStatement.netIncomeYtdMinor)} year to date; intercompany left after eliminations ${cents(c.unmatchedIcMinor)}.`,
+    };
+  } catch (e) {
+    console.warn(`group summary skipped: ${(e as Error).message}`);
+    return undefined;
   }
-  const { readFileSync, existsSync } = await import('node:fs');
-  const { join } = await import('node:path');
-  const { repoRoot } = await import('../stdb');
-  const slug = counterparty.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const p = join(repoRoot, 'fixtures', 'brightdata', `${slug}.md`);
-  if (existsSync(p)) return readFileSync(p, 'utf8').trim().split('\n').slice(0, 3).join(' ');
-  return `no public record found for "${counterparty}"; classifying from the bank description.`;
 }

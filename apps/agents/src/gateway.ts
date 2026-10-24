@@ -7,15 +7,20 @@
  * POST must be JSON (a cross-site page cannot send that without a preflight the allowlist refuses) and is refused
  * outright from a foreign Origin, and /v1/* requires a bearer key when GATEWAY_API_KEY is set. Open WebUI's server
  * sends no Origin and JSON bodies, so it is unaffected. Its background task prompts get canned JSON, never the Advisor.
+ * Other modules add routes (src/http.ts Route) that pass the same guards; one that changes state runs only from this
+ * machine or with the gateway API key.
  */
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { GATEWAY_PORT, agentsLive, gatewayAllowedHosts, gatewayAllowedOrigins, providers } from './env';
+import { BadRequest, TooLarge, changesState, matchRoute, readJson, type Route } from './http';
 import { runScriptedClose } from './scripted/close';
 import type { Cast } from './stdb';
 import { answerQuestion, type AnswerOptions, type CloseStart } from './advisor-chat';
 
-type CloseState = { periodYm: string; status: 'running' | 'done' | 'error'; startedAt: string; steps: string[]; error?: string };
+export { MAX_BODY_BYTES } from './http';
+
+export type CloseState = { periodYm: string; status: 'running' | 'done' | 'error'; startedAt: string; steps: string[]; error?: string };
 type ChatMessage = { role: string; content: string };
 type CloseRunner = (periodYm: string, onStep: (m: string) => void) => Promise<unknown>;
 
@@ -30,15 +35,21 @@ export interface GatewayOptions {
   chatStartGraceMs?: number;
   /** Test seam: whether a connection's remote address is this machine. Default: a loopback address. */
   isLocal?: (remoteAddress: string | undefined) => boolean;
+  /** More routes (feed, charters), tried after the built-in ones, behind the same guards (see src/http.ts). */
+  routes?: readonly Route[];
+  /** Extra fields merged into GET /status (feed state, charter eval state). */
+  status?: () => Record<string, unknown>;
+  /** The gateway's closes by month, shared so others can see which month is closing here (the continuous Bookkeeper). */
+  closes?: Map<string, CloseState>;
+  /**
+   * Awaited after a close is marked running and before it starts: the continuous Bookkeeper's in-flight batch finishes
+   * (it sees the month closing and files nothing more), so the close never proposes the same bank line twice.
+   */
+  beforeClose?: (periodYm: string) => Promise<void>;
 }
 
 /** A loopback address: 127.0.0.0/8, ::1, or either written as an IPv4-mapped IPv6 address. */
 export const isLoopback = (a: string | undefined) => !!a && (/^(::ffff:)?127\./.test(a) || a === '::1');
-
-class BadRequest extends Error {}
-class TooLarge extends Error {}
-/** Largest request body the gateway reads; a chat history or a close request is far smaller. */
-export const MAX_BODY_BYTES = 256 * 1024;
 
 /** Message content as text: a string, or the text parts of an OpenAI content-part array. */
 export function textOf(content: unknown): string {
@@ -74,28 +85,6 @@ function corsHeaders(req: IncomingMessage, allowed: readonly string[]): Record<s
   return { 'access-control-allow-origin': origin, vary: 'Origin', 'access-control-allow-headers': 'content-type, authorization', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
 }
 
-async function readJson(req: IncomingMessage): Promise<any> {
-  if (Number(req.headers['content-length'] ?? 0) > MAX_BODY_BYTES) throw new TooLarge(`request body over ${MAX_BODY_BYTES} bytes`);
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const c of req) {
-    size += (c as Buffer).length;
-    // Keep draining so the response can still be written, but stop keeping the bytes.
-    if (size <= MAX_BODY_BYTES) chunks.push(c as Buffer);
-  }
-  if (size > MAX_BODY_BYTES) throw new TooLarge(`request body over ${MAX_BODY_BYTES} bytes`);
-  const text = Buffer.concat(chunks).toString('utf8');
-  if (!text) return {};
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new BadRequest('request body is not valid JSON');
-  }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequest('request body must be a JSON object');
-  return body;
-}
-
 /** The Host header's name without its port, lower case; undefined when absent. */
 function hostName(req: IncomingMessage): string | undefined {
   const h = req.headers.host?.trim().toLowerCase();
@@ -116,7 +105,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   const hosts = gatewayAllowedHosts(env);
   const grace = opts.chatStartGraceMs ?? 1500;
   const apiKey = env.GATEWAY_API_KEY?.trim();
-  const closes = new Map<string, CloseState>();
+  const closes = opts.closes ?? new Map<string, CloseState>();
   const runClose: CloseRunner = opts.runClose ?? ((ym, onStep) => (agentsLive() && opts.liveClose ? opts.liveClose(ym, onStep) : runScriptedClose(cast, ym, { onStep })));
 
   /** Start a close unless one is running for that month. `settled` resolves when the run ends, either way. */
@@ -126,6 +115,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
     const state: CloseState = { periodYm, status: 'running', startedAt: new Date().toISOString(), steps: [] };
     closes.set(periodYm, state);
     const settled = Promise.resolve()
+      .then(() => opts.beforeClose?.(periodYm))
       .then(() => runClose(periodYm, m => state.steps.push(m)))
       .then(() => {
         state.status = 'done';
@@ -149,6 +139,8 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   /** May this request change state (start a close)? From this machine always; from elsewhere only with the key. */
   const mayChangeState = (req: IncomingMessage) => isLocal(req.socket.remoteAddress) || (!!apiKey && bearerMatches(req.headers.authorization, apiKey));
   const notFromHere = apiKey ? 'starting a close from another machine needs the gateway API key (Authorization: Bearer)' : 'starting a close is allowed only from this machine; set GATEWAY_API_KEY to allow it from elsewhere';
+  const changeNotFromHere = apiKey ? 'this request changes state; from another machine it needs the gateway API key (Authorization: Bearer)' : 'this request changes state and is allowed only from this machine; set GATEWAY_API_KEY to allow it from elsewhere';
+  const routes = opts.routes ?? [];
 
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -169,7 +161,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
     }
     try {
       if (req.method === 'GET' && url.pathname === '/status') {
-        return json(200, { providers: providers(), closes: [...closes.values()] });
+        return json(200, { ...opts.status?.(), providers: providers(), closes: [...closes.values()] });
       }
       if (req.method === 'POST' && url.pathname === '/close') {
         if (!mayChangeState(req)) return json(apiKey ? 401 : 403, { error: notFromHere });
@@ -217,6 +209,14 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         for await (const chunk of chunks()) text += chunk;
         return json(200, { id, object: 'chat.completion', created, model: 'cafoo-advisor', choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
       }
+      const hit = matchRoute(routes, req.method, url.pathname);
+      if (hit) {
+        const may = mayChangeState(req);
+        if (changesState(hit.route) && !may) return json(apiKey ? 401 : 403, { error: changeNotFromHere });
+        // The route writes its own response with http.ts json(); these CORS headers merge into it.
+        for (const [k, v] of Object.entries(cors)) res.setHeader(k, v);
+        return await hit.route.handle({ req, res, params: hit.params, url, mayChangeState: may });
+      }
       json(404, { error: 'not found' });
     } catch (e) {
       if (res.headersSent) {
@@ -235,8 +235,13 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   });
 }
 
-export function startGateway(cast: Cast, liveClose?: CloseRunner) {
-  const server = createGateway(cast, { liveClose });
+/**
+ * Start the gateway on GATEWAY_PORT. `routes` are added behind the same guards as the built-in ones (src/http.ts);
+ * `more.status` adds fields to GET /status; `more.closes` shares the map of closes by month; `more.beforeClose` runs
+ * before each close starts.
+ */
+export function startGateway(cast: Cast, liveClose?: CloseRunner, routes: readonly Route[] = [], more: Pick<GatewayOptions, 'status' | 'closes' | 'beforeClose'> = {}) {
+  const server = createGateway(cast, { liveClose, routes, ...more });
   server.listen(GATEWAY_PORT, () => console.log(`gateway listening on http://localhost:${GATEWAY_PORT} (${agentsLive() ? 'live agents' : 'demo mode'})`));
   return server;
 }

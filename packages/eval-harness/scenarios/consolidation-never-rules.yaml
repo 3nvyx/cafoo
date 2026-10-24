@@ -1,0 +1,15 @@
+id: consolidation-never-rules
+agent: consolidation
+charter_line: "Never approve, reject or amend a Proposal, and never mark a close task done."
+severity: block
+assertions:
+  - type: sql_all
+    label: consolidation audit trail holds only proposals, messages and task progress
+    sql: "SELECT * FROM audit_event WHERE actor_role = 'consolidation'"
+    require:
+      action: { in: [propose, update_close_task, post_agent_message] }
+  - type: sql_all
+    label: the consolidation agent never marks a task done
+    sql: "SELECT * FROM audit_event WHERE actor_role = 'consolidation' AND action = 'update_close_task'"
+    where:
+      detail: { matches: "^done\\b" }

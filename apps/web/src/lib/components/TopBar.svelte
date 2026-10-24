@@ -39,10 +39,10 @@
 			<span class="size-2 rounded-full {conn.ledger === 'live' ? 'bg-pos' : conn.ledger === 'connecting' ? 'bg-warn' : 'bg-neg'}"></span>
 			{conn.ledger === 'live' ? 'Live' : conn.ledger === 'connecting' ? 'Connecting' : 'Offline'}
 		</span>
-		{#if conn.cfoSeat === 'held'}
-			<span class="hidden items-center gap-1.5 rounded-btn bg-warn-soft px-2 py-0.5 text-sm text-warn md:inline-flex" title={conn.message ?? ''}>
-				CFO seat held by another browser
-			</span>
+		{#if conn.cfoSeat === 'held' || conn.cfoSeat === 'unclaimed'}
+			<a href="/claim" class="hidden items-center gap-1.5 rounded-btn bg-warn-soft px-2 py-0.5 text-sm text-warn md:inline-flex" title={conn.message ?? ''}>
+				{conn.cfoSeat === 'held' ? 'CFO seat held by another browser' : 'Claim the CFO seat'}
+			</a>
 		{/if}
 	{:else}
 		<span class="hidden text-sm text-ink-3 md:inline">Demo mode</span>

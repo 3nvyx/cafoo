@@ -4,6 +4,9 @@
   "private": true,
   "description": "Charter evals (one scenario per checkable charter line, run against the live ledger) and deterministic credit-cascade correctness. Runs with zero API keys.",
   "type": "module",
+  "exports": {
+    ".": "./src/api.ts"
+  },
   "scripts": {
     "run": "node --import tsx src/run.ts",
     "eval": "node --import tsx src/run.ts",

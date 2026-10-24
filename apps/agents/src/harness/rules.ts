@@ -24,6 +24,8 @@ export const PROPOSE_TOOLS: Record<string, ProposalKind> = {
   propose_credit_decision: 'credit_decision',
   propose_vendor_block: 'vendor_block',
   propose_vendor_verify: 'vendor_verify',
+  propose_fx_revaluation: 'fx_revaluation',
+  propose_ic_elimination: 'ic_elimination',
 };
 
 /** approve_proposal is the only tool call that can post a Journal Entry (below the Materiality threshold). */
@@ -53,7 +55,7 @@ export const idKey = (v: unknown) => (/^\d+$/.test(str(v)) ? BigInt(str(v)).toSt
 /** The Proposal kind a call would create, or undefined for any other tool. */
 export const proposalKindOf = (call: ToolCall): ProposalKind | undefined => PROPOSE_TOOLS[baseName(call.tool)];
 
-const kindWords: Record<ProposalKind, string> = {
+export const kindWords: Record<ProposalKind, string> = {
   journal_entry: 'journal entries',
   accrual: 'accruals',
   bank_match: 'bank matches',
@@ -61,6 +63,8 @@ const kindWords: Record<ProposalKind, string> = {
   credit_decision: 'credit decisions',
   vendor_block: 'vendor blocks',
   vendor_verify: 'vendor checks',
+  fx_revaluation: 'currency revaluations',
+  ic_elimination: 'intercompany eliminations',
 };
 
 /** Shared check behind every "You may propose X, and nothing else" line. */

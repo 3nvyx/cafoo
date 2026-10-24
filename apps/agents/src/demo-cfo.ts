@@ -1,11 +1,13 @@
 /**
  * Demo-only CFO stand-in, for recording eval fixtures and rehearsing the waiting close without a browser. It claims the
- * CFO seat (or reuses its identity from .secrets/<db>/cfo.token) and confirms every Proposal of the month that waits for the
+ * CFO seat with the bootstrap secret in .secrets/cfo-bootstrap.<db>.txt (or reuses its identity from
+ * .secrets/<db>/cfo.token once it holds the seat) and confirms every Proposal of the month that waits for the
  * CFO, as a CFO clicking OK in the app would, until the Advisor has requested the lock or time runs out. It never
  * locks the month. It approves without reading, so never point it at books anyone relies on; and once it holds the CFO
  * seat, a browser can take the seat only by a grant from this identity or a database reset with delete-data.
  * Usage: node --import tsx src/demo-cfo.ts 2026-09 [--timeout-s 600]
  */
+import { takeCfoSeat } from './cfo-seat';
 import { RoleConn, sleep } from './stdb';
 
 const ym = process.argv.slice(2).find(a => /^\d{4}-\d{2}$/.test(a));
@@ -17,9 +19,10 @@ if (!ym) {
 }
 
 const cfo = await RoleConn.connect('cfo');
-// Claims the seat on first use; on later runs the same identity re-registers as itself, which the module allows.
+// Claims the seat with the bootstrap secret on first use; on later runs the same identity re-registers as itself, which
+// the module allows.
 try {
-  await cfo.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'CFO', model: 'human' });
+  await takeCfoSeat(cfo);
 } catch (e) {
   console.error(`[demo-cfo] cannot act as the CFO: ${(e as Error).message}`);
   process.exit(1);
