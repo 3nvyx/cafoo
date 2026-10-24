@@ -53,6 +53,8 @@ Start a close from the app, or from the shell:
 curl -X POST http://localhost:8787/close -H 'content-type: application/json' -d '{"periodYm":"2026-09"}'
 ```
 
+The first connection to claim the `advisor` or `cfo` role keeps it; later claims need a grant from the advisor. The seed loader claims `advisor`, and the first browser to open the app against a fresh database claims `cfo`. That is fine for a demo on one machine, but anyone who can reach port 3000 before you could take the CFO seat, so do not expose a fresh database. A one-time bootstrap secret is on the roadmap.
+
 `pnpm -F @cafoo/web dev` on its own runs the UI against an in-browser Demo mode with nothing else started. To point it at the live database and gateway, set `PUBLIC_DATA_SOURCE=spacetime`; see `apps/web/README.md`.
 
 Optional chat front-end. Open WebUI talks to the gateway's OpenAI-compatible endpoint:

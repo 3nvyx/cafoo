@@ -34,7 +34,7 @@ Integrations today: SpacetimeDB, Claude Agent SDK, Grok through the Vercel AI SD
 
 **Custom agent charters.** The finance team writes its own Charter for each agent in plain English: what it may propose, what it must never do, when it escalates. Each line becomes an eval scenario that must pass before the Charter goes live.
 
-**Hosted deployment.** A managed Cafoo per customer, so a finance team can start without running a database or a gateway.
+**Hosted deployment.** A managed Cafoo per customer, so a finance team can start without running a database or a gateway. It needs a one-time bootstrap secret for the CFO seat, so the role no longer goes to whoever connects first.
 
 **SOC 2 readiness.** Controls, evidence collection, and access reviews, built on the audit trail the reducers already write.
 
