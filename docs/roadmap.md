@@ -8,15 +8,17 @@ Cafoo closes the month for one company in one currency.
 
 Worker agents (Bookkeeper, Revenue, Credit & Risk) propose. A Red Team agent on a second model vendor critiques. The Advisor rules with a written rationale. Rulings at or above the Materiality threshold (default $10,000) wait in the CFO's "Needs your OK" queue. The CFO confirms or sends back, can reverse any entry, and always confirms the period lock. SpacetimeDB reducers enforce all of this by checking the caller's identity.
 
-On the seeded company, a close produces about 47 Proposals:
+On the seeded company, a close produces about 48 Proposals:
 
-- About 40 bank matches at 75% confidence or better, and 2 low-confidence matches the Red Team rejects.
+- 9 vendor payments ($49,065) matched to their bills in one Proposal, every match at least 80% confident. Because the batch is above the Materiality threshold, it waits for the CFO.
+- 9 customer receipts that match their invoices only at 70% confidence, each in its own Proposal. The Red Team challenges them and the Advisor leaves them for a person.
 - A duplicate vendor payment, booked as money due back from the vendor.
 - Quick entries for payroll, fees, and card spend, with a live web lookup of an unknown vendor.
 - An accrual for a contractor bill dated after month end.
-- A missing 12-month revenue schedule rebuilt for a $26,400 contract, $64,000 of subscription revenue recognized across 14 customers, and $57,420 of usage revenue.
+- A missing 12-month revenue schedule rebuilt for a $26,400 contract, $66,200 of subscription revenue recognized across 14 customers, and $57,420 of usage revenue. The rebuilt contract's revenue is recognized in a catch-up entry once the CFO confirms its schedule.
 - A credit cascade (identity, fraud, three bureaus, public records) on every guarantor behind open receivables, with Risk Tiers A to D or BLOCK and Allowances from 1% to 100%. One customer's $48,000 is fully reserved because its guarantor is in an active bankruptcy plan.
 - Two vendors blocked before their first payment because their owners fail identity and fraud checks: one is a synthetic identity, one is deceased.
+- One vendor verified through a Vendor check after its owner passes the identity and fraud checks.
 
 Every Proposal and ruling carries a Plain summary and a technical rationale. Simple mode shows the sentence; Expert mode shows journal lines, codes, critiques, and raw payloads. The Board Pack (P&L, Balance Sheet, ARR waterfall, NRR) renders after the lock, and every figure drills down to its journal lines.
 

@@ -62,7 +62,7 @@ All records live in one SpacetimeDB module. The UI subscribes to them live.
 | `credit_check` | One product call in a credit cascade, with its request id, Risk Tier, and decision |
 | `audit_event` | Every action: who, what role, which record, when |
 
-Proposal kinds are journal entry, bank match, revenue schedule, credit decision, accrual, and vendor block. Proposal statuses are open, approved, rejected, amended, awaiting CFO, sent back, and superseded.
+Proposal kinds are journal entry, bank match, revenue schedule, credit decision, accrual, vendor block, and vendor check. A vendor check marks a vendor verified after its owner passes the identity and fraud checks; no agent can mark a vendor verified any other way. Proposal statuses are open, approved, rejected, amended, awaiting CFO, sent back, and superseded.
 
 ## Governance model
 
@@ -72,7 +72,7 @@ Tier one is the Advisor. Worker agents may propose. Only the Red Team may critiq
 
 Tier two is the CFO. When a Proposal's amount is at or above the Materiality threshold, the Advisor's approval does not post. The Proposal moves to "Needs your OK" and waits. Only the CFO can confirm it, send it back with a note, reverse a posted entry, change the threshold, or lock and unlock a Period. The Advisor can request a lock, and the request is refused while any Proposal for the month still needs a ruling or a confirmation.
 
-The Materiality threshold defaults to $10,000 and is a setting the CFO controls.
+The Materiality threshold defaults to $10,000 and is a setting the CFO controls. The module computes a Proposal's amount from its payload and stores the larger of that and the amount the proposer states, so understating never avoids the CFO: the debits of a journal entry or accrual, the bank transactions a bank match settles, the lines of a revenue schedule, and the unpaid bills a vendor block or vendor check affects. A credit decision moves no balances; its Allowance arrives as a separate journal entry.
 
 Plain summaries are a required field, not a display option. Every Proposal, critique, and ruling carries one sentence the CFO can read without accounting training, next to a technical rationale for anyone who wants it.
 

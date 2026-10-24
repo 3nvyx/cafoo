@@ -23,16 +23,16 @@ Let me close September for a SaaS company with twenty customers.
 | Cue | On screen | Say |
 |---|---|---|
 | 1 | Launchpad. Click Close September. Close Tasks turn to in progress. | "One click. Five agents come online." |
-| 2 | Bookkeeper posts one Proposal: about 40 bank matches at 75% confidence or better. | "Forty deposits and payments matched in one Proposal." |
+| 2 | Bookkeeper files one Proposal matching 9 vendor payments to their bills, every match at least 80% confident. | "Nine payments matched in one Proposal." |
 | 3 | Two more matches below 75% arrive as separate Proposals. | "Two it is unsure about. It says so." |
 | 4 | Duplicate payment to Northwind Cloud, booked as money due back from the vendor. | "Same bill paid twice. Caught and booked as a refund owed to us." |
 | 5 | Quick entries for payroll, bank fees, and card spend. One unknown vendor gets a live web lookup. | "It did not know this vendor, so it looked it up." |
 | 6 | Accrual for a contractor bill dated after month end. | "September work, October bill. Accrued." |
 | 7 | Revenue rebuilds a missing 12-month schedule for a $26,400 contract. | "This contract was never on a schedule. Now it is." |
-| 8 | $64,000 of subscription revenue across 14 customers, and $57,420 of usage revenue. | "Revenue recognized and tied to deferred revenue." |
+| 8 | $66,200 of subscription revenue across 14 customers, and $57,420 of usage revenue. | "Revenue recognized and tied to deferred revenue." |
 | 9 | Credit & Risk runs the cascade on every guarantor. Risk Tiers and Allowances appear. Two vendors are blocked. | "Credit is checked on the owners behind the invoices. More on that in a minute." |
 | 10 | Red Team rejects the two weak matches and questions the largest reserve. | "The second model pushes back. It wins on the weak matches." |
-| 11 | Advisor rules on about 47 Proposals. Material ones move to Needs your OK. | "Small items post. Big ones wait for me." |
+| 11 | Advisor rules on about 48 Proposals. Material ones move to Needs your OK. | "Small items post. Big ones wait for me." |
 | 12 | Open one item. Toggle Expert mode. Journal lines, codes, the critique, the raw payload. Toggle back. Confirm. | "One sentence for me. Every line for my controller." |
 | 13 | Advisor requests the lock. Click Lock September. Board Pack renders. | "I lock the month. Not the agent." |
 | 14 | Click revenue in the Board Pack. Land on the journal lines, then the Proposal, then the Debate. | "Every number drills down to who proposed it and why." |
@@ -55,7 +55,7 @@ Today Cafoo closes one company in one currency. In the next ninety days we add m
 2. **The close still takes 10 days.** Most of it is matching, accruing, and chasing receipts by hand.
 3. **Everyone has agents. Nobody trusts them to post.** So we built the approval gate first and the agents second.
 4. **Propose, critique, rule, confirm.** Worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material.
-5. **Live demo: close September.** About 47 Proposals, a Red Team that pushes back, and a CFO who locks the month.
+5. **Live demo: close September.** About 48 Proposals, a Red Team that pushes back, and a CFO who locks the month.
 6. **Every number drills down.** From the Board Pack to the journal lines, the Proposal, and the Debate behind each figure.
 7. **Credit and risk, built in.** Owner checks on every guarantor and vendor, a $48,000 reserve, two vendors blocked before payment.
 8. **Why now.** Models that can be checked, and a database that streams every row and every agent message live.

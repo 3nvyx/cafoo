@@ -25,7 +25,7 @@ _Avoid_: transaction, JE batch
 
 ### Governance
 
-**Proposal**: A worker agent's request to change the ledger (journal entry, revenue schedule, bank match, credit decision, accrual, vendor block). Never affects balances until approved.
+**Proposal**: A worker agent's request to change the ledger (journal entry, revenue schedule, bank match, credit decision, accrual, vendor block, vendor check). Never affects balances until approved.
 _Avoid_: draft, suggestion, pending entry
 
 **Approval**: The Advisor's ruling on a Proposal: approve, reject, or amend, always with a rationale.
@@ -72,6 +72,8 @@ _Avoid_: deal, subscription
 **Guarantor**: The owner of a small-business customer whose personal credit is checked.
 
 **Credit Check**: One cascade run (identity, fraud, credit report, public records) with stored results and request ids.
+
+**Vendor check**: A Proposal from the Credit & Risk agent to mark a Vendor verified, citing the request ids of the identity and fraud results in the owner's Credit Check. A Vendor becomes verified only when its Vendor check is approved (and, at or above the Materiality threshold, confirmed by the CFO); a verified Vendor is not re-checked at the next close.
 
 **Risk Tier**: The Credit & Risk agent's classification of a Guarantor or Vendor (A, B, C, D, or BLOCK) from a Credit Check.
 

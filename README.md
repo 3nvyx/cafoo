@@ -60,10 +60,13 @@ The first connection to claim the `advisor` or `cfo` role keeps it; later claims
 Optional chat front-end. Open WebUI talks to the gateway's OpenAI-compatible endpoint:
 
 ```sh
-docker run -d -p 3001:8080 --add-host=host.docker.internal:host-gateway -e OPENAI_API_BASE_URL=http://host.docker.internal:8787/v1 -e OPENAI_API_KEY=dev -v open-webui:/app/backend/data ghcr.io/open-webui/open-webui:main
+docker run -d --name open-webui -p 3001:8080 --add-host=host.docker.internal:host-gateway \
+  -e OPENAI_API_BASE_URL=http://host.docker.internal:8787/v1 -e OPENAI_API_KEY=dev \
+  -e ENABLE_OLLAMA_API=false -e ENABLE_TITLE_GENERATION=false -e ENABLE_TAGS_GENERATION=false -e ENABLE_FOLLOW_UP_GENERATION=false \
+  -v open-webui:/app/backend/data ghcr.io/open-webui/open-webui:main
 ```
 
-Then open http://localhost:3001 and pick the `cafoo-advisor` model.
+Then open http://localhost:3001 and pick the `cafoo-advisor` model. The image is about 1.6 GB to download. The three `ENABLE_*_GENERATION` flags stop Open WebUI from sending its own background prompts (titles, tags, follow-ups) to the Advisor. Starting a close is allowed only from this machine (a loopback connection) or with `Authorization: Bearer <GATEWAY_API_KEY>`; Open WebUI in Docker connects from the Docker network, so to start a close from its chat, set `GATEWAY_API_KEY` and pass the same value as `OPENAI_API_KEY`.
 
 ## Demo mode and environment
 
@@ -79,6 +82,9 @@ With zero API keys, Cafoo runs end to end. Every external call replays recorded 
 | `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Moss: vector search over policies and past entries | Local keyword search |
 | `SPACETIMEDB_URI`, `SPACETIMEDB_DB_NAME` | Ledger database | `http://localhost:3000`, `cafoo` |
 | `GATEWAY_PORT` | Agent gateway and OpenAI-compatible endpoint | `8787` |
+| `GATEWAY_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the gateway and start a close | The web app's dev and preview origins on localhost and 127.0.0.1 (ports 5173 and 4173) |
+| `GATEWAY_ALLOWED_HOSTS` | Extra Host names the gateway answers to (comma-separated; `*` turns the check off, e.g. for a LAN address) | localhost, 127.0.0.1, [::1], host.docker.internal, and the host of every allowed origin |
+| `GATEWAY_API_KEY` | When set, `/v1/*` requires `Authorization: Bearer <key>`; give Open WebUI the same value as `OPENAI_API_KEY` | Open |
 | `DEMO_MODE` | Force fixtures | `1` in the example file |
 | `CLOSE_PERIOD` | Close month for seed data, `YYYY-MM` | Last completed month |
 
