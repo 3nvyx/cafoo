@@ -38,6 +38,7 @@ export const ProposalKind = t.enum('ProposalKind', {
   credit_decision: t.unit(),
   accrual: t.unit(),
   vendor_block: t.unit(),
+  vendor_verify: t.unit(),
 });
 
 export const ProposalStatus = t.enum('ProposalStatus', {
@@ -224,7 +225,7 @@ const fxRate = table(
     id: t.u64().primaryKey().autoInc(),
     fromCcy: t.string(),
     toCcy: t.string(),
-    ym: t.string(),
+    ym: t.string().index('btree'),
     rateE6: t.i64(),
     kind: FxKind,
   }
@@ -276,7 +277,7 @@ const revenueScheduleLine = table(
   {
     id: t.u64().primaryKey().autoInc(),
     contractItemId: t.u64().index('btree'),
-    customerId: t.u64(),
+    customerId: t.u64().index('btree'),
     ym: t.string().index('btree'),
     amountMinor: t.i64(),
     recognized: t.bool(),
@@ -349,9 +350,13 @@ const bankMatch = table(
     id: t.u64().primaryKey().autoInc(),
     bankTxId: t.u64().unique(),
     targetKind: MatchTarget,
-    targetId: t.u64(),
+    targetId: t.u64().index('btree'),
     scoreBp: t.u16(),
-    proposalId: t.u64(),
+    proposalId: t.u64().index('btree'),
+    /** The payment entry a bank_match proposal posted for an invoice or bill match; none for a journal-entry match.
+     *  Option columns cannot carry an index in the 2.13 TypeScript SDK, so look matches up by proposalId first.
+     *  The default lets an existing database upgrade in place; its older matches have none (see isLegacyPaymentMatch). */
+    paymentJeId: t.option(t.u64()).default(undefined),
   }
 );
 

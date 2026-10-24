@@ -112,6 +112,7 @@ export const BankMatch = __t.object("BankMatch", {
   targetId: __t.u64(),
   scoreBp: __t.u16(),
   proposalId: __t.u64(),
+  paymentJeId: __t.option(__t.u64()),
 });
 export type BankMatch = __Infer<typeof BankMatch>;
 
@@ -459,6 +460,7 @@ export const ProposalKind = __t.enum("ProposalKind", {
   CreditDecision: __t.unit(),
   Accrual: __t.unit(),
   VendorBlock: __t.unit(),
+  VendorVerify: __t.unit(),
 });
 export type ProposalKind = __Infer<typeof ProposalKind>;
 

@@ -2,10 +2,13 @@
  * Loads seed/out/seed.json into the running SpacetimeDB database through reducers.
  * Runs as the advisor identity (token in .secrets/advisor.token) so the same identity later drives the agents.
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DbConnection } from '@cafoo/stdb-bindings';
+import { ACCOUNTS } from './accounts';
 import type { Seed } from './generate';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -56,31 +59,61 @@ function connect(): Promise<DbConnection> {
   });
 }
 
+/** The spacetime CLI and server name to use when the loader must act as the database owner. */
+function cli() {
+  const bin = process.env.SPACETIME_BIN ?? (existsSync(join(homedir(), '.local', 'bin', 'spacetime')) ? join(homedir(), '.local', 'bin', 'spacetime') : 'spacetime');
+  const server = process.env.SPACETIMEDB_SERVER ?? URI.replace(/^ws(s?):\/\//, 'http$1://');
+  return { bin, server };
+}
+
 /**
- * A database seeded by an older seed lacks accounts added since (e.g. 1250 Receivable from Vendors). seedAccounts
- * skips codes that exist, so add just the missing ones. Once setup is sealed only the CFO may seed, and this loader
- * runs as the advisor, so on a sealed database it reports what is missing instead of failing.
+ * Clear the demo. Once setup is sealed the Advisor (this loader's identity) may no longer reset, so fall back to the
+ * spacetime CLI, which runs as the database owner who published the module.
  */
-async function topUpAccounts(conn: DbConnection, seed: Seed) {
+async function resetDemo(conn: DbConnection) {
+  try {
+    await conn.reducers.resetDemo({ confirm: 'RESET' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // The module records its owner in init, which runs only when a database is first published (or republished with
+    // --delete-data). A database upgraded in place has no recorded owner, so the CLI fallback cannot work there.
+    if (![...conn.db.settings.iter()].some(s => s.key === 'database_owner' && s.valueText !== '')) {
+      throw new Error(
+        `reset as advisor refused (${msg}), and this database has no recorded owner because it was upgraded in place rather than published fresh. Publish it fresh with \`cd spacetimedb && spacetime publish ${DB} --server local --delete-data=always --yes\`, then run the loader again.`
+      );
+    }
+    const { bin, server } = cli();
+    console.log(`reset as advisor refused (${msg}); resetting as the database owner with the spacetime CLI`);
+    const r = spawnSync(bin, ['call', DB, 'reset_demo', '"RESET"', '-s', server, '--no-config', '--yes'], { encoding: 'utf8' });
+    if (r.status !== 0) {
+      throw new Error(
+        `owner reset failed (${(r.stderr || r.stdout || String(r.error ?? '')).trim()}). Republish with \`cd spacetimedb && spacetime publish ${DB} --server local --delete-data=always --yes\` and run the loader again.`
+      );
+    }
+  }
+}
+
+/**
+ * A database seeded before an account was added to the chart (e.g. 1250 Receivable from Vendors) lacks it, and the
+ * agents' entries on it fail. The chart comes from code (accounts.ts), not seed.json, so a stale seed.json cannot hide
+ * a gap. seedAccounts skips codes that exist, so add just the missing ones. Once setup is sealed only the CFO may seed
+ * and this loader runs as the Advisor, so it stops with a non-zero exit and says how to fix it.
+ */
+async function topUpAccounts(conn: DbConnection) {
   const have = new Set([...conn.db.account.iter()].map(a => a.code));
-  const missing = seed.accounts.filter(a => !have.has(a.code));
+  const missing = ACCOUNTS.filter(a => !have.has(a.code));
   if (missing.length === 0) return;
   const codes = missing.map(a => `${a.code} ${a.name}`).join(', ');
   const sealed = [...conn.db.settings.iter()].some(s => s.key === 'setup_sealed' && s.valueI64 === 1n);
   if (sealed) {
-    console.warn(
-      `missing account(s) ${codes}: setup is sealed, so only the CFO can add them. Run \`pnpm demo:reset\` to reload the demo with the current chart of accounts.`
+    console.error(
+      `the database is missing account(s) ${codes}, and setup is sealed, so only the CFO can add them. Run \`pnpm demo:reset\` to reload the demo with the current chart of accounts.`
     );
-    return;
+    process.exit(1);
   }
-  try {
-    await conn.reducers.seedAccounts({ subsidiaryCode: 'US', accounts: missing });
-    await waitFor(() => missing.every(a => [...conn.db.account.iter()].some(x => x.code === a.code)), 'missing accounts');
-    console.log(`added missing account(s): ${codes}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`could not add missing account(s) ${codes}: ${msg}. Run \`pnpm demo:reset\` to reload the demo.`);
-  }
+  await conn.reducers.seedAccounts({ subsidiaryCode: 'US', accounts: missing });
+  await waitFor(() => missing.every(a => [...conn.db.account.iter()].some(x => x.code === a.code)), 'missing accounts');
+  console.log(`added missing account(s): ${codes}`);
 }
 
 async function main() {
@@ -99,11 +132,11 @@ async function main() {
 
   if (conn.db.subsidiary.count() > 0n) {
     if (process.env.SEED_RESET === '1') {
-      await r.resetDemo({ confirm: 'RESET' });
+      await resetDemo(conn);
       await waitFor(() => conn.db.subsidiary.count() === 0n, 'reset');
       console.log('demo data cleared');
     } else {
-      await topUpAccounts(conn, seed);
+      await topUpAccounts(conn);
       console.log('database already seeded; set SEED_RESET=1 to reload');
       process.exit(0);
     }
@@ -111,9 +144,10 @@ async function main() {
 
   // 2. Structure
   await r.seedSubsidiary({ code: seed.subsidiary.code, name: seed.subsidiary.name, functionalCcy: seed.subsidiary.functionalCcy, parentCode: undefined });
-  await r.seedAccounts({ subsidiaryCode: 'US', accounts: seed.accounts });
+  // The chart comes from code, not seed.json, so a stale seed.json cannot leave an account out.
+  await r.seedAccounts({ subsidiaryCode: 'US', accounts: ACCOUNTS });
   await r.seedPeriods({ subsidiaryCode: 'US', yms: seed.periods.yms, closedYms: seed.periods.closedYms });
-  await waitFor(() => conn.db.account.count() >= BigInt(seed.accounts.length) && conn.db.period.count() >= BigInt(seed.periods.yms.length), 'accounts and periods');
+  await waitFor(() => conn.db.account.count() >= BigInt(ACCOUNTS.length) && conn.db.period.count() >= BigInt(seed.periods.yms.length), 'accounts and periods');
 
   // 3. Parties
   await r.seedCustomers({ subsidiaryCode: 'US', customers: seed.customers.map(c => ({ name: c.name, domain: c.domain, guarantorPersonaId: c.guarantorPersonaId, guarantorName: c.guarantorName, paymentTermsDays: c.paymentTermsDays })) });

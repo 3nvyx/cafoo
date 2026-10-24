@@ -23,4 +23,5 @@ export default __t.row({
   targetId: __t.u64().name("target_id"),
   scoreBp: __t.u16().name("score_bp"),
   proposalId: __t.u64().name("proposal_id"),
+  paymentJeId: __t.option(__t.u64()).name("payment_je_id"),
 });

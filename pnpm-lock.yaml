@@ -143,6 +143,13 @@ importers:
       spacetimedb:
         specifier: 2.13.*
         version: 2.13.0(svelte@5.57.2)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.5
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
 
   seed:
     dependencies:

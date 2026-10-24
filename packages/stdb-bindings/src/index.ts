@@ -176,6 +176,12 @@ const tablesSchema = __schema({
       { accessor: 'id', name: 'bank_match_id_idx_btree', algorithm: 'btree', columns: [
         'id',
       ] },
+      { accessor: 'proposalId', name: 'bank_match_proposal_id_idx_btree', algorithm: 'btree', columns: [
+        'proposalId',
+      ] },
+      { accessor: 'targetId', name: 'bank_match_target_id_idx_btree', algorithm: 'btree', columns: [
+        'targetId',
+      ] },
     ],
     constraints: [
       { name: 'bank_match_bank_tx_id_key', constraint: 'unique', columns: ['bankTxId'] },
@@ -287,6 +293,9 @@ const tablesSchema = __schema({
       { accessor: 'id', name: 'fx_rate_id_idx_btree', algorithm: 'btree', columns: [
         'id',
       ] },
+      { accessor: 'ym', name: 'fx_rate_ym_idx_btree', algorithm: 'btree', columns: [
+        'ym',
+      ] },
     ],
     constraints: [
       { name: 'fx_rate_id_key', constraint: 'unique', columns: ['id'] },
@@ -390,6 +399,9 @@ const tablesSchema = __schema({
     indexes: [
       { accessor: 'contractItemId', name: 'revenue_schedule_line_contract_item_id_idx_btree', algorithm: 'btree', columns: [
         'contractItemId',
+      ] },
+      { accessor: 'customerId', name: 'revenue_schedule_line_customer_id_idx_btree', algorithm: 'btree', columns: [
+        'customerId',
       ] },
       { accessor: 'id', name: 'revenue_schedule_line_id_idx_btree', algorithm: 'btree', columns: [
         'id',

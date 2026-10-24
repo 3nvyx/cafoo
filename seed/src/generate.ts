@@ -6,6 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ACCOUNTS, type SeedAccount } from './accounts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -120,7 +121,7 @@ type JE = { periodYm: string; memo: string; lines: Line[] };
 export type Seed = {
   closeYm: string;
   subsidiary: { code: string; name: string; functionalCcy: string };
-  accounts: { code: string; name: string; accountType: string; isIntercompany: boolean; sortOrder: number }[];
+  accounts: SeedAccount[];
   periods: { yms: string[]; closedYms: string[] };
   customers: { idx: number; name: string; domain: string; guarantorPersonaId: string; guarantorName: string; paymentTermsDays: number }[];
   vendors: { idx: number; name: string; domain: string; category: string; ownerPersonaId?: string; expenseAccountCode: string }[];
@@ -167,7 +168,7 @@ const BUSINESSES = [
 
 const VENDORS: Seed['vendors'] = [
   { idx: 1, name: 'Northwind Cloud', domain: 'northwindcloud.com', category: 'Hosting & infrastructure', expenseAccountCode: '5000' },
-  { idx: 2, name: 'Lumen Analytics', domain: 'lumenanalytics.io', category: 'Software & tools', expenseAccountCode: '5100' },
+  { idx: 2, name: 'Lumen Analytics', domain: 'lumenanalytics.io', category: 'Software & tools', ownerPersonaId: 'P10', expenseAccountCode: '5100' },
   { idx: 3, name: 'Harbor Payroll', domain: 'harborpayroll.com', category: 'Payroll', expenseAccountCode: '5300' },
   { idx: 4, name: 'Signal & Co Marketing', domain: 'signalandco.com', category: 'Marketing', expenseAccountCode: '5400' },
   { idx: 5, name: 'Meridian Workspace', domain: 'meridianworkspace.com', category: 'Rent & office', expenseAccountCode: '5500' },
@@ -195,31 +196,7 @@ function main() {
   const seed: Seed = {
     closeYm,
     subsidiary: { code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD' },
-    accounts: [
-      ['1000', 'Cash', 'asset'],
-      ['1100', 'Accounts Receivable', 'asset'],
-      ['1150', 'Allowance for Doubtful Accounts', 'asset'],
-      ['1200', 'Prepaid Expenses', 'asset'],
-      ['1250', 'Receivable from Vendors', 'asset'],
-      ['1500', 'Equipment', 'asset'],
-      ['2000', 'Accounts Payable', 'liability'],
-      ['2100', 'Accrued Liabilities', 'liability'],
-      ['2400', 'Deferred Revenue', 'liability'],
-      ['3000', 'Common Stock', 'equity'],
-      ['3100', 'Retained Earnings', 'equity'],
-      ['4000', 'Subscription Revenue', 'revenue'],
-      ['4100', 'Usage Revenue', 'revenue'],
-      ['5000', 'Hosting & Infrastructure', 'expense'],
-      ['5100', 'Software & Tools', 'expense'],
-      ['5200', 'Contractors', 'expense'],
-      ['5300', 'Payroll', 'expense'],
-      ['5400', 'Marketing', 'expense'],
-      ['5500', 'Rent & Office', 'expense'],
-      ['5600', 'Professional Services', 'expense'],
-      ['5700', 'Bad Debt Expense', 'expense'],
-      ['5800', 'Travel', 'expense'],
-      ['6000', 'Bank Fees', 'expense'],
-    ].map(([code, name, accountType], i) => ({ code, name, accountType, isIntercompany: false, sortOrder: i })),
+    accounts: ACCOUNTS,
     periods: { yms: [ymStr(m2), ymStr(m1), closeYm, ymStr(next)], closedYms: [ymStr(m2), ymStr(m1)] },
     customers: [],
     vendors: VENDORS,
@@ -365,11 +342,14 @@ function main() {
         });
       }
     }
+    // Revenue earned before the first seeded month belongs to earlier, already-closed years: it is an opening balance
+    // (deferred revenue released into retained earnings), not revenue of the first seeded month's P&L. The balance sheet
+    // is the same either way.
     if (earlier > 0) {
       seed.journalEntries.push({
         periodYm: ymStr(m2),
-        memo: `Revenue recognized before ${ymStr(m2)} for ${c.name}`,
-        lines: [line('2400', earlier, 0, `Release deferred ${code}`, { customerIdx: c.idx }), line('4000', 0, earlier, `Subscription revenue ${code}`, { customerIdx: c.idx })],
+        memo: `Opening balance: revenue recognized before ${ymStr(m2)} for ${c.name}`,
+        lines: [line('2400', earlier, 0, `Deferred revenue released before ${ymStr(m2)} (${code})`, { customerIdx: c.idx }), line('3100', 0, earlier, `Retained earnings: revenue earned before ${ymStr(m2)} (${code})`)],
       });
     }
     // Cash receipt for paid invoices: bank inflow + JE in the month after issue (or m2 if earlier), matched.
@@ -496,6 +476,7 @@ function main() {
     { id: 3, title: 'First payment pending to a vendor owned by a synthetic identity (P13)', expect: 'Credit & Risk proposes a vendor block before payment.' },
     { id: 4, title: 'Contractor invoice dated after month end for close-month work', expect: 'Bookkeeper proposes an accrual that reverses next month.' },
     { id: 5, title: 'Customer 7 guarantor is in an active Chapter 13 plan with $48,000 overdue', expect: 'Credit & Risk proposes a 100% allowance.' },
+    { id: 6, title: 'Lumen Analytics, with an open bill, has an owner (P10) who was never checked', expect: 'Credit & Risk records clean identity and fraud checks and proposes a vendor check; the Advisor\'s approval marks the vendor verified.' },
   ];
 
   // Prior-month bank activity is already matched (its entries are seeded); the close month is the Bookkeeper's job.
