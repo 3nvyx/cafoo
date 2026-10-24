@@ -8,7 +8,7 @@ assertions:
       sql: "SELECT * FROM proposal WHERE amount_minor >= ${materiality}"
       where:
         kind: journal_entry
-        payload_json.memo: { matches: "^Allowance for doubtful accounts" }
+        payload_json.memo: { imatches: "^Allowance for doubtful accounts" }
       key: id
     right:
       sql: "SELECT * FROM agent_message WHERE sender_role = 'redteam'"

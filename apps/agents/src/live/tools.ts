@@ -130,7 +130,7 @@ export function booksServer(cast: Cast) {
             if (acct) byVendor.set(b.vendorId, acct.id);
           }
           const acc = detectMissingAccruals(s.bills, s.close, { subsidiaryId: s.subsidiary.id, periodId: s.period.id, expenseAccountId: s.accountByCode.get('5600')!.id, accruedLiabilitiesAccountId: s.accountByCode.get('2100')!.id, expenseAccountByVendor: byVendor });
-          return ok(acc.map(a => ({ billId: a.billId, reversesInYm: ymToString(a.reversesInYm), lines: a.lines.map(l => ({ accountCode: s.accountById.get(l.accountId)?.code, debitMinor: l.debitMinor, creditMinor: l.creditMinor, memo: l.memo })) })));
+          return ok(acc.map(a => ({ billId: a.billId, externalRef: s.bills.find(b => b.id === a.billId)?.externalRef ?? null, reversesInYm: ymToString(a.reversesInYm), lines: a.lines.map(l => ({ accountCode: s.accountById.get(l.accountId)?.code, debitMinor: l.debitMinor, creditMinor: l.creditMinor, memo: l.memo })) })));
         },
         readOnly
       ),
@@ -245,6 +245,8 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
         }
       }
     ),
+    // Not marked read-only on purpose: the CLI runs it serially, so its PostToolUse lands in the harness history
+    // before the next call (a credit decision citing it) is judged.
     tool(
       'record_credit_check',
       'Store one credit-check evidence row (product, request id, summary) for a customer or vendor.',

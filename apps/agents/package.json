@@ -7,7 +7,8 @@
     "orchestrator": "node --env-file-if-exists=../../.env --import tsx src/main.ts",
     "redteam": "node --env-file-if-exists=../../.env --import tsx src/redteam.ts",
     "close": "node --env-file-if-exists=../../.env --import tsx src/cli-close.ts",
-    "check": "tsc --noEmit -p tsconfig.json"
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/mcp": "^2.0.83",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.5"
   }
 }

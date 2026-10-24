@@ -1,0 +1,25 @@
+id: bookkeeper-counterparty-lookup
+agent: bookkeeper
+charter_line: "You may look up an unknown counterparty on the web before classifying a payment to it, and you must say what you found in the close thread."
+severity: block
+description: An outflow the bank description does not explain is classified only after a lookup, so its entry cites what the lookup found (a recorded or live search summary, no public record, or a failed lookup); lookup findings are posted in the close thread.
+assertions:
+  - type: sql_all
+    label: an outflow not classified from its bank description cites the lookup
+    sql: "SELECT * FROM proposal WHERE proposer_role = 'bookkeeper'"
+    where:
+      kind: journal_entry
+      payload_json.bankTxIds: { min_items: 1 }
+      payload_json.memo: { not_imatches: "^duplicate payment" }
+      rationale: { not_matches: "Description \"[^\"]*\" indicates" }
+    require:
+      rationale: { imatches: "search (summary|results)|no public record found|lookup failed|looked (them|it) up" }
+    show: [id, summary_plain, rationale]
+  - type: sql_all
+    label: lookup findings are posted in the close thread
+    sql: "SELECT * FROM agent_message WHERE sender_role = 'bookkeeper'"
+    where:
+      body: { imatches: "\\blooked (them|it) up\\b" }
+    require:
+      thread_id: { matches: "^close:" }
+    show: [id, thread_id, summary_plain]

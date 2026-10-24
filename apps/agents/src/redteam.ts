@@ -1,7 +1,9 @@
 /**
  * The Red Team: a second model vendor (xAI Grok through the Vercel AI SDK) that critiques every open
  * proposal before the Advisor rules. Runs as its own database identity; it can critique, never propose or rule.
- * Without XAI_API_KEY it falls back to rule-based critiques so demo mode still shows a debate.
+ * Without XAI_API_KEY it falls back to rule-based critiques so demo mode still shows a debate. Either way the
+ * Red Team harness (src/harness/redteam.ts) judges the critique before it is written: open Proposals only, a plain
+ * summary, critiques only.
  */
 import { createXai } from '@ai-sdk/xai';
 import { generateText, stepCountIs, tool as aiTool } from 'ai';
@@ -9,7 +11,14 @@ import { z } from 'zod';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { redTeamLive } from './env';
+import { agentPrompt, checkCall, HARNESSES, modelFor, type Decision, type RuleContext } from './harness';
+import { statusKey } from './harness/rules';
 import { Cast, repoRoot, type RoleConn } from './stdb';
+
+const RED = HARNESSES.redteam;
+type Critique = { body: string; summaryPlain: string };
+/** Run the Red Team harness on a critique as the submit_critique tool call it is. */
+const judge = (proposalId: bigint, c: Critique, ctx: RuleContext): Decision => checkCall(RED, { tool: 'submit_critique', input: { proposalId: proposalId.toString(), ...c } }, ctx);
 
 const policiesDir = join(repoRoot, 'fixtures', 'moss');
 
@@ -50,7 +59,7 @@ function loadPolicyDocs() {
 
 type ProposalRow = NonNullable<ReturnType<RoleConn['db']['proposal']['id']['find']>>;
 
-function scriptedCritique(p: ProposalRow, materiality: bigint): { body: string; summaryPlain: string } | null {
+function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null {
   const payload = JSON.parse(p.payloadJson);
   const kind = p.kind.tag;
   if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
@@ -68,18 +77,31 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): { body: string; 
   return null;
 }
 
-async function grokCritique(p: ProposalRow, materiality: bigint): Promise<{ body: string; summaryPlain: string } | null> {
+async function grokCritique(p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
-  let submitted: { body: string; summaryPlain: string } | null = null;
+  let submitted: Critique | null = null;
   await generateText({
-    model: xai.responses(process.env.REDTEAM_MODEL ?? 'grok-4.7'),
-    system: `You are the Red Team of a finance close. A worker agent proposed a change to the books; the Chief Finance Advisor will rule next. Your job is to find what is wrong or unverified: weak evidence, wrong account, wrong period, double counting, an assumed rate, a single data source. Be specific and short (under 90 words). Use search_policies for the house accounting policy. If the proposal is sound, say so in one sentence and name the one check you would still make. Always finish by calling submit_critique with a technical body and a one-sentence plain summary for a non-technical CFO (no account codes).`,
+    model: xai.responses(modelFor(RED)),
+    // The harness instructions say how to use the tools; the charter and the gate formats follow them.
+    system: agentPrompt(RED, { withInstructions: true }),
     prompt: `Proposal ${p.id} (${p.kind.tag}, ${p.proposerRole}, amount minor units ${p.amountMinor}, materiality ${materiality}):\nPlain: ${p.summaryPlain}\nRationale: ${p.rationale}\nPayload: ${p.payloadJson.slice(0, 4000)}`,
     tools: {
       search_policies: aiTool({ description: 'Search the house accounting policies', inputSchema: z.object({ query: z.string() }), execute: async ({ query }) => searchPolicies(query) }),
-      submit_critique: aiTool({ description: 'Submit the critique', inputSchema: z.object({ body: z.string(), summaryPlain: z.string() }), execute: async a => { submitted = a; return 'submitted'; } }),
+      submit_critique: aiTool({
+        description: 'Submit the critique',
+        inputSchema: z.object({ body: z.string(), summaryPlain: z.string() }),
+        execute: async a => {
+          const c = ctx();
+          const d = judge(p.id, a, c);
+          const status = c.proposalStatus?.(p.id.toString());
+          if (!d.allow && status !== undefined && statusKey(status) !== 'open') return `Stop: Proposal ${p.id} is ${status}; it was already ruled or is no longer open, so no critique can be attached. Do not call submit_critique again.`;
+          if (!d.allow) return `Not submitted: ${d.reason}. Fix it and call submit_critique again.`;
+          submitted = a;
+          return 'submitted';
+        },
+      }),
     },
-    stopWhen: stepCountIs(6),
+    stopWhen: stepCountIs(RED.maxTurns ?? 6),
   });
   return submitted;
 }
@@ -90,13 +112,26 @@ export function startCritic(cast: Cast): () => void {
   const A = cast.advisor;
   const seen = new Set<bigint>();
   let stopped = false;
+  const ctx = (): RuleContext => ({ proposalStatus: id => (/^\d+$/.test(id) ? A.db.proposal.id.find(BigInt(id))?.status.tag : undefined), accountCodes: [...A.db.account.iter()].map(a => a.code) });
   const critique = async (p: ProposalRow) => {
     if (seen.has(p.id) || p.status.tag !== 'Open') return;
     seen.add(p.id);
     const materiality = A.db.settings.key.find('materiality_threshold_minor')?.valueI64 ?? 1_000_000n;
     try {
-      const c = redTeamLive() ? await grokCritique(p, materiality) : scriptedCritique(p, materiality);
-      if (c) await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
+      // Grok first when live; the scripted critique when Grok fails (outage, timeout, rate limit) or submits nothing
+      // the harness accepts within its step cap.
+      const grok = redTeamLive()
+        ? await grokCritique(p, materiality, ctx).catch(e => {
+            console.warn(`[redteam] proposal ${p.id}: Grok failed, using the scripted critique:`, (e as Error).message);
+            return null;
+          })
+        : null;
+      const c = grok ?? scriptedCritique(p, materiality);
+      if (!c) return;
+      // Judged again at write time: the Advisor may have ruled while Grok was thinking.
+      const d = judge(p.id, c, ctx());
+      if (!d.allow) return console.warn(`[redteam] proposal ${p.id}: critique withheld: ${d.reason}`);
+      await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
     } catch (e) {
       console.error(`[redteam] proposal ${p.id}:`, (e as Error).message);
     }
@@ -106,7 +141,7 @@ export function startCritic(cast: Cast): () => void {
   };
   A.db.proposal.onInsert(onInsert as any);
   for (const p of A.db.proposal.iter()) if (p.status.tag === 'Open') void critique(p);
-  console.log(`[redteam] watching proposals (${redTeamLive() ? 'grok-4.7' : 'scripted'})`);
+  console.log(`[redteam] watching proposals (${redTeamLive() ? modelFor(RED) : 'scripted'})`);
   return () => {
     stopped = true;
     try {

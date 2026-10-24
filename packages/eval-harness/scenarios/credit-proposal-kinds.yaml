@@ -14,7 +14,7 @@ assertions:
     where:
       kind: journal_entry
     require:
-      payload_json.memo: { matches: "^Allowance for doubtful accounts" }
+      payload_json.memo: { imatches: "^Allowance for doubtful accounts" }
       payload_json.lines: { each: { accountCode: { in: ["5700", "1150"] } } }
     show: [id, summary_plain]
   - type: sql_covers

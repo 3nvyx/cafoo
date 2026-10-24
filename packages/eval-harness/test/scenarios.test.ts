@@ -88,6 +88,10 @@ const MUTATIONS: Record<string, (t: Tables) => void> = {
   'bookkeeper-duplicate-payments': (t) => {
     t.proposal = t.proposal!.filter((p) => !/^duplicate payment/i.test(String(payload(p).memo ?? '')));
   },
+  'bookkeeper-counterparty-lookup': (t) => {
+    const p = first(t.proposal!, (r) => r.proposer_role === 'bookkeeper' && /search summary/i.test(String(r.rationale)));
+    p.rationale = 'Bank outflow of $890 to Quillstack Inc has no invoice or bill. Booking directly to Software subscription (5100).';
+  },
   'bookkeeper-plain-summary': (t) => {
     first(t.proposal!, (p) => p.proposer_role === 'bookkeeper').summary_plain = 'Dr 5300 and Cr 1000 for 4860000.';
   },

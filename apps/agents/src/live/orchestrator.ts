@@ -1,29 +1,24 @@
 /**
  * Live mode: the Chief Finance Advisor is the root Claude Agent SDK query; Bookkeeper, Revenue, and
- * Credit & Risk are named subagents with their own identity-bound tool servers. A PreToolUse hook denies any
- * role calling another role's tools (belt); the database reducers check identity (braces).
+ * Credit & Risk are named subagents with their own identity-bound tool servers. Each agent is built from its
+ * harness (src/harness: charter plus the formats its gate checks, model, exact tool list, turn cap), and one PreToolUse hook denies any role
+ * calling another role's tools or breaking a charter rule (belt); the database reducers check identity (braces).
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { query, type HookCallback, type PreToolUseHookInput, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
-import { repoRoot, type Cast } from '../stdb';
+import { query, type AgentDefinition, type HookCallback, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
+import { type Cast } from '../stdb';
 import { advisorServer, booksServer, crsServer, workerServer } from './tools';
 import { startCritic } from '../redteam';
+import { agentPrompt, HARNESSES, modelFor, WORKERS, type WorkerRole } from '../harness';
+import { harnessGate } from '../harness/hook';
+import { BOOKS_TOOLS, mcp } from '../harness/rules';
 
-const chartersDir = join(repoRoot, 'apps', 'agents', 'src', 'charters');
-function charter(role: string, fallback: string) {
-  const p = join(chartersDir, `${role}.md`);
-  return existsSync(p) ? readFileSync(p, 'utf8') : fallback;
+const ADVISOR = HARNESSES.advisor;
+
+/** A worker subagent exactly as its harness declares it. */
+function subagent(role: WorkerRole): AgentDefinition {
+  const h = HARNESSES[role];
+  return { description: h.description ?? role, prompt: agentPrompt(h), model: modelFor(h), tools: [...h.tools], maxTurns: h.maxTurns };
 }
-
-const PLAIN_RULE = `Every proposal, critique, and ruling carries a one-sentence plain summary for a CFO who has never seen a journal entry: no account codes, no jargon, dollar amounts spelled out (e.g. "$48,000"). The technical rationale goes in the rationale field.`;
-
-const FALLBACK = {
-  advisor: `You are the Chief Finance Advisor of Cafoo Inc. You run the month-end close by delegating to the bookkeeper, revenue, and credit subagents (use the Agent tool, one at a time or in parallel, and wait for each report). You are the only agent that approves or rejects proposals. Read every proposal with list_proposals, weigh the Red Team critiques, and rule on each one with a technical rationale and a plain summary. Amounts at or above the materiality threshold wait for the CFO automatically. When every proposal is decided, mark the close tasks done and call request_period_lock; never lock yourself. ${PLAIN_RULE}`,
-  bookkeeper: `You are the Bookkeeper. You reconcile the bank feed and keep payables right. Start with close_snapshot and score_bank_matches. Propose one bank_match proposal for all auto-confidence matches and one per review-confidence match. Book duplicate payments as money due back from the vendor (account 1250 Receivable from Vendors). For unexplained outflows propose quick journal entries (payroll 5300, bank fees 6000, travel 5800, office 5500, software 5100) with the bankTxIds they explain. Use detect_missing_accruals and propose accruals. You never post; you only propose. ${PLAIN_RULE}`,
-  revenue: `You are the Revenue agent. Every subscription contract must have a recognition schedule; use close_snapshot and build_revenue_schedule and propose any missing schedule. Then propose one journal entry recognizing this month's unrecognized schedule lines (Dr 2400 Deferred Revenue / Cr 4000 Subscription Revenue per customer, with recognizeScheduleYm set) and one for usage invoices of the month (Dr 1100 / Cr 4100). Never recognize revenue before the service month. You never post; you only propose. ${PLAIN_RULE}`,
-  credit: `You are Credit & Risk. For every customer with open receivables, run run_credit_cascade on the guarantor persona, record each evidence row with record_credit_check, propose a credit_decision (tier and terms), and use allowance_target to propose an allowance journal entry (Dr 5700 Bad Debt Expense / Cr 1150 Allowance) for the delta when it is not zero. For every unverified vendor with an owner persona, run the cascade as vendor_owner and propose a vendor_block when the tier is BLOCK. Only persona ids are ever sent to the credit API. You never post; you only propose. ${PLAIN_RULE}`,
-};
 
 export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: string) => void) {
   const period = [...cast.advisor.db.period.iter()].find(p => p.ym === periodYm);
@@ -40,15 +35,14 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const crs = crsServer();
   const stopCritic = startCritic(cast);
 
-  const roleGate: HookCallback = async input => {
-    const pre = input as PreToolUseHookInput;
-    const agent = (pre as any).agent_type as string | undefined;
-    const server = /^mcp__([a-z]+)__/.exec(pre.tool_name)?.[1];
-    const deny = (why: string) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: 'deny' as const, permissionDecisionReason: why } });
-    if (server === 'advisor' && agent) return deny(`Only the Advisor may use advisor tools; you are ${agent}.`);
-    if (['bookkeeper', 'revenue', 'credit'].includes(server ?? '') && agent !== server) return deny(`Only the ${server} agent may use ${server} tools${agent ? `; you are ${agent}` : ''}.`);
-    return {};
-  };
+  const A = cast.advisor;
+  const gate = harnessGate({
+    context: () => ({
+      proposalStatus: id => (/^\d+$/.test(id) ? A.db.proposal.id.find(BigInt(id))?.status.tag : undefined),
+      accountCodes: [...A.db.account.iter()].map(a => a.code),
+    }),
+    onDeny: (agent, tool, why) => onStep(`gate denied ${agent} ${tool}: ${why.slice(0, 200)}`),
+  });
   const mirror: HookCallback = async input => {
     const post = input as PostToolUseHookInput;
     if (post.tool_name !== 'SendMessage') return {};
@@ -63,24 +57,27 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     return {};
   };
 
-  const workerTools = (name: string, extra: string[] = []) => ['SendMessage', `mcp__${name}__*`, 'mcp__books__*', ...extra];
+  // The root pre-approves every harness tool so subagents can use theirs under dontAsk; the gate keeps each to its own list.
+  const allowedTools = [...new Set([ADVISOR, ...WORKERS.map(r => HARNESSES[r])].flatMap(h => h.tools))];
   let total = 0;
   try {
     for await (const msg of query({
       prompt: `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification). Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`,
       options: {
-        model: process.env.ADVISOR_MODEL ?? 'opus',
-        systemPrompt: charter('advisor', FALLBACK.advisor),
-        tools: ['Agent', 'SendMessage'],
-        allowedTools: ['Agent', 'SendMessage', 'mcp__advisor__*', 'mcp__books__*', 'mcp__bookkeeper__*', 'mcp__revenue__*', 'mcp__credit__*', 'mcp__crs__*'],
+        model: modelFor(ADVISOR),
+        systemPrompt: agentPrompt(ADVISOR),
+        tools: ADVISOR.tools.filter(t => !t.startsWith('mcp__')),
+        allowedTools,
+        ...(ADVISOR.maxTurns ? { maxTurns: ADVISOR.maxTurns } : {}),
         permissionMode: 'dontAsk',
         mcpServers: { books, advisor, bookkeeper, revenue, credit, crs },
-        agents: {
-          bookkeeper: { description: 'Bank reconciliation, duplicate payments, quick entries, accruals. Proposes only.', prompt: charter('bookkeeper', FALLBACK.bookkeeper), model: process.env.WORKER_MODEL ?? 'sonnet', tools: workerTools('bookkeeper'), maxTurns: 40 },
-          revenue: { description: 'Revenue schedules, recognition, deferred revenue. Proposes only.', prompt: charter('revenue', FALLBACK.revenue), model: process.env.WORKER_MODEL ?? 'sonnet', tools: workerTools('revenue'), maxTurns: 30 },
-          credit: { description: 'Guarantor and vendor credit cascades, risk tiers, allowances, vendor blocks. Proposes only.', prompt: charter('credit', FALLBACK.credit), model: process.env.WORKER_MODEL ?? 'sonnet', tools: workerTools('credit', ['mcp__crs__*']), maxTurns: 60 },
+        agents: Object.fromEntries(WORKERS.map(r => [r, subagent(r)])),
+        // The gate judges on PreToolUse and learns from results (history of successful calls) on the other two.
+        hooks: {
+          PreToolUse: [{ matcher: '^mcp__', hooks: [gate] }],
+          PostToolUse: [{ matcher: 'SendMessage', hooks: [mirror] }, { matcher: '^mcp__', hooks: [gate] }],
+          PostToolUseFailure: [{ matcher: '^mcp__', hooks: [gate] }],
         },
-        hooks: { PreToolUse: [{ matcher: '^mcp__', hooks: [roleGate] }], PostToolUse: [{ matcher: 'SendMessage', hooks: [mirror] }] },
         env: { ...process.env, CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '1', CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: '4' },
         maxBudgetUsd: Number(process.env.CLOSE_BUDGET_USD ?? 15),
         settingSources: [],
@@ -108,10 +105,10 @@ export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<
   for await (const msg of query({
     prompt: question,
     options: {
-      model: process.env.ADVISOR_MODEL ?? 'opus',
+      model: modelFor(ADVISOR),
       systemPrompt: `You are the Chief Finance Advisor of Cafoo Inc. Answer the CFO's question from the books using the books tools. Plain language, amounts spelled out, under 120 words, and say which page in the app shows the detail (Ledger, Board Pack, Proposals, Customers, Vendors).`,
       tools: [],
-      allowedTools: ['mcp__books__*'],
+      allowedTools: mcp('books', BOOKS_TOOLS),
       permissionMode: 'dontAsk',
       mcpServers: { books },
       maxTurns: 6,
