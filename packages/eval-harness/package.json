@@ -5,8 +5,8 @@
   "description": "Charter evals (one scenario per checkable charter line, run against the live ledger) and deterministic credit-cascade correctness. Runs with zero API keys.",
   "type": "module",
   "scripts": {
-    "run": "node --conditions=source --import tsx src/run.ts",
-    "eval": "node --conditions=source --import tsx src/run.ts",
+    "run": "node --import tsx src/run.ts",
+    "eval": "node --import tsx src/run.ts",
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
