@@ -115,7 +115,7 @@ export function booksServer(cast: Cast) {
       ),
       tool(
         'list_proposals',
-        `Proposals for a month with their status, the Red Team critiques, and the Advisor ruling if any. Pages of ${LIST_PAGE} (oldest first): read on with offset = nextOffset until nextOffset is null. A large payload comes as a preview; pass id to read that one Proposal in full.`,
+        `Proposals for a month with their status, the Red Team critiques, and the Advisor ruling if any. Pages of ${LIST_PAGE} (oldest first): read on with offset = nextOffset until nextOffset is null, except when ruling Open Proposals: ruled ones leave Open, so call again from offset 0 until total is 0. A large payload comes as a preview; pass id to read that one Proposal in full.`,
         {
           periodYm: z.string(),
           status: z.enum(['Open', 'AwaitingCfo', 'SentBack', 'Approved', 'Rejected', 'Amended', 'all']).optional(),
