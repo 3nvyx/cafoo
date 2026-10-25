@@ -68,7 +68,11 @@ export function resolveValue(tokens, id, mode, seen = []) {
 
 export function toHex(value, id) {
 	if (typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase();
-	if (value && typeof value === 'object' && typeof value.hex === 'string') return value.hex.toLowerCase();
+	if (value && typeof value === 'object' && typeof value.hex === 'string') {
+		const hex = value.hex.toLowerCase();
+		const alpha = typeof value.alpha === 'number' && value.alpha < 1 ? Math.round(value.alpha * 255).toString(16).padStart(2, '0') : '';
+		return hex + alpha;
+	}
 	throw new Error(`"${id}" is not a 6-digit hex colour (got ${JSON.stringify(value)})`);
 }
 

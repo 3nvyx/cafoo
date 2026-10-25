@@ -128,6 +128,37 @@
 
 	--radius-card: 8px;
 	--radius-btn: 4px;
+
+	/* The type scale, mirrored from packages/design-tokens/tokens/semantic.tokens.json until this
+	   file imports the generated @cafoo/design-tokens/css (which also retires text-sm and friends). */
+	--text-micro: 11px;
+	--text-micro--line-height: 16px;
+	--text-micro--letter-spacing: 0.01em;
+	--text-micro--font-weight: 500;
+	--text-caption: 12.5px;
+	--text-caption--line-height: 18px;
+	--text-caption--letter-spacing: 0em;
+	--text-caption--font-weight: 400;
+	--text-body-sm: 13px;
+	--text-body-sm--line-height: 20px;
+	--text-body-sm--letter-spacing: 0em;
+	--text-body-sm--font-weight: 400;
+	--text-body: 15px;
+	--text-body--line-height: 22px;
+	--text-body--letter-spacing: 0em;
+	--text-body--font-weight: 400;
+	--text-title: 20px;
+	--text-title--line-height: 26px;
+	--text-title--letter-spacing: -0.01em;
+	--text-title--font-weight: 500;
+	--text-display-sm: 28px;
+	--text-display-sm--line-height: 32px;
+	--text-display-sm--letter-spacing: -0.02em;
+	--text-display-sm--font-weight: 500;
+	--text-display: 44px;
+	--text-display--line-height: 46px;
+	--text-display--letter-spacing: -0.03em;
+	--text-display--font-weight: 500;
 }
 
 @layer base {

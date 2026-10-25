@@ -13,7 +13,7 @@
     "./tokens/*": "./tokens/*"
   },
   "scripts": {
-    "build": "tz build --no-lint && node scripts/postbuild-theme.mjs",
+    "build": "node scripts/build.mjs",
     "check": "tz check",
     "test": "vitest run",
     "baseline": "node scripts/baseline.mjs"

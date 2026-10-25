@@ -16,17 +16,6 @@
 					"hex": "#f7f5f0"
 				}
 			},
-			"25": {
-				"$value": {
-					"colorSpace": "srgb",
-					"components": [
-						0.9294,
-						0.9137,
-						0.8863
-					],
-					"hex": "#ede9e2"
-				}
-			},
 			"50": {
 				"$value": {
 					"colorSpace": "srgb",
@@ -36,6 +25,17 @@
 						0.8941
 					],
 					"hex": "#efebe4"
+				}
+			},
+			"75": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.9294,
+						0.9137,
+						0.8863
+					],
+					"hex": "#ede9e2"
 				}
 			},
 			"100": {
@@ -433,6 +433,21 @@
 						0.0627
 					],
 					"hex": "#2b2110"
+				}
+			}
+		},
+		"overlay": {
+			"$description": "Scrims over content: tar with alpha.",
+			"40": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.0824,
+						0.0784,
+						0.0745
+					],
+					"hex": "#151413",
+					"alpha": 0.4
 				}
 			}
 		},

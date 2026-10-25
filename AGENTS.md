@@ -26,11 +26,13 @@ Team rules:
 Every colour, type size, radius and agent-role colour is a token in `packages/design-tokens/tokens/*.tokens.json`
 (W3C DTCG format). `packages/design-tokens/NAMING.md` has the tiers and the naming rules; each token's own
 `$description`, `usage` and `rules` say what it is for. The build writes `packages/design-tokens/css/cafoo-tokens.css`,
-whose `@theme` block is the complete list of classes that exist (`bg-accent-soft`, `text-on-accent-soft`, `text-caption`,
-`rounded-md`, `bg-role-advisor`, …). If a class is not in that file, it does not exist.
+whose `@theme` block is the complete list of design classes that exist (`bg-accent-soft`, `text-on-accent-soft`, `text-caption`,
+`rounded-md`, `bg-role-advisor`, …). If a class is not in that file, it does not exist. Until `apps/web/src/app.css` imports that
+file (migration pending; the raw-values baseline tracks it), only the classes `app.css` itself defines render.
 
 Never in `apps/web`: raw hex or `rgb()` colours; bracketed sizes such as `text-[13px]` or `w-[220px]` (use the type
-scale and the 4px spacing scale); Tailwind palette classes such as `bg-red-500` or `text-gray-600` (the palette is off);
+scale and the 4px spacing scale); Tailwind's palette, size and radius classes such as `bg-red-500`, `text-sm`, `text-2xl`
+or `rounded-2xl` (they are switched off; use `text-caption`, `rounded-md`, …);
 invented names such as `bg-primary-container` or `text-on-error-container`; coloured borders (every box uses
 `border-line`; differences show through fill); all-caps eyebrows or labels (sentence case). The accent is for actions
 and selection only, never for status; status colours always travel as a pair (`bg-pos-soft text-on-pos-soft`).

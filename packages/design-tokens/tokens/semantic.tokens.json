@@ -36,7 +36,7 @@
 						"input",
 						"table-header"
 					],
-					"rules": "Only on canvas or subtle. Never stacked on another surface without a border-line between them."
+					"rules": "Only on canvas or subtle. Never stacked on another surface without a border between them."
 				}
 			},
 			"$description": "Cards, panels, dialogs, inputs: anything that sits on the canvas."
@@ -84,7 +84,7 @@
 			"$extensions": {
 				"mode": {
 					"light": "{palette.neutral.950}",
-					"dark": "{palette.neutral.25}"
+					"dark": "{palette.neutral.75}"
 				}
 			},
 			"$description": "Primary text and icons."
@@ -431,22 +431,21 @@
 			"$description": "Informational: a note, a hint, a neutral status. Deliberately grey, so a note never looks like an action."
 		},
 		"info-soft": {
-			"$value": "{palette.neutral.100}",
+			"$value": "{palette.neutral.150}",
 			"$extensions": {
 				"mode": {
-					"light": "{palette.neutral.100}",
-					"dark": "{palette.neutral.850}"
+					"light": "{palette.neutral.150}",
+					"dark": "{palette.neutral.800}"
 				},
 				"com.cafoo": {
 					"usage": [
 						"info-badge",
-						"note-banner",
-						"neutral-chip"
+						"note-banner"
 					],
-					"rules": "Only as a fill paired with on-info-soft."
+					"rules": "Only as a fill paired with on-info-soft. Never as a hover fill; that is subtle."
 				}
 			},
-			"$description": "Info container for neutral badges and notes."
+			"$description": "Info container for neutral badges and notes. One step firmer than subtle, so a badge stays visible on a hovered row."
 		},
 		"on-info-soft": {
 			"$value": "{palette.neutral.600}",
@@ -456,7 +455,7 @@
 					"dark": "{palette.neutral.300}"
 				}
 			},
-			"$description": "Text and icons on info-soft."
+			"$description": "Text and icons on info-soft. One step darker than info so it stays readable on the firmer fill."
 		},
 		"on-info": {
 			"$value": "{palette.neutral.0}",
@@ -467,6 +466,47 @@
 				}
 			},
 			"$description": "Text on a solid info fill."
+		},
+		"scrim": {
+			"$value": "{palette.overlay.40}",
+			"$description": "The dimmer behind dialogs and sheets.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"dialog-backdrop",
+						"sheet-backdrop"
+					],
+					"rules": "Only behind a dialog, sheet or command palette. Never as a tint on content."
+				}
+			}
+		},
+		"inverse": {
+			"$value": "{palette.neutral.950}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.950}",
+					"dark": "{palette.neutral.75}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"toast",
+						"tooltip",
+						"inverse-panel"
+					],
+					"rules": "Only for small transient surfaces. Never for a whole page or card. Only with on-inverse for its text."
+				}
+			},
+			"$description": "A surface that flips the mode: toasts, tooltips, the command palette's footer."
+		},
+		"on-inverse": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text and icons on inverse."
 		},
 		"focus": {
 			"$value": "{palette.neutral.950}",
@@ -550,7 +590,7 @@
 			"$extensions": {
 				"mode": {
 					"light": "{palette.neutral.950}",
-					"dark": "{palette.neutral.25}"
+					"dark": "{palette.neutral.75}"
 				}
 			},
 			"$description": "The CFO, the human in the loop."
@@ -568,7 +608,7 @@
 	},
 	"type": {
 		"$type": "typography",
-		"$description": "The type scale, by role. Classes: text-micro … text-display (size, line height, tracking and weight). Headings add font-display.",
+		"$description": "The type scale, by role. Classes: text-micro … text-display set size, line height and tracking; weight is a separate utility (font-medium) and the fontWeight here is the recommended pairing. Headings add font-display.",
 		"micro": {
 			"$value": {
 				"fontFamily": "{font.sans}",
@@ -592,7 +632,7 @@
 			"$value": {
 				"fontFamily": "{font.sans}",
 				"fontSize": {
-					"value": 12.5,
+					"value": 12,
 					"unit": "px"
 				},
 				"fontWeight": 400,
@@ -655,6 +695,25 @@
 				}
 			},
 			"$description": "Default body text."
+		},
+		"subtitle": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 17,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 24,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": -0.005,
+					"unit": "em"
+				}
+			},
+			"$description": "Card headers, KPI labels, the line under a page title."
 		},
 		"title": {
 			"$value": {
@@ -725,7 +784,7 @@
 	},
 	"shape": {
 		"$type": "dimension",
-		"$description": "Corner radii. Classes: rounded-sm, rounded-md, rounded-lg, rounded-xl; rounded-full stays Tailwind's pill. --radius-card and --radius-btn are legacy aliases kept for app.css.",
+		"$description": "Corner radii. Classes: rounded-sm, rounded-md, rounded-lg, rounded-xl; rounded-full stays Tailwind's pill.",
 		"sm": {
 			"$value": "{size.4}",
 			"$description": "Buttons, fields, chips."
@@ -751,14 +810,6 @@
 		"xl": {
 			"$value": "{size.24}",
 			"$description": "Hero frames."
-		},
-		"card": {
-			"$value": "{shape.md}",
-			"$description": "Legacy name used by app.css; prefer md."
-		},
-		"btn": {
-			"$value": "{shape.sm}",
-			"$description": "Legacy name used by app.css; prefer sm."
 		}
 	}
 }

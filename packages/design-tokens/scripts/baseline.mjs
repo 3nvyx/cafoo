@@ -1,5 +1,6 @@
-// Rewrites raw-values-baseline.json with the current counts. Counts may only
-// go down; set RATCHET_ALLOW_RAISE=1 to raise one deliberately.
+// Rewrites raw-values-baseline.json with the current counts. The total may
+// only go down: a file's count may rise (a rename, a move) as long as the sum
+// across files does not. Set RATCHET_ALLOW_RAISE=1 to raise the total deliberately.
 import { writeFileSync, existsSync } from 'node:fs';
 import { BASELINE_FILE, KINDS, scanWebSource, readBaseline } from './raw-values.mjs';
 
@@ -18,11 +19,11 @@ for (const [file, { counts }] of Object.entries(current)) {
 	}
 	next[file] = row;
 }
-if (raised.length && !isFirst && !process.env.RATCHET_ALLOW_RAISE) {
-	console.error('baseline: refusing to raise counts (set RATCHET_ALLOW_RAISE=1 to override):');
+const sum = (b) => Object.values(b).reduce((n, row) => n + Object.values(row).reduce((a, c) => a + c, 0), 0);
+if (sum(next) > sum(previous) && !isFirst && !process.env.RATCHET_ALLOW_RAISE) {
+	console.error(`baseline: refusing to raise the total from ${sum(previous)} to ${sum(next)} (set RATCHET_ALLOW_RAISE=1 to override):`);
 	for (const line of raised) console.error('  ' + line);
 	process.exit(1);
 }
 writeFileSync(BASELINE_FILE, JSON.stringify(next, null, '\t') + '\n');
-const total = Object.values(next).reduce((n, row) => n + Object.values(row).reduce((a, b) => a + b, 0), 0);
-console.log(`baseline: ${Object.keys(next).length} files, ${total} violations`);
+console.log(`baseline: ${Object.keys(next).length} files, ${sum(next)} violations`);

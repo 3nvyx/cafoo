@@ -25,6 +25,8 @@ describe('css/cafoo-tokens.css', () => {
 			expect(committed, `${cssName(t.id)} leaked into the CSS`).not.toContain(`${cssName(t.id)}:`);
 		}
 		expect(committed).not.toMatch(/var\(--(?:palette|size)-/);
+		expect(committed).not.toContain('--font-sans: \'DM Sans\'' + ';'); // font stacks appear only inside @theme
+		expect(committed.slice(0, committed.indexOf('@theme inline {'))).not.toMatch(/^\s*--font-(?:sans|display|mono):/m);
 	});
 
 	it('declares each colour token with its resolved value in both modes', () => {
@@ -45,7 +47,11 @@ describe('css/cafoo-tokens.css', () => {
 
 	it('switches Tailwind defaults off and maps every token in the @theme block', () => {
 		const theme = committed.slice(committed.indexOf('@theme inline {'));
-		for (const ns of ['color', 'font', 'text', 'radius']) expect(theme).toContain(`--${ns}-*: initial;`);
+		for (const ns of ['color', 'text', 'radius']) expect(theme).toContain(`--${ns}-*: initial;`);
+		// a --font-* wildcard would also remove --font-weight-*, breaking font-medium
+		expect(theme).not.toContain('--font-*: initial;');
+		expect(theme).toContain('--font-sans: initial;');
+		expect(theme).not.toMatch(/--text-[a-z-]+--font-weight/);
 		expect(theme).toContain('--color-on-accent-soft: var(--on-accent-soft);');
 		expect(theme).toContain('--color-role-advisor: var(--role-advisor);');
 		expect(theme).toContain('--text-caption--line-height: var(--type-caption-line-height);');
