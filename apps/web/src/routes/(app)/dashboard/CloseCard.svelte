@@ -46,16 +46,16 @@
 	});
 </script>
 
-<section aria-labelledby="close-h" class="card flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
+<section aria-labelledby="close-h" class="card flex flex-col gap-5 p-5">
 	<div class="flex min-w-0 flex-col gap-2">
 		<p class="text-body-sm text-ink-2">Month-end close · {periodLabel(period)}</p>
-		<h2 id="close-h" class="text-title">{headline}</h2>
+		<h2 id="close-h" class="text-subtitle">{headline}</h2>
 		{#if gate.canLock && gate.request}
 			<p class="max-w-prose text-body-sm text-ink-2"><span class="font-medium text-ink">Advisor:</span> {gate.request.summaryPlain}</p>
 		{/if}
 		<LiveActivity periodId={period.id} />
 	</div>
-	<div class="flex w-full shrink-0 flex-col gap-4 lg:w-80">
+	<div class="flex flex-col gap-4">
 		{#if period.status === 'closed'}
 			<a href="/reports" class="btn w-full">Open the Board Pack <Icon name="arrowRight" size={18} /></a>
 		{:else if gate.canLock}
