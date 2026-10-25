@@ -71,7 +71,7 @@
 		onfocusin={() => (navFocused = true)}
 		onfocusout={() => (navFocused = false)}
 	>
-		<div class="wide flex h-14 items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
+		<div class="content flex h-14 items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
@@ -216,8 +216,8 @@
 <style>
 	/* Blur the river behind headings, or across the whole workflow section, with feathered edges. */
 	/* One 12-column grid, after Harvey's: a frame padded 28 / 32 / 36 / 40px (by breakpoint) with
-	   14 / 16 / 18 / 20px gaps. Wide things (the header, the painted hero panel) use the whole
-	   frame; copy and sections sit on columns 2–11 from lg up, so they line up with the hero. */
+	   14 / 16 / 18 / 20px gaps. Wide things (the painted hero panel) use the whole
+	   frame; the header, copy and sections sit on columns 2–11 from lg up, so they line up with the hero. */
 	.page {
 		--pad: 28px;
 		--gap: 14px;
