@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { redTeamLive } from './env';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
-import { eliminationCritique } from './scripted/rulings';
+import { eliminationCritique, weakBankMatchCritique } from './scripted/rulings';
 import { statusKey } from './harness/rules';
 import { Cast, repoRoot, type RoleConn } from './stdb';
 
@@ -85,7 +85,7 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   const payload = JSON.parse(p.payloadJson);
   const kind = p.kind.tag;
   if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
-    return { body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty only partly matches. A wrong match shows an invoice as paid when it is not. Ask the customer for remittance detail instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` };
+    return weakBankMatchCritique(payload.matches[0].scoreBp);
   }
   if (kind === 'RevenueSchedule') return { body: `Straight-line is right for a flat annual subscription. Confirm the schedule starts in the invoice month and runs 12 months inclusive.`, summaryPlain: `The Red Team agrees with straight-line and asks to confirm the start month.` };
   if (kind === 'VendorVerify') return { body: `The owner's identity and fraud checks are clean, so verification is reasonable. Before the first payment, confirm the bank account on the bill belongs to the vendor and not to a look-alike.`, summaryPlain: `The Red Team agrees and asks to confirm the bank details before the first payment.` };
@@ -103,10 +103,15 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
 }
 
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
+  const timeoutMs = Number(process.env.REDTEAM_TIMEOUT_MS?.trim() || 30_000);
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+    throw new Error('REDTEAM_TIMEOUT_MS must be a positive integer no greater than 2147483647');
+  }
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
   const charter = red(A);
   let submitted: Critique | null = null;
   await generateText({
+    abortSignal: AbortSignal.timeout(timeoutMs),
     model: xai.responses(modelFor(charter.harness)),
     // The harness instructions say how to use the tools; the charter and the gate formats follow them.
     system: charter.prompt,

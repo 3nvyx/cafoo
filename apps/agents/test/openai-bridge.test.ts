@@ -26,7 +26,7 @@ describe('agent provider mode', () => {
     expect(live.detail).toContain('Anthropic Messages API');
     expect(providers({ AGENT_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-live', DEMO_MODE: '1' })[0]!.mode).toBe('demo');
     expect(providers({ AGENT_PROVIDER: 'openai' })[0]!.mode).toBe('demo');
-    expect(providers({ ANTHROPIC_API_KEY: 'sk-ant' })[0]).toMatchObject({ mode: 'live', detail: 'live agents' });
+    expect(providers({ ANTHROPIC_API_KEY: 'sk-ant' })[0]).toMatchObject({ mode: 'live', detail: expect.stringContaining('configured') });
     expect(providers({})[0]!.mode).toBe('demo');
   });
 

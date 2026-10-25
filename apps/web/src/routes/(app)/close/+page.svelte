@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
 	import { monthName, periodLabel } from '#lib/data/derive.js';
+	import { formatMoney } from '#lib/data/money.js';
 	import type { CloseTaskStatus } from '#lib/data/types.js';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
@@ -17,6 +18,7 @@
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
 	const tasks = $derived(db.closeTasks().filter((t) => t.periodId === ui.periodId).sort((a, b) => a.order - b.order));
 	const proposals = $derived(new Map(db.proposals().map((p) => [p.id, p])));
+	const subsidiaryNames = $derived(new Map(db.subsidiaries().map((s) => [s.id, s.name])));
 	const gate = $derived(lockGate(db, ui.periodId));
 	const canLock = $derived(gate.canLock);
 	const month = $derived(period ? monthName(period.month) : '');
@@ -32,6 +34,8 @@
 	);
 
 	let confirmOpen = $state(false);
+	let acceptExceptionsOpen = $state(false);
+	let reviewedSnapshot = $state('');
 	let unlockOpen = $state(false);
 	let expanded = $state<Record<string, boolean>>({});
 	const SHOW = 4;
@@ -109,6 +113,39 @@
 		</ol>
 	{/if}
 
+	{#if gate.bankExceptions.rows.length}
+		<section id="bank-exceptions" class="card mt-8 p-5" aria-labelledby="bank-exceptions-h">
+			<div class="flex flex-wrap items-start justify-between gap-3">
+				<div>
+					<p class="eyebrow">Reconciliation</p>
+					<h2 id="bank-exceptions-h" class="mt-1 text-xl">{gate.bankExceptions.rows.length} unmatched bank line{gate.bankExceptions.rows.length === 1 ? '' : 's'}</h2>
+					<p class="mt-1 text-sm text-ink-2">These lines still need reconciliation, including any carried forward from earlier months. Accepting them lets you close this Period without marking them matched.</p>
+				</div>
+				{#if gate.bankExceptions.acceptance.accepted}
+					<Pill tone="warn">Accepted by CFO</Pill>
+				{:else}
+					<Pill tone="warn">Needs your review</Pill>
+				{/if}
+			</div>
+			<ul class="mt-4 divide-y divide-line border-y border-line" aria-label="Unmatched bank lines">
+				{#each gate.bankExceptions.rows as line (line.id)}
+					<li class="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+						<div>
+							<p class="font-medium">{line.counterparty || line.description}</p>
+							<p class="text-ink-2">Bank line {line.id} · {line.description} · {line.bookedAt.slice(0, 10)} · {subsidiaryNames.get(line.subsidiaryId) ?? line.subsidiaryId} · {line.ccy}</p>
+						</div>
+						<span class="font-medium">{formatMoney(line.amountMinor, { currency: line.ccy })}</span>
+					</li>
+				{/each}
+			</ul>
+			{#if gate.bankExceptions.acceptance.accepted}
+				<p class="mt-4 text-sm text-ink-2">You accepted this exact set on {dateTime(gate.bankExceptions.acceptance.at)}. Reason: {gate.bankExceptions.acceptance.reasonPlain}. The lines remain unmatched.</p>
+			{:else if period.status !== 'closed'}
+				<button class="btn btn-primary mt-4" disabled={db.cfoSeat().status !== 'you'} onclick={() => { reviewedSnapshot = gate.bankExceptions.snapshot; acceptExceptionsOpen = true; }}>Accept these exceptions</button>
+			{/if}
+		</section>
+	{/if}
+
 	<section id="lock" class="card mt-8 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="lock-h">
 		<div class="flex gap-4">
 			<span class="grid size-11 shrink-0 place-items-center rounded-full bg-subtle text-ink-2"><Icon name="lock" /></span>
@@ -119,7 +156,7 @@
 						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}. Nothing can post to {month} anymore. The Board Pack is final. {reversalNote}
 					{:else if canLock}
 						{#if gate.request}<span class="mb-1 block text-ink"><span class="font-medium">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</span>{/if}
-						Locking stops anyone, including the agents, from posting to {month}. Any tasks still open are marked done.
+						Locking stops anyone, including the agents, from posting to {month}. Accepted bank lines remain unmatched, and their reconciliation task stays incomplete.
 					{:else}
 						{gate.blocker}
 					{/if}
@@ -139,9 +176,22 @@
 	</section>
 
 	<ConfirmDialog
+		bind:open={acceptExceptionsOpen}
+		title="Accept unmatched bank lines?"
+		body="You are accepting the exact bank lines listed above for {periodLabel(period)}. They stay unmatched and the reconciliation task stays incomplete. If the bank or ledger evidence changes, you must review and accept again."
+		confirmLabel="Accept exceptions"
+		inputLabel="Why can this Period close with these exceptions?"
+		inputPlaceholder="e.g. Remittance details are still pending"
+		inputRequired
+		onconfirm={async (reason) => {
+			await attempt(() => db.acceptBankExceptions(period.id, reviewedSnapshot, reason), 'Bank exceptions accepted. They remain unmatched.');
+		}}
+	/>
+
+	<ConfirmDialog
 		bind:open={confirmOpen}
 		title="Lock {periodLabel(period)}?"
-		body="After this, nothing can be posted to {month}, by you or by any agent, and the Board Pack becomes final. {reversalNote} You can unlock {month} again if you need to."
+		body="After this, nothing can be posted to {month}, by you or by any agent, and the Board Pack becomes final. Accepted bank lines stay unmatched. {reversalNote} You can unlock {month} again if you need to."
 		confirmLabel="Lock {month}"
 		onconfirm={async () => {
 			await attempt(() => db.lockPeriod(period.id), `${month} is locked. The Board Pack is final.`);

@@ -14,7 +14,7 @@ vi.mock('ai', async importOriginal => ({ ...(await importOriginal<typeof import(
 vi.mock('@ai-sdk/xai', () => ({ createXai: vi.fn((o: { apiKey?: string }) => ({ responses: (modelId: string) => ({ fake: 'xai', modelId, apiKey: o.apiKey }) })) }));
 
 type Tools = Record<string, { execute: (input: unknown, opts: unknown) => Promise<unknown> }>;
-type Req = { model: { modelId: string; apiKey?: string }; system: string; prompt: string; tools: Tools; stopWhen: unknown };
+type Req = { model: { modelId: string; apiKey?: string }; system: string; prompt: string; tools: Tools; stopWhen: unknown; abortSignal?: AbortSignal };
 /** Grok's turn: what it does with the request's tools. */
 type Grok = (req: Req, submit: (c: { body: string; summaryPlain: string }) => Promise<unknown>) => Promise<void>;
 
@@ -55,13 +55,14 @@ const weakMatch = (id = 14n, extra: Record<string, unknown> = {}) => ({
 });
 const smallEntry = (id = 15n) => weakMatch(id, { kind: { tag: 'JournalEntry' }, amountMinor: 4500n, payloadJson: JSON.stringify({ memo: 'Bank fees', lines: [] }) });
 const good = { body: 'The counterparty name only partly matches and the score is 61%; ask for remittance detail before matching.', summaryPlain: 'The Red Team doubts this match because the name only partly fits.' };
-const scripted = { body: expect.stringMatching(/^Confidence 61% is below the auto threshold/), summaryPlain: 'The Red Team doubts this match: the name only partly fits.' };
+const scripted = { body: expect.stringMatching(/^Confidence 61% is below the auto threshold/), summaryPlain: 'The Red Team asks for payment details because the match confidence is too low.' };
 const critiques = () => fx.callsTo('critique');
 
 beforeEach(() => {
   vi.stubEnv('DEMO_MODE', '');
   vi.stubEnv('XAI_API_KEY', 'test-key-not-real');
   vi.stubEnv('REDTEAM_MODEL', undefined);
+  vi.stubEnv('REDTEAM_TIMEOUT_MS', undefined);
   vi.stubEnv('MOSS_PROJECT_ID', '');
   vi.stubEnv('MOSS_PROJECT_KEY', '');
   vi.stubEnv('CHARTER_OVERRIDE_JSON', '');
@@ -80,6 +81,18 @@ afterEach(() => {
 });
 
 describe('live Red Team (Grok)', () => {
+  it('falls back when Grok exceeds its own request deadline', async () => {
+    vi.stubEnv('REDTEAM_TIMEOUT_MS', '10');
+    ai.generateText.mockImplementation((req: Req) => new Promise((_resolve, reject) => {
+      req.abortSignal?.addEventListener('abort', () => reject(req.abortSignal?.reason), { once: true });
+    }));
+    rows.proposal = [weakMatch()];
+    stop = startCritic(fx.cast);
+    await vi.waitFor(() => expect(critiques()).toHaveLength(1), { timeout: 200 });
+    expect(critiques()[0]!.args).toMatchObject(scripted);
+    expect(warn).toHaveBeenCalledWith('[redteam] proposal 14: Grok failed, using the scripted critique:', expect.stringMatching(/timeout/i));
+  });
+
   it('asks Grok about each open Proposal with the charter, the two tools and the step cap, and writes the critique it submits', async () => {
     grokDoes(async (_req, submit) => void (await submit(good)));
     rows.proposal = [weakMatch()];

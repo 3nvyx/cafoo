@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { answerQuestion, CLOSE_COMMAND_SOURCE, closeCommand, isCloseCommand, monthIn, resolveYm } from '../src/advisor-chat';
 import type { Cast } from '../src/stdb';
+import { ts } from './fake-conn';
 
 /** A cast whose advisor cache holds just these rows; every other table is empty. */
 function fakeCast(rows: Record<string, unknown[]>): Cast {
@@ -17,20 +18,20 @@ function fakeCast(rows: Record<string, unknown[]>): Cast {
 const acct = (id: bigint, code: string, tag: string) => ({ id, subsidiaryId: 1n, code, name: code, accountType: { tag }, isIntercompany: false });
 const books = (extra: Record<string, unknown[]> = {}) =>
   fakeCast({
-    subsidiary: [{ id: 1n, name: 'Cafoo Inc' }],
+    subsidiary: [{ id: 1n, code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD', isElimination: false }],
     period: [
       { id: 1n, ym: '2026-08', status: { tag: 'Closed' } },
       { id: 2n, ym: '2026-09', status: { tag: 'Open' } },
     ],
     account: [acct(10n, '4000', 'Revenue'), acct(11n, '4100', 'Revenue'), acct(12n, '1000', 'Asset'), acct(13n, '2400', 'Liability')],
     journalEntry: [
-      { id: 100n, periodId: 1n },
-      { id: 101n, periodId: 2n },
+      { id: 100n, periodId: 1n, postedAt: ts('2026-08-31'), source: { tag: 'Seed' } },
+      { id: 101n, periodId: 2n, postedAt: ts('2026-09-30'), source: { tag: 'Seed' } },
     ],
     journalLine: [
-      { jeId: 100n, accountId: 10n, debitMinor: 0n, creditMinor: 500000n },
-      { jeId: 101n, accountId: 10n, debitMinor: 0n, creditMinor: 300000n },
-      { jeId: 101n, accountId: 11n, debitMinor: 0n, creditMinor: 50000n },
+      { id: 1n, jeId: 100n, accountId: 10n, debitMinor: 0n, creditMinor: 500000n, ccy: 'USD', fxRateE6: 1000000n },
+      { id: 2n, jeId: 101n, accountId: 10n, debitMinor: 0n, creditMinor: 300000n, ccy: 'USD', fxRateE6: 1000000n },
+      { id: 3n, jeId: 101n, accountId: 11n, debitMinor: 0n, creditMinor: 50000n, ccy: 'USD', fxRateE6: 1000000n },
     ],
     proposal: [
       {
@@ -194,4 +195,203 @@ describe('answerQuestion', () => {
     expect(await ask(closing, 'start the close', { startClose })).toMatch(/lock has been requested/);
     expect(startClose).toHaveBeenCalledTimes(5);
   });
+});
+
+
+/** Three sets of books: £200 UK revenue, £100 UK expense, and $127 fee eliminations. */
+const groupBooks = (extra: Record<string, unknown[]> = {}) => books({
+  subsidiary: [
+    { id: 1n, code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD', isElimination: false },
+    { id: 2n, code: 'UK', name: 'Cafoo Ltd', functionalCcy: 'GBP', parentId: 1n, isElimination: false },
+    { id: 3n, code: 'ELIM', name: 'Eliminations', functionalCcy: 'USD', parentId: 1n, isElimination: true },
+  ],
+  account: [
+    acct(10n, '4000', 'Revenue'), acct(11n, '5000', 'Expense'), acct(12n, '1000', 'Asset'),
+    { ...acct(20n, '4000-UK', 'Revenue'), subsidiaryId: 2n },
+    { ...acct(21n, '5000-UK', 'Expense'), subsidiaryId: 2n },
+    { ...acct(22n, '1000-UK', 'Asset'), subsidiaryId: 2n },
+    { ...acct(30n, '4000-ELIM', 'Revenue'), subsidiaryId: 3n },
+    { ...acct(31n, '5000-ELIM', 'Expense'), subsidiaryId: 3n },
+  ],
+  journalLine: [
+    { id: 1n, jeId: 101n, accountId: 10n, debitMinor: 0n, creditMinor: 100000n, ccy: 'USD', fxRateE6: 1000000n },
+    { id: 2n, jeId: 101n, accountId: 11n, debitMinor: 150000n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n },
+    { id: 3n, jeId: 101n, accountId: 20n, debitMinor: 0n, creditMinor: 20000n, ccy: 'GBP', fxRateE6: 1000000n },
+    { id: 4n, jeId: 101n, accountId: 21n, debitMinor: 10000n, creditMinor: 0n, ccy: 'GBP', fxRateE6: 1000000n },
+    { id: 5n, jeId: 101n, accountId: 30n, debitMinor: 12700n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n },
+    { id: 6n, jeId: 101n, accountId: 31n, debitMinor: 0n, creditMinor: 12700n, ccy: 'USD', fxRateE6: 1000000n },
+    { id: 7n, jeId: 101n, accountId: 12n, debitMinor: 10000n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n },
+    { id: 8n, jeId: 101n, accountId: 22n, debitMinor: 20000n, creditMinor: 0n, ccy: 'GBP', fxRateE6: 1000000n },
+  ],
+  fxRate: [
+    { id: 1n, ym: '2026-09', fromCcy: 'GBP', toCcy: 'USD', rateE6: 1270000n, kind: { tag: 'Average' } },
+    { id: 2n, ym: '2026-09', fromCcy: 'GBP', toCcy: 'USD', rateE6: 1280000n, kind: { tag: 'Closing' } },
+  ],
+  proposal: [],
+  ...extra,
+});
+
+describe('grounded financial answers', () => {
+  it('reports each company cash in its own currency and does not infer runway from missing bills', async () => {
+    const cast = books({
+      subsidiary: [
+        { id: 1n, code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD', isElimination: false },
+        { id: 2n, code: 'UK', name: 'Cafoo Ltd', functionalCcy: 'GBP', parentId: 1n, isElimination: false },
+      ],
+      account: [acct(12n, '1000', 'Asset'), { ...acct(20n, '1000-UK', 'Asset'), subsidiaryId: 2n }],
+      journalLine: [
+        { id: 1n, jeId: 101n, accountId: 12n, debitMinor: 35554200n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n },
+        { id: 2n, jeId: 101n, accountId: 20n, debitMinor: 17805000n, creditMinor: 0n, ccy: 'GBP', fxRateE6: 1000000n },
+      ],
+    });
+    const answer = await ask(cast, 'How much cash do we have by company, and what is our runway?');
+    expect(answer).toContain('Cafoo Inc: $355,542');
+    expect(answer).toContain('Cafoo Ltd: £178,050');
+    expect(answer).toContain('as of October 24, 2026');
+    expect(answer).toMatch(/cannot estimate runway/i);
+    expect(answer).not.toMatch(/end of October|many months|covers roughly/);
+  });
+});
+
+
+it('answers consolidated P&L with expenses, currency translation and eliminations', async () => {
+  const answer = await ask(groupBooks(), 'What is the consolidated September P&L?');
+  expect(answer).toContain('September 2026');
+  expect(answer).toContain('Cafoo Inc: revenue $1,000, expenses $1,500, net loss $500');
+  expect(answer).toContain('Cafoo Ltd: revenue £200, expenses £100, net income £100');
+  expect(answer).toContain('Consolidated group: revenue $1,127, expenses $1,500, net loss $373');
+  expect(answer).toMatch(/including.*eliminations/i);
+  expect(answer).toContain('Board Pack');
+});
+
+it('answers group ARR from active subscriptions, excluding usage and translating UK contracts', async () => {
+  const answer = await ask(groupBooks({
+    customer: [{ id: 1n, subsidiaryId: 1n, name: 'US customer' }, { id: 2n, subsidiaryId: 2n, name: 'UK customer' }],
+    contract: [
+      { id: 1n, customerId: 1n, startYm: '2026-01', endYm: '2026-12', totalMinor: 240000n, plan: { tag: 'Annual' } },
+      { id: 2n, customerId: 2n, startYm: '2026-01', endYm: '2026-12', totalMinor: 120000n, plan: { tag: 'Annual' } },
+      { id: 3n, customerId: 1n, startYm: '2026-01', endYm: '2026-12', totalMinor: 999999n, plan: { tag: 'Usage' } },
+    ],
+    contractItem: [
+      { id: 1n, contractId: 1n, kind: { tag: 'Subscription' }, priceMinor: 20000n, qty: 1n, sspMinor: 240000n },
+      { id: 2n, contractId: 2n, kind: { tag: 'Subscription' }, priceMinor: 10000n, qty: 1n, sspMinor: 120000n },
+      { id: 3n, contractId: 3n, kind: { tag: 'Usage' }, priceMinor: 999999n, qty: 1n, sspMinor: 999999n },
+    ],
+  }), 'What is our group ARR for September?');
+  expect(answer).toContain('Cafoo Inc: $2,400');
+  expect(answer).toContain('Cafoo Ltd: £1,200');
+  expect(answer).toContain('Consolidated group ARR: $3,936');
+  expect(answer).toMatch(/usage.*excluded/i);
+});
+
+it('discloses missing contract coverage instead of treating absent UK contracts as complete group ARR', async () => {
+  const answer = await ask(groupBooks(), 'What is our ARR for September?');
+  expect(answer).toMatch(/Cafoo Ltd.*no contracts on file/i);
+  expect(answer).toMatch(/group ARR.*incomplete|incomplete.*group ARR/i);
+});
+
+it('answers allowance adequacy with gross and net receivables in each currency, without claiming sufficiency', async () => {
+  const answer = await ask(groupBooks({
+    account: [acct(40n, '1100', 'Asset'), acct(41n, '1150', 'Asset'), { ...acct(42n, '1100-UK', 'Asset'), subsidiaryId: 2n }, { ...acct(43n, '1150-UK', 'Asset'), subsidiaryId: 2n }],
+    journalLine: [
+      { id: 1n, jeId: 101n, accountId: 40n, debitMinor: 100000n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n },
+      { id: 2n, jeId: 101n, accountId: 41n, debitMinor: 0n, creditMinor: 25000n, ccy: 'USD', fxRateE6: 1000000n },
+      { id: 3n, jeId: 101n, accountId: 42n, debitMinor: 50000n, creditMinor: 0n, ccy: 'GBP', fxRateE6: 1000000n },
+      { id: 4n, jeId: 101n, accountId: 43n, debitMinor: 0n, creditMinor: 10000n, ccy: 'GBP', fxRateE6: 1000000n },
+    ],
+  }), 'Is our allowance adequate for September?');
+  expect(answer).toContain('Cafoo Inc: gross receivables $1,000, allowance $250, net receivables $750');
+  expect(answer).toContain('Cafoo Ltd: gross receivables £500, allowance £100, net receivables £400');
+  expect(answer).toMatch(/cannot conclude.*adequacy/i);
+  expect(answer).toMatch(/unmatched receipts/);
+});
+
+it('honors an explicit company instead of answering for the parent or whole group', async () => {
+  const cash = await ask(groupBooks(), 'How much cash does Cafoo Ltd have in September?');
+  expect(cash).toContain('Cafoo Ltd: £200');
+  expect(cash).not.toContain('Cafoo Inc');
+  const pnl = await ask(groupBooks(), 'What is the UK P&L for September?');
+  expect(pnl).toContain('Cafoo Ltd: revenue £200, expenses £100, net income £100');
+  expect(pnl).not.toContain('Cafoo Inc');
+  expect(pnl).not.toContain('Consolidated group');
+});
+
+it('answers a consolidated group overview rather than silently returning US-only balances', async () => {
+  const answer = await ask(groupBooks(), 'Give me the consolidated group view for September.');
+  expect(answer).toContain('Consolidated group');
+  expect(answer).toContain('cash $356');
+  expect(answer).toContain('net loss $373');
+  expect(answer).toContain('September 2026');
+});
+
+it('reports unresolved receipts and outflows separately in their recorded currencies', async () => {
+  const answer = await ask(groupBooks({ bankTransaction: [
+    { id: 1n, subsidiaryId: 1n, ym: '2026-09', bookedAt: ts('2026-09-05'), amountMinor: 5000n, ccy: 'USD', matched: false },
+    { id: 2n, subsidiaryId: 2n, ym: '2026-09', bookedAt: ts('2026-09-05'), amountMinor: 7000n, ccy: 'GBP', matched: false },
+    { id: 3n, subsidiaryId: 1n, ym: '2026-09', bookedAt: ts('2026-09-06'), amountMinor: -2000n, ccy: 'USD', matched: false },
+    { id: 4n, subsidiaryId: 1n, ym: '2026-10', bookedAt: ts('2026-10-05'), amountMinor: 999999n, ccy: 'USD', matched: false },
+    { id: 5n, subsidiaryId: 1n, ym: '2026-09', bookedAt: ts('2026-09-05'), amountMinor: 111111n, ccy: 'USD', matched: true },
+  ] }), 'What bank receipts remain unmatched for September?');
+  expect(answer).toContain('Cafoo Inc: 1 unmatched receipt totaling $50; 1 unmatched outflow totaling $20');
+  expect(answer).toContain('Cafoo Ltd: 1 unmatched receipt totaling £70');
+  expect(answer).toMatch(/not fully reconciled/);
+  expect(answer).not.toContain('9,999.99');
+});
+
+it('derives overdue exposure from due dates and separates company currencies despite stale status flags', async () => {
+  const cast = groupBooks({
+    customer: [{ id: 1n, subsidiaryId: 1n, name: 'US customer' }, { id: 2n, subsidiaryId: 2n, name: 'UK customer' }],
+    invoice: [
+      { id: 1n, customerId: 1n, ym: '2026-09', amountMinor: 10000n, dueAt: ts('2026-10-01'), status: { tag: 'Open' } },
+      { id: 2n, customerId: 2n, ym: '2026-09', amountMinor: 20000n, dueAt: ts('2026-10-01'), status: { tag: 'Open' } },
+      { id: 3n, customerId: 1n, ym: '2026-09', amountMinor: 999999n, dueAt: ts('2026-09-01'), status: { tag: 'Paid' } },
+    ],
+  });
+  const current = await ask(cast, 'What is overdue today?');
+  expect(current).toContain('Cafoo Inc: 1 overdue invoice totaling $100');
+  expect(current).toContain('Cafoo Ltd: 1 overdue invoice totaling £200');
+  expect(current).toContain('October 24, 2026');
+  expect(current).not.toContain('9,999.99');
+  const historical = await ask(cast, 'What was overdue for September?');
+  expect(historical).toContain('Cafoo Inc: 0 overdue invoices');
+  expect(historical).toContain('September 30, 2026');
+  expect(historical).toMatch(/current unpaid.*status/i);
+});
+
+it('includes the translated total when the CFO explicitly asks for consolidated cash', async () => {
+  const answer = await ask(groupBooks(), 'What is consolidated cash for September?');
+  expect(answer).toContain('Consolidated group cash: $356');
+  expect(answer).toMatch(/closing rate/i);
+});
+
+it('keeps legacy revenue and payables answers in the requested company scope and functional currency', async () => {
+  const revenue = await ask(groupBooks(), 'What revenue did the UK recognize in September?');
+  expect(revenue).toContain('Revenue for September 2026 is £200 on the books');
+  expect(revenue).not.toContain('$1,000');
+  const payables = await ask(groupBooks({
+    account: [{ ...acct(23n, '2000-UK', 'Liability'), subsidiaryId: 2n }],
+    journalLine: [{ id: 1n, jeId: 101n, accountId: 23n, debitMinor: 0n, creditMinor: 8000n, ccy: 'GBP', fxRateE6: 1000000n }],
+  }), 'What are UK payables for September?');
+  expect(payables).toContain('£80');
+  expect(payables).not.toContain('$0');
+});
+
+it('keeps unresolved bank lines visible when every recorded close task says done', async () => {
+  const answer = await ask(groupBooks({
+    closeTask: [{ id: 1n, periodId: 2n, title: 'Bank reconciliation', status: { tag: 'Done' }, sortOrder: 1 }],
+    bankTransaction: [{ id: 1n, subsidiaryId: 1n, ym: '2026-09', bookedAt: ts('2026-09-05'), amountMinor: 5000n, ccy: 'USD', matched: false }],
+  }), 'What is the September close status?');
+  expect(answer).toMatch(/1 of 1 close tasks done/);
+  expect(answer).toMatch(/1 unmatched bank line.*not fully reconciled/);
+});
+
+it('answers each requested financial section and does not confuse ARR reconciliation with bank matching', async () => {
+  const answer = await ask(groupBooks(), 'Give me September group cash, ARR, P&L and bank reconciliation.');
+  expect(answer).toContain('Consolidated group cash: $356');
+  expect(answer).toContain('Consolidated group ARR');
+  expect(answer).toContain('net loss $373');
+  expect(answer).toContain('unmatched bank lines');
+  const arr = await ask(groupBooks(), 'What is September ARR and how does it reconcile to recognized subscription revenue?');
+  expect(arr).toContain('ARR from active subscription contracts');
+  expect(arr).not.toContain('Current unmatched bank lines');
 });

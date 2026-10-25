@@ -6,7 +6,7 @@
 	import FootprintPanel from '#lib/components/FootprintPanel.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import Icon from '#lib/components/Icon.svelte';
-	import { STATUS, TIER, dateTime, drill, shortDate } from '#lib/labels.js';
+	import { STATUS, TIER, dateTime, shortDate } from '#lib/labels.js';
 	import { customerIdsOf } from '#lib/proposals.js';
 	import { ui } from '#lib/ui.svelte.js';
 
@@ -58,10 +58,11 @@
 	<dl class="mt-6 grid grid-cols-2 divide-line border-y border-line sm:grid-cols-4 sm:divide-x">
 		<div class="py-4 sm:pr-4"><dt class="eyebrow">Payment terms</dt><dd class="num mt-1 text-xl">{c.paymentTermsDays === 0 ? 'Prepay' : `${c.paymentTermsDays} days`}</dd></div>
 		<div class="py-4 sm:px-4"><dt class="eyebrow">ARR</dt><dd class="num mt-1 text-xl">{formatMoney(arr, { whole: true })}</dd></div>
-		<div class="py-4 sm:px-4"><dt class="eyebrow">Owed to us</dt><dd class="num mt-1 text-xl"><a class="drill" href={drill({ customer: c.id }, 'all')}>{formatMoney(ar, { whole: true })}</a></dd></div>
+		<div class="py-4 sm:px-4"><dt class="eyebrow">Owed to us</dt><dd class="num mt-1 text-xl"><a class="drill" href="#inv-h">{formatMoney(ar, { whole: true })}</a></dd></div>
 		<div class="py-4 sm:pl-4">
-			<dt class="eyebrow">Allowance</dt>
-			<dd class="num mt-1 text-xl"><a class="drill" href={drill({ account: '1150' }, 'all')}>{formatMoney(allowance, { whole: true })}</a></dd>
+			<dt class="eyebrow">Target allowance</dt>
+			<dd class="num mt-1 text-xl"><a class="drill" href="#inv-h">{formatMoney(allowance, { whole: true })}</a></dd>
+			<dd class="text-sm text-ink-3">Tier-based estimate on these open invoices, not a posted entry.</dd>
 			{#if c.creditTier}<dd class="text-sm text-ink-3">{ALLOWANCE_RATE_BP[c.creditTier] / 100}% of what they owe, from {TIER[c.creditTier].label}</dd>{/if}
 		</div>
 	</dl>

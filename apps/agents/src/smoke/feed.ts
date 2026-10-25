@@ -2,8 +2,9 @@
  * End-to-end smoke test of the live feed, against a local SpacetimeDB (destructive: it republishes its database).
  *   pnpm -F @cafoo/agents smoke:feed            database cafoo-c1 (SPACETIMEDB_DB_NAME to choose another; never cafoo)
  * Steps: publish the module fresh, generate and load the demo group with a CFO bootstrap secret, run the September close
- * without waiting, claim the CFO seat with the secret, confirm what waits for the CFO, resume the close until the lock is
- * requested, lock September; switch the feed on and send every October event back to back while the continuous
+ * without waiting, claim the CFO seat with the secret, confirm what waits for the CFO, explicitly accept the remaining
+ * bank exceptions as the fixture CFO, and resume until the lock is requested. Lock September, then switch the feed on
+ * and send every October event back to back while the continuous
  * Bookkeeper books what lands, and confirm the (material) bank-match batches as the CFO. It then checks: exact receipts
  * and bill payments matched, the partial payment left unmatched, the part-name receipt rejected, the payroll run
  * waiting for the CFO, no Proposal in September from the feed.
@@ -12,6 +13,7 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '@cafoo/ledger-core';
 import { closePeriod } from '../close-period';
 
 process.env.SPACETIMEDB_DB_NAME ||= 'cafoo-c1';
@@ -62,6 +64,21 @@ console.log(JSON.stringify(await runScriptedClose(cast, CLOSE)));
 step('claim the CFO seat with the bootstrap secret and confirm what waits');
 const cfo = await RoleConn.connect('cfo');
 console.log(`  CFO seat: ${await takeCfoSeat(cfo, 'Smoke CFO')} (${cfo.hex})`);
+// This is an explicit decision by the isolated fixture CFO, never the production demo-CFO automation.
+const exceptionInput = (source = cfo) => ({
+  periodYm: CLOSE,
+  bankRows: [...source.db.bankTransaction.iter()].map(row => ({
+    id: String(row.id), subsidiaryId: String(row.subsidiaryId), ym: row.ym,
+    bookedAt: new Date(Number(row.bookedAt.microsSinceUnixEpoch / 1000n)).toISOString(),
+    amountMinor: String(row.amountMinor), ccy: row.ccy, description: row.description,
+    counterparty: row.counterparty, matched: row.matched,
+  })),
+  auditEvents: [...source.db.auditEvent.iter()].map(event => ({
+    id: String(event.id), actorRole: event.actorRole, action: event.action, targetTable: event.targetTable,
+    targetId: String(event.targetId), detail: event.detail,
+    at: new Date(Number(event.at.microsSinceUnixEpoch / 1000n)).toISOString(),
+  })),
+});
 // The seed locked July and August itself: switching the feed on before the CFO locks September sends nothing.
 await cfo.reducers.setFeedEnabled({ enabled: true });
 await waitFor(() => A.db.settings.key.find('feed_enabled')?.valueI64 === 1n, 'feed switched on');
@@ -75,6 +92,19 @@ for (let round = 1; round <= 4 && period(CLOSE)?.status.tag === 'Open'; round++)
   for (const p of waiting) await cfo.reducers.cfoConfirm({ proposalId: p.id, note: '' });
   console.log(`  round ${round}: confirmed ${waiting.length}; resuming the close`);
   await sleep(300);
+  console.log(`  ${JSON.stringify(await runScriptedClose(cast, CLOSE))}`);
+  await sleep(300);
+}
+const pendingClose = [...cfo.db.proposal.iter()].filter(p => p.periodId === period(CLOSE)?.id && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag));
+const remainingExceptions = currentBankExceptions(exceptionInput());
+if (period(CLOSE)?.status.tag === 'Open' && pendingClose.length === 0 && remainingExceptions.length > 0) {
+  step(`fixture CFO reviews and accepts ${remainingExceptions.length} remaining ${CLOSE} bank exceptions`);
+  await cfo.reducers.acceptBankExceptions({
+    periodYm: CLOSE,
+    expectedSnapshot: bankExceptionSnapshot(exceptionInput()),
+    reasonPlain: 'Smoke fixture CFO reviewed these unmatched bank lines and accepts carrying them as explicit exceptions for this feed test.',
+  });
+  await waitFor(() => bankExceptionAcceptance(exceptionInput(A)).accepted, 'Advisor sees fixture CFO bank exception acceptance');
   console.log(`  ${JSON.stringify(await runScriptedClose(cast, CLOSE))}`);
   await sleep(300);
 }

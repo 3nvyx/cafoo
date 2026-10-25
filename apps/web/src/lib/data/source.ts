@@ -146,6 +146,8 @@ export interface DataSource {
 	/** CFO switches the live feed on or off. It books only into the open month after one the CFO locked. */
 	setFeedEnabled(enabled: boolean): Promise<void>;
 	setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void>;
+	/** CFO accepts the exact reviewed unmatched bank lines with a reason; lines remain unmatched. */
+	acceptBankExceptions(periodId: string, expectedSnapshot: string, reasonPlain: string): Promise<void>;
 	/** CFO locks the Period. The Board Pack becomes final. */
 	lockPeriod(periodId: string): Promise<void>;
 	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */

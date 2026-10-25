@@ -30,6 +30,14 @@ const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 /** A Proposal kind tag as the module stores the kind: "BankMatch" → "bank_match". */
 export const kindOfTag = (tag: string) => tag.replace(/[A-Z]/g, (c, i) => `${i ? '_' : ''}${c.toLowerCase()}`);
 
+/** The combined score does not identify which amount, date, name or reference evidence is weak. */
+export function weakBankMatchCritique(scoreBp: number): { body: string; summaryPlain: string } {
+  return {
+    body: `Confidence ${(scoreBp / 100).toFixed(0)}% is below the auto threshold. The combined score alone does not establish which matching evidence is weak. Ask the customer for remittance detail before matching, because a wrong match would show an unpaid invoice as paid.`,
+    summaryPlain: `The Red Team asks for payment details because the match confidence is too low.`,
+  };
+}
+
 /**
  * The Red Team's critique of an elimination: a difference over the one-dollar tolerance is a disagreement for a person;
  * a smaller one is translation rounding (the activity pair at the average rate is usually a cent apart); none agrees.
@@ -83,18 +91,18 @@ export async function ruleOpen(cast: Cast, proposals: readonly ProposalRow[], op
     const kind: string = p.kind.tag;
     const payload = JSON.parse(p.payloadJson);
     if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
-      await RT.reducers.critique({ proposalId: p.id, body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty name only partly overlaps. If this is wrong, a customer's invoice shows paid when it is not. Recommend asking the customer for a remittance advice instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` });
+      await RT.reducers.critique({ proposalId: p.id, ...weakBankMatchCritique(payload.matches[0].scoreBp) });
       rulings.push({ id: p.id, action: 'reject', rationale: `The Red Team is right: at ${(payload.matches[0].scoreBp / 100).toFixed(0)}% confidence this match is a guess. Leave the transaction unmatched, request remittance detail, and revisit next week.`, plain: `Not matching this one yet; we will ask the customer what the payment was for.` });
       continue;
     }
     if (kind === 'JournalEntry' && /Allowance for doubtful/.test(payload.memo) && p.amountMinor >= s.materiality) {
       const bankruptcy = /bankruptcy/i.test(p.summaryPlain);
       if (bankruptcy) {
-        await RT.reducers.critique({ proposalId: p.id, body: `A 100% reserve is the right default for an active bankruptcy plan, but confirm two things before posting: that none of the receivable is secured or prepaid, and that the bankruptcy is the guarantor's and not a same-name match. The evidence shows a public record tied to the same SSN, so the second concern is answered; the first is a question for the account owner.`, summaryPlain: `The Red Team asks whether any of this debt is secured before reserving all of it.` });
-        rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved. The bankruptcy record matches the guarantor's SSN across the bureau file and public records, and no collateral or prepayment is attached to the contract. Because the amount is material it goes to the CFO for confirmation.`, plain: `Approved: set aside the full amount; the CFO gets the final say because it is large.` });
+        await RT.reducers.critique({ proposalId: p.id, body: `The proposal cites bankruptcy risk. Before posting, confirm that the recorded bankruptcy belongs to this guarantor, check whether any debt is secured or prepaid, and reconcile payments not yet matched. The summary alone does not establish those facts.`, summaryPlain: `The Red Team asks the CFO to check the bankruptcy evidence and any payments before confirming this reserve.` });
+        rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved as proposed, pending the CFO's confirmation because it is material. The CFO must check the cited bankruptcy evidence, collateral, prepayments and unmatched receipts before deciding whether the proposed reserve is appropriate.`, plain: `The CFO must check the evidence and unpaid balance before this reserve posts.` });
       } else {
-        await RT.reducers.critique({ proposalId: p.id, body: `The reserve rate follows the tier table, which is fine as a default. Two checks: the open balance should exclude anything already paid this month but not yet matched, and a 50% reserve on a customer who is still paying monthly may be high. Suggest the Advisor confirm the balance against the bank matches approved today.`, summaryPlain: `The Red Team asks to confirm the unpaid balance before reserving against it.` });
-        rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved at the tier rate. The open balance excludes invoices matched to payments earlier in this close. The rate is a policy default and can be revisited when payment history improves. Material, so it goes to the CFO.`, plain: `Approved at the standard rate for this risk level; the CFO gets the final say because it is large.` });
+        await RT.reducers.critique({ proposalId: p.id, body: `Check the proposed reserve against the customer's recorded risk tier and confirm the open balance excludes payments received but not yet matched. Reconcile those receipts before deciding whether the proposed reserve is appropriate; the proposal alone does not establish a payment history.`, summaryPlain: `The Red Team asks to confirm the unpaid balance before reserving against it.` });
+        rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved as proposed, subject to the CFO's confirmation because it is material. Matched invoices are excluded from the recorded open balance, but unmatched receipts still need reconciliation before the CFO decides whether this reserve is appropriate.`, plain: `The CFO must confirm the unpaid balance before this reserve posts.` });
       }
       continue;
     }

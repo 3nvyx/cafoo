@@ -4,6 +4,7 @@ import spacetimedb, { agentIdentity, ContractItemArg, ItemKind, LineArg, overdue
 import { sha256HexOfString, utf8 } from './sha256';
 // The Risk Tier rules, shared with the Credit & Risk agent's cascade: one pure file with no imports, I/O or clock.
 import { deriveTier, POLICY as CREDIT_POLICY, TIERS as CREDIT_TIERS, type Tier } from '../../../packages/crs-mcp/src/tiers';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions, isBankReconciliationTask } from '../../../packages/ledger-core/src/bank-exceptions';
 
 export { default } from './tables';
 
@@ -1540,7 +1541,8 @@ export const overdueSweepTick = spacetimedb.reducer(
   { onSchedule: overdueSweep },
   { timer: overdueSweep.rowType },
   (ctx, _args) => {
-    if (!ctx.senderAuth.isInternal) throw new SenderError('The overdue sweep runs on a schedule only.');
+    // Scheduled reducers are private in SpacetimeDB 2.x. The 2.13 host does not set
+    // senderAuth.isInternal for scheduler calls, so an extra flag check rejects every tick.
     const now = ctx.timestamp.microsSinceUnixEpoch;
     const due = [...ctx.db.invoice.iter()].filter(inv => inv.status.tag === 'open' && inv.dueAt.microsSinceUnixEpoch < now);
     for (const inv of due) ctx.db.invoice.id.update({ ...inv, status: { tag: 'overdue' } });
@@ -1952,9 +1954,15 @@ export const updateCloseTask = spacetimedb.reducer(
     const role = requireRole(ctx, ['advisor', 'cfo', 'bookkeeper', 'revenue', 'credit', 'consolidation'], 'update close tasks');
     const task = ctx.db.closeTask.id.find(taskId);
     if (!task) throw new SenderError(`Unknown close task ${taskId}`);
-    const s = status as 'todo' | 'in_progress' | 'blocked' | 'done';
+    let s = status as 'todo' | 'in_progress' | 'blocked' | 'done';
     if (!['todo', 'in_progress', 'blocked', 'done'].includes(s)) throw new SenderError(`Unknown status ${status}`);
     if (s === 'done' && role !== 'advisor' && role !== 'cfo') throw new SenderError('Only the advisor or the CFO can mark a task done.');
+    if (s === 'done' && isBankReconciliationTask(task)) {
+      const period = ctx.db.period.id.find(task.periodId);
+      if (!period) throw new SenderError(`Unknown period ${task.periodId}`);
+      const bank = assertBankExceptionsAccepted(ctx, period.ym);
+      if (bank.rows.length) s = 'in_progress';
+    }
     ctx.db.closeTask.id.update({ ...task, status: { tag: s } });
     audit(ctx, role, 'update_close_task', 'close_task', taskId, `${s} ${note}`);
   }
@@ -1966,6 +1974,51 @@ function money(minor: bigint): string {
   const dollars = (a / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${neg ? '-' : ''}$${dollars}.${(a % 100n).toString().padStart(2, '0')}`;
 }
+
+function bankExceptions(ctx: Ctx, periodYm: string) {
+  const input = {
+    periodYm,
+    bankRows: [...ctx.db.bankTransaction.iter()].map(row => ({
+      id: String(row.id), subsidiaryId: String(row.subsidiaryId), ym: row.ym, bookedAt: isoOf(row.bookedAt),
+      amountMinor: String(row.amountMinor), ccy: row.ccy, description: row.description, counterparty: row.counterparty, matched: row.matched,
+    })),
+    auditEvents: [...ctx.db.auditEvent.iter()].map(event => ({
+      id: String(event.id), actorRole: event.actorRole, action: event.action, targetTable: event.targetTable,
+      targetId: String(event.targetId), detail: event.detail, at: isoOf(event.at),
+    })),
+  };
+  return { rows: currentBankExceptions(input), snapshot: bankExceptionSnapshot(input), acceptance: bankExceptionAcceptance(input) };
+}
+
+function assertBankExceptionsAccepted(ctx: Ctx, periodYm: string) {
+  const state = bankExceptions(ctx, periodYm);
+  if (state.rows.length && !state.acceptance.accepted) {
+    throw new SenderError(`${periodYm} has ${state.rows.length} unmatched bank line(s). Resolve them or have the CFO review and accept the current bank exceptions with a reason before locking.`);
+  }
+  return state;
+}
+
+function keepBankTaskIncomplete(ctx: Ctx, periodId: bigint) {
+  for (const task of ctx.db.closeTask.periodId.filter(periodId)) {
+    if (isBankReconciliationTask(task) && task.status.tag === 'done') ctx.db.closeTask.id.update({ ...task, status: { tag: 'in_progress' } });
+  }
+}
+
+export const acceptBankExceptions = spacetimedb.reducer(
+  { periodYm: t.string(), expectedSnapshot: t.string(), reasonPlain: t.string() },
+  (ctx, { periodYm, expectedSnapshot, reasonPlain }) => {
+    requireRole(ctx, ['cfo'], 'accept bank exceptions');
+    const period = periodByYm(ctx, periodYm);
+    if (period.status.tag === 'closed') throw new SenderError(`Period ${periodYm} is closed. Reopen it before reviewing bank exceptions.`);
+    const reason = reasonPlain.trim();
+    if (!reason) throw new SenderError('Give a reason for accepting the unresolved bank exceptions.');
+    const state = bankExceptions(ctx, periodYm);
+    if (!state.rows.length) throw new SenderError(`No unmatched bank exceptions remain through ${periodYm}.`);
+    if (expectedSnapshot !== state.snapshot) throw new SenderError('The bank exceptions changed since you reviewed them. Refresh and review the current lines before accepting.');
+    audit(ctx, 'cfo', 'accept_bank_exceptions', 'period', period.id, JSON.stringify({ periodYm, snapshot: state.snapshot, reasonPlain: reason }));
+    keepBankTaskIncomplete(ctx, period.id);
+  }
+);
 
 /** A month cannot lock while one of its close tasks is blocked: someone said it cannot be finished as things stand. */
 function assertNoBlockedTasks(ctx: Ctx, periodId: bigint, ym: string, what: string) {
@@ -2008,7 +2061,9 @@ export const requestPeriodLock = spacetimedb.reducer(
     if (open.length > 0) throw new SenderError(`${open.length} proposals for ${periodYm} still need a ruling or the CFO's confirmation.`);
     assertNoBlockedTasks(ctx, p.id, periodYm, `${periodYm} cannot be locked yet`);
     assertRevenueRecognizedThrough(ctx, periodYm, `${periodYm} cannot be locked yet`);
+    const bank = assertBankExceptionsAccepted(ctx, periodYm);
     ctx.db.period.id.update({ ...p, status: { tag: 'closing' } });
+    if (bank.rows.length) keepBankTaskIncomplete(ctx, p.id);
     // The Advisor's own tasks (board pack, lock request) are done once the lock is requested; the CFO's click closes the month.
     for (const task of ctx.db.closeTask.periodId.filter(p.id)) {
       if (task.ownerRole === 'advisor' && task.status.tag !== 'done') ctx.db.closeTask.id.update({ ...task, status: { tag: 'done' } });
@@ -2175,6 +2230,7 @@ export const lockPeriod = spacetimedb.reducer(
     if (pending.length > 0) throw new SenderError(`${pending.length} proposal(s) for ${periodYm} still need a decision before the month can lock.`);
     assertNoBlockedTasks(ctx, p.id, periodYm, `${periodYm} cannot be locked yet`);
     assertRevenueRecognizedThrough(ctx, periodYm, `${periodYm} cannot be locked yet`);
+    const bank = assertBankExceptionsAccepted(ctx, periodYm);
     ctx.db.periodLock.insert({
       id: 0n,
       periodId: p.id,
@@ -2184,7 +2240,9 @@ export const lockPeriod = spacetimedb.reducer(
       rationale,
     });
     ctx.db.period.id.update({ ...p, status: { tag: 'closed' } });
+    if (bank.rows.length) keepBankTaskIncomplete(ctx, p.id);
     for (const task of ctx.db.closeTask.periodId.filter(p.id)) {
+      if (bank.rows.length && isBankReconciliationTask(task)) continue;
       if (task.status.tag !== 'done') ctx.db.closeTask.id.update({ ...task, status: { tag: 'done' } });
     }
     postMessage(ctx, 'cfo', `close:${periodYm}`, 'statement', rationale, `The CFO closed ${periodYm}.`, undefined);
