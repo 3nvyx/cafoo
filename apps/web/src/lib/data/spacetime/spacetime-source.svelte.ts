@@ -250,6 +250,7 @@ export class SpacetimeDataSource implements DataSource {
 	capTable = (): U.CapTableEntry[] => [];
 	employees = (): U.Employee[] => [];
 	ptoRequests = (): U.PtoRequest[] => [];
+	calendarEvents = (): U.CalendarEvent[] => [];
 	payRuns = (): U.PayRun[] => [];
 	payslips = (): U.Payslip[] => [];
 	cloudCosts = (): U.CloudCost[] => [];

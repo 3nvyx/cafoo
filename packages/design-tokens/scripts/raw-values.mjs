@@ -204,7 +204,8 @@ export function scanWebSource(css) {
 	const names = acceptedNames(css);
 	const result = {};
 	for (const file of walk(WEB_SRC)) {
-		const rel = relative(WEB_SRC, file);
+		// Forward slashes on every platform, so Windows paths match the committed baseline's keys.
+		const rel = relative(WEB_SRC, file).split('\\').join('/');
 		if (ALLOWLIST[rel]) continue;
 		const { counts, samples } = scan(readFileSync(file, 'utf8'), names, file.endsWith('.css') ? 'css' : 'markup');
 		if (Object.values(counts).some((n) => n > 0)) result[rel] = { counts, samples };

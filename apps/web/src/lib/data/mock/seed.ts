@@ -9,6 +9,7 @@ import group from './seed/group.json';
 import footprint from './seed/footprint.json';
 import financing from './seed/financing.json';
 import people from './seed/people.json';
+import calendar from './seed/calendar.json';
 import costs from './seed/costs.json';
 import crm from './seed/crm.json';
 import integrations from './seed/integrations.json';
@@ -44,6 +45,7 @@ import type {
 	CapTableEntry,
 	Employee,
 	PtoRequest,
+	CalendarEvent,
 	PayRun,
 	Payslip,
 	CloudCost,
@@ -86,6 +88,7 @@ export interface Tables {
 	cap_table_entry: CapTableEntry[];
 	employee: Employee[];
 	pto_request: PtoRequest[];
+	calendar_event: CalendarEvent[];
 	pay_run: PayRun[];
 	payslip: Payslip[];
 	cloud_cost: CloudCost[];
@@ -181,6 +184,7 @@ export function loadSeed(): Tables {
 		cap_table_entry: financing.cap_table_entry as CapTableEntry[],
 		employee: people.employee as Employee[],
 		pto_request: people.pto_request as PtoRequest[],
+		calendar_event: calendar.calendar_event as CalendarEvent[],
 		pay_run: people.pay_run as PayRun[],
 		payslip: people.payslip as Payslip[],
 		cloud_cost: costs.cloud_cost as CloudCost[],

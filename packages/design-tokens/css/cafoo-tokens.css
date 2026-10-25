@@ -57,6 +57,16 @@
 	--on-subtle: #151413;
 	/* Primary text and icons. */
 	--on-surface: #151413;
+	/* Text and icons on tag-due-soft. */
+	--on-tag-due-soft: #84400c;
+	/* Text and icons on tag-holiday-soft. */
+	--on-tag-holiday-soft: #45413c;
+	/* Text and icons on tag-leave-soft. */
+	--on-tag-leave-soft: #1d5759;
+	/* Text and icons on tag-pay-soft. */
+	--on-tag-pay-soft: #434b10;
+	/* Text and icons on tag-sick-soft. */
+	--on-tag-sick-soft: #8b1330;
 	/* Text on a solid warn fill. */
 	--on-warn: #f7f5f0;
 	/* Text and icons on warn-soft. */
@@ -97,6 +107,16 @@
 	--subtle: #e5e0d7;
 	/* Cards, panels, dialogs, inputs: anything that sits on the canvas. */
 	--surface: #f7f5f0;
+	/* Calendar tag container: bill and invoice due dates. */
+	--tag-due-soft: #ecdbcb;
+	/* Calendar tag container: public and company holidays. Neutral on purpose, so a day off reads as quiet. */
+	--tag-holiday-soft: #d9d3c8;
+	/* Calendar tag container: vacation, parental and other planned leave. */
+	--tag-leave-soft: #d5e0dd;
+	/* Calendar tag container: paydays and payroll debits. */
+	--tag-pay-soft: #ddddcd;
+	/* Calendar tag container: sick days. */
+	--tag-sick-soft: #eed1d3;
 	/* Default body text. */
 	--type-body: var(--type-body-font-weight) var(--type-body-font-size)/var(--type-body-line-height) var(--type-body-font-family);
 	/* Default body text. */
@@ -255,6 +275,16 @@
 	--on-subtle: #ede9e2;
 	/* Primary text and icons. */
 	--on-surface: #ede9e2;
+	/* Text and icons on tag-due-soft. */
+	--on-tag-due-soft: #e4a763;
+	/* Text and icons on tag-holiday-soft. */
+	--on-tag-holiday-soft: #b8b1a6;
+	/* Text and icons on tag-leave-soft. */
+	--on-tag-leave-soft: #65b4a2;
+	/* Text and icons on tag-pay-soft. */
+	--on-tag-pay-soft: #c6d183;
+	/* Text and icons on tag-sick-soft. */
+	--on-tag-sick-soft: #fa98a8;
 	/* Text on a solid warn fill. */
 	--on-warn: #151413;
 	/* Text and icons on warn-soft. */
@@ -287,6 +317,16 @@
 	--subtle: #211f1c;
 	/* Cards, panels, dialogs, inputs: anything that sits on the canvas. */
 	--surface: #171614;
+	/* Calendar tag container: bill and invoice due dates. */
+	--tag-due-soft: #372918;
+	/* Calendar tag container: public and company holidays. Neutral on purpose, so a day off reads as quiet. */
+	--tag-holiday-soft: #2d2a26;
+	/* Calendar tag container: vacation, parental and other planned leave. */
+	--tag-leave-soft: #1a2c26;
+	/* Calendar tag container: paydays and payroll debits. */
+	--tag-pay-soft: #30321f;
+	/* Calendar tag container: sick days. */
+	--tag-sick-soft: #3c2528;
 	/* Warning: needs a look, not yet wrong. */
 	--warn: #fbbf24;
 	/* Warning container for badges and banners. */
@@ -350,6 +390,16 @@
 		--on-subtle: #ede9e2;
 		/* Primary text and icons. */
 		--on-surface: #ede9e2;
+		/* Text and icons on tag-due-soft. */
+		--on-tag-due-soft: #e4a763;
+		/* Text and icons on tag-holiday-soft. */
+		--on-tag-holiday-soft: #b8b1a6;
+		/* Text and icons on tag-leave-soft. */
+		--on-tag-leave-soft: #65b4a2;
+		/* Text and icons on tag-pay-soft. */
+		--on-tag-pay-soft: #c6d183;
+		/* Text and icons on tag-sick-soft. */
+		--on-tag-sick-soft: #fa98a8;
 		/* Text on a solid warn fill. */
 		--on-warn: #151413;
 		/* Text and icons on warn-soft. */
@@ -382,6 +432,16 @@
 		--subtle: #211f1c;
 		/* Cards, panels, dialogs, inputs: anything that sits on the canvas. */
 		--surface: #171614;
+		/* Calendar tag container: bill and invoice due dates. */
+		--tag-due-soft: #372918;
+		/* Calendar tag container: public and company holidays. Neutral on purpose, so a day off reads as quiet. */
+		--tag-holiday-soft: #2d2a26;
+		/* Calendar tag container: vacation, parental and other planned leave. */
+		--tag-leave-soft: #1a2c26;
+		/* Calendar tag container: paydays and payroll debits. */
+		--tag-pay-soft: #30321f;
+		/* Calendar tag container: sick days. */
+		--tag-sick-soft: #3c2528;
 		/* Warning: needs a look, not yet wrong. */
 		--warn: #fbbf24;
 		/* Warning container for badges and banners. */
@@ -428,6 +488,16 @@
 	--color-inverse: var(--inverse);
 	--color-on-inverse: var(--on-inverse);
 	--color-focus: var(--focus);
+	--color-tag-leave-soft: var(--tag-leave-soft);
+	--color-on-tag-leave-soft: var(--on-tag-leave-soft);
+	--color-tag-sick-soft: var(--tag-sick-soft);
+	--color-on-tag-sick-soft: var(--on-tag-sick-soft);
+	--color-tag-pay-soft: var(--tag-pay-soft);
+	--color-on-tag-pay-soft: var(--on-tag-pay-soft);
+	--color-tag-due-soft: var(--tag-due-soft);
+	--color-on-tag-due-soft: var(--on-tag-due-soft);
+	--color-tag-holiday-soft: var(--tag-holiday-soft);
+	--color-on-tag-holiday-soft: var(--on-tag-holiday-soft);
 	--color-role-advisor: var(--role-advisor);
 	--color-role-bookkeeper: var(--role-bookkeeper);
 	--color-role-revenue: var(--role-revenue);
