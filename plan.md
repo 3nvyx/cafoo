@@ -70,7 +70,7 @@ Update this table when a stream lands on `main`.
 | 1 | Done | see git log for seed/src/quillmesh.ts |
 | 2 | Done | 36f150f |
 | 3 | Done | 1312688 |
-| 4 | In progress | |
-| 5 | In progress | |
-| 6 | In progress | |
-| 7 | In progress | |
+| 4 | Done | 3a59311 |
+| 5 | Done | 3a59311 |
+| 6 | Done | dcef8a1 |
+| 7 | Done | 3a59311 |
