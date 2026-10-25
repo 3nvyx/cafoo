@@ -2,11 +2,15 @@
 	import { db } from '#lib/data/index.js';
 	import { roleName } from '#lib/labels.js';
 	import { appear } from '#lib/motion.js';
+	import { latestStep } from '#lib/close-run.js';
 	import RoleAvatar from './RoleAvatar.svelte';
 
 	let { periodId }: { periodId?: string } = $props();
 	const act = $derived(db.liveActivity());
-	const working = $derived(db.connection().closes.some((c) => c.status === 'running' && (!periodId || c.periodYm === periodId)));
+	const running = $derived(db.connection().closes.find((c) => c.status === 'running' && (!periodId || c.periodYm === periodId)));
+	const working = $derived(!!running);
+	// The gateway's latest live-close step, in plain words, when it reports steps (live mode only).
+	const step = $derived(latestStep(running));
 </script>
 
 <div class="min-h-[32px]" aria-live="polite">
@@ -19,9 +23,9 @@
 			</p>
 		{/key}
 	{:else if working}
-		<p class="flex items-center gap-2 text-sm text-ink-2" in:appear>
-			<span class="size-2 rounded-full bg-pos"></span>
-			<span>Agents are working on the close</span>
+		<p class="flex min-w-0 items-center gap-2 text-body-sm text-ink-2" in:appear>
+			<span class="size-2 shrink-0 rounded-full bg-pos"></span>
+			<span class="min-w-0 truncate" title={step}>{step ?? 'Agents are working on the close'}</span>
 			<span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>
 		</p>
 	{/if}

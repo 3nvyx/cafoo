@@ -367,7 +367,7 @@ export class SpacetimeDataSource implements DataSource {
 			const res = await fetch(`${this.#cfg.gateway}/status`);
 			if (!res.ok) throw new Error(String(res.status));
 			const body = (await res.json()) as {
-				closes?: { periodYm: string; status: string }[];
+				closes?: { periodYm: string; status: string; steps?: unknown; error?: unknown }[];
 				providers?: { name: string; mode: string; detail?: string }[];
 				feed?: { enabled?: boolean; ym?: string | null; planned?: number; ingested?: number; blockedReason?: string | null };
 			};
@@ -376,7 +376,12 @@ export class SpacetimeDataSource implements DataSource {
 				this.#conn.feed = { enabled: !!f.enabled, ym: f.ym ?? undefined, planned: f.planned ?? 0, ingested: f.ingested ?? 0, blockedReason: f.blockedReason ?? undefined };
 			}
 			this.#conn.agents = 'online';
-			this.#conn.closes = (body.closes ?? []).map((c) => ({ periodYm: c.periodYm, status: c.status === 'running' ? 'running' : 'done' }));
+			this.#conn.closes = (body.closes ?? []).map((c) => ({
+				periodYm: c.periodYm,
+				status: c.status === 'error' ? 'error' : c.status === 'running' ? 'running' : 'done',
+				steps: Array.isArray(c.steps) ? c.steps.filter((s): s is string => typeof s === 'string') : undefined,
+				error: typeof c.error === 'string' ? c.error : undefined
+			}));
 			this.#gatewayProviders = (body.providers ?? [])
 				.filter((p) => !/spacetime/i.test(p.name))
 				.map((p, i) => ({ id: `gw-${i}`, name: p.name, purpose: 'Reported by the agent gateway', mode: p.mode === 'live' ? 'live' : 'demo', detail: p.detail ?? '' }));

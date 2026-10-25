@@ -3,6 +3,8 @@
 	import { accountBalance, arrAt, monthName, periodEnd, periodLabel } from '#lib/data/derive.js';
 	import type { Proposal } from '#lib/data/types.js';
 	import { lockGate } from '#lib/close.js';
+	import { closeRunNotes } from '#lib/close-run.js';
+	import Notice from '#lib/components/Notice.svelte';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
 	import ConfirmAll from '#lib/components/ConfirmAll.svelte';
 	import CountUp from '#lib/components/CountUp.svelte';
@@ -19,6 +21,12 @@
 	const month = $derived(period ? monthName(period.month) : '');
 	const books = $derived({ accounts: db.accounts(), entries: db.journalEntries(), lines: db.journalLines() });
 	const gate = $derived(lockGate(db, period?.id ?? ''));
+
+	// Unmatched bank lines block the lock until the CFO accepts them on the Close page.
+	const bankN = $derived(gate.bankExceptions.rows.length);
+	const bankDecision = $derived(!!period && gate.started && period.status !== 'closed' && bankN > 0 && !gate.bankExceptions.acceptance.accepted);
+	// The first thing the agent gateway flagged about this month's close run (live mode only).
+	const runNote = $derived(closeRunNotes(db.connection().closes.find((c) => c.periodYm === period?.id))[0]);
 
 	const cash = $derived(period ? accountBalance(books, db.periods(), period.id, '1000') : '0');
 	const openAr = $derived(period ? accountBalance(books, db.periods(), period.id, '1100') : '0');
@@ -85,13 +93,21 @@
 					<Icon name="play" size={18} />{starting ? 'Starting…' : `Close ${month}`}
 				</button>
 			{/if}
+			{#if bankDecision}
+				<Notice tone="warn" href="/close#bank-exceptions" action="Review the bank lines">
+					{bankN} unmatched bank line{bankN === 1 ? ' needs' : 's need'} your decision before {month} can lock.
+				</Notice>
+			{/if}
+			{#if runNote}
+				<Notice tone={runNote.tone} title={runNote.title} href={runNote.href} action={runNote.action}>{runNote.body}</Notice>
+			{/if}
 			<CloseProgress periodId={period.id} />
 		</div>
 	</section>
 
 	<section aria-label="Key numbers" class="grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
 		<!-- Balances as of the month end drill through that month; ARR comes from the contracts, not the ledger, so it has no drill. -->
-		{#each [{ label: 'Cash', minor: cash, href: drill({ account: '1000' }, { to: period.id }), hint: `in the bank at the end of ${month}` }, { label: 'ARR', minor: arr, href: '', hint: 'annual recurring revenue, from the contracts' }, { label: 'Open receivables', minor: openAr, href: drill({ account: '1100' }, { to: period.id }), hint: 'owed to us by customers' }] as k (k.label)}
+		{#each [{ label: 'Book cash', minor: cash, href: drill({ account: '1000' }, { to: period.id }), hint: `posted through the end of ${month}; bank reconciliation may be incomplete` }, { label: 'ARR', minor: arr, href: '', hint: 'annual recurring revenue, from the contracts' }, { label: 'Book receivables', minor: openAr, href: drill({ account: '1100' }, { to: period.id }), hint: 'posted receivables, before the allowance' }] as k (k.label)}
 			<svelte:element this={k.href ? 'a' : 'div'} href={k.href || undefined} class="group flex flex-col gap-1 py-5 sm:px-6 sm:first:pl-0">
 				<span class="eyebrow">{k.label}</span>
 				<span class="text-[28px] leading-9 font-medium sm:text-[32px] {k.href ? 'group-hover:text-accent-ink' : ''}"><CountUp minor={k.minor} /></span>
