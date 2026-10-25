@@ -57,8 +57,8 @@ describe('the Quillmesh profile', () => {
     // As the web app counts it (map.ts, derive.ts): a contract is active from its first day to its last month's end.
     const arrAt = (ym: string) => q.contracts.filter(k => k.totalMinor !== '0' && k.startYm <= ym && k.endYm > ym).reduce((n, k) => n + BigInt(k.totalMinor) * 12n / BigInt(k.scheduleLines.length || 12), 0n);
     const yms = q.periods.yms.filter(ym => ym <= q.closeYm);
-    for (let i = 1; i < yms.length; i++) expect(arrAt(yms[i]), yms[i]).toBeGreaterThanOrEqual(arrAt(yms[i - 1]));
-    expect(arrAt(q.closeYm)).toBeGreaterThan(arrAt(yms[yms.length - 2]));
+    for (let i = 1; i < yms.length; i++) expect(arrAt(yms[i]), yms[i]).toBeGreaterThan(arrAt(yms[i - 1]));
+    for (const k of q.contracts.filter(x => x.code.startsWith('QM-'))) expect(k.endYm > q.closeYm, k.code).toBe(true);
     expect(arrAt(q.closeYm)).toBeGreaterThan(4_600_000_00n);
     expect(arrAt(q.closeYm)).toBeLessThan(5_000_000_00n);
     const yearAgo = arrAt(yms[yms.length - 13]);

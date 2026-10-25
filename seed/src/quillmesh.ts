@@ -14,7 +14,7 @@
  *   hiring and growth spend after the Series A, synced from the payroll and cloud providers each month (the close
  *   month's fixture bills and bank lines come on top);
  * - the seed and Series A rounds in cash and paid-in capital, tying to the funding records ($16.25M), so the close
- *   month ends near $11M of cash and about 23 months of runway at its burn;
+ *   month ends near $11M of cash and about 24 months of runway at its three-month burn;
  * - the group's companies named Quillmesh Inc and Quillmesh Ltd.
  * Every new customer's receivables are paid before the close, so Credit & Risk's checks and the Bookkeeper's September
  * work are exactly the fixture's.
@@ -77,9 +77,9 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
   // share signed by month t is 3^((t - 17) / 12), so a third were on board a year before the close and about one in
   // eleven signs in the close month itself (customers who predate the books start in their first month). Each
   // contract renews every 12 months at the same price, so it is one contract over every term up to the one running at
-  // the close. A customer whose term would end in the close month starts a month earlier instead, so no contract ends
-  // inside the books and ARR only grows. Each term is invoiced on its first day and paid the month after, never later
-  // than the close month, so annual cash keeps arriving every month.
+  // the close. A customer whose term ends in the close month has already signed its renewal (invoiced on its first
+  // day, after the close), so no contract ends inside the books and ARR only grows. Each term inside the books is
+  // invoiced on its first day and paid within the month, so annual cash keeps arriving every month.
   const lastT = t(close);
   const shuffle = mulberry32(48_000_001);
   const names = [...ENTERPRISE, ...Array.from({ length: 65 }, (_, i) => `${MID_A[i % MID_A.length]} ${MID_B[(i * 3) % MID_B.length]}`)];
@@ -91,15 +91,16 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
   let idx = seed.customers.length;
   const recognized = new Map<string, Line[]>();
   const add = (ym: string, l: Line[]) => recognized.set(ym, [...(recognized.get(ym) ?? []), ...l]);
-  const terms: { ym: Ym; pay: Ym; c: Seed['customers'][number]; code: string; amount: number; renewal: boolean }[] = [];
+  const terms: { ym: Ym; c: Seed['customers'][number]; code: string; amount: number; renewal: boolean }[] = [];
   names.forEach((name, i) => {
     const enterprise = i < ENTERPRISE.length;
     const annual = enterprise ? 100_000 + Math.round(rand() * 90_000) : 20_000 + Math.round(rand() * 20_000);
     const monthly = cents(Math.round(annual / 12));
     const u = (order[i] + 0.5) / names.length;
-    let s = Math.min(lastT, Math.max(0, Math.ceil(lastT + (12 * Math.log(u)) / Math.log(3))));
-    if ((lastT - s) % 12 === 11) s += 1;
-    const count = Math.floor((lastT - s) / 12) + 1;
+    const s = Math.min(lastT, Math.max(0, Math.ceil(lastT + (12 * Math.log(u)) / Math.log(3))));
+    // Terms that started by the close, plus the renewal signed early when the running term ends in the close month.
+    const invoiced = Math.floor((lastT - s) / 12) + 1;
+    const count = invoiced + ((lastT - s) % 12 === 11 ? 1 : 0);
     const start = ymAdd(first, s);
     const c = { idx: ++idx, name, domain: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}.example`, guarantorPersonaId: '', guarantorName: '', paymentTermsDays: enterprise ? 60 : 30 };
     seed.customers.push(c);
@@ -116,10 +117,7 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
       items: [{ kind: 'subscription', priceMinor: String(monthly), qty: '1', sspMinor: String(monthly), description: count > 1 ? `${plan}, renewed ${ymStr(ymAdd(start, 12))}` : plan }],
       scheduleLines,
     });
-    for (let k = 0; k < count; k++) {
-      const ym = ymAdd(start, 12 * k);
-      terms.push({ ym, pay: ym, c, code, amount: monthly * 12, renewal: k > 0 });
-    }
+    for (let k = 0; k < invoiced; k++) terms.push({ ym: ymAdd(start, 12 * k), c, code, amount: monthly * 12, renewal: k > 0 });
     for (const sl of scheduleLines) {
       if (!sl.recognized) continue;
       add(sl.ym, [line('2400', monthly, 0, `Release deferred ${code}`, c.idx), line('4000', 0, monthly, `Subscription revenue ${code}`, c.idx)]);
@@ -127,12 +125,12 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
   });
   // Invoices are numbered in the order they were issued.
   terms.sort((a, b) => t(a.ym) - t(b.ym) || a.c.idx - b.c.idx);
-  terms.forEach(({ ym, pay, c, code, amount, renewal }, k) => {
+  terms.forEach(({ ym, c, code, amount, renewal }, k) => {
     const number = `INV-${5001 + k}`;
     const issued = micros(ym, 1);
     seed.invoices.push({ customerIdx: c.idx, contractCode: code, number, ym: ymStr(ym), issuedAtMicros: issued, dueAtMicros: plusDays(issued, c.paymentTermsDays), amountMinor: String(amount), status: 'paid' });
     seed.journalEntries.push({ periodYm: ymStr(ym), memo: `${renewal ? 'Renewal' : 'Annual'} invoice ${c.name} (${code}) ${number}`, lines: [line('1100', amount, 0, `Invoice ${number}`, c.idx), line('2400', 0, amount, `Deferred revenue ${code}`, c.idx)] });
-    seed.journalEntries.push({ periodYm: ymStr(pay), memo: `Payment received ${c.name} ${number}`, lines: [line('1000', amount, 0, 'Bank receipt', c.idx), line('1100', 0, amount, `Settle ${number}`, c.idx)] });
+    seed.journalEntries.push({ periodYm: ymStr(ym), memo: `Payment received ${c.name} ${number}`, lines: [line('1000', amount, 0, 'Bank receipt', c.idx), line('1100', 0, amount, `Settle ${number}`, c.idx)] });
   });
   for (const [ym, lines] of [...recognized.entries()].sort()) {
     seed.journalEntries.push({ periodYm: ym, memo: `Revenue recognition, Quillmesh annual contracts, ${ym}`, lines });
@@ -152,14 +150,14 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
     const headcount = usStaffAt(ymStr(close), s);
     const payroll = cents(headcount * 15_400);
     const sinceA = before(ym, seriesAYm) ? -1 : t(ym) - t(seriesAYm);
-    const advisers = sinceA < 0 ? 0 : cents(40_000 + 5_000 * sinceA);
-    const contractors = sinceA < 0 ? 0 : cents(25_000 * Math.pow(1.05, sinceA));
+    const advisers = sinceA < 0 ? 0 : cents(45_000 + 7_000 * sinceA);
+    const contractors = sinceA < 0 ? 0 : cents(30_000 * Math.pow(1.06, sinceA));
     const travel = sinceA < 0 ? 0 : cents(10_000 + 2_000 * sinceA);
     const growth = advisers + contractors + travel;
     const gpu = cents(26_000 * Math.pow(1.075, t(ym)) * (s === ymStr(m1) ? 1.38 : 1));
     const models = cents(11_000 * Math.pow(1.08, t(ym)));
     const tools = cents(9_500 + 450 * t(ym));
-    const marketing = cents(18_000 + 2_600 * t(ym) + 5_000 * Math.max(0, sinceA));
+    const marketing = cents(18_000 + 2_600 * t(ym) + 12_000 * Math.max(0, sinceA));
     const rent = cents(t(ym) < 9 ? 14_000 : 26_000);
     seed.journalEntries.push({
       periodYm: s,

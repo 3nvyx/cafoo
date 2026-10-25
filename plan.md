@@ -22,7 +22,7 @@ Pricing is a platform fee plus per-page usage.
 
 - Stage: Series A, $50M post-money, closed March 2026, $12M raised. About $4.8M ARR, growing about 3x a year: ARR rises every month and September adds about $0.6M.
 - Funding: pre-seed SAFEs $0.75M and seed $3.5M, then the $12M Series A: $16.25M of paid-in capital, the same in the books and on the Financing page.
-- People: 62 (48 in the US, 14 in the UK), all started by the September close. Cash about $11M. Net burn about $470k a month at the close (payroll for the US team at about $15k a month each, loaded, plus the hiring and growth spend the Series A pays for), so runway about 23 months.
+- People: 62 (48 in the US, 14 in the UK), all started by the September close. Cash about $11M. Net operating cash burn about $440k a month over July to September (payroll for the US team at about $15k a month each, loaded, plus the hiring and growth spend the Series A pays for), so runway about 24 months.
 - Group: Quillmesh Inc (USD, parent), Quillmesh Ltd (GBP), Elimination.
 - Customers: 80 on annual contracts that renew every 12 months, 65 mid-market ($20k to $40k a year) and 15 enterprise ($100k to $190k a year, net-60), carrying about $4.0M of ARR; the test fixture's annual contracts add about $0.8M (103 customer records in all). Self-serve card customers are not individual records: their subscriptions and per-page usage post as one billing-sync entry a month. Say "80 contract customers plus self-serve", never "300 customers".
 - ARR counts contracts only. Self-serve subscriptions and per-page usage (about $175k a month at the close) are revenue but not ARR, so monthly revenue (about $655k in September) runs well above ARR / 12 (about $400k).
