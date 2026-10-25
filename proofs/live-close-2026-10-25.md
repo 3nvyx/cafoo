@@ -17,9 +17,9 @@ Provider-level proof (one minimal real call each) is in `live-2026-10-25T11-24-4
 
 - `list_proposals` pages 10 at a time with payload previews; the ruling prompts read Open Proposals until none are left; the Red Team critiques 4 Proposals at a time.
 - The workers filed 48 Proposals and recorded 102 credit checks. Agent SDK cost $4.92, under the $5 cap.
-- The Advisor made 79 paged `list_proposals` reads and 58 approve or reject calls. The safety net did not fire: no Proposal was left unruled.
+- The Advisor made 79 paged `list_proposals` reads and 58 approve or reject calls (more calls than Proposals; I did not break down which were retries or refused by the gate). The safety net did not fire: no Proposal was left unruled.
 - Outcome: 34 Proposals approved by the Advisor and waiting for the CFO, 14 rejected. 55 Advisor rulings are recorded in the close thread.
-- Grok still timed out on 35 of 48 critiques (13 answered). The cause is the 30 s deadline against Grok's up to six tool steps. Commit 39401a4 raises the default to 90 s; that change has not been run live yet.
+- Grok still timed out on 35 of 48 critiques (13 answered); those 35 fell back to the scripted critique, labelled as scripted. The cause is the 30 s deadline against Grok's up to six tool steps. Commit 39401a4 raises the default to 90 s; that change has not been run live yet.
 - CRS: 15 real calls, 0 fallbacks. Moss: 150 real searches, 1 fallback. Apify: 1 ok, 13 fallbacks. The fallbacks are customers on made-up `.example` domains, which return no page text and now count as a failure instead of "crawled 0 pages" (579ee2d).
 
 ## Not covered
