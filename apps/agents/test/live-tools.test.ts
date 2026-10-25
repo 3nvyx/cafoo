@@ -165,12 +165,37 @@ describe('books tools (read-only, on the Advisor cache)', () => {
       { proposalId: 12n, kind: { tag: 'Statement' }, senderRole: 'cfo', body: 'check the vendor' },
     ];
     const all = data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09' })));
-    expect(all).toEqual([
-      { id: '11', kind: 'BankMatch', status: 'Open', proposer: 'bookkeeper', amount: '$4,500', summaryPlain: 's11', rationale: 'r11', payload: { n: 11 }, critiques: ['weak match'], cfoNotes: [] },
-      { id: '12', kind: 'JournalEntry', status: 'AwaitingCfo', proposer: 'bookkeeper', amount: '$4,500', summaryPlain: 's12', rationale: 'r12', payload: { n: 12 }, critiques: [], cfoNotes: ['check the vendor'] },
-    ]);
-    expect(data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', status: 'Open' }))).map((x: { id: string }) => x.id)).toEqual(['11']);
-    expect(data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', status: 'all' }))).map((x: { id: string }) => x.id)).toEqual(['11', '12']);
+    expect(all).toEqual({
+      total: 2,
+      offset: 0,
+      nextOffset: null,
+      rows: [
+        { id: '11', kind: 'BankMatch', status: 'Open', proposer: 'bookkeeper', amount: '$4,500', summaryPlain: 's11', rationale: 'r11', payload: { n: 11 }, critiques: ['weak match'], cfoNotes: [] },
+        { id: '12', kind: 'JournalEntry', status: 'AwaitingCfo', proposer: 'bookkeeper', amount: '$4,500', summaryPlain: 's12', rationale: 'r12', payload: { n: 12 }, critiques: [], cfoNotes: ['check the vendor'] },
+      ],
+    });
+    const ids = (r: { rows: { id: string }[] }) => r.rows.map(x => x.id);
+    expect(ids(data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', status: 'Open' }))))).toEqual(['11']);
+    expect(ids(data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', status: 'all' }))))).toEqual(['11', '12']);
+  });
+
+  it('list_proposals pages a big month and previews large payloads, with id for one in full', async () => {
+    const big = JSON.stringify({ lines: Array.from({ length: 200 }, (_, i) => ({ ym: `2026-${i}`, amountMinor: '100000' })) });
+    rows.proposal = Array.from({ length: 23 }, (_, i) => ({ id: BigInt(100 + i), periodId: 9n, kind: { tag: 'RevenueSchedule' }, status: { tag: 'Open' }, proposerRole: 'revenue', amountMinor: 1n, summaryPlain: 's', rationale: 'r', payloadJson: i === 0 ? big : '{"n":1}' }));
+    rows.agentMessage = [];
+    const first = data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09' })));
+    expect(first).toMatchObject({ total: 23, offset: 0, nextOffset: 10 });
+    expect(first.rows).toHaveLength(10);
+    expect(first.rows[0]).toMatchObject({ id: '100', payloadTruncated: true });
+    expect(first.rows[0].payload).toBeUndefined();
+    expect(first.rows[0].payloadPreview.length).toBeLessThan(big.length);
+    expect(first.rows[1]).toMatchObject({ id: '101', payload: { n: 1 } });
+    const last = data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', offset: 20 })));
+    expect(last).toMatchObject({ total: 23, offset: 20, nextOffset: null });
+    expect(last.rows.map((x: { id: string }) => x.id)).toEqual(['120', '121', '122']);
+    const one = data(ok(await call(books(), 'list_proposals', { periodYm: '2026-09', id: '100' })));
+    expect(one).toMatchObject({ id: '100', payload: JSON.parse(big) });
+    expect(text(await call(books(), 'list_proposals', { periodYm: '2026-09', id: '999' }))).toMatch(/No Proposal 999/);
   });
 
   it('score_bank_matches offers only exact-amount matches as candidates', async () => {
