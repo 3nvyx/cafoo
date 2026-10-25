@@ -16,6 +16,15 @@ export const ROLE: Record<PostedByRole, { name: string; initials: string }> = {
 
 export const roleName = (r: PostedByRole) => ROLE[r]?.name ?? r;
 
+/**
+ * Which model wrote a Red Team critique, when the body says so. Gemini, the second critic, starts every critique with
+ * "Gemini: " (live) or "Gemini (scripted): " (Demo mode stand-in); the first critic's critiques carry no label.
+ */
+export function criticOf(body: string): { name: string; scripted: boolean } | undefined {
+	const m = /^Gemini( \(scripted\))?: /.exec(body);
+	return m ? { name: 'Gemini', scripted: Boolean(m[1]) } : undefined;
+}
+
 export const KIND: Record<ProposalKind, string> = {
 	journal_entry: 'Journal Entry',
 	bank_match: 'Bank Match',

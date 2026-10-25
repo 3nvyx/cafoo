@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { AgentMessage } from '#lib/data/types.js';
-	import { MESSAGE_KIND, roleName, timeOnly } from '#lib/labels.js';
+	import { MESSAGE_KIND, criticOf, roleName, timeOnly } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import RoleAvatar from './RoleAvatar.svelte';
 
 	let { m, pinned = false }: { m: AgentMessage; pinned?: boolean } = $props();
+
+	const critic = $derived(m.kind === 'critique' ? criticOf(m.body) : undefined);
 
 	const style = $derived(
 		m.kind === 'critique'
@@ -22,6 +24,9 @@
 	<div class="min-w-0 flex-1 {style}" style={m.kind === 'critique' || m.kind === 'question' ? `border-color: var(--role-${m.senderRole})` : ''}>
 		<div class="flex flex-wrap items-baseline gap-x-2 text-sm">
 			<span class="font-medium">{roleName(m.senderRole)}</span>
+			{#if critic}
+				<span class="text-sm text-ink-3" title={critic.scripted ? 'Scripted Demo mode critique' : undefined}>{critic.name}{critic.scripted ? ' (scripted)' : ''}</span>
+			{/if}
 			{#if m.kind !== 'statement'}
 				<span class="text-[11px] font-semibold tracking-[0.08em] uppercase {m.kind === 'critique' ? 'text-neg' : m.kind === 'ruling' ? 'text-primary' : 'text-ink-3'}"
 					>{pinned ? 'Ruling, pinned' : MESSAGE_KIND[m.kind]}</span

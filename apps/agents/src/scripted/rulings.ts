@@ -1,10 +1,12 @@
 /**
- * Demo-mode rulings: the Red Team critiques each open Proposal and the Advisor rules on it, the same way whether a
+ * Demo-mode rulings: the Red Team critiques each open Proposal (its scripted critique, then Gemini's scripted second
+ * critique from fixtures/gemini/) and the Advisor rules on it, the same way whether a
  * close runs fresh, resumes, or the continuous Bookkeeper filed the Proposals from the live bank feed. The critiques
  * and rulings are scripted per kind; the approval reducer still decides post-now or wait-for-the-CFO, and a ruling the
  * books refuse is recorded as a refusal (the Proposal is rejected so the close can continue).
  */
 import { formatMinor } from '@cafoo/ledger-core';
+import { scriptedGeminiCritique } from '../gemini';
 import { IC_DIFFERENCE_TOLERANCE_MINOR } from '../harness/consolidation';
 import type { Snapshot } from '../snapshot';
 import { say, type Cast, type RoleConn } from '../stdb';
@@ -24,6 +26,8 @@ export interface RuleOpenOptions {
   pause?: (mult?: number) => Promise<void>;
   /** Refusals are pushed here. */
   refused?: Refusal[];
+  /** Write Gemini's scripted second critique after the first. Default true; false when the live critic (startCritic) already ran Gemini on these. */
+  secondCritic?: boolean;
 }
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
@@ -78,12 +82,19 @@ export async function ruleOpen(cast: Cast, proposals: readonly ProposalRow[], op
   const open = proposals;
   await say(RT, thread, `Reviewing ${open.length} proposals before the Advisor rules. I will challenge anything that leans on a weak match, an assumed rate, or a single data source.`, `The Red Team is reviewing ${open.length} proposals.`);
   const rulings: { id: bigint; action: 'approve' | 'reject'; rationale: string; plain: string }[] = [];
+  /** Gemini's scripted second critique, after the first one on the same Proposal. */
+  const second = async (p: ProposalRow) => {
+    if (opts.secondCritic === false) return;
+    const g = scriptedGeminiCritique(p, s.materiality, id => s.vendorName.get(id));
+    if (g) await RT.reducers.critique({ proposalId: p.id, ...g });
+  };
   for (const p of open) {
     // A plain string: the consolidation kinds arrive with the multi-entity bindings.
     const kind: string = p.kind.tag;
     const payload = JSON.parse(p.payloadJson);
     if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
       await RT.reducers.critique({ proposalId: p.id, body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty name only partly overlaps. If this is wrong, a customer's invoice shows paid when it is not. Recommend asking the customer for a remittance advice instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` });
+      await second(p);
       rulings.push({ id: p.id, action: 'reject', rationale: `The Red Team is right: at ${(payload.matches[0].scoreBp / 100).toFixed(0)}% confidence this match is a guess. Leave the transaction unmatched, request remittance detail, and revisit next week.`, plain: `Not matching this one yet; we will ask the customer what the payment was for.` });
       continue;
     }
@@ -91,37 +102,44 @@ export async function ruleOpen(cast: Cast, proposals: readonly ProposalRow[], op
       const bankruptcy = /bankruptcy/i.test(p.summaryPlain);
       if (bankruptcy) {
         await RT.reducers.critique({ proposalId: p.id, body: `A 100% reserve is the right default for an active bankruptcy plan, but confirm two things before posting: that none of the receivable is secured or prepaid, and that the bankruptcy is the guarantor's and not a same-name match. The evidence shows a public record tied to the same SSN, so the second concern is answered; the first is a question for the account owner.`, summaryPlain: `The Red Team asks whether any of this debt is secured before reserving all of it.` });
+        await second(p);
         rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved. The bankruptcy record matches the guarantor's SSN across the bureau file and public records, and no collateral or prepayment is attached to the contract. Because the amount is material it goes to the CFO for confirmation.`, plain: `Approved: set aside the full amount; the CFO gets the final say because it is large.` });
       } else {
         await RT.reducers.critique({ proposalId: p.id, body: `The reserve rate follows the tier table, which is fine as a default. Two checks: the open balance should exclude anything already paid this month but not yet matched, and a 50% reserve on a customer who is still paying monthly may be high. Suggest the Advisor confirm the balance against the bank matches approved today.`, summaryPlain: `The Red Team asks to confirm the unpaid balance before reserving against it.` });
+        await second(p);
         rulings.push({ id: p.id, action: 'approve', rationale: `Reserve approved at the tier rate. The open balance excludes invoices matched to payments earlier in this close. The rate is a policy default and can be revisited when payment history improves. Material, so it goes to the CFO.`, plain: `Approved at the standard rate for this risk level; the CFO gets the final say because it is large.` });
       }
       continue;
     }
     if (kind === 'RevenueSchedule') {
       await RT.reducers.critique({ proposalId: p.id, body: `Straight-line is appropriate for a flat annual subscription. Check that the invoice date, not the signature date, starts the schedule, and that the term is 12 months inclusive.`, summaryPlain: `The Red Team agrees with straight-line and asks to confirm the start month.` });
+      await second(p);
       rulings.push({ id: p.id, action: 'approve', rationale: `Schedule approved. The term runs from the invoice month for 12 months inclusive, which matches the contract.`, plain: `Approved: the schedule follows the contract's twelve months.` });
       continue;
     }
     if (kind === 'VendorVerify') {
       const vendor = s.vendorName.get(BigInt(payload.vendorId)) ?? 'this vendor';
       await RT.reducers.critique({ proposalId: p.id, body: `The owner's identity and fraud checks are clean, so verification is reasonable. Before the first payment, confirm the bank account on the bill belongs to ${vendor} and not to a look-alike.`, summaryPlain: `The Red Team agrees and asks to confirm the bank details before the first payment.` });
+      await second(p);
       rulings.push({ id: p.id, action: 'approve', rationale: `Vendor check approved. The cited identity and fraud checks on the owner came back APPROVE at tier A or B; the Red Team's bank-detail check goes to whoever releases the first payment.`, plain: `Approved: ${vendor} can be paid now that their owner checks out.` });
       continue;
     }
     if (kind === 'VendorBlock') {
       await RT.reducers.critique({ proposalId: p.id, body: `Agree with the block. One caution: notify procurement before the bill's due date so the engagement is cancelled, not just unpaid.`, summaryPlain: `The Red Team agrees and asks that procurement be told.` });
+      await second(p);
       rulings.push({ id: p.id, action: 'approve', rationale: `Block approved. Identity and fraud checks fail on the owner; no payment leaves until a verified owner is on file. Procurement will be notified.`, plain: `Approved: no money goes to this vendor until a real owner is verified.` });
       continue;
     }
     if (kind === 'FxRevaluation') {
       const material = p.amountMinor >= s.materiality;
       await RT.reducers.critique({ proposalId: p.id, body: `The rate is the recorded closing rate for ${String(payload.periodYm ?? 'the month')} and only balances held in another currency are restated, which is right. One check: nothing in these balances should have been settled after month end, or the gain or loss is overstated.`, summaryPlain: `The Red Team agrees with the rate and asks whether anything was paid after month end.` });
+      await second(p);
       rulings.push({ id: p.id, action: 'approve', rationale: `Revaluation approved. The books re-check each balance and the closing rate at apply, and the difference lands on the company's own currency gain or loss account. ${material ? 'Material, so it waits for the CFO.' : 'Below the materiality threshold, so it posts now.'}`, plain: `Approved: restate the foreign-currency balances at the month's closing rate${material ? '; the CFO gets the final say because it is large' : ''}.` });
       continue;
     }
     if (kind === 'IcElimination') {
       await RT.reducers.critique({ proposalId: p.id, ...eliminationCritique(payload) });
+      await second(p);
       const material = p.amountMinor >= s.materiality;
       const what = payload.basis === 'activity' ? `the fees the two companies charged each other from the group's combined results` : `what the two companies owe each other from the group's combined balance sheet`;
       rulings.push({

@@ -1,0 +1,45 @@
+{
+  "_note": "Scripted stand-ins for Gemini, the Red Team's second critic. Replayed when GEMINI_API_KEY is empty or DEMO_MODE=1, and labeled 'Gemini (scripted)' in the app. They are written by hand, not recorded from the API. Each one adds a point the first critic (Grok, or its scripted critique) does not make. {vendor} and {period} are filled in from the Proposal.",
+  "critiques": {
+    "bank_match_weak": {
+      "body": "Beyond the partial name: check whether this customer has a second open invoice for a similar amount. A payment that half-matches one invoice often settles another one exactly, and matching it here would leave that one overdue and trigger a needless reminder.",
+      "summaryPlain": "Gemini asks whether this payment belongs to a different invoice from the same customer."
+    },
+    "allowance_bankruptcy": {
+      "body": "If the bankruptcy plan schedules this debt, the company may still recover part of it through the plan. Reserve in full now, but record the plan's claim deadline so the claim is filed and any recovery is booked when it arrives.",
+      "summaryPlain": "Gemini agrees with reserving it all and asks that the claim in the bankruptcy be filed so some money may still come back."
+    },
+    "allowance_tier": {
+      "body": "The tier comes from the guarantor's checks, but the customer's own payment record this year is the better signal for how much of this balance will be collected. If the customer has paid on time since the tier was set, say so in the rationale, or the reserve will look arbitrary in an audit.",
+      "summaryPlain": "Gemini asks that the customer's recent payment record be cited next to the risk tier."
+    },
+    "revenue_schedule": {
+      "body": "Check the contract for a termination-for-convenience clause. If the customer can cancel mid-term, the schedule should still be straight-line, but the unearned part must be refundable and should not count toward committed revenue in the board numbers.",
+      "summaryPlain": "Gemini asks whether the customer can cancel early, which would change how this revenue is reported to the board."
+    },
+    "vendor_verify": {
+      "body": "The owner checks out, but {vendor}'s first invoice is the moment most payment fraud happens. Pay a small first amount or confirm the bank account by phone on a number from {vendor}'s own website, not from the invoice.",
+      "summaryPlain": "Gemini agrees and suggests confirming {vendor}'s bank details by phone before the first payment."
+    },
+    "vendor_block": {
+      "body": "Check whether any other vendor on file shares this one's bank account, address or phone number. A synthetic or stolen identity is rarely used only once, and a match would point to a second vendor that also needs blocking.",
+      "summaryPlain": "Gemini agrees with the block and asks whether any other vendor shares its bank account or address."
+    },
+    "accrual": {
+      "body": "Check that the work was actually done before month end, not just ordered. If the statement of work shows delivery in the next month, this cost belongs there and the accrual overstates this month's expenses.",
+      "summaryPlain": "Gemini asks to confirm the work was done this month before booking the cost now."
+    },
+    "fx_revaluation": {
+      "body": "The {period} closing rate should come from the same source the group used last month. Switching rate sources between months creates a gain or loss that comes from the data feed, not the currency.",
+      "summaryPlain": "Gemini asks that the exchange rate come from the same source as last month."
+    },
+    "ic_elimination": {
+      "body": "Both companies should record this elimination against the same agreement. If the services agreement between them changed during the year, confirm the fee basis in both books follows the current version before the amounts are removed.",
+      "summaryPlain": "Gemini asks that both companies use the current agreement between them for these amounts."
+    },
+    "material_entry": {
+      "body": "For an entry this large, attach the source document itself, not only the bank lines it explains. An auditor sampling the month will ask for the invoice or contract behind it first.",
+      "summaryPlain": "Gemini asks that the invoice or contract behind this large entry be attached."
+    }
+  }
+}

@@ -6,7 +6,7 @@ Updated 2026-10-24. "Now" is what runs in this repo today. Everything after it i
 
 Cafoo closes the month for a group of companies in two currencies, and keeps the books current between closes.
 
-Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) propose. A Red Team agent on a second model vendor critiques. The Advisor rules with a written rationale. Rulings at or above the Materiality threshold (default $10,000, measured in the Reporting currency) wait in the CFO's "Needs your OK" queue. The CFO confirms or sends back, can reverse any entry, and always confirms the period lock. SpacetimeDB reducers enforce all of this by checking the caller's identity.
+Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) propose. A Red Team on two other model vendors critiques: Grok first, then Gemini adds what Grok missed. The Advisor rules with a written rationale. Rulings at or above the Materiality threshold (default $10,000, measured in the Reporting currency) wait in the CFO's "Needs your OK" queue. The CFO confirms or sends back, can reverse any entry, and always confirms the period lock. SpacetimeDB reducers enforce all of this by checking the caller's identity.
 
 The demo group is Cafoo Inc (USD), its UK subsidiary Cafoo Ltd (GBP), and an Elimination subsidiary. Closing September produces 52 Proposals: 49 for Cafoo Inc, one Revaluation and two Eliminations (51 when the close runs without waiting for the CFO, because the revenue catch-up rolls over to the next run).
 
@@ -33,7 +33,7 @@ Every Proposal and ruling carries a Plain summary and a technical rationale. Sim
 
 Demo mode runs all of it with zero API keys. Live mode switches on one provider at a time as keys are added. Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine has 142 unit tests, and the credit cascade reproduces all 20 expected decisions in the sandbox dataset.
 
-Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind the Anthropic Messages API; see `.env.example`), Grok through the Vercel AI SDK, Moss, Bright Data, CRS Credit API sandbox, and Open WebUI as an optional chat front-end.
+Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind the Anthropic Messages API; see `.env.example`), Grok and Gemini through the Vercel AI SDK, Moss, Bright Data, CRS Credit API sandbox, and Open WebUI as an optional chat front-end.
 
 ## Next 90 days (roadmap)
 

@@ -12,3 +12,4 @@ packages/eval-harness/reports/
 spacetimedb/.spacetime/
 .claude/settings.local.json
 .preview/
+.codex/config.toml

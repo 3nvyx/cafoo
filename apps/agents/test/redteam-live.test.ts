@@ -6,6 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { builtinCharter } from '../src/charter/active';
+import { GEMINI_SCRIPTED_LABEL } from '../src/gemini';
 import { startCritic } from '../src/redteam';
 import { books, fakeCast, type Rows } from './fake-cast';
 
@@ -56,12 +57,15 @@ const weakMatch = (id = 14n, extra: Record<string, unknown> = {}) => ({
 const smallEntry = (id = 15n) => weakMatch(id, { kind: { tag: 'JournalEntry' }, amountMinor: 4500n, payloadJson: JSON.stringify({ memo: 'Bank fees', lines: [] }) });
 const good = { body: 'The counterparty name only partly matches and the score is 61%; ask for remittance detail before matching.', summaryPlain: 'The Red Team doubts this match because the name only partly fits.' };
 const scripted = { body: expect.stringMatching(/^Confidence 61% is below the auto threshold/), summaryPlain: 'The Red Team doubts this match: the name only partly fits.' };
-const critiques = () => fx.callsTo('critique');
+/** The first critic's critiques: Gemini's second critique (scripted here, no GEMINI_API_KEY) is pinned in redteam.test.ts. */
+const critiques = () => fx.callsTo('critique').filter(c => !String((c.args as { body?: unknown }).body).startsWith(GEMINI_SCRIPTED_LABEL));
 
 beforeEach(() => {
   vi.stubEnv('DEMO_MODE', '');
   vi.stubEnv('XAI_API_KEY', 'test-key-not-real');
   vi.stubEnv('REDTEAM_MODEL', undefined);
+  vi.stubEnv('GEMINI_API_KEY', '');
+  vi.stubEnv('GOOGLE_GENERATIVE_AI_API_KEY', '');
   vi.stubEnv('MOSS_PROJECT_ID', '');
   vi.stubEnv('MOSS_PROJECT_KEY', '');
   vi.stubEnv('CHARTER_OVERRIDE_JSON', '');
