@@ -34,7 +34,7 @@ interface Figure {
 	rejected: boolean;
 }
 
-const REJECTING = /\b(?:not|than|instead of|from|rather than)\s*(?:at\s+|the\s+|a\s+|about\s+)?(?:rate\s+of\s+)?$/;
+const REJECTING = /\b(?:not|than|instead of|from|was|currently|now|rather than)\s*(?:at\s+|the\s+|a\s+|about\s+)?(?:rate\s+of\s+)?$/;
 
 function figuresIn(note: string, pattern: RegExp, toValue: (m: RegExpExecArray) => bigint): Figure[] {
 	return [...note.matchAll(pattern)].map((m) => ({
@@ -61,11 +61,7 @@ export function dollarsIn(note: string): Figure[] {
 function requested(figures: Figure[], current: bigint[], what: string): { value: bigint; rejected: bigint[] } | string {
 	const rejected = figures.filter((f) => f.rejected).map((f) => f.value);
 	let asked = [...new Set(figures.filter((f) => !f.rejected).map((f) => f.value))];
-	if (asked.length > 1) {
-		// Of several figures, the one already on the Proposal is the one being replaced ("75% is too high, use 50%").
-		rejected.push(...asked.filter((v) => current.includes(v)));
-		asked = asked.filter((v) => !current.includes(v));
-	}
+	if (asked.length > 1) asked = asked.filter((v) => !current.includes(v));
 	if (asked.length === 1) return { value: asked[0]!, rejected };
 	return asked.length ? `the note names more than one ${what}` : `the note only says which ${what} not to use`;
 }
@@ -103,11 +99,10 @@ export function reviseForNote(p: Proposal, noteRaw: string, ctx: SendBackContext
 
 function recomputeAllowance(p: Proposal, note: string, payload: Raw, lines: Line[], percents: Figure[], ctx: SendBackContext): SendBackOutcome {
 	const tiers = (payload.tiers ?? {}) as Record<string, string>;
-	const before = (payload.ratesBp ?? {}) as Record<string, number>;
-	const ratesBp = { ...before };
+	const ratesBp = { ...((payload.ratesBp ?? {}) as Record<string, number>) };
 	const rateOf = (l: Line, open: bigint): bigint => {
 		const tier = l.customerId ? tiers[l.customerId] : undefined;
-		return tier && before[tier] !== undefined ? BigInt(before[tier]!) : open > 0n ? mulDiv(toBig(l.creditMinor), 10_000n, open) : 0n;
+		return tier && ratesBp[tier] !== undefined ? BigInt(ratesBp[tier]!) : open > 0n ? mulDiv(toBig(l.creditMinor), 10_000n, open) : 0n;
 	};
 	const reserve = lines.filter((l) => l.account === '1150' && l.customerId);
 	const current = reserve.map((l) => rateOf(l, ctx.openReceivable(l.customerId!)));
