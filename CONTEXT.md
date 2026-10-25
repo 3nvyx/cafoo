@@ -63,7 +63,7 @@ _Avoid_: consolidation entity, elim company
 **Proposal**: A worker agent's request to change the ledger (journal entry, revenue schedule, bank match, credit decision, accrual, vendor block, vendor check, Revaluation, Elimination). Never affects balances until approved.
 _Avoid_: draft, suggestion, pending entry
 
-**Approval**: The Advisor's ruling on a Proposal: approve, reject, or amend, always with a rationale.
+**Approval**: The Advisor's ruling on a Proposal: approve, reject, or amend, always with a rationale. An amendment always waits for the CFO, whatever its amount.
 _Avoid_: sign-off, OK
 
 **Advisor**: The Chief Finance Advisor agent, the only agent identity that may commit Proposals. It never proposes, and no identity approves or confirms a Proposal it proposed.

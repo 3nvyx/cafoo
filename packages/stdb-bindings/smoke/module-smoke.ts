@@ -425,6 +425,21 @@ async function main() {
     if (waiting) await accepts('the waiting decision is still ruled on, since the latest check derives the same tier', () => settle(waiting));
   });
 
+  await section('Advisor amendments wait for the CFO, whatever the amount', async () => {
+    const small = await je(B, CLOSE, [{ accountCode: '6000', debitMinor: '300', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '300' }]);
+    const amendedPayload = JSON.stringify({ ...JSON.parse(small.payloadJson), memo: 'smoke amended memo' });
+    await accepts('the Advisor amends an entry far below the threshold', () =>
+      A.conn.reducers.approveProposal({ proposalId: small.id, rationale: 'smoke amendment', summaryPlain: 'Amended by the smoke test.', amendedPayloadJson: amendedPayload }),
+    );
+    await waitFor(() => !['Open', 'SentBack'].includes(status(small.id)), 'amendment ruled');
+    check(status(small.id) === 'AwaitingCfo', 'an amendment waits for the CFO even below the threshold', status(small.id));
+    check(entriesOf(small.id).length === 0, 'nothing posts before the CFO confirms the amendment');
+    await accepts('the CFO confirms the amendment', () => X.conn.reducers.cfoConfirm({ proposalId: small.id, note: '' }));
+    await waitFor(() => status(small.id) === 'Amended', 'amendment applied');
+    const posted = entriesOf(small.id);
+    check(posted.length === 1 && posted[0]!.memo === 'smoke amended memo', 'the confirmed amendment posts the amended entry', posted.map(e => e.memo).join(', '));
+  });
+
   await section('Feed on fresh seed data: the month being closed is never a feed month', async () => {
     const at = (ym: string) => {
       const [y, m] = ym.split('-').map(Number);
@@ -1049,6 +1064,20 @@ async function main() {
     check(db.charterVersion.count() === charters && db.charterEval.count() === evals && charters > 0n, 'charter versions and evals survive', `${db.charterVersion.count()} versions, ${db.charterEval.count()} evals`);
     check([...db.settings.iter()].find(x => x.key === 'feed_enabled')?.valueI64 === 0n, 'the reset turns the live feed off');
     check(!!db.agentRoster.role.find('cfo'), 'the CFO keeps the seat');
+  });
+
+  await section('Releasing the CFO seat: only the CFO or the database owner', async () => {
+    await refuses('the Advisor releases the CFO seat', () => A.conn.reducers.releaseCfo({}), /Only the CFO or the database owner/);
+    await refuses('a worker releases the CFO seat', () => B.conn.reducers.releaseCfo({}), /Only the CFO or the database owner/);
+    check(!!db.agentRoster.role.find('cfo'), 'the CFO still holds the seat after both refusals');
+    await accepts('the CFO gives up its own seat', () => X.conn.reducers.releaseCfo({}));
+    await waitFor(() => !db.agentRoster.role.find('cfo'), 'seat released by the CFO');
+    const again = randomBytes(18).toString('base64url');
+    await accepts('the owner arms a new claim', async () => armBootstrap(DB, again));
+    await accepts('the CFO claims the seat again', () => X.conn.reducers.claimCfo({ secret: again, displayName: 'Smoke CFO' }));
+    await waitFor(() => !!db.agentRoster.role.find('cfo'), 'seat claimed again');
+    await accepts('the database owner releases the seat through the CLI', async () => run(BIN, ['call', DB, 'release_cfo', '--server', 'local', '--no-config', '--yes']));
+    await waitFor(() => !db.agentRoster.role.find('cfo'), 'seat released by the owner');
   });
 
   A.conn.disconnect();

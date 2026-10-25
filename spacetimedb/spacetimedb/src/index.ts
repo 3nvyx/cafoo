@@ -1560,13 +1560,16 @@ function releaseCfoSeat(ctx: Ctx, why: string, actor: string) {
   return released;
 }
 
-/** Force-free the CFO seat (advisor, database owner, or the CFO itself), e.g. after a tab was lost. */
+/**
+ * Free the CFO seat, e.g. after a tab was lost: the CFO itself or the database owner (through the CLI). Never an agent:
+ * the seat is the human's, and an agent that could empty it could leave material items with nobody to confirm them.
+ */
 export const releaseCfo = spacetimedb.reducer(ctx => {
   const role = roleOf(ctx);
   const owner = ctx.db.settings.key.find(OWNER_KEY)?.valueText;
   const isOwner = !!owner && owner === ctx.sender.toHexString();
-  if (role !== 'advisor' && role !== 'cfo' && !isOwner) {
-    throw new SenderError(`Only the advisor, the CFO, or the database owner may release the CFO seat. Your connection is ${role ?? 'not registered'}.`);
+  if (role !== 'cfo' && !isOwner) {
+    throw new SenderError(`Only the CFO or the database owner may release the CFO seat. Your connection is ${role ?? 'not registered'}.`);
   }
   releaseCfoSeat(ctx, 'Released on request.', role ?? 'owner');
 });
@@ -1728,14 +1731,16 @@ export const approveProposal = spacetimedb.reducer(
     validateProposal(ctx, p.kind.tag, payloadJson, p.id);
     const computed = computedAmount(ctx, p.kind.tag, payloadJson);
     const amountMinor = computed > p.amountMinor ? computed : p.amountMinor;
+    // An amendment is the Advisor's own text replacing a worker's, so it never posts on the Advisor's word alone: like
+    // anything material, it waits for the CFO, whatever its amount.
     const material = amountMinor >= materiality(ctx);
-    if (material) {
+    if (material || decision === 'amend') {
       ctx.db.proposal.id.update({ ...p, status: { tag: 'awaiting_cfo' }, payloadJson, amountMinor, updatedAt: ctx.timestamp });
     } else {
       applyProposal(ctx, p, payloadJson, 'advisor');
       ctx.db.proposal.id.update({
         ...p,
-        status: { tag: decision === 'amend' ? 'amended' : 'approved' },
+        status: { tag: 'approved' },
         payloadJson,
         amountMinor,
         updatedAt: ctx.timestamp,
@@ -1756,7 +1761,7 @@ export const approveProposal = spacetimedb.reducer(
       cfoConfirmedAt: undefined,
     });
     postMessage(ctx, 'advisor', p.threadId, 'ruling', rationale, summaryPlain, proposalId);
-    audit(ctx, 'advisor', material ? 'approve_awaiting_cfo' : `approve_${decision}`, 'proposal', proposalId, summaryPlain);
+    audit(ctx, 'advisor', material || decision === 'amend' ? 'approve_awaiting_cfo' : `approve_${decision}`, 'proposal', proposalId, summaryPlain);
   }
 );
 
