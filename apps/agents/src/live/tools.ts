@@ -22,6 +22,7 @@ import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 import { collectFootprint } from '../footprint';
+import { searchPolicies } from '../redteam';
 import { customerSite, searchSite, siteSignals, sitePlain } from '../apify';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
@@ -55,6 +56,20 @@ export function booksServer(cast: Cast) {
     name: 'books',
     version: '1.0.0',
     tools: [
+      tool(
+        'search_policies',
+        "Search the house accounting policies (accruals, bank reconciliation, revenue recognition, credit and allowance, consolidation, materiality) through Moss, the same search the Red Team uses. Cite the policy id in a rationale or answer.",
+        { query: z.string() },
+        async ({ query }) => {
+          try {
+            const hits = await searchPolicies(query);
+            return ok(hits.length ? hits.map(h => ({ policy: h.id, excerpt: h.text.slice(0, 800) })) : 'No house policy matches that query.');
+          } catch (e) {
+            return fail((e as Error).message);
+          }
+        },
+        readOnly
+      ),
       tool(
         'close_snapshot',
         'Everything an agent needs to start the close for a month: period, close tasks, unmatched bank transactions, open invoices and bills, contracts missing schedules, unrecognized schedule lines, customers with open receivables and their guarantor persona ids, unverified vendors, chart of accounts, materiality threshold.',

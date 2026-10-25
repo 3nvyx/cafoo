@@ -122,6 +122,13 @@ describe('month in a question', () => {
 });
 
 describe('answerQuestion', () => {
+  it('answers a policy question by quoting the house policy, not a figure', async () => {
+    vi.stubEnv('MOSS_PROJECT_ID', '');
+    const text = await ask(books(), 'What is our policy on accruals for bills dated after month end?');
+    expect(text).toMatch(/^From the accruals policy: .*accrued/);
+    expect(text).toContain('The Red Team checks every Proposal against these same policies');
+  });
+
   it('reads pending revenue payloads the way the module posts them, and never fails on one it would refuse', async () => {
     const entry = (id: bigint, lines: unknown) => ({ id, periodId: 2n, kind: { tag: 'JournalEntry' }, status: { tag: 'AwaitingCfo' }, summaryPlain: 'x', amountMinor: 0n, payloadJson: JSON.stringify({ lines }) });
     const text = await ask(books({ proposal: [

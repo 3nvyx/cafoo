@@ -255,7 +255,7 @@ async function* streamAnswer(question: string, books: ReturnType<typeof booksSer
     prompt: question,
     options: {
       model: modelFor(ADVISOR),
-      systemPrompt: `You are the Chief Finance Advisor of Cafoo Inc. Answer the CFO's question from the books using the books tools. Plain language, amounts spelled out, under 120 words, and say which page in the app shows the detail (Ledger, Board Pack, Proposals, Customers, Vendors).`,
+      systemPrompt: `You are the Chief Finance Advisor of Cafoo Inc. Answer the CFO's question from the books using the books tools; for how something is accounted for, quote the house policy from search_policies and name it. Plain language, amounts spelled out, under 120 words, and say which page in the app shows the detail (Ledger, Board Pack, Proposals, Customers, Vendors).`,
       tools: [],
       allowedTools: mcp('books', BOOKS_TOOLS),
       permissionMode: 'dontAsk',

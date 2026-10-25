@@ -11,6 +11,7 @@ import { snapshot } from './snapshot';
 import { bankExceptionsOf, closeHasWork } from './close-state';
 import type { Cast } from './stdb';
 import { advisorReport } from './advisor-report';
+import { searchPolicies } from './redteam';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 /** Whole minor units as the module's parseLines reads them: a string or number of digits; absent or "" is the default. */
@@ -64,6 +65,15 @@ const CLOSE_COMMAND = new RegExp(
   `^\\s*(?:please\\s+)?(?:start|run|begin|kick\\s+off)\\s+(?:the\\s+)?(?:(?<slot>${MONTH_SLOT})(?:'s)?\\s+)?(?:month.?end\\s+)?close(?:\\s+for\\s+(?:the\\s+month\\s+of\\s+)?(?<for>${MONTH_SLOT}))?(?:[\\s,]+(?:please|now)\\b)*[\\s.!]*$`,
   'i'
 );
+
+/** The policy's sentences that share the most words with the question, in their original order (at most three). */
+function policyExcerpt(text: string, question: string): string {
+  const terms = new Set(question.toLowerCase().split(/\W+/).filter(t => t.length > 3 && !['what', 'policy', 'does', 'should', 'cafoo', 'account', 'about'].includes(t)));
+  const sentences = text.replace(/^#.*$/gm, '').split(/(?<=[.!?])\s+|\n+/).map(s => s.replace(/^[-*\d.\s]+/, '').trim()).filter(s => s.length > 20);
+  const scored = sentences.map((s, i) => ({ s, i, n: [...terms].filter(t => s.toLowerCase().includes(t)).length }));
+  const best = scored.filter(x => x.n > 0).sort((a, b) => b.n - a.n || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i);
+  return (best.length ? best : scored.slice(0, 2)).map(x => x.s).join(' ');
+}
 
 /** "September 2026" for "2026-09". */
 export const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1] ?? ym} ${ym.slice(0, 4)}`;
@@ -235,6 +245,18 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
   if (agentsLive()) {
     const { liveAnswer } = await import('./live/orchestrator');
     yield* liveAnswer(cast, question);
+    return;
+  }
+
+  // "What is our policy on…", "how do we account for…": quote the house policy (Moss, else local search) instead of a figure.
+  if (/\bpolic(?:y|ies)\b|accounting (?:rule|treatment)|how (?:should|do|does) (?:we|cafoo) (?:account|treat|book|recogni[sz]e|reserve|reconcile)/.test(q)) {
+    const hits = await searchPolicies(question, 2);
+    if (!hits.length) {
+      yield 'No house policy covers that. The policies cover accruals, bank reconciliation, revenue recognition, credit and allowances, consolidation, and materiality.';
+      return;
+    }
+    for (const h of hits) yield `From the ${h.id.replace(/-/g, ' ')} policy: ${policyExcerpt(h.text, question)} `;
+    yield 'The Red Team checks every Proposal against these same policies before the Advisor rules.';
     return;
   }
 

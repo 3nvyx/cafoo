@@ -6,7 +6,7 @@
 import type { CharterLine, ProposalKind, Rule, RuleContext, ToolCall, Verdict } from './types';
 
 // Tool names, exactly as apps/agents/src/live/tools.ts and packages/crs-mcp register them.
-export const BOOKS_TOOLS = ['close_snapshot', 'list_proposals', 'score_bank_matches', 'detect_missing_accruals', 'build_revenue_schedule', 'allowance_target'] as const;
+export const BOOKS_TOOLS = ['search_policies', 'close_snapshot', 'list_proposals', 'score_bank_matches', 'detect_missing_accruals', 'build_revenue_schedule', 'allowance_target'] as const;
 export const ADVISOR_TOOLS = ['approve_proposal', 'reject_proposal', 'post_ruling', 'update_close_task', 'request_period_lock'] as const;
 export const CRS_TOOLS = ['crs_personas', 'crs_credit_report', 'crs_identity_verify', 'crs_fraud_score', 'crs_public_records', 'crs_cascade'] as const;
 /** Red Team tools in redteam.ts (Vercel AI SDK, no MCP prefix). */
