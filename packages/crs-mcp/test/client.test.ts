@@ -29,6 +29,20 @@ describe('mode', () => {
     expect(resolveMode({ CRS_USERNAME: 'u', CRS_REPLAY: '' })).toBe('live');
   });
 
+  it('replays whenever DEMO_MODE=1 forces demo, even with credentials and CRS_REPLAY unset', () => {
+    // The gateway reports CRS as demo under DEMO_MODE=1, so the client must never log in to the sandbox then.
+    expect(resolveMode({ CRS_USERNAME: 'u', CRS_REPLAY: '', DEMO_MODE: '1' })).toBe('replay');
+    expect(resolveMode({ CRS_USERNAME: 'u', DEMO_MODE: '0' })).toBe('live');
+  });
+
+  it('a client built under DEMO_MODE=1 never touches the network', async () => {
+    const { f, calls } = fakeFetch(() => json(500, {}));
+    const c = new CrsClient({ username: 'u', password: 'p', fetch: f, env: { DEMO_MODE: '1', CRS_REPLAY: '' } });
+    expect(c.mode).toBe('replay');
+    await c.call(req);
+    expect(calls.length).toBe(0);
+  });
+
   it('replay never touches the network', async () => {
     const { f, calls } = fakeFetch(() => json(500, {}));
     const c = new CrsClient({ mode: 'replay', fetch: f });

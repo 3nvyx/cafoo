@@ -25,8 +25,10 @@ export interface CrsFixture {
 }
 
 export interface CrsClientOptions {
-  /** Force a mode. Default: replay when CRS_USERNAME is empty or CRS_REPLAY=1, else live. */
+  /** Force a mode. Default: replay when CRS_USERNAME is empty, CRS_REPLAY=1 or DEMO_MODE=1, else live. */
   mode?: CrsMode;
+  /** The environment to read settings from (default process.env). */
+  env?: NodeJS.ProcessEnv;
   username?: string;
   password?: string;
   baseUrl?: string;
@@ -93,10 +95,14 @@ export function __resetLoginStateForTests(): void {
   loginStates.clear();
 }
 
-/** Resolve the mode from env the same way the client does. */
+/**
+ * Resolve the mode from env the same way the client does. DEMO_MODE=1 forces replay, as it forces every provider's
+ * stand-in (the gateway then reports CRS as demo), so a demo run never logs in to the sandbox, whose account locks after
+ * repeated failed logins.
+ */
 export function resolveMode(env: NodeJS.ProcessEnv = process.env): CrsMode {
   const user = (env.CRS_USERNAME ?? '').trim();
-  if (!user || env.CRS_REPLAY === '1' || env.CRS_REPLAY === 'true') return 'replay';
+  if (!user || env.DEMO_MODE === '1' || env.CRS_REPLAY === '1' || env.CRS_REPLAY === 'true') return 'replay';
   return 'live';
 }
 
@@ -144,7 +150,7 @@ export class CrsClient {
   private readonly log: (msg: string) => void;
 
   constructor(opts: CrsClientOptions = {}) {
-    const env = process.env;
+    const env = opts.env ?? process.env;
     this.username = opts.username ?? (env.CRS_USERNAME ?? '').trim();
     this.password = opts.password ?? env.CRS_PASSWORD ?? '';
     this.baseUrl = (opts.baseUrl ?? (env.CRS_BASE_URL || DEFAULT_BASE_URL)).replace(/\/+$/, '');
