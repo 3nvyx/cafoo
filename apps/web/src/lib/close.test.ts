@@ -37,4 +37,17 @@ describe('CFO close readiness', () => {
 		db.bankRows[0].amountMinor = '6000';
 		expect(lockGate(db, '2026-09').canLock).toBe(false);
 	});
+
+	it('lets the CFO lock an open month once the exceptions are accepted, though the bank task stays in progress', () => {
+		const db = books();
+		const open = { ...db, periods: () => [{ ...db.periods()[0], status: 'open' as const }], closeTasks: () => [{ ...db.closeTasks()[0], status: 'in_progress' as const }] };
+		expect(lockGate(open, '2026-09').canLock).toBe(false);
+		const snapshot = bankExceptionState(open, '2026-09').snapshot;
+		db.events.push({
+			id: 'ae1', actorRole: 'cfo', action: 'accept_bank_exceptions', targetTable: 'period', targetId: '1',
+			detailJson: JSON.stringify({ periodYm: '2026-09', snapshot, reasonPlain: 'Research the remittance next month.' }), at: '2026-10-24T00:00:00.000Z'
+		});
+		const gate = lockGate(open, '2026-09');
+		expect(gate).toMatchObject({ canLock: true, pendingTasks: 0, blocker: '' });
+	});
 });

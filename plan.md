@@ -23,7 +23,7 @@ Pricing is a platform fee plus per-page usage.
 - Stage: Series A, $50M post-money, closed March 2026, $12M raised. About $4.8M ARR, growing about 3x a year.
 - People: 62 (48 in the US, 14 in the UK). Cash about $11M. Runway about 24 months.
 - Group: Quillmesh Inc (USD, parent), Quillmesh Ltd (GBP), Elimination.
-- Customers, about 300: about 220 self-serve (card, booked monthly through the billing sync), 65 mid-market ($18k to $40k a year), 15 enterprise ($90k to $190k a year, net-60). The 80 contract customers carry about $4.75M of ARR.
+- Customers: 80 on annual contracts, 65 mid-market ($18k to $40k a year) and 15 enterprise ($90k to $190k a year, net-60), carrying about $4.75M of ARR, plus the test fixture's customers (103 customer records in all). Self-serve card customers are not individual records: their subscriptions and per-page usage post as one billing-sync entry a month. Say "80 contract customers plus self-serve", never "300 customers".
 - Vendors: GPU cloud, a model API, payroll provider, SaaS tools, contractors.
 - Finance team of 3: CFO, controller, AP/AR clerk. Daily bank feed, a two-day close, Board Pack and cap table for investors, credit checks on the owners behind self-serve and mid-market customers and on new vendors.
 - History: 18 months, April 2025 to September 2026. September 2026 is the month the demo closes.
