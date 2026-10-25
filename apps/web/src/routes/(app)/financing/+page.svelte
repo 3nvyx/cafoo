@@ -11,6 +11,7 @@
 	import UploadDemo from '#lib/components/UploadDemo.svelte';
 	import { KIND, STATUS, shortDate, type Tone } from '#lib/labels.js';
 	import CapTable from './CapTable.svelte';
+	import CapTableTools from './CapTableTools.svelte';
 
 	const COMMITMENT: Record<Commitment['status'], { label: string; tone: Tone }> = {
 		committed: { label: 'Committed', tone: 'muted' },
@@ -112,6 +113,38 @@
 		];
 	});
 
+	// Every round in order, oldest first, with what arrived and the instruments it used.
+	const timeline = $derived(
+		[...db.fundingRounds()]
+			.sort((a, b) => a.openedAt.localeCompare(b.openedAt))
+			.map((r) => {
+				const cs = db.commitments().filter((c) => c.roundId === r.id && c.status !== 'withdrawn');
+				const kinds = [...new Set(db.instruments().filter((i) => i.roundId === r.id).map((i) => INSTRUMENT_KIND[i.kind]))];
+				return {
+					r,
+					received: cs.reduce((t, c) => t + usd(c.receivedMinor, c.ccy), 0n),
+					investorCount: new Set(cs.map((c) => c.investorId)).size,
+					kinds,
+					postMinor: r.preMoneyMinor ? toBig(r.preMoneyMinor) + toBig(r.targetMinor) : null
+				};
+			})
+	);
+
+	// Investors across every round: what each committed and what arrived.
+	const investorTotals = $derived.by(() => {
+		const out = new Map<string, { id: string; committed: bigint; received: bigint; rounds: string[] }>();
+		for (const c of db.commitments()) {
+			if (c.status === 'withdrawn') continue;
+			const t = out.get(c.investorId) ?? { id: c.investorId, committed: 0n, received: 0n, rounds: [] };
+			t.committed += usd(c.amountMinor, c.ccy);
+			t.received += usd(c.receivedMinor, c.ccy);
+			if (!t.rounds.includes(c.roundId)) t.rounds.push(c.roundId);
+			out.set(c.investorId, t);
+		}
+		return [...out.values()].sort((a, b) => (b.committed > a.committed ? 1 : b.committed < a.committed ? -1 : 0));
+	});
+	const roundName = (id: string) => db.fundingRounds().find((r) => r.id === id)?.name ?? id;
+
 	const proposals = $derived(
 		db
 			.proposals()
@@ -134,6 +167,33 @@
 	they sit with liabilities; shares sold sit in equity. Only interest on notes, changes in a SAFE's fair value and the cost of
 	issuing SAFEs reach the profit and loss.
 </Notice>
+
+{#if timeline.length === 0}
+	<div class="card mt-6 flex flex-col gap-1 p-5">
+		<p class="font-medium">No rounds yet</p>
+		<p class="max-w-prose text-body-sm text-ink-2">Upload a term sheet, SAFE or closing tracker below and the Funding desk builds the round, its investors and the instrument register from it.</p>
+	</div>
+{:else}
+	<section aria-labelledby="timeline-h" class="mt-6 flex flex-col gap-3">
+		<h2 id="timeline-h" class="text-title">Rounds</h2>
+		<ol class="flex flex-col border-l border-line">
+			{#each timeline as t (t.r.id)}
+				<li class="relative flex flex-col gap-1 py-2 pl-5">
+					<span class="absolute top-4 -left-1 h-2 w-2 rounded-full {t.r.status === 'closed' ? 'bg-ink-2' : t.r.status === 'open' ? 'bg-accent' : 'bg-line-strong'}" aria-hidden="true"></span>
+					<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+						<button class="drill font-medium" onclick={() => (picked = t.r.id)}>{t.r.name}</button>
+						<span class="text-caption text-ink-3">{shortDate(t.r.closedAt ?? t.r.openedAt)} {(t.r.closedAt ?? t.r.openedAt).slice(0, 4)}</span>
+						<Pill tone={t.r.status === 'open' ? 'neutral' : t.r.status === 'closed' ? 'pos' : 'muted'}>{t.r.status === 'open' ? 'Open' : t.r.status === 'closed' ? 'Closed' : 'Planned'}</Pill>
+						<span class="ml-auto num text-body-sm">{money(t.received)} <span class="text-ink-3">of {money(t.r.targetMinor, t.r.ccy)}</span></span>
+					</div>
+					<p class="text-caption text-ink-3">
+						{t.kinds.length ? t.kinds.join(', ') : 'No instruments yet'}{t.investorCount ? ` · ${t.investorCount} investor${t.investorCount === 1 ? '' : 's'}` : ''}{t.r.leadInvestorId ? ` · led by ${investorName(t.r.leadInvestorId)}` : ''}{t.r.preMoneyMinor ? ` · ${money(t.r.preMoneyMinor)} pre-money` : ''}{t.postMinor !== null ? `, ${money(t.postMinor)} post` : ''}{t.r.pricePerShareE4 ? ` · ${formatPriceE4(t.r.pricePerShareE4)} a share` : ''}
+					</p>
+				</li>
+			{/each}
+		</ol>
+	</section>
+{/if}
 
 {#if rounds.length > 1}
 	<div class="mt-6 flex flex-wrap gap-2" role="group" aria-label="Round">
@@ -263,7 +323,28 @@
 	</ul>
 </section>
 
+{#if investorTotals.length}
+	<section aria-labelledby="inv-h" class="mt-10 flex flex-col gap-3">
+		<div class="flex flex-col gap-1">
+			<h2 id="inv-h" class="text-title">Investors</h2>
+			<p class="max-w-prose text-body-sm text-ink-2">Everyone who has committed money, every round together, largest first.</p>
+		</div>
+		<ul class="border-t border-line">
+			{#each investorTotals as t (t.id)}
+				{@const inv = investors.get(t.id)}
+				<li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line py-2">
+					<span class="font-medium">{inv?.name ?? t.id}</span>
+					<span class="text-caption text-ink-3">{inv ? INVESTOR_KIND[inv.kind] : ''}{inv?.country ? ` · ${inv.country}` : ''} · {t.rounds.map(roundName).join(', ')}</span>
+					<span class="ml-auto num text-body-sm">{money(t.received)} <span class="text-ink-3">of {money(t.committed)}</span></span>
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
+
 <div class="mt-10"><CapTable /></div>
+
+<div class="mt-10"><CapTableTools /></div>
 
 {#if proposals.length}
 	<section aria-labelledby="props-h" class="mt-10 flex flex-col gap-3">
