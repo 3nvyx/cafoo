@@ -1,5 +1,8 @@
 // App-wide view state: the theme, the selected Period, nav and palette.
 // Persisted bits go through localStorage, always wrapped: storage can be blocked.
+import { MediaQuery } from 'svelte/reactivity';
+
+const prefersDark = new MediaQuery('prefers-color-scheme: dark', false);
 
 /** 'system' follows the device; 'light' and 'dark' pin one. app.html applies a pinned theme before first paint. */
 export type Theme = 'system' | 'light' | 'dark';
@@ -36,11 +39,20 @@ class UiState {
 		if (t === 'light' || t === 'dark') this.theme = t;
 	}
 
+	/** The theme on screen: the pinned one, or the device's while following the system. */
+	get resolvedTheme(): 'light' | 'dark' {
+		if (this.theme !== 'system') return this.theme;
+		return prefersDark.current ? 'dark' : 'light';
+	}
+
 	setTheme(t: Theme) {
 		this.theme = t;
 		write(KEY_THEME, t);
-		if (t === 'system') delete document.documentElement.dataset.theme;
-		else document.documentElement.dataset.theme = t;
+		const root = document.documentElement;
+		root.classList.add('theme-switching');
+		if (t === 'system') delete root.dataset.theme;
+		else root.dataset.theme = t;
+		requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
 	}
 
 	toggleNav() {

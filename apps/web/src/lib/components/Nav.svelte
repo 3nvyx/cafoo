@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The dashboard sidebar: brand, Search and the collapse toggle on top, then the month every page shows,
+	// The dashboard sidebar: brand, Search, the light/dark switch and the collapse toggle on top, then the month every page shows,
 	// grouped destinations that can fold away, and the CFO profile pinned to the bottom.
 	// Collapsed to icons, the top holds one button, so Search becomes a row and the month picker a button that expands.
 	import { page } from '$app/state';
@@ -8,6 +8,7 @@
 	import { ui } from '#lib/ui.svelte.js';
 	import Icon, { type IconName } from './Icon.svelte';
 	import ProfileMenu from './ProfileMenu.svelte';
+	import ThemeToggle from './ThemeToggle.svelte';
 	import Wordmark from './Wordmark.svelte';
 
 	// A row either navigates (href) or runs an action (onclick); both render through the same snippet.
@@ -129,6 +130,7 @@
 				>
 					<Icon name="search" size={18} />
 				</button>
+				<ThemeToggle variant="icon" class="{drawer ? 'w-11' : 'w-10'} px-0 text-ink-3 hover:text-ink" />
 			{/if}
 			{#if drawer}
 				<button class="btn btn-quiet w-11 px-0" aria-label="Close navigation" onclick={() => (ui.navOpenMobile = false)}><Icon name="x" /></button>
