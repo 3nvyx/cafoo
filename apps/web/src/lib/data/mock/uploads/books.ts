@@ -324,7 +324,7 @@ const bills: UploadHandler = {
 					amountMinor: a,
 					periodId,
 					summaryPlain: `Record ${owner('Glasshouse Analytics Tools')} ${money(a)} October software bill as owed.`,
-					rationale: `Bill ${SOFTWARE_BILL.number}, service October 2026 only, same amount as September's GAT-2609.`,
+					rationale: `Bill ${SOFTWARE_BILL.number}, service October 2026 only, same amount as September's GA-INV-30418.`,
 					payload: { billId: SOFTWARE_BILL.id, memo: `Software subscription for October, bill ${SOFTWARE_BILL.number}`, lines: [L('6100', a, '0'), L('2000', '0', a, { vendorId: SOFTWARE_BILL.vendorId })] },
 					body: `${SOFTWARE_BILL.number} Glasshouse Analytics Tools ${money(a).slice(1)}, service 2026-10. Dr 6100 Software and Tools / Cr 2000 Accounts Payable ${money(a).slice(1)}, vendor ${SOFTWARE_BILL.vendorId}.`
 				})

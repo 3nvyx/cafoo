@@ -79,7 +79,7 @@ export const CLOSE_SCRIPT: Step[] = [
 			},
 			taskId: 'ct-1'
 		},
-		body: "bt13 +600.00 'DEPOSIT HARBOR YOGA STUDIO' vs i16 INV-1047 600.00 open, customer c05. Amount exact, payer exact, no reference. scoreBp 9400, bucket strong. Dr 1000 / Cr 1100 600.00.",
+		body: "bt13 +600.00 'DEPOSIT HARBOR YOGA STUDI' vs i16 INV-1047 600.00 open, customer c05. Amount exact, payer exact, no reference. scoreBp 9400, bucket strong. Dr 1000 / Cr 1100 600.00.",
 		summary: "Bookkeeper matched Harbor Yoga Studio's $600 deposit to their September invoice."
 	},
 	{ at: 3000, type: 'activity', role: 'redteam', label: 'Reviewing the Harbor Yoga match', proposalId: 'pr-09' },
