@@ -109,5 +109,5 @@ Live data motion only. Rows appear, statuses change, and totals count when the u
 
 ## Design tokens
 
-The web app's colors, type and shape are defined once, in `apps/web/src/app.css`, which is the source of truth for the theme.
+The web app's colors, type and shape are defined once, as design tokens in `packages/design-tokens` (see `packages/design-tokens/NAMING.md` and ADR 0012); the build writes `packages/design-tokens/css/cafoo-tokens.css`, which `apps/web/src/app.css` consumes. Components use only token classes: no raw colours, no bracketed pixel sizes.
 Numbers are always set in tabular figures.
