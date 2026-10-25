@@ -67,7 +67,7 @@ Update this table when a stream lands on `main`.
 |---|---|---|
 | 1 | In progress | |
 | 2 | Done | 36f150f |
-| 3 | In progress | |
+| 3 | Done | 1312688 |
 | 4 | In progress | |
 | 5 | In progress | |
 | 6 | In progress | |
