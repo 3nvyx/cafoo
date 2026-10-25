@@ -67,7 +67,7 @@
 		"unknown-class": 9
 	},
 	"routes/(app)/proposals/+page.svelte": {
-		"bracket-size": 5,
+		"bracket-size": 4,
 		"unknown-class": 1
 	},
 	"routes/(app)/reports/+page.svelte": {
