@@ -1,3 +1,6 @@
 # The credit cascade is implemented in-house against the sandbox REST API
 
 The credit provider's hosted workflow builder can author screening cascades but exposes no API to execute one, so the Credit & Risk agent runs its own cascade (identity verification, fraud score, three-bureau credit report, public records) against the REST sandbox, stopping early on a deceased or mismatched identity. Login happens once per process with a cached token and is never retried on failure, because repeated failed logins disable the sandbox account permanently.
+
+The module derives each Credit Check's Risk Tier itself with the same pure rules file the agent uses (`packages/crs-mcp/src/tiers.ts`, no imports, I/O or clock), as of the moment of recording, instead of storing a tier the agent states. Evidence that passes identity and fraud must include all three bureaus and the public-records search, or the check is refused.
+The same derived tiers gate vendor blocks: when a vendor's owner is on file, a block holds only if that owner's newest recorded check derives BLOCK. We import the file by relative path rather than copying the rules into the module, so the two can never drift, and rather than adding a workspace dependency, which would pull the package's network code into the module.

@@ -1,5 +1,12 @@
 import type {
 	Account,
+	CharterCatalog,
+	CharterEval,
+	CharterEvalMode,
+	CharterEvalRun,
+	CharterMappingEntry,
+	CharterVersion,
+	FxRate,
 	AgentMessage,
 	Approval,
 	AuditEvent,
@@ -25,7 +32,8 @@ import type {
 	Settings,
 	Subsidiary,
 	TableName,
-	Vendor
+	Vendor,
+	FeedStatus
 } from './types';
 
 export type ChangeKind = 'insert' | 'update' | 'delete';
@@ -37,11 +45,22 @@ export interface ConnectionState {
 	/** Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working. */
 	closes: { periodYm: string; status: 'running' | 'done' }[];
 	message?: string;
-	/**
-	 * Live mode only: whether this browser holds the CFO seat. 'unclaimed' means nobody does and the one-time claim
-	 * link (printed by the seed loader) must be opened in this browser; 'held' means another browser has it.
-	 */
-	cfoSeat?: 'mine' | 'unclaimed' | 'held' | 'unknown';
+	/** The live feed, as the agent gateway last reported it (undefined until it has). */
+	feed?: FeedStatus;
+}
+
+/**
+ * Who holds the CFO seat, as this browser sees it. The ledger module is the authority: it refuses every CFO action
+ * from a connection that does not hold the seat. This only tells the UI what to show.
+ * - 'you': this browser holds the seat.
+ * - 'other': someone holds it, but not this browser, so it is read-only.
+ * - 'unclaimed': nobody holds it yet; the claim link seats whoever opens it.
+ * - 'checking': still connecting to the ledger.
+ */
+export interface CfoSeat {
+	status: 'you' | 'other' | 'unclaimed' | 'checking';
+	/** The display name the seat holder claimed it with, when someone holds it. */
+	holderName?: string;
 }
 
 export interface ChangeEvent<T = unknown> {
@@ -86,6 +105,12 @@ export interface DataSource {
 	/** Every public footprint fetch, all subjects and sources, in fetch order. */
 	publicFootprints(): PublicFootprint[];
 	settings(): Settings;
+	/** Recorded FX rates (spot, average, closing) per currency pair and month. */
+	fxRates(): FxRate[];
+	/** Every Charter version of every agent: drafts, the live one per role, and retired ones. */
+	charterVersions(): CharterVersion[];
+	/** Every recorded Charter eval. */
+	charterEvals(): CharterEval[];
 	providers(): ProviderStatus[];
 	/** What an agent is doing right now, or null when idle. */
 	liveActivity(): LiveActivity | null;
@@ -93,11 +118,19 @@ export interface DataSource {
 	now(): string;
 	/** Whether the ledger and the agents are reachable. */
 	connection(): ConnectionState;
+	/** Whether this browser holds the CFO seat. Demo mode: always 'you'. */
+	cfoSeat(): CfoSeat;
 
 	/** Called after every row change on `table`. Returns an unsubscribe function. */
 	subscribe(table: TableName, cb: (event: ChangeEvent) => void): () => void;
 
 	// Actions
+	/**
+	 * Claim the empty CFO seat for this browser with the one-time Bootstrap secret from the claim link. The module
+	 * refuses a wrong, expired or used secret, and any claim once the seat is held. Demo mode: the viewer is already
+	 * the CFO, so this refuses.
+	 */
+	claimCfo(secret: string, displayName: string): Promise<void>;
 	/** Kick off the month-end close: agents start proposing and debating. */
 	startClose(periodId: string): Promise<void>;
 	/** CFO confirms an Advisor ruling that is above the Materiality threshold. */
@@ -110,11 +143,28 @@ export interface DataSource {
 	 */
 	cfoReverse(jeId: string, reasonPlain: string): Promise<void>;
 	setMateriality(minor: Minor): Promise<void>;
+	/** CFO switches the live feed on or off. It books only into the open month after one the CFO locked. */
+	setFeedEnabled(enabled: boolean): Promise<void>;
 	setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void>;
 	/** CFO locks the Period. The Board Pack becomes final. */
 	lockPeriod(periodId: string): Promise<void>;
 	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */
 	unlockPeriod(periodId: string, reasonPlain: string): Promise<void>;
+	/** What a charter line can map to (rule templates, eval scenarios) and each agent's Built-in Charter. */
+	charterCatalog(): Promise<CharterCatalog>;
+	/** Save an edited Charter as a new draft version. A draft changes nothing until the CFO publishes it. */
+	saveCharterDraft(draft: { role: string; bodyMd: string; mapping: CharterMappingEntry[]; summaryPlain: string; basedOnVersionId?: string }): Promise<void>;
+	/**
+	 * Start an eval of a saved version: the full eval ('dry_run', a whole close on a scratch database) or the quick
+	 * check ('snapshot', against the recorded close). The result arrives as a Charter eval row.
+	 */
+	startCharterEval(versionId: string, mode: CharterEvalMode): Promise<CharterEvalRun>;
+	/** The eval runner's progress for a version ('idle' when none is running or ran for it since the gateway started). */
+	charterEvalRun(versionId: string): Promise<CharterEvalRun>;
+	/** CFO publishes a version; refused unless its latest eval is a passing full eval. The previous live one retires. */
+	publishCharter(versionId: string, notePlain: string): Promise<void>;
+	/** CFO retires a role's live Charter; the Built-in Charter applies again. */
+	retireLiveCharter(role: string, notePlain: string): Promise<void>;
 	/**
 	 * Ask the agents to look the business up on the public web (one fetch per listing on file). Resolves once the job
 	 * is accepted; results arrive later as new `publicFootprints()` rows. Throws a plain-English error if the agents are
@@ -125,6 +175,4 @@ export interface DataSource {
 	setListings(subjectKind: FootprintSubject, subjectId: string, listings: Listings): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
-	/** Live mode only: take the CFO seat with the one-time bootstrap secret from the claim link. */
-	claimCfo?(secret: string): Promise<void>;
 }

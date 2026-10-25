@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { request, type Server } from 'node:http';
 import { createGateway, isLoopback, MAX_BODY_BYTES, taskReply, textOf, type GatewayOptions } from '../src/gateway';
 import type { Cast } from '../src/stdb';
+import { gatewayHost } from '../src/env';
 import { BadRequest, json, readJson, type Route } from '../src/http';
 
 let server: Server | undefined;
@@ -146,10 +147,7 @@ describe('starting a close from another machine', () => {
   it('is refused without a configured key, whatever the Host header says', async () => {
     const { base, runClose } = await gateway(remote);
     expect((await closeReq(base, { host: 'localhost' })).status).toBe(403);
-    expect(await reply(await chat(base, 'start the close'))).toBe('close: failed');
     expect(runClose).not.toHaveBeenCalled();
-    // Questions from Docker Open WebUI still work.
-    expect(await reply(await chat(base, 'Give me an overview'))).toBe('answer: Give me an overview');
   });
   it('needs the bearer key when one is configured', async () => {
     const { base, runClose } = await gateway({ ...remote, env: { GATEWAY_API_KEY: 'sekret' } });
@@ -161,6 +159,36 @@ describe('starting a close from another machine', () => {
   it('needs no key from this machine, as the web app and curl on the host connect', async () => {
     const { base } = await gateway({ env: { GATEWAY_API_KEY: 'sekret' } });
     expect((await closeReq(base)).status).toBe(202);
+  });
+});
+
+describe('the OpenAI-compatible endpoint (/v1/*) from another machine', () => {
+  const remote = { isLocal: () => false };
+  it('listens on 127.0.0.1 unless GATEWAY_HOST opts in to another interface', () => {
+    expect(gatewayHost({})).toBe('127.0.0.1');
+    expect(gatewayHost({ GATEWAY_HOST: '  ' })).toBe('127.0.0.1');
+    expect(gatewayHost({ GATEWAY_HOST: ' 0.0.0.0 ' })).toBe('0.0.0.0');
+  });
+  it('is refused without a configured key, so the Advisor never reads the books or spends budget for a stranger', async () => {
+    const { base, runClose, answer } = await gateway(remote);
+    expect((await fetch(`${base}/v1/models`, { headers: { host: 'localhost' } })).status).toBe(403);
+    const r = await chat(base, 'Give me an overview');
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: { message: string } }).error.message).toMatch(/GATEWAY_API_KEY/);
+    expect((await chat(base, 'start the close', { stream: true })).status).toBe(403);
+    expect(answer).not.toHaveBeenCalled();
+    expect(runClose).not.toHaveBeenCalled();
+  });
+  it('answers with the bearer key when one is configured', async () => {
+    const { base, answer } = await gateway({ ...remote, env: { GATEWAY_API_KEY: 'sekret' } });
+    expect((await chat(base, 'Give me an overview')).status).toBe(401);
+    expect(await reply(await chat(base, 'Give me an overview', {}, { authorization: 'Bearer sekret' }))).toBe('answer: Give me an overview');
+    expect(answer).toHaveBeenCalledTimes(1);
+  });
+  it('needs no key from this machine when none is configured', async () => {
+    const { base } = await gateway();
+    expect((await fetch(`${base}/v1/models`)).status).toBe(200);
+    expect(await reply(await chat(base, 'Give me an overview'))).toBe('answer: Give me an overview');
   });
 });
 

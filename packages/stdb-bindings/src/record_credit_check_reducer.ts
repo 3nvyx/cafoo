@@ -17,6 +17,4 @@ export default {
   product: __t.string(),
   requestId: __t.string(),
   summaryJson: __t.string(),
-  tier: __t.string(),
-  decision: __t.string(),
 };

@@ -1,5 +1,6 @@
 // Pure functions: raw CRS response bodies -> normalized facts. No I/O, no clock unless passed in.
 import type { Bureau } from './csv.js';
+import { fraudLevel } from './tiers.js';
 
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -199,13 +200,8 @@ export interface FraudFacts {
   signals: string[];
 }
 
-/** risk.score 0-100: <=30 low, 31-69 medium, >=70 high (AtData suggests a 70-80 cut-off). */
-export function fraudLevel(score: number | null): FraudFacts['level'] {
-  if (score == null) return 'medium';
-  if (score >= 70) return 'high';
-  if (score > 30) return 'medium';
-  return 'low';
-}
+// risk.score 0-100 -> level lives with the tier rules, which re-check it on recorded evidence.
+export { fraudLevel };
 
 export function interpretFraud(body: unknown, asOf?: Date): FraudFacts {
   const b = isObj(body) ? body : {};

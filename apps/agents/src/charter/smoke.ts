@@ -15,10 +15,11 @@
  * Usage: pnpm -F @cafoo/agents smoke:charter   (CHARTER_SMOKE_DB=..., CHARTER_EVAL_DB=..., CLOSE_PERIOD=2026-09)
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { closePeriod } from '../close-period';
 
 const smokeDb = process.env.CHARTER_SMOKE_DB?.trim() || 'cafoo-charter-smoke';
 const evalDb = process.env.CHARTER_EVAL_DB?.trim() || 'cafoo-eval';
-const ym = process.env.CLOSE_PERIOD?.trim() || '2026-09';
+const ym = closePeriod();
 if (smokeDb === evalDb || smokeDb === 'cafoo' || evalDb === 'cafoo') {
   console.error(`[smoke:charter] refusing to reset ${smokeDb === evalDb ? `one database for both roles (${smokeDb})` : 'the default database cafoo'}; set CHARTER_SMOKE_DB and CHARTER_EVAL_DB to two scratch databases`);
   process.exit(2);

@@ -1,6 +1,6 @@
 # @cafoo/crs-mcp
 
-Updated 2026-10-24. Agent-facing: keep one rule per line, imperative, no filler. Change the tier rules here and in `src/cascade.ts` (`POLICY`, `classify`) together.
+Updated 2026-10-24. Agent-facing: keep one rule per line, imperative, no filler. Change the tier rules here and in `src/tiers.ts` (`POLICY`, `classify`) together.
 
 CRS Credit API sandbox client, response interpreters, the Credit Check cascade (ADR 0006), and the in-process `crs` MCP server for the Credit & Risk agent.
 
@@ -35,6 +35,9 @@ Every response keeps `headers.requestId` (the `RequestID` header; fixtures use `
 `creditReport`, `identityVerify`, `fraudScore`, `publicRecords` call one product and return `{ facts, evidence, raw }` (`src/products.ts`).
 `runCascade(client, personaId, { subjectKind, asOf? })` returns `{ personaId, tier, decision, paymentTermsDays, evidence[], reasons[], allowanceReasonCodes[], summaryPlain, summaryTechnical, stoppedEarly, facts }`.
 `classify(...)` is the pure tier function; use it to re-tier stored facts without calling CRS.
+`src/tiers.ts` holds the tier rules (`POLICY`, `classify`, `gateReasons`, `fraudLevel`, `deriveTier`) with no imports, I/O or clock; the SpacetimeDB module imports it, so keep it to ES2021.
+`deriveTier(facts, asOf)` checks untrusted recorded facts (shape, consistency, completeness) and returns `{ tier, decision, paymentTermsDays, reasons }`, or throws an Error naming the bad field.
+`creditCheckSummaryJson(result, evidence)` is the `summaryJson` of one recorded Credit Check row: the evidence row plus `facts`; pass it to `recordCreditCheck` unchanged.
 `allowanceReasonCodes` on the cascade result holds the ledger allowance codes (`active_bankruptcy`, `fraud_alert`, `identity_mismatch`, `judgment_or_lien`, `deceased_guarantor`) for BLOCK and D tiers only; pass them to the allowance Proposal unchanged.
 Mapping in `ALLOWANCE_CODE`: `synthetic_identity` -> `identity_mismatch`; `fraud_high` and `identity_step_up` -> `fraud_alert`. `sanctions_match` is never emitted (no OFAC search runs).
 
@@ -71,6 +74,9 @@ Reasons are grouped; the first group present decides tier and decision.
 Fraud levels: <= 30 low, 31-69 medium, >= 70 high.
 Dismissed criminal charges and dismissed evictions are ignored; undated records count as recent.
 Lookbacks use `asOf` (default now); pass a fixed `asOf` in tests and demo replays.
+Record dates are read as UTC calendar days (`YYYY-MM-DD`, `MM-DD-YYYY`, `MM/DD/YYYY`); any other text counts as recent.
+The ledger never takes a tier from the agent: `recordCreditCheck` derives each row's tier and decision from `summaryJson.facts` with `deriveTier`, as of the moment of recording.
+`deriveTier` refuses evidence that passes identity and fraud but lacks a bureau or the public-records search, because missing evidence must never read as clean credit.
 `subjectKind: 'vendor_owner'` changes only the plain summary wording (onboarding instead of payment terms); tier and terms are the same.
 
 ## Persona results (replay, asOf 2026-10-24)

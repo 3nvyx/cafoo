@@ -2,7 +2,7 @@
 // Every table is mirrored into `$state` arrays of UI rows; reducer calls are
 // the CFO's actions. Starting a close goes to the agent gateway over HTTP.
 import { DbConnection } from '../../module_bindings';
-import type { ChangeEvent, ConnectionState, DataSource } from '../source';
+import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
 import type * as U from '../types';
 import * as M from './map';
 
@@ -36,7 +36,10 @@ const ACCESSORS = {
 	creditCheck: 'credit_check',
 	auditEvent: 'audit_event',
 	publicFootprint: 'public_footprint',
-	settings: 'settings'
+	settings: 'settings',
+	fxRate: 'fx_rate',
+	charterVersion: 'charter_version',
+	charterEval: 'charter_eval'
 } as const satisfies Record<string, U.TableName>;
 
 type Accessor = keyof typeof ACCESSORS;
@@ -62,6 +65,9 @@ interface Mirror {
 	audit_event: U.AuditEvent[];
 	public_footprint: U.PublicFootprint[];
 	settings: U.Settings;
+	fx_rate: U.FxRate[];
+	charter_version: U.CharterVersion[];
+	charter_eval: U.CharterEval[];
 }
 
 const empty = (): Mirror => ({
@@ -84,7 +90,10 @@ const empty = (): Mirror => ({
 	credit_check: [],
 	audit_event: [],
 	public_footprint: [],
-	settings: { materialityThresholdMinor: '1000000' }
+	settings: { materialityThresholdMinor: '1000000', reportingCcy: 'USD', feedEnabled: false },
+	fx_rate: [],
+	charter_version: [],
+	charter_eval: []
 });
 
 function readToken(): string | undefined {
@@ -95,11 +104,13 @@ function readToken(): string | undefined {
 	}
 }
 
-function saveToken(token: string) {
+function saveToken(token: string): boolean {
 	try {
 		localStorage.setItem(TOKEN_KEY, token);
+		return localStorage.getItem(TOKEN_KEY) === token;
 	} catch {
-		/* storage blocked: a new identity next visit, which is fine for the CFO seat */
+		/* storage blocked: a new identity next visit, so a claimed CFO seat would not survive a reload */
+		return false;
 	}
 }
 
@@ -115,6 +126,8 @@ export class SpacetimeDataSource implements DataSource {
 
 	#t: Mirror = $state(empty());
 	#conn: ConnectionState = $state({ ledger: 'connecting', agents: 'unknown', closes: [] });
+	#seat: CfoSeat = $state({ status: 'checking' });
+	#tokenSaved = false;
 	#gatewayProviders: U.ProviderStatus[] = $state([]);
 	#poll: ReturnType<typeof setTimeout> | null = null;
 	#db: DbConnection | null = null;
@@ -152,9 +165,13 @@ export class SpacetimeDataSource implements DataSource {
 	auditEvents = () => this.#t.audit_event;
 	publicFootprints = () => this.#t.public_footprint;
 	settings = () => this.#t.settings;
+	fxRates = () => this.#t.fx_rate;
+	charterVersions = () => this.#t.charter_version;
+	charterEvals = () => this.#t.charter_eval;
 	liveActivity = () => null;
 	now = () => new Date().toISOString();
 	connection = () => this.#conn;
+	cfoSeat = () => this.#seat;
 	providers = (): U.ProviderStatus[] => [
 		{ id: 'ledger', name: 'Ledger database', purpose: 'Books, Proposals and the agent message bus', mode: 'live', detail: `${this.#cfg.uri} / ${this.#cfg.database} (${this.#conn.ledger})` },
 		{ id: 'agents', name: 'Agent gateway', purpose: 'Starts the close; runs the worker agents, Red Team and Advisor', mode: 'live', detail: `${this.#cfg.gateway} (${this.#conn.agents})` },
@@ -169,6 +186,22 @@ export class SpacetimeDataSource implements DataSource {
 	}
 
 	// Actions
+	async claimCfo(secret: string, displayName: string): Promise<void> {
+		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
+		// The seat belongs to this connection's identity, which lives in the saved token. If the token cannot be kept,
+		// the seat would be lost on the next reload and the one-time secret would be used up for nothing.
+		if (!this.#tokenSaved) {
+			throw new Error('This browser is blocking site storage, so it cannot keep the CFO seat after a reload. Allow storage for this site (or leave private browsing), then open the claim link again.');
+		}
+		try {
+			await this.#db.reducers.claimCfo({ secret: secret.trim(), displayName: displayName.trim() || 'CFO' });
+		} catch (err) {
+			throw plain(err, 'Could not claim the CFO seat.');
+		}
+		// my_agent_identity now shows this connection as the CFO; its update refreshes the seat as well.
+		this.#seatFrom(this.#db);
+	}
+
 	async startClose(periodId: string): Promise<void> {
 		let res: Response;
 		try {
@@ -202,6 +235,12 @@ export class SpacetimeDataSource implements DataSource {
 		await this.#call('Could not reverse this Journal Entry.', (c) => c.reducers.cfoReverse({ jeId: BigInt(jeId), reasonPlain }));
 	}
 
+	async setFeedEnabled(enabled: boolean): Promise<void> {
+		await this.#call(enabled ? 'Could not switch the live feed on.' : 'Could not switch the live feed off.', (c) => c.reducers.setFeedEnabled({ enabled }));
+		// The gateway's feeder notices the setting on its own; ask it straight away so the status line follows.
+		void this.#pollStatus();
+	}
+
 	async setMateriality(minor: U.Minor): Promise<void> {
 		await this.#call('Could not change the Materiality threshold.', (c) => c.reducers.setMateriality({ thresholdMinor: BigInt(minor) }));
 	}
@@ -216,6 +255,73 @@ export class SpacetimeDataSource implements DataSource {
 
 	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
 		await this.#call('Could not unlock this Period.', (c) => c.reducers.unlockPeriod({ periodYm: periodId, rationale: reasonPlain }));
+	}
+
+	// Charters: versions, publishing and retiring are module reducers; the catalog and the eval runner live on the gateway.
+	async charterCatalog(): Promise<U.CharterCatalog> {
+		return (await this.#gateway('GET', '/charters/catalog', 'Could not load the charter catalog from the agent gateway.')) as U.CharterCatalog;
+	}
+
+	async saveCharterDraft(d: { role: string; bodyMd: string; mapping: U.CharterMappingEntry[]; summaryPlain: string; basedOnVersionId?: string }): Promise<void> {
+		await this.#call('Could not save this Charter draft.', (c) =>
+			c.reducers.saveCharterDraft({
+				role: d.role,
+				bodyMd: d.bodyMd,
+				mappingJson: JSON.stringify(d.mapping),
+				summaryPlain: d.summaryPlain,
+				basedOnVersionId: d.basedOnVersionId ? BigInt(d.basedOnVersionId) : undefined
+			})
+		);
+	}
+
+	async startCharterEval(versionId: string, mode: U.CharterEvalMode): Promise<U.CharterEvalRun> {
+		this.#readOnlyCheck();
+		return (await this.#gateway('POST', `/charters/${encodeURIComponent(versionId)}/eval`, 'The agent gateway could not start the eval.', { mode })) as U.CharterEvalRun;
+	}
+
+	async charterEvalRun(versionId: string): Promise<U.CharterEvalRun> {
+		return (await this.#gateway('GET', `/charters/${encodeURIComponent(versionId)}/eval`, 'Could not read the eval status from the agent gateway.')) as U.CharterEvalRun;
+	}
+
+	async publishCharter(versionId: string, notePlain: string): Promise<void> {
+		await this.#call('Could not publish this Charter version.', (c) => c.reducers.publishCharter({ charterVersionId: BigInt(versionId), notePlain }));
+	}
+
+	async retireLiveCharter(role: string, notePlain: string): Promise<void> {
+		await this.#call('Could not restore the built-in Charter.', (c) => c.reducers.retireLiveCharter({ role, notePlain }));
+	}
+
+	/** One gateway request; its JSON error (or text) becomes the thrown message. */
+	async #gateway(method: 'GET' | 'POST', path: string, fallback: string, body?: unknown): Promise<unknown> {
+		let res: Response;
+		try {
+			res = await fetch(`${this.#cfg.gateway}${path}`, {
+				method,
+				...(method === 'POST' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) } : {})
+			});
+		} catch {
+			this.#conn.agents = 'offline';
+			throw new Error('The agents are offline. Start the agent gateway, then try again.');
+		}
+		this.#conn.agents = 'online';
+		const text = await res.text().catch(() => '');
+		let parsed: unknown;
+		try {
+			parsed = text ? JSON.parse(text) : {};
+		} catch {
+			parsed = undefined;
+		}
+		if (!res.ok) {
+			const err = parsed && typeof parsed === 'object' && 'error' in parsed ? String((parsed as { error: unknown }).error) : text;
+			throw new Error(err ? `${fallback} ${err.charAt(0).toUpperCase()}${err.slice(1)}.` : `${fallback} (${res.status})`);
+		}
+		if (parsed === undefined) throw new Error(fallback);
+		return parsed;
+	}
+
+	#readOnlyCheck() {
+		if (this.#seat.status === 'unclaimed') throw new Error('This browser is read-only: nobody has claimed the CFO seat yet. Open your claim link to claim it.');
+		if (this.#seat.status === 'other') throw new Error('This browser is read-only: it does not hold the CFO seat. Use the browser that claimed it.');
 	}
 
 	/** Public web lookups run in the agent gateway (it holds the scraping credentials); never from the browser. */
@@ -259,7 +365,12 @@ export class SpacetimeDataSource implements DataSource {
 			const body = (await res.json()) as {
 				closes?: { periodYm: string; status: string }[];
 				providers?: { name: string; mode: string; detail?: string }[];
+				feed?: { enabled?: boolean; ym?: string | null; planned?: number; ingested?: number; blockedReason?: string | null };
 			};
+			if (body.feed) {
+				const f = body.feed;
+				this.#conn.feed = { enabled: !!f.enabled, ym: f.ym ?? undefined, planned: f.planned ?? 0, ingested: f.ingested ?? 0, blockedReason: f.blockedReason ?? undefined };
+			}
 			this.#conn.agents = 'online';
 			this.#conn.closes = (body.closes ?? []).map((c) => ({ periodYm: c.periodYm, status: c.status === 'running' ? 'running' : 'done' }));
 			this.#gatewayProviders = (body.providers ?? [])
@@ -279,7 +390,7 @@ export class SpacetimeDataSource implements DataSource {
 			.withDatabaseName(this.#cfg.database)
 			.withToken(readToken())
 			.onConnect((conn, _identity, token) => {
-				saveToken(token);
+				this.#tokenSaved = saveToken(token);
 				this.#wire(conn);
 				conn
 					.subscriptionBuilder()
@@ -287,11 +398,11 @@ export class SpacetimeDataSource implements DataSource {
 						for (const a of Object.keys(ACCESSORS) as Accessor[]) this.#dirty.add(a);
 						this.#flush();
 						this.#conn.ledger = 'live';
+						this.#seatFrom(conn);
 					})
 					.subscribeToAllTables();
-				// The browser is the CFO seat. A second tab on the same origin reuses the token and is already registered;
-				// a different origin or a stale tab may hold it, in which case the seat frees when that tab disconnects.
-				void this.#claimCfoSeat(conn);
+				// The browser never registers itself as CFO: the module refuses that. The seat is claimed once with the
+				// one-time Bootstrap secret on /claim, and stays with this identity through the saved token.
 			})
 			.onConnectError((_ctx, err) => {
 				this.#conn.ledger = 'offline';
@@ -319,6 +430,40 @@ export class SpacetimeDataSource implements DataSource {
 			table.onDelete?.(mark('delete'));
 			table.onUpdate?.(mark('update'));
 		}
+		// This connection's own role and the roster decide what the UI shows about the CFO seat.
+		const seat = () => this.#queueSeat();
+		for (const table of [conn.db.myAgentIdentity, conn.db.agentRoster]) {
+			table.onInsert(seat);
+			table.onDelete(seat);
+		}
+		conn.db.agentRoster.onUpdate(seat);
+	}
+
+	#seatQueued = false;
+	#queueSeat() {
+		if (this.#seatQueued) return;
+		this.#seatQueued = true;
+		queueMicrotask(() => {
+			this.#seatQueued = false;
+			if (this.#db) this.#seatFrom(this.#db);
+		});
+	}
+
+	/**
+	 * Who holds the CFO seat: my_agent_identity is this connection's own role (the module's per-caller view of the
+	 * private agent_identity table), and agent_roster has a 'cfo' row once anyone claimed the seat. The module still
+	 * checks every CFO action; this only decides the banner and the read-only message.
+	 */
+	#seatFrom(c: DbConnection) {
+		if (this.#conn.ledger !== 'live') {
+			this.#seat = { status: 'checking' };
+			return;
+		}
+		const holder = Array.from(c.db.agentRoster.iter()).find((r) => r.role === 'cfo');
+		const mine = Array.from(c.db.myAgentIdentity.iter()).some((r) => r.role.tag === 'Cfo');
+		if (mine) this.#seat = { status: 'you', holderName: holder?.displayName };
+		else if (holder) this.#seat = { status: 'other', holderName: holder.displayName };
+		else this.#seat = { status: 'unclaimed' };
 	}
 
 	#queue() {
@@ -365,72 +510,31 @@ export class SpacetimeDataSource implements DataSource {
 		if (d.has('publicFootprint')) t.public_footprint = all(c.db.publicFootprint.iter()).map(M.publicFootprint).sort(byTime('fetchedAt'));
 		if (d.has('auditEvent')) t.audit_event = all(c.db.auditEvent.iter()).map(M.auditEvent).sort(byTime('at'));
 		if (d.has('settings')) {
-			const row = all(c.db.settings.iter()).find((s) => s.key === 'materiality_threshold_minor');
-			if (row) t.settings = { materialityThresholdMinor: row.valueI64.toString() };
+			const rows = all(c.db.settings.iter());
+			const threshold = rows.find((s) => s.key === 'materiality_threshold_minor');
+			const reporting = rows.find((s) => s.key === 'reporting_ccy');
+			const feed = rows.find((s) => s.key === 'feed_enabled');
+			t.settings = {
+				materialityThresholdMinor: threshold ? threshold.valueI64.toString() : t.settings.materialityThresholdMinor,
+				reportingCcy: reporting?.valueText || t.settings.reportingCcy,
+				feedEnabled: feed ? feed.valueI64 === 1n : false
+			};
 		}
+		if (d.has('fxRate')) t.fx_rate = all(c.db.fxRate.iter()).map(M.fxRate);
+		if (d.has('charterVersion')) t.charter_version = all(c.db.charterVersion.iter()).map(M.charterVersion).sort((a, b) => a.role.localeCompare(b.role) || b.version - a.version);
+		if (d.has('charterEval')) t.charter_eval = all(c.db.charterEval.iter()).map(M.charterEval).sort(byTime('ranAt'));
 	}
 
-	async #claimCfoSeat(conn: DbConnection): Promise<boolean> {
-		try {
-			await conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'CFO', model: 'human' });
-			this.#conn.cfoSeat = 'mine';
-			if (this.#conn.message?.startsWith('Another browser')) this.#conn.message = undefined;
-			return true;
-		} catch (err) {
-			const text = err instanceof Error ? err.message : String(err);
-			if (/registered as cfo/i.test(text)) {
-				this.#conn.cfoSeat = 'mine';
-				return true;
-			}
-			if (/bootstrap secret|Claim the CFO seat/i.test(text)) {
-				// Nobody has claimed the seat from this browser. The seed loader printed a one-time claim link
-				// (also saved in .secrets/cfo-bootstrap.<db>.txt); opening it here takes the seat.
-				this.#conn.cfoSeat = this.#conn.cfoSeat === 'mine' ? 'mine' : 'unclaimed';
-				this.#conn.message = 'This browser is not the CFO yet. Open the claim link printed by the seed loader (saved in .secrets/cfo-bootstrap.<db>.txt).';
-				return false;
-			}
-			this.#conn.cfoSeat = 'held';
-			this.#conn.message = 'Another browser holds the CFO seat. Ask the advisor to release it, then retry.';
-			return false;
-		}
-	}
-
-	async claimCfo(secret: string): Promise<void> {
-		if (!this.#db) throw new Error('Not connected to the ledger database yet.');
-		try {
-			await this.#db.reducers.claimCfo({ secret: secret.trim(), displayName: 'CFO' });
-		} catch (err) {
-			const text = err instanceof Error ? err.message : String(err);
-			// Already the CFO (claiming twice from the same browser) is fine.
-			if (!/registered as cfo|already/i.test(text)) throw plain(err, 'Could not claim the CFO seat.');
-		}
-		this.#conn.cfoSeat = 'mine';
-		this.#conn.message = undefined;
-	}
-
+	/**
+	 * Run one of the CFO's reducers. The module decides who may act; a browser that does not hold the seat gets a plain
+	 * read-only message instead of the module's refusal.
+	 */
 	async #call(fallback: string, fn: (c: DbConnection) => Promise<unknown>) {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
-		if (this.#conn.cfoSeat !== 'mine') {
-			const ok = await this.#claimCfoSeat(this.#db);
-			if (!ok) throw new Error(this.#conn.message ?? 'This browser does not hold the CFO seat.');
-		}
+		this.#readOnlyCheck();
 		try {
 			await fn(this.#db);
 		} catch (err) {
-			const text = err instanceof Error ? err.message : String(err);
-			if (/not registered|Only cfo/i.test(text)) {
-				// The seat may have been released and reclaimed elsewhere; try once more after re-registering.
-				this.#conn.cfoSeat = 'unknown';
-				if (await this.#claimCfoSeat(this.#db)) {
-					try {
-						await fn(this.#db);
-						return;
-					} catch (again) {
-						throw plain(again, fallback);
-					}
-				}
-				throw new Error(this.#conn.message ?? 'This browser does not hold the CFO seat.');
-			}
 			throw plain(err, fallback);
 		}
 	}

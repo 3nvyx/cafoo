@@ -63,10 +63,10 @@ _Avoid_: consolidation entity, elim company
 **Proposal**: A worker agent's request to change the ledger (journal entry, revenue schedule, bank match, credit decision, accrual, vendor block, vendor check, Revaluation, Elimination). Never affects balances until approved.
 _Avoid_: draft, suggestion, pending entry
 
-**Approval**: The Advisor's ruling on a Proposal: approve, reject, or amend, always with a rationale.
+**Approval**: The Advisor's ruling on a Proposal: approve, reject, or amend, always with a rationale. An amendment always waits for the CFO, whatever its amount.
 _Avoid_: sign-off, OK
 
-**Advisor**: The Chief Finance Advisor agent, the only agent identity that may commit Proposals.
+**Advisor**: The Chief Finance Advisor agent, the only agent identity that may commit Proposals. It never proposes, and no identity approves or confirms a Proposal it proposed.
 _Avoid_: supervisor, orchestrator, CFO bot
 
 **CFO**: The human owner of the books with final say above the Advisor: confirms material rulings, can reverse anything, may be non-technical or technical.
@@ -100,7 +100,7 @@ _Avoid_: default charter, stock charter
 **Charter eval**: One recorded run of a Charter version's scenarios and rule probes, passed or failed: a full eval (the whole close rerun with that version on a scratch copy of the books, then its scenarios) or a quick check (its scenarios against the close already recorded). A version goes live only if its latest Charter eval is a passing full eval.
 _Avoid_: charter test, validation
 
-**Demo mode**: Runtime with no API keys where every external call replays recorded fixtures.
+**Demo mode**: Runtime with no API keys where the agents run a scripted close over the real engines and the credit, vendor-lookup and search calls replay recorded fixtures.
 _Avoid_: mock mode, offline
 
 ### Revenue and receivables
@@ -124,11 +124,11 @@ _Avoid_: auto-matcher, background job
 
 **Guarantor**: The owner of a small-business customer whose personal credit is checked.
 
-**Credit Check**: One cascade run (identity, fraud, credit report, public records) with stored results and request ids.
+**Credit Check**: One cascade run (identity, fraud, credit report, public records) with stored results, request ids and the cascade's facts, recorded only on the customer's own Guarantor or the vendor's own owner.
 
 **Vendor check**: A Proposal from the Credit & Risk agent to mark a Vendor verified, citing the request ids of the identity and fraud results in the owner's Credit Check. A Vendor becomes verified only when its Vendor check is approved (and, at or above the Materiality threshold, confirmed by the CFO); a verified Vendor is not re-checked at the next close.
 
-**Risk Tier**: The Credit & Risk agent's classification of a Guarantor or Vendor (A, B, C, D, or BLOCK) from a Credit Check.
+**Risk Tier**: The classification of a Guarantor or Vendor (A, B, C, D, or BLOCK), derived by the module from a Credit Check's recorded facts with the shared tier rules; the agent never states it.
 
 **Allowance**: The expected-credit-loss reserve against a customer's receivables, proposed from Risk Tier.
 _Avoid_: bad debt reserve, provision

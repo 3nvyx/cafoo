@@ -262,9 +262,9 @@ const customer = table(
     paymentTermsDays: t.u16(),
     allowanceMinor: t.i64(),
     // Public listings used for the public footprint (optional, editable by the CFO).
-    yelpUrl: t.option(t.string()),
-    jobBoard: t.option(t.string()),
-    linkedinUrl: t.option(t.string()),
+    yelpUrl: t.option(t.string()).default(undefined),
+    jobBoard: t.option(t.string()).default(undefined),
+    linkedinUrl: t.option(t.string()).default(undefined),
   }
 );
 
@@ -333,9 +333,9 @@ const vendor = table(
     ownerPersonaId: t.option(t.string()),
     verification: Verification,
     verificationNote: t.string(),
-    yelpUrl: t.option(t.string()),
-    jobBoard: t.option(t.string()),
-    linkedinUrl: t.option(t.string()),
+    yelpUrl: t.option(t.string()).default(undefined),
+    jobBoard: t.option(t.string()).default(undefined),
+    linkedinUrl: t.option(t.string()).default(undefined),
   }
 );
 
@@ -460,7 +460,7 @@ const settings = table(
 );
 
 // Private: which identity holds which role. Clients never see tokens or identities of others.
-const agentIdentity = table(
+export const agentIdentity = table(
   { name: 'agent_identity' },
   {
     identity: t.identity().primaryKey(),

@@ -15,7 +15,7 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
-import { CrsClient, createCrsMcpServer, runCascade } from '@cafoo/crs-mcp';
+import { CrsClient, createCrsMcpServer, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { activeCharter } from '../charter/active';
 import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
@@ -28,9 +28,13 @@ const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }]
 const readOnly = { annotations: { readOnlyHint: true } };
 /**
  * A row id as the module stores it: "012" becomes "12". Payloads are compared as strings downstream (evals, the web
- * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id.
+ * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id: digits only, as
+ * the harness reads ids (rules.ts idKey), because BigInt alone reads "" as 0 and "0x3C" as 60, another row.
  */
-const id = (v: string) => BigInt(v).toString();
+const id = (v: string) => {
+  if (!/^\d+$/.test(v)) throw new Error(`"${v}" is not a row id (digits only)`);
+  return BigInt(v).toString();
+};
 const optId = (v: string | undefined) => (v ? id(v) : undefined);
 
 const lineSchema = z.object({
@@ -218,6 +222,8 @@ function threadTools(worker: RoleConn) {
 /** Proposal tools bound to a worker's own identity. */
 export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnType<typeof tool>[] = []) {
   const A = cast.advisor;
+  /** The latest cascade this agent ran per persona (run_credit_cascade): record_credit_check records only its rows. */
+  const cascades = new Map<string, CascadeResult>();
   const common = { rationale: z.string().describe('Technical rationale with the evidence'), summaryPlain: z.string().describe('One sentence for a non-technical CFO: no account codes, amounts spelled out'), periodYm: z.string(), closeTaskId: z.string().optional() };
   const kindTool = (kind: 'journal_entry' | 'accrual', name: string, desc: string) =>
     tool(
@@ -265,7 +271,7 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
     ),
     tool(
       'propose_credit_decision',
-      'Propose a customer risk tier and payment terms (no ledger impact; the allowance is a separate journal entry proposal).',
+      "Propose a customer risk tier and payment terms (no ledger impact; the allowance is a separate journal entry proposal). Cite the request ids of the rows you recorded from the customer's latest cascade (the books refuse a decision that skips their latest check); the tier must be the one the books derived for every cited check, and the terms no longer than that tier allows (A 45 days, B 30, C 15, D and BLOCK 0).",
       { ...common, customerId: z.string(), tier: z.enum(['A', 'B', 'C', 'D', 'BLOCK']), paymentTermsDays: z.number().int(), creditCheckRequestIds: z.array(z.string()).optional() },
       async a => {
         try {
@@ -312,11 +318,18 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
     // before the next call (a credit decision citing it) is judged.
     tool(
       'record_credit_check',
-      'Store one credit-check evidence row (product, request id, summary) for a customer or vendor.',
+      "Store one evidence row (product, request id) of the cascade you last ran with run_credit_cascade for that persona, on the customer it guarantees or the vendor it owns. The row is recorded with that cascade's facts, and the books derive its tier and decision from them; tier and decision here must be what the cascade returned.",
       { subjectKind: z.enum(['customer', 'vendor']), subjectId: z.string(), personaId: z.string(), product: z.string(), requestId: z.string(), summaryJson: z.string(), tier: z.string(), decision: z.string() },
       async a => {
         try {
-          await worker.reducers.recordCreditCheck({ ...a, subjectId: BigInt(a.subjectId) });
+          // Built from the cascade itself, never from what the model typed: the evidence row and the facts the books
+          // derive the tier from. The stated tier must agree, so the harness's history of these calls stays true.
+          const run = cascades.get(a.personaId.trim().toUpperCase());
+          if (!run) return fail(`run run_credit_cascade for ${a.personaId} first: only rows of a cascade you ran are recorded`);
+          const ev = run.evidence.find(e => e.product === a.product && (e.requestId ?? '') === a.requestId);
+          if (!ev) return fail(`your last cascade for ${a.personaId} has no ${a.product} row with request id ${a.requestId}; its rows are ${run.evidence.map(e => `${e.product} ${e.requestId ?? 'n/a'}`).join(', ')}`);
+          if (a.tier !== run.tier || a.decision !== run.decision) return fail(`that cascade returned tier ${run.tier} and decision ${run.decision}, not ${a.tier} and ${a.decision}`);
+          await worker.reducers.recordCreditCheck({ subjectKind: a.subjectKind, subjectId: BigInt(a.subjectId), personaId: run.personaId, product: a.product, requestId: a.requestId, summaryJson: creditCheckSummaryJson(run, ev) });
           return ok('recorded');
         } catch (e) {
           return fail((e as Error).message);
@@ -343,6 +356,7 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       async ({ personaId, subjectKind }) => {
         try {
           const r = await runCascade(new CrsClient(), personaId, { subjectKind });
+          cascades.set(r.personaId.toUpperCase(), r);
           return ok(r);
         } catch (e) {
           return fail((e as Error).message);

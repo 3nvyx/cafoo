@@ -3,6 +3,7 @@
 	import { contractArr, openReceivable, periodEnd } from '#lib/data/derive.js';
 	import { formatMoney } from '#lib/data/money.js';
 	import type { RiskTier } from '#lib/data/types.js';
+	import Icon from '#lib/components/Icon.svelte';
 	import FootprintChip from '#lib/components/FootprintChip.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { TIER } from '#lib/labels.js';
@@ -25,7 +26,7 @@
 
 <svelte:head><title>Customers · Cafoo</title></svelte:head>
 
-<h1 class="text-[32px]">Customers</h1>
+<h1 class="text-[34px] sm:text-[42px]">Customers</h1>
 <p class="mt-2 max-w-[60ch] text-ink-2">Each customer is a small business with an owner who guarantees the account. Their Risk Tier sets payment terms and the Allowance.</p>
 
 <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -36,9 +37,9 @@
 	<div class="flex flex-wrap gap-2" role="group" aria-label="Filter by Risk Tier">
 		{#each TIERS as t (t)}
 			<button
-				class="min-h-[44px] rounded-full border px-3.5 text-sm transition-colors duration-150 {tier === t ? 'border-ink bg-ink text-canvas' : 'border-line-strong text-ink-2 hover:text-ink'}"
+				class="chip"
 				aria-pressed={tier === t}
-				onclick={() => (tier = t)}>{t === 'all' ? 'All' : t === 'none' ? 'Not checked' : TIER[t].label}</button
+				onclick={() => (tier = t)}>{#if tier === t}<Icon name="check" size={16} />{/if}{t === 'all' ? 'All' : t === 'none' ? 'Not checked' : TIER[t].label}</button
 			>
 		{/each}
 	</div>
@@ -51,7 +52,7 @@
 	<ul>
 		{#each rows as { c, ar } (c.id)}
 			<li class="border-b border-line">
-				<a href="/customers/{c.id}" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 hover:bg-subtle/60 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] md:items-center xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_150px_110px_90px_120px]">
+				<a href="/customers/{c.id}" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 state md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] md:items-center xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_150px_110px_90px_120px]">
 					<span class="min-w-0">
 						<span class="block truncate font-medium">{c.name}</span>
 						<span class="block truncate text-sm text-ink-3">{c.domain}</span>

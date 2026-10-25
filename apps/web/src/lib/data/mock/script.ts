@@ -1,5 +1,5 @@
 // The scripted September close the mock source replays when the CFO clicks
-// "Close September". About 22 seconds end to end. Times are ms after start.
+// "Close September". About 23 seconds end to end. Times are ms after start.
 import type { AgentRole, CloseTaskStatus, MessageKind, Minor, ProposalKind, ProposalStatus, VendorVerification } from '../types';
 
 export interface ScriptLine {
@@ -30,7 +30,9 @@ export type Step =
 	| { at: number; type: 'task'; taskId: string; status: CloseTaskStatus }
 	| { at: number; type: 'status'; proposalId: string; status: ProposalStatus }
 	| { at: number; type: 'vendor'; vendorId: string; verification: VendorVerification; note: string }
-	| { at: number; type: 'wrapup' };
+	| { at: number; type: 'wrapup' }
+	/** The Consolidation agent proposes the month's Revaluation and Eliminations, computed from the books by the ledger engine. */
+	| { at: number; type: 'consolidate'; taskId: string };
 
 const L = (account: string, debitMinor: Minor, creditMinor: Minor, extra: Partial<ScriptLine> = {}): ScriptLine => ({
 	account,
@@ -242,6 +244,12 @@ export const CLOSE_SCRIPT: Step[] = [
 	},
 	{ at: 20800, type: 'rule', proposalId: 'pr-08', body: 'APPROVE pr-08 as amended (payments only).', summary: 'Advisor approved pausing payments to Halvorsen Freight Co.', rationale: 'Scope narrowed per Red Team.' },
 	{ at: 20900, type: 'vendor', vendorId: 'v09', verification: 'blocked', note: 'Payments on hold until the new bank account is confirmed by phone.' },
-	{ at: 21600, type: 'wrapup' },
-	{ at: 21700, type: 'idle' }
+	{ at: 21000, type: 'activity', role: 'consolidation', label: "Revaluing Cafoo Ltd's dollar balances" },
+	{ at: 21400, type: 'consolidate', taskId: 'ct-7' },
+	{ at: 21800, type: 'activity', role: 'advisor', label: 'Ruling on the consolidation entries', proposalId: 'pr-c1' },
+	{ at: 22100, type: 'rule', proposalId: 'pr-c1', body: 'APPROVE pr-c1. Balances and rates recomputed from the books; closing rate recorded for the month.', summary: "Advisor approved restating Cafoo Ltd's dollar balances", rationale: 'Revaluation at the recorded closing rate; recomputed from the posted ledger.' },
+	{ at: 22400, type: 'rule', proposalId: 'pr-c2', body: 'APPROVE pr-c2. Both pairs tie to the cent; reverses next month.', summary: 'Advisor approved removing what the group companies owe each other', rationale: 'Balance elimination; pairs agree after revaluation.' },
+	{ at: 22700, type: 'rule', proposalId: 'pr-c3', body: 'APPROVE pr-c3. One cent of translation rounding, under the $1 tolerance.', summary: "Advisor approved removing the month's intercompany service fees", rationale: 'Activity elimination; difference within tolerance.' },
+	{ at: 23000, type: 'wrapup' },
+	{ at: 23100, type: 'idle' }
 ];

@@ -12,6 +12,7 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { closePeriod } from '../close-period';
 
 process.env.SPACETIMEDB_DB_NAME ||= 'cafoo-c1';
 process.env.DEMO_STEP_MS = '0';
@@ -24,7 +25,7 @@ if (DB === 'cafoo') {
 const repoRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..', '..');
 const SERVER = process.env.SPACETIME_SERVER ?? 'local';
 const CLI = process.env.SPACETIME_BIN ?? (spawnSync('sh', ['-c', 'test -x ~/.local/bin/spacetime && echo ~/.local/bin/spacetime']).stdout.toString().trim() || 'spacetime');
-const CLOSE = process.env.CLOSE_PERIOD ?? '2026-09';
+const CLOSE = closePeriod();
 const NEXT = `${CLOSE.slice(0, 4)}-${String(Number(CLOSE.slice(5, 7)) + 1).padStart(2, '0')}`;
 
 const step = (m: string) => console.log(`\n[smoke:feed] ${m}`);

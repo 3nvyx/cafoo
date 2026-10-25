@@ -7,6 +7,7 @@
 
 	const periods = $derived(db.periods());
 	const conn = $derived(db.connection());
+	const seat = $derived(db.cfoSeat());
 	const statusWord = { open: 'Open', closing: 'Closing', closed: 'Locked' } as const;
 	const current = $derived(periods.find((p) => p.id === ui.periodId));
 </script>
@@ -35,9 +36,9 @@
 			<span class="size-2 rounded-full {conn.ledger === 'live' ? 'bg-pos' : conn.ledger === 'connecting' ? 'bg-warn' : 'bg-neg'}"></span>
 			{conn.ledger === 'live' ? 'Live' : conn.ledger === 'connecting' ? 'Connecting' : 'Offline'}
 		</span>
-		{#if conn.cfoSeat === 'held' || conn.cfoSeat === 'unclaimed'}
+		{#if seat.status === 'other' || seat.status === 'unclaimed'}
 			<a href="/claim" class="hidden items-center gap-1.5 rounded-btn bg-warn-soft px-2 py-0.5 text-sm text-warn md:inline-flex" title={conn.message ?? ''}>
-				{conn.cfoSeat === 'held' ? 'CFO seat held by another browser' : 'Claim the CFO seat'}
+				{seat.status === 'other' ? 'CFO seat held by another browser' : 'Claim the CFO seat'}
 			</a>
 		{/if}
 	{:else}

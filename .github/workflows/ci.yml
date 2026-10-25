@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SPACETIMEDB_VERSION: 2.13.0
+
+jobs:
+  check-and-test:
+    name: Check and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
+  ledger:
+    name: Ledger smoke and eval (SpacetimeDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The module smoke's in-place upgrade check publishes an old commit's module (LEGACY_REF).
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install the SpacetimeDB CLI (pinned to the module's version)
+        run: |
+          curl -sSf https://install.spacetimedb.com -o "$RUNNER_TEMP/spacetime-install.sh"
+          sh "$RUNNER_TEMP/spacetime-install.sh" --yes
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/spacetime" version install "$SPACETIMEDB_VERSION"
+          "$HOME/.local/bin/spacetime" version use "$SPACETIMEDB_VERSION"
+      - name: Start SpacetimeDB
+        run: |
+          nohup spacetime start > "$RUNNER_TEMP/spacetime.log" 2>&1 &
+          for i in $(seq 1 60); do spacetime server ping local && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/spacetime.log"; exit 1
+      - name: Module smoke (every gate and refusal, plus an in-place upgrade)
+        run: pnpm -F @cafoo/stdb-bindings smoke
+      - name: Feed smoke (September close, CFO lock, then the October feed)
+        run: pnpm -F @cafoo/agents smoke:feed
+      - name: Eval (rerun the scripted close, check every charter and persona scenario)
+        run: |
+          (cd spacetimedb && spacetime publish cafoo-ci-eval --server local --delete-data=always --yes)
+          pnpm eval --rerun --db cafoo-ci-eval
+      - name: SpacetimeDB log on failure
+        if: failure()
+        run: tail -n 200 "$RUNNER_TEMP/spacetime.log"
+
+  advisor:
+    name: Advisor uAgents (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/asi-advisor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/asi-advisor/requirements.txt
+      - run: pip install -r requirements.txt
+      # Card, decoding, report and selection tests; the live tests skip without a running ledger.
+      - run: python -m unittest -v test_agent
+        env:
+          CAFOO_ADVISOR_SEED: ci-only-seed-not-a-secret

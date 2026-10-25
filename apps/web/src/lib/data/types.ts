@@ -4,14 +4,21 @@
 export type Minor = string;
 export type Iso = string;
 
-export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'cfo';
+export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'consolidation' | 'redteam' | 'feed' | 'cfo';
 /** Who posted or acted. 'seed' is opening data loaded by the seed scripts. */
 export type PostedByRole = AgentRole | 'system' | 'seed';
 
 export interface Subsidiary {
 	id: string;
 	name: string;
+	/** The Functional currency: the currency this Subsidiary keeps its books in. */
 	baseCurrency: string;
+	/** Short code ("US", "UK", "ELIM"); every company but the root suffixes its account codes with it ("1000-UK"). */
+	code: string;
+	/** Unset for the root company. */
+	parentId?: string;
+	/** The bookkeeping-only company that holds every Elimination. */
+	isElimination: boolean;
 }
 
 export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
@@ -22,6 +29,8 @@ export interface Account {
 	code: string;
 	name: string;
 	type: AccountType;
+	/** Records what one group company owes, is owed, charges or is charged by another. */
+	isIntercompany?: boolean;
 }
 
 export type PeriodStatus = 'open' | 'closing' | 'closed';
@@ -53,16 +62,36 @@ export interface JournalLine {
 	id: string;
 	jeId: string;
 	accountId: string;
+	/** In the line's own currency (`ccy`). */
 	debitMinor: Minor;
 	creditMinor: Minor;
+	/** The line's currency; unset means the account's company's Functional currency. */
+	ccy?: string;
+	/** Line currency to Functional currency, scaled by 1e6 ("1000000" is 1:1); unset means 1:1. */
+	fxRateE6?: string;
 	customerId?: string;
 	vendorId?: string;
+}
+
+export type FxRateKind = 'spot' | 'average' | 'closing';
+
+/** One recorded rate: 1 unit of `fromCcy` buys `rateE6 / 1e6` units of `toCcy` in month `ym`. */
+export interface FxRate {
+	id: string;
+	fromCcy: string;
+	toCcy: string;
+	/** "yyyy-mm" */
+	ym: string;
+	rateE6: string;
+	kind: FxRateKind;
 }
 
 export type RiskTier = 'A' | 'B' | 'C' | 'D' | 'BLOCK';
 
 export interface Customer {
 	id: string;
+	/** The company whose customer this is; unset means the root company. Its invoices are in that company's currency. */
+	subsidiaryId?: string;
 	name: string;
 	domain: string;
 	guarantorPersonaId: string;
@@ -199,7 +228,9 @@ export type ProposalKind =
 	| 'credit_decision'
 	| 'accrual'
 	| 'vendor_block'
-	| 'vendor_verify';
+	| 'vendor_verify'
+	| 'fx_revaluation'
+	| 'ic_elimination';
 
 export type ProposalStatus =
 	| 'open'
@@ -287,6 +318,21 @@ export interface AuditEvent {
 
 export interface Settings {
 	materialityThresholdMinor: Minor;
+	/** The one currency the group reports in (USD). */
+	reportingCcy: string;
+	/** Whether the CFO has switched the live feed on (the module's feed_enabled setting). */
+	feedEnabled: boolean;
+}
+
+/** What the live feed is doing, as the agent gateway reports it (GET /status, `feed`). */
+export interface FeedStatus {
+	enabled: boolean;
+	/** The month the feed books into (the open month after the latest one the CFO locked). */
+	ym?: string;
+	planned: number;
+	ingested: number;
+	/** Why nothing is arriving, in plain words, when nothing can. */
+	blockedReason?: string;
 }
 
 export interface ProviderStatus {
@@ -316,8 +362,100 @@ export type TableName =
 	| 'close_task'
 	| 'credit_check'
 	| 'audit_event'
-	| 'public_footprint'
-	| 'settings';
+	| 'settings'
+	| 'fx_rate'
+	| 'charter_version'
+	| 'charter_eval'
+	| 'public_footprint';
+
+// Charters. The shapes mirror the agent gateway's contracts (apps/agents/src/charter/types.ts and routes.ts).
+
+/** The agents that have a Charter. */
+export type CharterRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'consolidation';
+export type CharterStatus = 'draft' | 'live' | 'retired';
+/** dry_run: the full eval (a whole close on a scratch database); snapshot: the quick check against the recorded close. */
+export type CharterEvalMode = 'dry_run' | 'snapshot';
+
+/** One numbered, unchangeable text of a Charter with its line mapping. */
+export interface CharterVersion {
+	id: string;
+	role: string;
+	version: number;
+	status: CharterStatus;
+	bodyMd: string;
+	mappingJson: string;
+	summaryPlain: string;
+	basedOnVersionId?: string;
+	authoredByRole: string;
+	createdAt: Iso;
+	publishedAt?: Iso;
+}
+
+/** One recorded run of a Charter version's scenarios and rule probes. */
+export interface CharterEval {
+	id: string;
+	charterVersionId: string;
+	passed: boolean;
+	mode: CharterEvalMode;
+	/** The eval report (JSON text): coverage, probes, scenarios. */
+	resultsJson: string;
+	summaryPlain: string;
+	ranByRole: string;
+	ranAt: Iso;
+}
+
+export type CharterMappingTarget =
+	| { kind: 'rule'; template: string; params?: Record<string, unknown> }
+	| { kind: 'scenario'; scenario: string; vars?: Record<string, string | number | boolean | null> }
+	| { kind: 'custom_scenario'; yaml: string };
+
+/** One charter line ("May 2", "Must never 1", "Escalates 3", "Plain summary") mapped to what checks it. */
+export interface CharterMappingEntry {
+	label: string;
+	text: string;
+	target: CharterMappingTarget;
+}
+
+/** One input a rule template takes. bp: basis points shown as a percentage; minor: money in minor units. */
+export interface CharterParamSpec {
+	name: string;
+	labelPlain: string;
+	type: 'bp' | 'minor' | 'kinds' | 'int' | 'text';
+	default?: string | number | string[];
+	min?: number;
+	max?: number;
+	options?: string[];
+}
+
+export interface CharterTemplate {
+	id: string;
+	/** The role whose Charter may use it, or '*' for any worker agent. */
+	role: string;
+	titlePlain: string;
+	params: CharterParamSpec[];
+	/** The shipped line this template may stand on, tightening that line's rule. */
+	tightensLine?: string;
+}
+
+/** What a charter line can map to, and each role's Built-in Charter with its default mapping. */
+export interface CharterCatalog {
+	templates: CharterTemplate[];
+	scenarios: { id: string; agent: string; charterLine: string }[];
+	builtin: Record<string, { bodyMd: string; mapping: CharterMappingEntry[] }>;
+}
+
+/** The eval runner's progress for one version, as the gateway reports it. */
+export interface CharterEvalRun {
+	versionId?: string;
+	status: 'idle' | 'running' | 'done' | 'error';
+	mode?: CharterEvalMode;
+	passed?: boolean;
+	publishable?: boolean;
+	steps: string[];
+	error?: string;
+	startedAt?: Iso;
+	finishedAt?: Iso;
+}
 
 /** What an agent is doing right now (drives the "is writing" indicator). */
 export interface LiveActivity {

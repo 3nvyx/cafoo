@@ -2,6 +2,7 @@
 	import { db } from '#lib/data/index.js';
 	import { formatMoney, toNumber } from '#lib/data/money.js';
 	import ModeToggle from '#lib/components/ModeToggle.svelte';
+	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { toasts } from '#lib/toast.svelte.js';
@@ -12,6 +13,22 @@
 	const shown = $derived(draft ?? current);
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
 	let resetOpen = $state(false);
+
+	const feedOn = $derived(db.settings().feedEnabled);
+	const feed = $derived(db.connection().feed);
+	const readOnly = $derived(db.cfoSeat().status !== 'you');
+	let feedBusy = $state(false);
+	async function toggleFeed() {
+		feedBusy = true;
+		try {
+			await db.setFeedEnabled(!feedOn);
+			toasts.push(feedOn ? 'The live feed is off.' : 'The live feed is on. New bank lines and invoices will arrive as they happen.', 'success');
+		} catch (err) {
+			toasts.error(err);
+		} finally {
+			feedBusy = false;
+		}
+	}
 
 	// Arrow keys fire `change` on every step, so the change is saved once: on release or blur, or after a pause.
 	const SETTLE_MS = 700;
@@ -66,7 +83,7 @@
 
 <svelte:head><title>Settings · Cafoo</title></svelte:head>
 
-<h1 class="text-[32px]">Settings</h1>
+<h1 class="text-[34px] sm:text-[42px]">Settings</h1>
 
 <div class="mt-8 flex max-w-[720px] flex-col gap-10">
 	<section aria-labelledby="mat-h" class="flex flex-col gap-4">
@@ -101,13 +118,45 @@
 		</div>
 	</section>
 
+	<section aria-labelledby="feed-h" class="flex flex-col gap-4">
+		<div>
+			<h2 id="feed-h" class="text-2xl">Live feed</h2>
+			<p class="mt-1 text-ink-2">
+				Once you lock a month, the feed streams the next month's bank lines and invoices as they happen, and the Bookkeeper proposes matches as they land. It
+				books only into the open month after one you locked.
+			</p>
+		</div>
+		<div class="card flex flex-col gap-3 p-5">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div class="flex items-center gap-2">
+					<Pill tone={feedOn ? 'pos' : 'neutral'}>{feedOn ? 'On' : 'Off'}</Pill>
+					{#if feed?.ym}<span class="text-sm text-ink-2">Books into {feed.ym}</span>{/if}
+				</div>
+				<button class="btn {feedOn ? '' : 'btn-primary'}" disabled={feedBusy || readOnly} onclick={toggleFeed}>
+					{feedOn ? 'Switch the feed off' : 'Switch the feed on'}
+				</button>
+			</div>
+			{#if feed && (feed.planned || feed.ingested)}
+				<p class="num text-sm text-ink-2">{feed.ingested} of {feed.planned} events received</p>
+			{/if}
+			{#if feed?.blockedReason}<p class="text-sm text-ink-3">{feed.blockedReason}</p>{/if}
+			{#if readOnly}<p class="text-sm text-ink-3">Only the browser holding the CFO seat can switch the feed.</p>{/if}
+		</div>
+	</section>
+
 	<section aria-labelledby="mode-h" class="flex flex-col gap-3">
 		<h2 id="mode-h" class="text-2xl">View</h2>
 		<p class="text-ink-2">
 			<strong class="font-medium text-ink">Simple</strong> shows plain summaries and two buttons. <strong class="font-medium text-ink">Expert</strong> adds journal lines with account
-			codes, Red Team critiques verbatim, raw payloads, agent transcripts and keyboard shortcuts. Press <kbd class="rounded border border-line px-1 font-mono text-xs">E</kbd> anywhere to switch.
+			codes, Red Team critiques verbatim, raw payloads, agent transcripts and keyboard shortcuts. Press <kbd class="kbd">E</kbd> anywhere to switch.
 		</p>
 		<div><ModeToggle /></div>
+	</section>
+
+	<section aria-labelledby="theme-h" class="flex flex-col gap-3">
+		<h2 id="theme-h" class="text-2xl">Appearance</h2>
+		<p class="text-ink-2">Cream paper by day, warm brown by night. System follows your device.</p>
+		<div><ThemeToggle /></div>
 	</section>
 
 	<section aria-labelledby="prov-h" class="flex flex-col gap-3">
@@ -133,7 +182,7 @@
 		<section aria-labelledby="reset-h" class="flex flex-col gap-3">
 			<h2 id="reset-h" class="text-2xl">Demo</h2>
 			<p class="text-ink-2">Put every table back to the starting data so you can run the September close again.</p>
-			<div><button class="btn" onclick={() => (resetOpen = true)}>Reset demo data</button></div>
+			<div><button class="btn btn-tonal" onclick={() => (resetOpen = true)}>Reset demo data</button></div>
 		</section>
 		<ConfirmDialog
 			bind:open={resetOpen}

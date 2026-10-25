@@ -5,6 +5,7 @@ import vendors from './seed/vendors.json';
 import bank from './seed/bank.json';
 import journal from './seed/journal.json';
 import governance from './seed/governance.json';
+import group from './seed/group.json';
 import footprint from './seed/footprint.json';
 import type {
 	Account,
@@ -14,10 +15,13 @@ import type {
 	BankMatch,
 	BankTransaction,
 	Bill,
+	CharterEval,
+	CharterVersion,
 	CloseTask,
 	Contract,
 	CreditCheck,
 	Customer,
+	FxRate,
 	Invoice,
 	JournalEntry,
 	JournalLine,
@@ -50,29 +54,49 @@ export interface Tables {
 	audit_event: AuditEvent[];
 	public_footprint: PublicFootprint[];
 	settings: Settings;
+	fx_rate: FxRate[];
+	charter_version: CharterVersion[];
+	charter_eval: CharterEval[];
 }
 
-type SeedLine = [string, string, string, { customerId?: string; vendorId?: string }?];
+type SeedLine = [string, string, string, { customerId?: string; vendorId?: string; ccy?: string; fxRateE6?: string }?];
 interface SeedEntry extends Omit<JournalEntry, 'id'> {
 	id: string;
 	lines: SeedLine[];
 }
 
 export const SUBSIDIARY_ID = 'sub-us';
+/** Account ids follow the code, which is unique across the group ("1000" is Cafoo Inc's, "1000-UK" Cafoo Ltd's). */
 export const accountIdFor = (code: string) => `acc-${code}`;
+const subsidiaryIdFor = (code: string) => (code === 'US' ? SUBSIDIARY_ID : `sub-${code.toLowerCase()}`);
 
 export function loadSeed(): Tables {
-	const account: Account[] = reference.accounts.map((a) => ({
-		id: accountIdFor(a.code),
-		subsidiaryId: SUBSIDIARY_ID,
-		code: a.code,
-		name: a.name,
-		type: a.type as Account['type']
-	}));
+	const subsidiary: Subsidiary[] = [
+		...reference.subsidiaries.map((s) => ({ ...s, code: 'US', isElimination: false })),
+		...group.subsidiaries.map((s) => ({ id: subsidiaryIdFor(s.code), name: s.name, baseCurrency: s.baseCurrency, code: s.code, parentId: SUBSIDIARY_ID, isElimination: s.isElimination }))
+	];
+	const account: Account[] = [
+		...[...reference.accounts.map((a) => ({ ...a, isIntercompany: false })), ...group.usAccounts].map((a) => ({
+			id: accountIdFor(a.code),
+			subsidiaryId: SUBSIDIARY_ID,
+			code: a.code,
+			name: a.name,
+			type: a.type as Account['type'],
+			isIntercompany: a.isIntercompany
+		})),
+		...group.accounts.map((a) => ({
+			id: accountIdFor(a.code),
+			subsidiaryId: subsidiaryIdFor(a.subsidiary),
+			code: a.code,
+			name: a.name,
+			type: a.type as Account['type'],
+			isIntercompany: a.isIntercompany
+		}))
+	].sort((a, b) => a.code.localeCompare(b.code));
 
 	const journal_entry: JournalEntry[] = [];
 	const journal_line: JournalLine[] = [];
-	for (const raw of journal.journalEntries as unknown as SeedEntry[]) {
+	for (const raw of [...(journal.journalEntries as unknown as SeedEntry[]), ...(group.journalEntries as unknown as SeedEntry[])]) {
 		const { lines, ...je } = raw;
 		journal_entry.push(je);
 		lines.forEach(([code, debitMinor, creditMinor, extra], i) => {
@@ -88,7 +112,7 @@ export function loadSeed(): Tables {
 	}
 
 	return structuredClone({
-		subsidiary: reference.subsidiaries as Subsidiary[],
+		subsidiary,
 		account,
 		period: reference.periods.map((p) => ({ ...p, subsidiaryId: SUBSIDIARY_ID })) as Period[],
 		journal_entry,
@@ -107,6 +131,9 @@ export function loadSeed(): Tables {
 		credit_check: customers.creditChecks as CreditCheck[],
 		audit_event: governance.auditEvents as AuditEvent[],
 		public_footprint: footprint.publicFootprints as PublicFootprint[],
-		settings: { ...reference.settings }
+		settings: { ...reference.settings, reportingCcy: group.reportingCcy, feedEnabled: false },
+		fx_rate: group.fxRates.map((r, i) => ({ id: `fx-${i + 1}`, ...r, kind: r.kind as FxRate['kind'] })),
+		charter_version: [],
+		charter_eval: []
 	});
 }

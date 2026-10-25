@@ -108,6 +108,22 @@ const divRound = (n: bigint, d: bigint) => {
 const applyFx = (amount: bigint, rateE6: bigint) => divRound(amount * (rateE6 === 0n ? FX : rateE6), FX);
 const absB = (n: bigint) => (n < 0n ? -n : n);
 
+// ---------- credit check evidence (the cascade's facts, as packages/crs-mcp records them) ----------
+const bureauFile = (score: number) => ({ fileStatus: 'returned', score, tradelines: 9, derogatories: 0, activeDerogatories: 0, collections: 0, publicRecords: [] });
+/** A clean full cascade: identity PASS, low fraud, three scored bureau files (lowest 760), no public records. Tier A. */
+const CLEAN_FACTS = {
+  identity: { result: 'PASS', codes: [], texts: [], deceased: false, synthetic: false, available: true },
+  fraud: { score: 12, level: 'low', signals: [], available: true },
+  bureaus: { transunion: bureauFile(781), equifax: bureauFile(760), experian: bureauFile(790) },
+  publicRecords: { available: true, counts: { bankruptcies: 0, judgments: 0, liens: 0 }, bankruptcies: [], judgments: [], liens: [], criminal: [], evictions: [] },
+};
+/** An early stop: the identity check says the person has died. Tier BLOCK. */
+const DECEASED_FACTS = {
+  identity: { result: 'FAIL', codes: ['2301'], texts: ['Deceased'], deceased: true, synthetic: false, available: true },
+  fraud: { score: 74, level: 'high', signals: [], available: true },
+  bureaus: {},
+};
+
 // ---------- connections ----------
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function waitFor<T>(f: () => T | undefined | null | false, what: string, ms = 8000): Promise<T> {
@@ -127,7 +143,11 @@ function connect(db: string, name: string, token?: string, tables?: string[]): P
       .withDatabaseName(db)
       .withToken(token)
       .onConnect((conn, identity, newToken) => {
-        const sub = conn.subscriptionBuilder().onApplied(() => resolve({ conn, identity, name, token: newToken }));
+        // A refused subscription (an unknown table or view) rejects instead of leaving the smoke waiting forever.
+        const sub = conn
+          .subscriptionBuilder()
+          .onApplied(() => resolve({ conn, identity, name, token: newToken }))
+          .onError(ctx => reject(new Error(`subscription for ${name} refused: ${String((ctx as { event?: unknown }).event ?? 'unknown error')}`)));
         if (tables) sub.subscribe(tables.map(t => `SELECT * FROM ${t}`));
         else sub.subscribeToAllTables();
       })
@@ -172,6 +192,21 @@ async function main() {
     Y.conn.disconnect();
     await refuses('the owner arms again once a CFO exists', async () => armBootstrap(DB, secret), /already claimed/);
     await accepts('the CFO re-registers as itself (display-name refresh)', () => X.conn.reducers.registerAgent({ role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' }));
+    // agent_identity is private; my_agent_identity shows each caller its own row only, so a browser can tell whether
+    // it holds the CFO seat without reading anyone else's identity.
+    const mineOf = async (name: string, token: string | undefined) => {
+      const w = await connect(DB, name, token, ['my_agent_identity']);
+      await sleep(200);
+      const rows = [...w.conn.db.myAgentIdentity.iter()];
+      w.conn.disconnect();
+      return rows;
+    };
+    const cfoRows = await mineOf('cfo view', X.token);
+    check(cfoRows.length === 1 && cfoRows[0]!.role.tag === 'Cfo' && cfoRows[0]!.identity.isEqual(X.identity), 'my_agent_identity shows the CFO its own seat', cfoRows.map(r => r.role.tag).join(', '));
+    const advRows = await mineOf('advisor view', advisorToken(DB));
+    check(advRows.length === 1 && advRows[0]!.role.tag === 'Advisor', 'my_agent_identity shows the advisor its own role, not the CFO row', advRows.map(r => r.role.tag).join(', '));
+    const noRows = await mineOf('unregistered view', undefined);
+    check(noRows.length === 0, 'my_agent_identity shows an unregistered connection nothing', `${noRows.length} row(s)`);
   });
   const workers: Record<string, Who> = {};
   for (const [role, tag] of [['bookkeeper', 'Bookkeeper'], ['revenue', 'Revenue'], ['credit', 'Credit'], ['redteam', 'Redteam'], ['consolidation', 'Consolidation'], ['feed', 'Feed']] as const) {
@@ -292,10 +327,117 @@ async function main() {
     await refuses('bookkeeper registers as advisor', () => B.conn.reducers.registerAgent({ role: { tag: 'Advisor' }, displayName: 'x', model: 'x' }), /registered as bookkeeper/);
     await refuses('red team proposes', () => RT.conn.reducers.propose({ kind: 'journal_entry', payloadJson: '{}', rationale: 'x', summaryPlain: 'Red team trying to propose.', amountMinor: 0n, periodYm: CLOSE, closeTaskId: undefined }), /may propose/);
     await refuses('bookkeeper proposes a revenue schedule', () => B.conn.reducers.propose({ kind: 'revenue_schedule', payloadJson: '{"lines":[]}', rationale: 'x', summaryPlain: 'Bookkeeper proposing revenue.', amountMinor: 0n, periodYm: CLOSE, closeTaskId: undefined }), /does not propose revenue_schedule/);
-    await refuses('advisor records a credit check', () => A.conn.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: bds.id, personaId: 'P01', product: 'fraud_finder', requestId: 'adv-1', summaryJson: '{}', tier: 'A', decision: 'APPROVE' }), /Only credit/);
+    await refuses('advisor records a credit check', () => A.conn.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: bds.id, personaId: 'P01', product: 'fraud_finder', requestId: 'adv-1', summaryJson: '{}' }), /Only credit/);
     await refuses('advisor resets the sealed demo', () => A.conn.reducers.resetDemo({ confirm: 'RESET' }), /sealed/);
     await refuses('advisor seeds a journal entry after sealing', () => A.conn.reducers.seedJournalEntry({ subsidiaryCode: 'US', periodYm: CLOSE, memo: 'x', lines: [{ accountCode: '1000', debitMinor: 1n, creditMinor: 0n, ccy: 'USD', fxRateE6: 1000000n, customerId: undefined, vendorId: undefined, memo: '' }, { accountCode: '3000', debitMinor: 0n, creditMinor: 1n, ccy: 'USD', fxRateE6: 1000000n, customerId: undefined, vendorId: undefined, memo: '' }] }), /sealed/);
     await A.conn.reducers.rejectProposal({ proposalId: open.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+  });
+
+  await section('F10: the Advisor never proposes, and no identity approves or confirms its own Proposal', async () => {
+    const small = [{ accountCode: '6000', debitMinor: '300', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '300' }];
+    await refuses('the advisor proposes a journal entry', () => A.conn.reducers.propose({ kind: 'journal_entry', payloadJson: JSON.stringify({ subsidiaryId: sub, periodYm: CLOSE, memo: 'smoke advisor entry', lines: small }), rationale: 'x', summaryPlain: 'The Advisor trying to propose its own entry.', amountMinor: 0n, periodYm: CLOSE, closeTaskId: undefined }), /may propose\. Your connection is advisor/);
+    await sleep(200);
+    check(![...db.proposal.iter()].some(p => p.proposerRole === 'advisor'), 'no proposal on file comes from the advisor');
+    // A bookkeeper the CFO later promotes to Advisor cannot rule on what it proposed as a bookkeeper.
+    const W = await connect(DB, 'promoted bookkeeper');
+    await A.conn.reducers.grantRole({ identity: W.identity, role: { tag: 'Bookkeeper' }, displayName: 'Smoke promoted bookkeeper', model: 'smoke' });
+    await sleep(300);
+    const own = await je(W, CLOSE, small);
+    await accepts('the CFO promotes that bookkeeper to advisor', () => X.conn.reducers.grantRole({ identity: W.identity, role: { tag: 'Advisor' }, displayName: 'Smoke second advisor', model: 'smoke' }));
+    await sleep(300);
+    await refuses('the promoted advisor approves the proposal it made', () => W.conn.reducers.approveProposal({ proposalId: own.id, rationale: 'x', summaryPlain: 'Approving the proposal I made myself.', amendedPayloadJson: undefined }), /its own Proposal/);
+    await refuses('the promoted advisor approves it with an amendment', () => W.conn.reducers.approveProposal({ proposalId: own.id, rationale: 'x', summaryPlain: 'Amending the proposal I made myself.', amendedPayloadJson: own.payloadJson }), /its own Proposal/);
+    await sleep(200);
+    check(status(own.id) === 'Open', 'the proposal stays open for another identity to rule', status(own.id));
+    // A bookkeeper the CFO later makes CFO cannot confirm what it proposed.
+    const V = await connect(DB, 'bookkeeper made cfo');
+    await A.conn.reducers.grantRole({ identity: V.identity, role: { tag: 'Bookkeeper' }, displayName: 'Smoke bookkeeper made CFO', model: 'smoke' });
+    await sleep(300);
+    const material = await je(V, CLOSE, [{ accountCode: '6000', debitMinor: '2000000', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '2000000' }]);
+    await approve(material);
+    check(status(material.id) === 'AwaitingCfo', 'the material proposal waits for the CFO', status(material.id));
+    await accepts('the CFO makes that bookkeeper a second CFO', () => X.conn.reducers.grantRole({ identity: V.identity, role: { tag: 'Cfo' }, displayName: 'Smoke CFO', model: 'human' }));
+    await sleep(300);
+    await refuses('the new CFO confirms the proposal it made', () => V.conn.reducers.cfoConfirm({ proposalId: material.id, note: 'x' }), /its own Proposal/);
+    await sleep(200);
+    check(status(material.id) === 'AwaitingCfo', 'it still waits for a CFO who did not propose it', status(material.id));
+    await X.conn.reducers.cfoSendBack({ proposalId: material.id, notePlain: 'smoke cleanup' });
+    for (const p of [material, own]) await A.conn.reducers.rejectProposal({ proposalId: p.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+    W.conn.disconnect();
+    V.conn.disconnect();
+  });
+
+  await section('F24: a credit tier is derived from the recorded evidence, never taken from the caller', async () => {
+    const guarantor = cust0.guarantorPersonaId;
+    const other = guarantor === 'P02' ? 'P03' : 'P02';
+    const nw = [...db.vendor.iter()].find(v => v.name === 'Northwind Cloud')!;
+    const rec = (requestId: string, facts: unknown, o: { personaId?: string; subjectKind?: string; subjectId?: bigint } = {}) =>
+      C.conn.reducers.recordCreditCheck({
+        subjectKind: o.subjectKind ?? 'customer',
+        subjectId: o.subjectId ?? cust0.id,
+        personaId: o.personaId ?? guarantor,
+        product: 'fraud_finder',
+        requestId,
+        summaryJson: JSON.stringify({ product: 'fraud_finder', requestId, summary: 'smoke evidence', status: 200, ...(facts === undefined ? {} : { facts }) }),
+      });
+    const rowOf = (requestId: string) => waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === requestId), `credit check ${requestId}`);
+    await refuses('a credit check with no evidence facts', () => rec('smk-cc-none', undefined), /facts/);
+    await refuses("a credit check on someone other than the customer's guarantor", () => rec('smk-cc-other', CLEAN_FACTS, { personaId: other }), new RegExp(`guarantor of customer ${cust0.id} .* is ${guarantor}; a check on ${other} is not evidence`));
+    await refuses('a credit check on a vendor with no owner on file', () => rec('smk-cc-nw', CLEAN_FACTS, { subjectKind: 'vendor', subjectId: nw.id, personaId: 'P01' }), /no owner/);
+    await refuses('evidence that passes identity and fraud but skips the bureaus', () => rec('smk-cc-short', { ...CLEAN_FACTS, bureaus: {} }), /all three credit bureaus/);
+    await refuses('evidence whose fraud level contradicts its score', () => rec('smk-cc-fraud', { ...CLEAN_FACTS, fraud: { ...CLEAN_FACTS.fraud, score: 85, level: 'low' } }), /fraud level/);
+    await accepts("a deceased guarantor's evidence (the caller states no tier)", () => rec('smk-cc-dead', DECEASED_FACTS));
+    const dead = await rowOf('smk-cc-dead');
+    check(dead.tier === 'BLOCK' && dead.decision === 'DECLINE', 'the tier on file is the one its evidence derives', `${dead.tier}/${dead.decision}`);
+    const decide = (tier: string, ids: string[], paymentTermsDays: number) => propose(C, 'credit_decision', { customerId: cust0.id.toString(), tier, paymentTermsDays, creditCheckIds: ids }, CLOSE);
+    await refuses('a credit decision citing no credit check', () => decide('A', [], 45), /must cite/);
+    await refuses('a credit decision with a tier its evidence does not derive', () => decide('A', ['smk-cc-dead'], 45), /derives tier BLOCK, not A/);
+    await refuses('a credit decision with an unknown tier', () => decide('AAA', ['smk-cc-dead'], 45), /tier must be one of/);
+    await sleep(20);
+    await accepts('clean evidence for the same guarantor', () => rec('smk-cc-clean', CLEAN_FACTS));
+    const clean = await rowOf('smk-cc-clean');
+    check(clean.tier === 'A' && clean.decision === 'APPROVE', 'clean evidence derives tier A', `${clean.tier}/${clean.decision}`);
+    await refuses('longer payment terms than the tier allows', () => decide('A', ['smk-cc-clean'], 60), /at most 45-day/);
+    const ok = await accepts('a tier A decision citing the clean check', () => decide('A', ['smk-cc-clean'], 30));
+    if (ok) {
+      await settle(ok);
+      const c = db.customer.id.find(cust0.id)!;
+      check(c.creditTier === 'A' && c.paymentTermsDays === 30, 'the ruled decision sets the tier and terms', `${c.creditTier} ${c.paymentTermsDays}`);
+    }
+    await sleep(20);
+    await accepts('newer evidence: the guarantor has since died', () => rec('smk-cc-dead-2', DECEASED_FACTS));
+    await rowOf('smk-cc-dead-2');
+    await refuses('a decision citing the older clean check after a newer BLOCK', () => decide('A', ['smk-cc-clean'], 30), /latest credit check \(request smk-cc-dead-2.*derives tier BLOCK/);
+    const block = await accepts('a BLOCK decision with no credit, citing the latest check', () => decide('BLOCK', ['smk-cc-dead-2'], 0));
+    if (block) await settle(block);
+    // A provider call can come back without a request id; the books store it as ''. Such a row cannot be cited, so it
+    // must not make every decision for the customer impossible: the decision's tier must match the latest check's.
+    await sleep(20);
+    await accepts('newer clean evidence recorded without a request id', () => rec('', CLEAN_FACTS));
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === '' && r.subjectId === cust0.id && r.tier === 'A'), 'the id-less clean check');
+    const idless = await accepts('a tier A decision while the latest check (tier A) has no request id', () => decide('A', ['smk-cc-clean'], 30));
+    if (idless) await settle(idless);
+    // A newer check at the same tier does not strand a decision that is still waiting for its ruling.
+    const waiting = await accepts('a tier A decision citing the clean check', () => decide('A', ['smk-cc-clean'], 30));
+    await sleep(20);
+    await accepts('newer clean evidence lands before the ruling', () => rec('smk-cc-clean-3', CLEAN_FACTS));
+    await rowOf('smk-cc-clean-3');
+    if (waiting) await accepts('the waiting decision is still ruled on, since the latest check derives the same tier', () => settle(waiting));
+  });
+
+  await section('Advisor amendments wait for the CFO, whatever the amount', async () => {
+    const small = await je(B, CLOSE, [{ accountCode: '6000', debitMinor: '300', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '300' }]);
+    const amendedPayload = JSON.stringify({ ...JSON.parse(small.payloadJson), memo: 'smoke amended memo' });
+    await accepts('the Advisor amends an entry far below the threshold', () =>
+      A.conn.reducers.approveProposal({ proposalId: small.id, rationale: 'smoke amendment', summaryPlain: 'Amended by the smoke test.', amendedPayloadJson: amendedPayload }),
+    );
+    await waitFor(() => !['Open', 'SentBack'].includes(status(small.id)), 'amendment ruled');
+    check(status(small.id) === 'AwaitingCfo', 'an amendment waits for the CFO even below the threshold', status(small.id));
+    check(entriesOf(small.id).length === 0, 'nothing posts before the CFO confirms the amendment');
+    await accepts('the CFO confirms the amendment', () => X.conn.reducers.cfoConfirm({ proposalId: small.id, note: '' }));
+    await waitFor(() => status(small.id) === 'Amended', 'amendment applied');
+    const posted = entriesOf(small.id);
+    check(posted.length === 1 && posted[0]!.memo === 'smoke amended memo', 'the confirmed amendment posts the amended entry', posted.map(e => e.memo).join(', '));
   });
 
   await section('Feed on fresh seed data: the month being closed is never a feed month', async () => {
@@ -461,20 +603,22 @@ async function main() {
   });
 
   await section('M2: vendor verification needs the latest clean checks', async () => {
-    const nw = [...db.vendor.iter()].find(v => v.name === 'Northwind Cloud')!;
-    const rec = (product: string, requestId: string, tier: string, decision: string) =>
-      C.conn.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: nw.id, personaId: 'P01', product, requestId, summaryJson: '{}', tier, decision });
-    await rec('tu_identity_verification', 'smk-id-1', 'A', 'APPROVE');
-    await rec('fraud_finder', 'smk-fr-1', 'A', 'APPROVE');
+    // A vendor with an owner on file; each row's tier is derived from its facts (A clean, BLOCK deceased, B at 700).
+    const nw = [...db.vendor.iter()].find(v => v.name === 'Lumen Analytics' && v.ownerPersonaId)!;
+    const rec = (product: string, requestId: string, facts: unknown) =>
+      C.conn.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: nw.id, personaId: nw.ownerPersonaId!, product, requestId, summaryJson: JSON.stringify({ product, requestId, summary: 'smoke evidence', status: 200, facts }) });
+    const tierB = { ...CLEAN_FACTS, bureaus: { ...CLEAN_FACTS.bureaus, equifax: bureauFile(700) } };
+    await rec('tu_identity_verification', 'smk-id-1', CLEAN_FACTS);
+    await rec('fraud_finder', 'smk-fr-1', CLEAN_FACTS);
     await sleep(20);
-    await rec('fraud_finder', 'smk-fr-2', 'BLOCK', 'DECLINE');
+    await rec('fraud_finder', 'smk-fr-2', DECEASED_FACTS);
     await sleep(200);
     const verify = (ids: string[]) => propose(C, 'vendor_verify', { vendorId: nw.id.toString(), creditCheckIds: ids }, CLOSE);
     check(db.vendor.id.find(nw.id)!.verification.tag === 'Unverified', 'recording clean checks does not verify a vendor');
     await refuses('verification citing older clean rows after a newer DECLINE', () => verify(['smk-id-1', 'smk-fr-1']), /latest fraud_finder check .* is DECLINE/);
     await refuses('verification citing an unrecorded request id', () => verify(['smk-id-1', 'smk-fr-1', 'nope']), /not recorded credit checks/);
     await sleep(20);
-    await rec('fraud_finder', 'smk-fr-3', 'B', 'APPROVE');
+    await rec('fraud_finder', 'smk-fr-3', tierB);
     await sleep(200);
     await refuses('verification that also cites the old DECLINE row', () => verify(['smk-id-1', 'smk-fr-3', 'smk-fr-2']), /not a clean APPROVE/);
     const ok = await accepts('verification citing the latest clean identity and fraud checks', () => verify(['smk-id-1', 'smk-fr-3']));
@@ -496,7 +640,35 @@ async function main() {
     await refuses('L2: duplicate bankTxIds in a journal entry', () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '1', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1' }], { bankTxIds: [`0${free.id}`, Number(free.id)] }), /listed twice/);
   });
 
+  /** Record one owner check on a vendor with these facts (the module derives its tier). */
+  const ownerCheck = (v: { id: bigint; ownerPersonaId?: string }, requestId: string, facts: unknown) =>
+    C.conn.reducers.recordCreditCheck({
+      subjectKind: 'vendor',
+      subjectId: v.id,
+      personaId: v.ownerPersonaId!,
+      product: 'fraud_finder',
+      requestId,
+      summaryJson: JSON.stringify({ product: 'fraud_finder', requestId, summary: 'smoke evidence', status: 200, facts }),
+    });
+
+  await section('Vendor blocks rest on a BLOCK owner check whenever an owner is on file', async () => {
+    const pet = [...db.vendor.iter()].find(v => v.name === 'Pettigrew Consulting' && v.ownerPersonaId)!;
+    const block = () => propose(C, 'vendor_block', { vendorId: pet.id.toString(), reasonPlain: 'smoke: the owner failed its checks' }, CLOSE);
+    await refuses('blocking a vendor whose owner has no recorded check', block, /no recorded owner check/);
+    await accepts("a clean check on the vendor's owner", () => ownerCheck(pet, 'smk-pet-clean', CLEAN_FACTS));
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-pet-clean'), 'clean owner check');
+    await refuses("blocking a vendor whose owner's latest check is clean", block, /derives tier A, not BLOCK/);
+    await sleep(20);
+    await accepts("a newer check: the vendor's owner has died", () => ownerCheck(pet, 'smk-pet-dead', DECEASED_FACTS));
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-pet-dead'), 'BLOCK owner check');
+    const ok = await accepts("blocking once the owner's latest check derives BLOCK", block);
+    if (ok) await settle(ok);
+    check(db.vendor.id.find(pet.id)!.verification.tag === 'Blocked', 'Pettigrew is blocked');
+  });
+
   await section('L6 and finding 6: nothing pays a blocked vendor; voiding its bill is allowed', async () => {
+    await ownerCheck(bds, 'smk-bds-block', DECEASED_FACTS);
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-bds-block'), 'BDS owner check');
     const block = await propose(C, 'vendor_block', { vendorId: bds.id.toString(), reasonPlain: 'the owner failed identity checks' }, CLOSE);
     await settle(block);
     check(db.vendor.id.find(bds.id)!.verification.tag === 'Blocked', 'BDS is blocked');
@@ -796,6 +968,7 @@ async function main() {
       await X.conn.reducers.seedVendors({ subsidiaryCode: root.code, vendors: [{ name: payroll.counterparty, domain: 'smoke.example', category: 'smoke', ownerPersonaId: undefined }] });
       payee = await waitFor(() => [...db.vendor.iter()].find(v => v.name === payroll.counterparty), 'payee vendor');
     }
+    // The payee has no owner on file, so no owner check is possible and the block stands on its reason alone.
     await settle(await propose(C, 'vendor_block', { vendorId: payee.id.toString(), reasonPlain: 'smoke: the payee failed its checks while the match waited' }, CLOSE));
     await refuses('CFO confirms the bank match after its payee was blocked', () => X.conn.reducers.cfoConfirm({ proposalId: bm.id, note: 'go' }), /is blocked/);
     await X.conn.reducers.cfoSendBack({ proposalId: bm.id, notePlain: 'smoke cleanup' });
@@ -922,6 +1095,20 @@ async function main() {
     check(!!db.agentRoster.role.find('cfo'), 'the CFO keeps the seat');
   });
 
+  await section('Releasing the CFO seat: only the CFO or the database owner', async () => {
+    await refuses('the Advisor releases the CFO seat', () => A.conn.reducers.releaseCfo({}), /Only the CFO or the database owner/);
+    await refuses('a worker releases the CFO seat', () => B.conn.reducers.releaseCfo({}), /Only the CFO or the database owner/);
+    check(!!db.agentRoster.role.find('cfo'), 'the CFO still holds the seat after both refusals');
+    await accepts('the CFO gives up its own seat', () => X.conn.reducers.releaseCfo({}));
+    await waitFor(() => !db.agentRoster.role.find('cfo'), 'seat released by the CFO');
+    const again = randomBytes(18).toString('base64url');
+    await accepts('the owner arms a new claim', async () => armBootstrap(DB, again));
+    await accepts('the CFO claims the seat again', () => X.conn.reducers.claimCfo({ secret: again, displayName: 'Smoke CFO' }));
+    await waitFor(() => !!db.agentRoster.role.find('cfo'), 'seat claimed again');
+    await accepts('the database owner releases the seat through the CLI', async () => run(BIN, ['call', DB, 'release_cfo', '--server', 'local', '--no-config', '--yes']));
+    await waitFor(() => !db.agentRoster.role.find('cfo'), 'seat released by the owner');
+  });
+
   A.conn.disconnect();
   X.conn.disconnect();
   for (const w of Object.values(workers)) w.conn.disconnect();
@@ -958,9 +1145,9 @@ async function legacy() {
     run(tsx, [join(dir, 'seed', 'src', 'load.ts')], { SPACETIMEDB_DB_NAME: LEGACY_DB }, join(dir, 'seed'));
     const oldToken = [join(dir, '.secrets', LEGACY_DB, 'advisor.token'), join(dir, '.secrets', 'advisor.token')].find(f => existsSync(f));
     if (!oldToken) throw new Error('the legacy loader saved no advisor token');
-    // Rows of tables whose schema changed since (bank_match.paymentJeId, subsidiary.isElimination) would not decode with
-    // today's bindings, so these connections do not subscribe to them.
-    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'vendor', 'agent_roster'];
+    // Rows of tables whose schema changed since (bank_match.paymentJeId, subsidiary.isElimination, the listing columns on
+    // customer and vendor) would not decode with today's bindings, so these connections do not subscribe to them.
+    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'agent_roster'];
     const A = await connect(LEGACY_DB, 'advisor', readFileSync(oldToken, 'utf8').trim(), tables);
     const B = await connect(LEGACY_DB, 'bookkeeper', undefined, tables);
     // The old module seats the CFO by first claim and records no database owner, so an owner-armed claim is impossible
@@ -971,9 +1158,9 @@ async function legacy() {
     const db = A.conn.db;
     const sub = [...db.journalEntry.iter()][0]!.subsidiaryId.toString();
     const close = JSON.parse(readFileSync(join(dir, 'seed', 'out', 'seed.json'), 'utf8')).closeYm as string;
-    const lumen = [...db.vendor.iter()].find(v => v.name === 'Lumen Analytics')!;
-    const bill = [...db.bill.iter()].find(b => b.vendorId === lumen.id && b.ym === close)!;
-    const tx = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === close && t.amountMinor === -bill.amountMinor && t.counterparty === lumen.name)!;
+    // The Lumen Analytics payment and the bill it pays, found through the bank line (vendor rows are not subscribed).
+    const tx = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === close && t.counterparty === 'Lumen Analytics' && t.amountMinor < 0n)!;
+    const bill = [...db.bill.iter()].find(b => b.ym === close && b.amountMinor === -tx.amountMinor)!;
     const proposeOld = async (kind: string, payload: object, label: string) => {
       const summary = `Smoke legacy ${label}, a plain English summary.`;
       await B.conn.reducers.propose({ kind, payloadJson: JSON.stringify(payload), rationale: 'smoke', summaryPlain: summary, amountMinor: 0n, periodYm: close, closeTaskId: undefined });

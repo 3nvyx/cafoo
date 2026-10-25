@@ -51,7 +51,6 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const crs = crsServer();
   // A group (a second trading company and an elimination subsidiary) gets the Consolidation agent too.
   const group = groupSnapshot(cast.advisor).entities.filter(e => !e.isElimination).length > 1;
-  const stopCritic = startCritic(cast);
 
   const A = cast.advisor;
   const advisorCharter = activeCharter(A, 'advisor');
@@ -84,8 +83,15 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // The root pre-approves every harness tool so subagents can use theirs under dontAsk; the gate keeps each to its own list.
   const allowedTools = [...new Set([advisorCharter.harness, ...WORKERS.map(r => activeCharter(A, r).harness)].flatMap(h => h.tools))];
   let total = 0;
+  /** The most the whole close may spend (CLOSE_BUDGET_USD, empty means the default); each run gets what is left. */
+  const budget = Number(process.env.CLOSE_BUDGET_USD?.trim() || 15);
   /** One Advisor query over the same servers, subagents and gate. */
   const run = async (prompt: string) => {
+    const left = budget - total;
+    if (!(left > 0)) {
+      onStep(`the close budget of $${budget.toFixed(2)} is spent ($${total.toFixed(2)}); no further Advisor run`);
+      return;
+    }
     const env = await claudeProcessEnv();
     for await (const msg of query({
       prompt,
@@ -105,7 +111,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
           PostToolUseFailure: [{ matcher: '^mcp__', hooks: [gate] }],
         },
         env,
-        maxBudgetUsd: Number(process.env.CLOSE_BUDGET_USD ?? 15),
+        maxBudgetUsd: left,
         settingSources: [],
       },
     })) {
@@ -163,6 +169,8 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
       await ruleOpen(cast, open, { thread: `close:${periodYm}`, snapshot: snapshot(A, periodYm), log: onStep, secondCritic: false });
     }
   };
+  // Started only now, so a close that fails while setting up (a charter that does not build) leaves no critic running.
+  const stopCritic = startCritic(cast);
   try {
     // The opening message marks the close as started, so a second run resumes instead of proposing twice.
     await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');

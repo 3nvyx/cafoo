@@ -1,22 +1,23 @@
 <script lang="ts">
+	// Material 3 snackbars for action results: inverse surface, one line of plain English, a dismiss button.
+	// On phones they sit above the bottom navigation bar.
 	import { toasts } from '#lib/toast.svelte.js';
 	import { arrive } from '#lib/motion.js';
 	import Icon from './Icon.svelte';
 </script>
 
-<div class="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2 sm:left-auto sm:w-[380px]" aria-live="polite" role="status">
+<div
+	class="pointer-events-none fixed inset-x-4 bottom-[calc(88px+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 md:right-6 md:bottom-6 md:left-auto md:w-[400px] md:items-end"
+	aria-live="polite"
+	role="status"
+>
 	{#each toasts.items as t (t.id)}
-		<div
-			in:arrive
-			class="pointer-events-auto flex w-full items-start gap-3 rounded-card border bg-surface px-4 py-3 text-[15px] {t.tone === 'error'
-				? 'border-neg text-ink'
-				: 'border-line-strong text-ink'}"
-		>
-			<span class="mt-0.5 {t.tone === 'error' ? 'text-neg' : t.tone === 'success' ? 'text-pos' : 'text-ink-3'}">
+		<div in:arrive class="pointer-events-auto flex w-full items-start gap-3 rounded-[12px] bg-inverse-surface py-3 pr-2 pl-4 text-[15px] text-inverse-on-surface shadow-[var(--elevation-2)]">
+			<span class="mt-0.5 shrink-0" style="color: {t.tone === 'error' ? 'var(--inverse-error)' : t.tone === 'success' ? 'var(--inverse-success)' : 'var(--inverse-primary)'}">
 				<Icon name={t.tone === 'error' ? 'alert' : 'check'} size={18} />
 			</span>
-			<p class="flex-1">{t.text}</p>
-			<button class="-m-2 grid size-11 shrink-0 place-items-center text-ink-3 hover:text-ink" aria-label="Dismiss" onclick={() => toasts.dismiss(t.id)}>
+			<p class="flex-1 py-px">{t.text}</p>
+			<button class="state -my-2 grid size-11 shrink-0 place-items-center rounded-full" aria-label="Dismiss" onclick={() => toasts.dismiss(t.id)}>
 				<Icon name="x" size={16} />
 			</button>
 		</div>

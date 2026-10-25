@@ -39,7 +39,8 @@
 			code: l.code,
 			name: accounts.get(l.code)?.name ?? (l.memo || l.code),
 			debitMinor: l.debitMinor,
-			creditMinor: l.creditMinor
+			creditMinor: l.creditMinor,
+			ccy: l.ccy ?? db.subsidiaries().find((s) => s.id === accounts.get(l.code)?.subsidiaryId)?.baseCurrency
 		}))
 	);
 	const schedule = $derived(scheduleLinesOf(payload));
@@ -84,10 +85,10 @@
 	onfocusin={onfocus}
 	aria-labelledby="proposal-{p.id}-summary"
 	class="card flex scroll-mt-24 flex-col gap-4 p-4 transition-[border-color,box-shadow] duration-300 sm:p-5 {p.status === 'awaiting_cfo'
-		? 'border-2 border-focus'
+		? 'border-primary shadow-[0_0_0_1px_var(--primary)]'
 		: ''} {focused && ui.expert ? 'ring-2 ring-focus ring-offset-2 ring-offset-canvas' : ''}"
 >
-	<header class="flex items-start gap-3">
+	<header class="flex flex-wrap items-start gap-x-3 gap-y-2">
 		<RoleAvatar role={p.proposerRole} />
 		<div class="min-w-0 flex-1 text-sm">
 			<p class="font-medium">{roleName(p.proposerRole)}</p>
@@ -98,7 +99,7 @@
 		{/key}
 	</header>
 
-	<p id="proposal-{p.id}-summary" class="text-xl leading-7 font-medium text-ink">{p.summaryPlain}</p>
+	<p id="proposal-{p.id}-summary" class="font-display text-[22px] leading-[1.3] font-normal text-ink">{p.summaryPlain}</p>
 
 	<div>
 		<p class="eyebrow">{amountLabel}</p>
@@ -106,7 +107,7 @@
 	</div>
 
 	{#if approval}
-		<p class="self-start rounded-btn bg-accent-soft px-3 py-1.5 text-sm text-accent-ink"><span class="font-medium">Advisor:</span> {approval.summaryPlain}</p>
+		<p class="rounded-[12px] bg-surface-container px-3 py-2 text-sm text-ink-2"><span class="font-semibold text-primary">Advisor:</span> {approval.summaryPlain}</p>
 	{/if}
 
 	{#if p.status === 'awaiting_cfo'}
@@ -123,7 +124,7 @@
 					onkeydown={(e) => e.key === 'Escape' && (composing = false)}
 				/>
 				<div class="flex gap-2">
-					<button type="button" class="btn flex-1 sm:flex-none" onclick={() => (composing = false)}>Cancel</button>
+					<button type="button" class="btn btn-text flex-1 sm:flex-none" onclick={() => (composing = false)}>Cancel</button>
 					<button class="btn btn-primary flex-1 sm:flex-none" disabled={busy || !note.trim()}>Send back</button>
 				</div>
 			</form>
@@ -131,11 +132,11 @@
 			<div class="grid grid-cols-2 gap-3 sm:flex">
 				<button class="btn btn-primary btn-lg sm:min-w-[160px]" disabled={busy} onclick={confirm}>
 					{busy ? 'Confirming…' : 'Confirm'}
-					{#if ui.expert}<kbd class="hidden rounded border border-white/40 px-1 font-mono text-xs sm:inline">A</kbd>{/if}
+					{#if ui.expert}<kbd class="hidden rounded-[6px] border border-current/40 px-1 font-mono text-xs sm:inline">A</kbd>{/if}
 				</button>
 				<button class="btn btn-lg sm:min-w-[160px]" disabled={busy} onclick={startSendBack}>
 					Send back
-					{#if ui.expert}<kbd class="hidden rounded border border-line px-1 font-mono text-xs text-ink-3 sm:inline">S</kbd>{/if}
+					{#if ui.expert}<kbd class="kbd hidden sm:inline-block">S</kbd>{/if}
 				</button>
 			</div>
 		{/if}

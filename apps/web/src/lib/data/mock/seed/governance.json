@@ -73,8 +73,9 @@
 		{ "id": "ct-2", "periodId": "2026-09", "order": 2, "title": "Accrue unbilled costs and review payables", "ownerRole": "bookkeeper", "status": "in_progress", "proposalIds": ["pr-03", "pr-04"] },
 		{ "id": "ct-3", "periodId": "2026-09", "order": 3, "title": "Recognize revenue and roll deferred revenue", "ownerRole": "revenue", "status": "in_progress", "proposalIds": ["pr-07", "pr-02"] },
 		{ "id": "ct-4", "periodId": "2026-09", "order": 4, "title": "Review receivables, Risk Tiers and the Allowance", "ownerRole": "credit", "status": "blocked", "proposalIds": ["pr-06", "pr-08"] },
-		{ "id": "ct-5", "periodId": "2026-09", "order": 5, "title": "Advisor rules on every open Proposal", "ownerRole": "advisor", "status": "todo", "proposalIds": [] },
-		{ "id": "ct-6", "periodId": "2026-09", "order": 6, "title": "CFO locks September", "ownerRole": "cfo", "status": "todo", "proposalIds": [] }
+		{ "id": "ct-7", "periodId": "2026-09", "order": 5, "title": "Consolidate subsidiaries", "ownerRole": "consolidation", "status": "todo", "proposalIds": [] },
+		{ "id": "ct-5", "periodId": "2026-09", "order": 6, "title": "Advisor rules on every open Proposal", "ownerRole": "advisor", "status": "todo", "proposalIds": [] },
+		{ "id": "ct-6", "periodId": "2026-09", "order": 7, "title": "CFO locks September", "ownerRole": "cfo", "status": "todo", "proposalIds": [] }
 	],
 	"auditEvents": [
 		{ "id": "ae-01", "actorRole": "cfo", "action": "period.lock", "targetTable": "period", "targetId": "2026-08", "detailJson": "{\"note\":\"August locked\"}", "at": "2026-09-03T16:42:00Z" },

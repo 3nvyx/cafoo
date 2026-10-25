@@ -1,0 +1,2 @@
+uagents==0.25.5
+python-dotenv

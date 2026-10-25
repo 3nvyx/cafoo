@@ -59,7 +59,7 @@
 
 <svelte:head><title>Proposals · Cafoo</title></svelte:head>
 
-<h1 class="text-[32px]">Proposals</h1>
+<h1 class="text-[34px] sm:text-[42px]">Proposals</h1>
 <p class="mt-2 max-w-[60ch] text-ink-2">
 	Every change an agent wants to make to the books. Nothing touches a balance until the Advisor approves it, and anything over your threshold waits for you.
 </p>

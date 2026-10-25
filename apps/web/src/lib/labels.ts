@@ -6,6 +6,8 @@ export const ROLE: Record<PostedByRole, { name: string; initials: string }> = {
 	bookkeeper: { name: 'Bookkeeper', initials: 'BK' },
 	revenue: { name: 'Revenue', initials: 'RV' },
 	credit: { name: 'Credit & Risk', initials: 'CR' },
+	consolidation: { name: 'Consolidation', initials: 'CO' },
+	feed: { name: 'Bank feed', initials: 'BF' },
 	redteam: { name: 'Red Team', initials: 'RT' },
 	cfo: { name: 'CFO', initials: 'You' },
 	system: { name: 'System', initials: 'SY' },
@@ -30,7 +32,9 @@ export const KIND: Record<ProposalKind, string> = {
 	credit_decision: 'Credit decision',
 	accrual: 'Accrual',
 	vendor_block: 'Vendor block',
-	vendor_verify: 'Vendor check'
+	vendor_verify: 'Vendor check',
+	fx_revaluation: 'Revaluation',
+	ic_elimination: 'Elimination'
 };
 
 export const STATUS: Record<ProposalStatus, { label: string; tone: Tone }> = {

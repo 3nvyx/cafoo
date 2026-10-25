@@ -34,6 +34,10 @@
 				{ href: '/customers', label: 'Customers', icon: 'users' },
 				{ href: '/vendors', label: 'Vendors', icon: 'truck' }
 			]
+		},
+		{
+			title: 'Governance',
+			items: [{ href: '/charters', label: 'Charters', icon: 'shield' }]
 		}
 	];
 

@@ -18,14 +18,22 @@ export function lastDayOfYm(ym: string): string {
 	return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
 
-export const subsidiary = (r: B.Subsidiary): U.Subsidiary => ({ id: String(r.id), name: r.name, baseCurrency: r.functionalCcy });
+export const subsidiary = (r: B.Subsidiary): U.Subsidiary => ({
+	id: String(r.id),
+	name: r.name,
+	baseCurrency: r.functionalCcy,
+	code: r.code,
+	parentId: sid(r.parentId),
+	isElimination: r.isElimination
+});
 
 export const account = (r: B.Account): U.Account => ({
 	id: String(r.id),
 	subsidiaryId: String(r.subsidiaryId),
 	code: r.code,
 	name: r.name,
-	type: lower<U.AccountType>(r.accountType.tag)
+	type: lower<U.AccountType>(r.accountType.tag),
+	isIntercompany: r.isIntercompany
 });
 
 export const period = (r: B.Period, locks: B.PeriodLock[]): U.Period => ({
@@ -54,12 +62,49 @@ export const journalLine = (r: B.JournalLine): U.JournalLine => ({
 	accountId: String(r.accountId),
 	debitMinor: r.debitMinor.toString(),
 	creditMinor: r.creditMinor.toString(),
+	ccy: r.ccy,
+	fxRateE6: r.fxRateE6.toString(),
 	customerId: sid(r.customerId),
 	vendorId: sid(r.vendorId)
 });
 
+export const fxRate = (r: B.FxRate): U.FxRate => ({
+	id: String(r.id),
+	fromCcy: r.fromCcy,
+	toCcy: r.toCcy,
+	ym: r.ym,
+	rateE6: r.rateE6.toString(),
+	kind: lower<U.FxRateKind>(r.kind.tag)
+});
+
+export const charterVersion = (r: B.CharterVersion): U.CharterVersion => ({
+	id: String(r.id),
+	role: r.role,
+	version: r.version,
+	status: lower<U.CharterStatus>(r.status.tag),
+	bodyMd: r.bodyMd,
+	mappingJson: r.mappingJson,
+	summaryPlain: r.summaryPlain,
+	basedOnVersionId: sid(r.basedOnVersionId),
+	authoredByRole: r.authoredByRole,
+	createdAt: iso(r.createdAt),
+	publishedAt: r.publishedAt ? iso(r.publishedAt) : undefined
+});
+
+export const charterEval = (r: B.CharterEval): U.CharterEval => ({
+	id: String(r.id),
+	charterVersionId: String(r.charterVersionId),
+	passed: r.passed,
+	mode: r.mode === 'dry_run' ? 'dry_run' : 'snapshot',
+	resultsJson: r.resultsJson,
+	summaryPlain: r.summaryPlain,
+	ranByRole: r.ranByRole,
+	ranAt: iso(r.ranAt)
+});
+
 export const customer = (r: B.Customer): U.Customer => ({
 	id: String(r.id),
+	subsidiaryId: String(r.subsidiaryId),
 	name: r.name,
 	domain: r.domain,
 	guarantorPersonaId: r.guarantorPersonaId,

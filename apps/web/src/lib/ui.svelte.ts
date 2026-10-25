@@ -1,10 +1,13 @@
-// App-wide view state: Simple/Expert mode, the selected Period, nav and palette.
+// App-wide view state: Simple/Expert mode, the theme, the selected Period, nav and palette.
 // Persisted bits go through localStorage, always wrapped: storage can be blocked.
 
 export type Mode = 'simple' | 'expert';
+/** 'system' follows the device; 'light' and 'dark' pin one. app.html applies a pinned theme before first paint. */
+export type Theme = 'system' | 'light' | 'dark';
 
 const KEY_MODE = 'cafoo.mode';
 const KEY_NAV = 'cafoo.navCollapsed';
+const KEY_THEME = 'cafoo.theme';
 
 function read(key: string): string | null {
 	try {
@@ -24,6 +27,7 @@ function write(key: string, value: string) {
 
 class UiState {
 	mode: Mode = $state('simple');
+	theme: Theme = $state('system');
 	periodId = $state('2026-09');
 	navCollapsed = $state(false);
 	navOpenMobile = $state(false);
@@ -37,6 +41,15 @@ class UiState {
 		const m = read(KEY_MODE);
 		if (m === 'simple' || m === 'expert') this.mode = m;
 		this.navCollapsed = read(KEY_NAV) === '1';
+		const t = read(KEY_THEME);
+		if (t === 'light' || t === 'dark') this.theme = t;
+	}
+
+	setTheme(t: Theme) {
+		this.theme = t;
+		write(KEY_THEME, t);
+		if (t === 'system') delete document.documentElement.dataset.theme;
+		else document.documentElement.dataset.theme = t;
 	}
 
 	setMode(m: Mode) {

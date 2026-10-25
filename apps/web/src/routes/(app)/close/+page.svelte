@@ -45,7 +45,7 @@
 	<div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
 		<div>
 			<p class="eyebrow">Month-end close</p>
-			<h1 class="text-[32px]">{periodLabel(period)}</h1>
+			<h1 class="text-[34px] sm:text-[42px]">{periodLabel(period)}</h1>
 			<div class="mt-2"><LiveActivity periodId={period.id} /></div>
 		</div>
 		<div class="w-full lg:w-[320px]"><CloseProgress periodId={period.id} /></div>

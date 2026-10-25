@@ -67,7 +67,7 @@
 	<section class="flex flex-col gap-6 border-b border-line pb-8 lg:flex-row lg:items-end lg:justify-between">
 		<div class="flex flex-col gap-2">
 			<p class="eyebrow">Cafoo Inc · {periodLabel(period)}</p>
-			<h1 class="max-w-[22ch] text-[32px] sm:text-[40px]">{headline}</h1>
+			<h1 class="max-w-[20ch] text-[36px] sm:text-[48px]">{headline}</h1>
 			{#if gate.canLock && gate.request}
 				<p class="max-w-[60ch] text-ink-2"><span class="font-medium text-ink">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</p>
 			{/if}

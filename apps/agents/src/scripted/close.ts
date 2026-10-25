@@ -20,7 +20,7 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
-import { CrsClient, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
+import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
 import { STEP_MS } from '../env';
 import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
@@ -534,13 +534,15 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   for (const cust of exposed) {
     const result = await runCascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
     for (const ev of result.evidence) {
-      await C.reducers.recordCreditCheck({ subjectKind: 'customer', subjectId: cust.id, personaId: cust.guarantorPersonaId, product: ev.product, requestId: ev.requestId ?? '', summaryJson: JSON.stringify(ev), tier: result.tier, decision: result.decision });
+      // The row carries the cascade's facts; the books derive its tier and decision from them, never from us.
+      await C.reducers.recordCreditCheck({ subjectKind: 'customer', subjectId: cust.id, personaId: cust.guarantorPersonaId, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
     }
     const ar = openAr.get(cust.id) ?? 0n;
     const tier = result.tier as RiskTier;
     await file(C, {
       kind: 'credit_decision',
-      payload: { customerId: cust.id.toString(), tier: result.tier, paymentTermsDays: result.paymentTermsDays ?? 0, creditCheckIds: result.evidence.map(e => e.requestId) },
+      // Cites every row just recorded (the latest among them), each of which the books derived at this tier.
+      payload: { customerId: cust.id.toString(), tier: result.tier, paymentTermsDays: result.paymentTermsDays ?? 0, creditCheckIds: result.evidence.map(e => e.requestId).filter(Boolean) },
       rationale: result.summaryTechnical,
       summaryPlain: creditDecisionSummary(cust.name, result.summaryPlain),
       amountMinor: 0n,
@@ -585,7 +587,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   for (const v of unverified) {
     const result = await runCascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
     for (const ev of result.evidence) {
-      await C.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: v.id, personaId: v.ownerPersonaId!, product: ev.product, requestId: ev.requestId ?? '', summaryJson: JSON.stringify(ev), tier: result.tier, decision: result.decision });
+      await C.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: v.id, personaId: v.ownerPersonaId!, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
     }
     const openBills = s.bills.filter(b => b.vendorId === v.id && b.status !== 'paid');
     const exposure = openBills.reduce((a, b) => a + b.amountMinor, 0n);

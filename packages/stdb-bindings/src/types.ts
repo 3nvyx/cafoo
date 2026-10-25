@@ -481,6 +481,9 @@ export const MessageKind = __t.enum("MessageKind", {
 });
 export type MessageKind = __Infer<typeof MessageKind>;
 
+export const MyAgentIdentity = __t.object("MyAgentIdentity", {});
+export type MyAgentIdentity = __Infer<typeof MyAgentIdentity>;
+
 export const OverdueSweep = __t.object("OverdueSweep", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),

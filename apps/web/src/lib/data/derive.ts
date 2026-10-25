@@ -1,5 +1,5 @@
-// Pure read-side maths over DataSource rows: balances, Board Pack sections,
-// ARR, aging, Allowance. No side effects, so the same code works on any source.
+// Pure read-side maths over DataSource rows: one account's balance, ARR, aging, Allowance. No side effects, so the
+// same code works on any source. The Board Pack's statements, which need translation and consolidation, are group.ts.
 import type { Account, AccountType, Contract, Customer, Invoice, JournalEntry, JournalLine, Minor, Period, RiskTier } from './types';
 import { toBig } from './money';
 
@@ -48,109 +48,6 @@ export function balances(books: Books, periodIds?: Set<string>): Map<string, big
 
 export function periodsThrough(periods: Period[], periodId: string): Set<string> {
 	return new Set(periods.filter((p) => p.id <= periodId).map((p) => p.id));
-}
-
-export function quarterOf(periods: Period[], periodId: string): Set<string> {
-	const p = periods.find((x) => x.id === periodId);
-	if (!p) return new Set();
-	const q = Math.floor((p.month - 1) / 3);
-	return new Set(periods.filter((x) => x.year === p.year && Math.floor((x.month - 1) / 3) === q && x.id <= periodId).map((x) => x.id));
-}
-
-/** The quarter-to-date months of `periodId` as an inclusive range of period ids, for drill-down links. */
-export function quarterRange(periods: Period[], periodId: string): { from: string; to: string } {
-	const ids = [...quarterOf(periods, periodId)].sort();
-	return { from: ids[0] ?? periodId, to: periodId };
-}
-
-export interface StatementRow {
-	account: Account;
-	month: Minor;
-	qtd: Minor;
-}
-
-export interface ProfitAndLoss {
-	revenue: StatementRow[];
-	expenses: StatementRow[];
-	totalRevenue: { month: Minor; qtd: Minor };
-	totalExpenses: { month: Minor; qtd: Minor };
-	netIncome: { month: Minor; qtd: Minor };
-}
-
-export function profitAndLoss(books: Books, periods: Period[], periodId: string): ProfitAndLoss {
-	const m = balances(books, new Set([periodId]));
-	const q = balances(books, quarterOf(periods, periodId));
-	const row = (a: Account): StatementRow => ({ account: a, month: (m.get(a.id) ?? 0n).toString(), qtd: (q.get(a.id) ?? 0n).toString() });
-	const nonZero = (r: StatementRow) => r.month !== '0' || r.qtd !== '0';
-	const revenue = books.accounts.filter((a) => a.type === 'revenue').map(row).filter(nonZero);
-	const expenses = books.accounts.filter((a) => a.type === 'expense').map(row).filter(nonZero);
-	const sum = (rows: StatementRow[], k: 'month' | 'qtd') => rows.reduce((t, r) => t + toBig(r[k]), 0n);
-	const rm = sum(revenue, 'month'), rq = sum(revenue, 'qtd'), em = sum(expenses, 'month'), eq = sum(expenses, 'qtd');
-	return {
-		revenue,
-		expenses,
-		totalRevenue: { month: rm.toString(), qtd: rq.toString() },
-		totalExpenses: { month: em.toString(), qtd: eq.toString() },
-		netIncome: { month: (rm - em).toString(), qtd: (rq - eq).toString() }
-	};
-}
-
-export interface BalanceRow {
-	account: Account | null;
-	label: string;
-	amount: Minor;
-	/** Earnings rows (no account): the months of income statement activity the amount sums. */
-	periods?: { from?: string; to: string };
-}
-
-export interface BalanceSheet {
-	assets: BalanceRow[];
-	liabilities: BalanceRow[];
-	equity: BalanceRow[];
-	totalAssets: Minor;
-	totalLiabilities: Minor;
-	totalEquity: Minor;
-	balanced: boolean;
-}
-
-export function balanceSheet(books: Books, periods: Period[], periodId: string): BalanceSheet {
-	const through = periodsThrough(periods, periodId);
-	const b = balances(books, through);
-	const rows = (t: AccountType): BalanceRow[] =>
-		books.accounts
-			.filter((a) => a.type === t)
-			.map((a) => ({ account: a, label: a.name, amount: (b.get(a.id) ?? 0n).toString() }))
-			.filter((r) => r.amount !== '0');
-	const assets = rows('asset');
-	// The Allowance is contra-asset: it carries a credit, so it shows negative under assets.
-	const liabilities = rows('liability');
-	const equity = rows('equity');
-	// Income statement activity not yet closed to Retained Earnings: this year's months (ids are "yyyy-mm"), and any
-	// earlier year's separately, so "Current year earnings" is exactly the year to date.
-	const year = periods.find((p) => p.id === periodId)?.year ?? Number(periodId.slice(0, 4));
-	const yearStart = `${year}-01`;
-	const ytd = balances(books, new Set([...through].filter((id) => id >= yearStart)));
-	const prior = balances(books, new Set([...through].filter((id) => id < yearStart)));
-	let earnings = 0n;
-	let earlier = 0n;
-	for (const a of books.accounts) {
-		const sign = a.type === 'revenue' ? 1n : a.type === 'expense' ? -1n : 0n;
-		earnings += sign * (ytd.get(a.id) ?? 0n);
-		earlier += sign * (prior.get(a.id) ?? 0n);
-	}
-	if (earlier !== 0n) equity.push({ account: null, label: "Earlier years' earnings", amount: earlier.toString(), periods: { to: `${year - 1}-12` } });
-	equity.push({ account: null, label: 'Current year earnings', amount: earnings.toString(), periods: { from: yearStart, to: periodId } });
-	const total = (rs: BalanceRow[]) => rs.reduce((t, r) => t + toBig(r.amount), 0n);
-	const ta = total(assets), tl = total(liabilities), te = total(equity);
-	return {
-		assets,
-		liabilities,
-		equity,
-		totalAssets: ta.toString(),
-		totalLiabilities: tl.toString(),
-		totalEquity: te.toString(),
-		balanced: ta === tl + te
-	};
 }
 
 export function accountBalance(books: Books, periods: Period[], periodId: string, code: string): Minor {
@@ -217,6 +114,18 @@ export function arrWaterfall(contracts: Contract[], from: string, to: string): A
 		from,
 		to
 	};
+}
+
+/**
+ * Net revenue retention over a waterfall's window, in basis points: what the customers who had ARR at the start are
+ * worth at the end (expansion in, contraction and churn out, new customers left out), over what they were worth.
+ * Floored like @cafoo/ledger-core's nrr() (floor(ending * 10000 / starting)); null when nobody had ARR at the start.
+ */
+export function nrrBp(w: ArrWaterfall): number | null {
+	const start = toBig(w.start);
+	if (start <= 0n) return null;
+	const ending = start + toBig(w.expansion) - toBig(w.contraction) - toBig(w.churned);
+	return Number((ending * 10000n) / start);
 }
 
 // Aging

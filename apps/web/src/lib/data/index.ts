@@ -10,5 +10,5 @@ export const db: DataSource =
 		? new SpacetimeDataSource({ uri: PUBLIC_STDB_URI, database: PUBLIC_STDB_DATABASE, gateway: PUBLIC_AGENT_GATEWAY })
 		: new MockDataSource();
 
-export type { DataSource, ConnectionState } from './source';
+export type { CfoSeat, DataSource, ConnectionState } from './source';
 export * from './types';
