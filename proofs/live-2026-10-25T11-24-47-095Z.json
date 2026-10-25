@@ -1,12 +1,12 @@
 {
-  "commit": "fd64420",
+  "commit": "579ee2d",
   "proofs": [
     {
       "id": "spacetimedb",
       "name": "SpacetimeDB",
       "status": "proved",
-      "at": "2026-10-25T11:19:53.608Z",
-      "ms": 9,
+      "at": "2026-10-25T11:24:47.095Z",
+      "ms": 10,
       "evidence": {
         "endpoint": "http://localhost:3000/v1/ping",
         "http": 200
@@ -16,11 +16,11 @@
       "id": "agents",
       "name": "Claude Agent SDK (openai)",
       "status": "proved",
-      "at": "2026-10-25T11:19:53.617Z",
-      "ms": 1884,
+      "at": "2026-10-25T11:24:47.105Z",
+      "ms": 1274,
       "evidence": {
         "model": "opus",
-        "session": "f196ac07-6844-42f9-b151-d06bf03011d5",
+        "session": "085eb310-dfe3-480f-868d-848343598e35",
         "costUsd": 0.000125,
         "reply": "ready"
       }
@@ -29,11 +29,11 @@
       "id": "grok",
       "name": "xAI Grok (Red Team)",
       "status": "proved",
-      "at": "2026-10-25T11:19:55.501Z",
-      "ms": 1470,
+      "at": "2026-10-25T11:24:48.379Z",
+      "ms": 1202,
       "evidence": {
         "model": "grok-4.7",
-        "responseId": "8218c246-3917-99ba-ba16-18c43b7f91df",
+        "responseId": "346f2681-be3c-9e8f-ad14-334836b5c773",
         "reply": "ready",
         "tokens": 1308
       }
@@ -42,15 +42,15 @@
       "id": "gemini",
       "name": "Google Gemini (second critic)",
       "status": "skipped",
-      "at": "2026-10-25T11:19:56.971Z",
+      "at": "2026-10-25T11:24:49.581Z",
       "reason": "not configured on this machine"
     },
     {
       "id": "moss",
       "name": "Moss (policy search)",
       "status": "proved",
-      "at": "2026-10-25T11:19:56.971Z",
-      "ms": 2914,
+      "at": "2026-10-25T11:24:49.581Z",
+      "ms": 3078,
       "evidence": {
         "index": "cafoo-proof",
         "topHit": "accruals",
@@ -61,16 +61,16 @@
       "id": "brightdata",
       "name": "Bright Data (Web Unlocker)",
       "status": "failed",
-      "at": "2026-10-25T11:19:59.885Z",
-      "ms": 257,
+      "at": "2026-10-25T11:24:52.659Z",
+      "ms": 295,
       "reason": "Zone \"mcp_unlocker\" does not exist on this Bright Data account. Add a Web Unlocker zone in the control panel (Proxies & Scraping → Add → Web Unlocker API)."
     },
     {
       "id": "apify",
       "name": "Apify (Website Content Crawler)",
       "status": "proved",
-      "at": "2026-10-25T11:20:00.142Z",
-      "ms": 7270,
+      "at": "2026-10-25T11:24:52.954Z",
+      "ms": 6891,
       "evidence": {
         "domain": "example.com",
         "pages": 1,
@@ -81,15 +81,15 @@
       "id": "nessie",
       "name": "Capital One Nessie",
       "status": "skipped",
-      "at": "2026-10-25T11:20:07.412Z",
+      "at": "2026-10-25T11:24:59.845Z",
       "reason": "configuration refused: NESSIE_ACCOUNT_IDS is required when NESSIE_API_KEY is set."
     },
     {
       "id": "crs",
       "name": "CRS Credit API (sandbox)",
       "status": "proved",
-      "at": "2026-10-25T11:20:07.412Z",
-      "ms": 1279,
+      "at": "2026-10-25T11:24:59.845Z",
+      "ms": 986,
       "evidence": {
         "persona": "P01",
         "tier": "A",
@@ -101,7 +101,7 @@
       "id": "slides",
       "name": "Google Slides (export)",
       "status": "skipped",
-      "at": "2026-10-25T11:20:08.691Z",
+      "at": "2026-10-25T11:25:00.831Z",
       "reason": "pass --slides to create and share one small deck"
     }
   ]
