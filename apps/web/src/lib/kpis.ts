@@ -76,6 +76,12 @@ export const ndrHealth = (bp: number | null): Health => (bp === null ? null : bp
 /** Months of runway: 18 or more is comfortable for a startup between rounds, under 9 means raise now. */
 export const runwayHealth = (months: number | null): Health => (months === null ? 'good' : months >= 18 ? 'good' : months >= 9 ? 'watch' : 'poor');
 
+/** Days sales outstanding: small-business customers on 30-day terms should pay within about 45 days; past 60 is slow. */
+export const dsoHealth = (days: number | null): Health => (days === null ? null : days <= 45 ? 'good' : days <= 60 ? 'watch' : 'poor');
+
+/** The Allowance as a share of receivables, in basis points: under 5% is normal, over 10% means credit is slipping. */
+export const reserveHealth = (bp: number | null): Health => (bp === null ? null : bp <= 500 ? 'good' : bp <= 1000 ? 'watch' : 'poor');
+
 /**
  * Gross margin as a percentage, in basis points, from revenue and every cost of running the product. AI products
  * usually land between 50% and 65%; classic software sits near 75% to 80%.
