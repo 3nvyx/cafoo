@@ -90,7 +90,7 @@ export interface ChangeEvent<T = unknown> {
 	row: T;
 }
 
-/** One table as the source stores it, for the Dash bar. Live mode: every public table in the ledger database. */
+/** One table as the source stores it, for the Tables page. Live mode: every public table in the ledger database. */
 export interface DataSet {
 	/** Stable id: the table's accessor in live mode, its table name in Demo mode. */
 	id: string;

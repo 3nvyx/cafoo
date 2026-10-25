@@ -62,7 +62,7 @@ export function closeRunNotes(close: CloseRun | undefined): CloseRunNote[] {
 		}
 	}
 
-	// A failed close outranks every fallback: the Dashboard shows only the first note.
+	// A failed close outranks every fallback: the Overview shows only the first note.
 	if (close.status === 'error') {
 		notes.unshift({ tone: 'neg', title: 'The close stopped with an error', body: close.error?.trim() || 'No reason was reported.' });
 	}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Close progress: the Period's checklist as a progress bar, counts per state, and each step with its owner, so the
-	// Dashboard shows where the close stands without opening the Close page.
+	// Overview shows where the close stands without opening the Close page.
 	import { db } from '#lib/data/index.js';
 	import { monthName } from '#lib/data/derive.js';
 	import type { Period } from '#lib/data/types.js';

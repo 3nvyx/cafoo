@@ -1,4 +1,4 @@
-// Pure read-side maths for the Dashboard's panels: close progress, agent status, credit Risk Tiers, Proposals by
+// Pure read-side maths for the Overview's panels: close progress, agent status, credit Risk Tiers, Proposals by
 // status, and the arrow-key stepping the charts use. No side effects and no `db`, so every figure is unit-tested.
 import { allowanceFor } from '#lib/data/derive.js';
 import type { AgentMessage, AgentRole, CloseTask, CreditCheck, Customer, Invoice, Minor, Proposal, RiskTier, Subsidiary, Vendor } from '#lib/data/types.js';
@@ -31,7 +31,7 @@ export const PROPOSAL_BUCKETS: ProposalBucket[] = ['approved', 'awaiting', 'deba
 export const PROPOSAL_BUCKET_LABEL: Record<ProposalBucket, string> = { approved: 'Approved', awaiting: 'Awaiting CFO', debate: 'In debate', rejected: 'Rejected' };
 
 /**
- * Proposals counted into the four buckets the Dashboard draws. Amended counts as approved; sent back and superseded
+ * Proposals counted into the four buckets the Overview draws. Amended counts as approved; sent back and superseded
  * are left out of the chart and reported as `other`.
  */
 export function proposalCounts(proposals: Proposal[], periodId?: string): Record<ProposalBucket, number> & { other: number; total: number } {

@@ -20,7 +20,7 @@
 	}
 
 	const primary: Item[] = [
-		{ href: '/dashboard', label: 'Dashboard', icon: 'home' },
+		{ href: '/dashboard', label: 'Overview', icon: 'home' },
 		{ href: '/proposals', label: 'Proposals', icon: 'inbox' },
 		{ href: '/agents', label: 'Agents', icon: 'chat' },
 		{ href: '/close', label: 'Close', icon: 'checklist' }
@@ -56,7 +56,7 @@
 		},
 		{
 			title: 'Data',
-			items: [{ href: '/dash-bar', label: 'Dash bar', icon: 'database' }]
+			items: [{ href: '/dash-bar', label: 'Tables', icon: 'database' }]
 		}
 	];
 
@@ -117,7 +117,7 @@
 <nav aria-label="Main" class="flex h-full flex-col">
 	<div class="flex h-16 shrink-0 items-center gap-1 px-3 {compact ? 'justify-center' : 'justify-between'}">
 		{#if !compact}
-			<a href="/dashboard" class="flex min-h-[44px] items-center rounded-card px-2" aria-label="Luyten Dashboard"><Wordmark size={22} /></a>
+			<a href="/dashboard" class="flex min-h-[44px] items-center rounded-card px-2" aria-label="Luyten Overview"><Wordmark size={22} /></a>
 		{/if}
 		<div class="flex items-center gap-0.5">
 			{#if !compact}

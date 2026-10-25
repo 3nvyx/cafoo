@@ -150,7 +150,7 @@ export class SpacetimeDataSource implements DataSource {
 	#cfg: SpacetimeConfig;
 	#subs = new Map<U.TableName, Set<(e: ChangeEvent) => void>>();
 	#dirty = new Set<Accessor>();
-	/** The Dash bar's raw reads: one version per table, so a change to one table redraws only that table, plus one
+	/** The Tables page's raw reads: one version per table, so a change to one table redraws only that table, plus one
 	 * for the list of tables and their counts. Changes are gathered for up to 150 ms, so a busy feed redraws calmly. */
 	#rawVersions: Record<string, number> = $state({});
 	#listVersion = $state(0);
@@ -547,7 +547,7 @@ export class SpacetimeDataSource implements DataSource {
 		};
 		conn.db.companyRecord.onInsert(companyChanged);
 		conn.db.companyRecord.onDelete(companyChanged);
-		// Any table, mapped or not, keeps the Dash bar's raw view current.
+		// Any table, mapped or not, keeps the Tables page's raw view current.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const view = conn.db as any;
 		for (const id of Object.keys(view)) {

@@ -10,7 +10,7 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-	{ href: '/dashboard', label: 'Dashboard', icon: 'home', primary: true },
+	{ href: '/dashboard', label: 'Overview', icon: 'home', primary: true },
 	{ href: '/proposals', label: 'Proposals', icon: 'inbox', primary: true },
 	{ href: '/agents', label: 'Agents', icon: 'chat', primary: true },
 	{ href: '/close', label: 'Close', icon: 'checklist', primary: true },
@@ -19,7 +19,7 @@ export const NAV: NavItem[] = [
 	{ href: '/charters', label: 'Charters', icon: 'shield' },
 	{ href: '/customers', label: 'Customers', icon: 'users' },
 	{ href: '/vendors', label: 'Vendors', icon: 'truck' },
-	{ href: '/dash-bar', label: 'Dash bar', icon: 'database' },
+	{ href: '/dash-bar', label: 'Tables', icon: 'database' },
 	{ href: '/settings', label: 'Settings', icon: 'sliders' }
 ];
 

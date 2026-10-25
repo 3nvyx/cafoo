@@ -11,7 +11,7 @@
 
 	let { children }: LayoutProps = $props();
 
-	// The Dash bar is a spreadsheet: it takes the whole pane and scrolls inside its own grid, so its header can stick.
+	// The Tables page is a spreadsheet: it takes the whole pane and scrolls inside its own grid, so its header can stick.
 	const bleed = $derived(page.url.pathname === '/dash-bar' || page.url.pathname.startsWith('/dash-bar/'));
 
 	function onkey(e: KeyboardEvent) {
@@ -61,7 +61,7 @@
 	</div>
 </div>
 
-<!-- Phones have no sidebar, so this opens the drawer. Bottom corner: in thumb reach and clear of page headings; main's bottom padding (on every page, the Dash bar too) keeps it off the last row. -->
+<!-- Phones have no sidebar, so this opens the drawer. Bottom corner: in thumb reach and clear of page headings; main's bottom padding (on every page, the Tables page too) keeps it off the last row. -->
 <!-- Stays mounted under the drawer's backdrop, so focus has somewhere to be while the drawer is open. -->
 <button
 	class="btn fixed right-4 bottom-4 z-30 mb-[env(safe-area-inset-bottom)] size-12 rounded-full border-line px-0 shadow-lg lg:hidden"

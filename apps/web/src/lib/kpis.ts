@@ -1,5 +1,5 @@
 // The numbers an AI startup's board and investors ask about, each with the yardstick it is usually read against.
-// Pure maths over DataSource rows and the Dashboard's Summary; the Metrics page renders them.
+// Pure maths over DataSource rows and the Overview's Summary; the Metrics page renders them.
 import { summarize, type Posting, type Summary } from './data/dashboard';
 import { BURN_MONTHS, burnMultipleLabel, burnReading, burnWindowLabel, runwayLabel, windowRange } from './saas-metrics';
 import { arrAt, arrWaterfall, nrrBp } from './data/derive';
@@ -103,7 +103,7 @@ export function shareOfRevenueBp(cost: Minor | bigint, revenue: Minor): number |
 
 export const inferenceShareHealth = (bp: number | null): Health => (bp === null ? null : bp <= 1500 ? 'good' : bp <= 2500 ? 'watch' : 'poor');
 
-// One month's efficiency readings, shared by the Metrics page and the Dashboard's health check so they never disagree.
+// One month's efficiency readings, shared by the Metrics page and the Overview's health check so they never disagree.
 
 export interface Tile {
 	key: string;

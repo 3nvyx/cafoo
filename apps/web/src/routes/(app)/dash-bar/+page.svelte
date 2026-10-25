@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The Dash bar: every table the books hold, as a dense read-only spreadsheet. Live mode reads the SpacetimeDB client
+	// The Tables page: every table the books hold, as a dense read-only spreadsheet. Live mode reads the SpacetimeDB client
 	// cache directly (every public table, mapped by the screens or not); Demo mode reads the in-browser tables.
 	// The page holds the list of data sets; DataGrid draws the chosen one and is remounted per table. Nothing writes.
 	import { goto } from '$app/navigation';
@@ -31,7 +31,7 @@
 	const BARS = ['w-24', 'w-16', 'w-20', 'w-14', 'w-28', 'w-12', 'w-20'];
 </script>
 
-<svelte:head><title>Dash bar · Luyten</title></svelte:head>
+<svelte:head><title>Tables · Luyten</title></svelte:head>
 
 <div class="flex min-h-0 flex-1">
 	<!-- Data sets: every table, with its row count. Phones choose from the select in the toolbar instead. -->

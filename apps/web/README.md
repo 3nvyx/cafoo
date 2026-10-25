@@ -1,6 +1,6 @@
 # @luyten/web
 
-The CFO's app: Dashboard (`/dashboard`), Proposals, Agent activity, Close, Ledger, Board Pack, Customers, Vendors, Settings, plus the public landing page at `/` and `/pitch`. SvelteKit 3, Svelte 5 runes, Tailwind v4 (tokens in `src/app.css`).
+The CFO's app: Overview (`/dashboard`), Proposals, Agent activity, Close, Ledger, Board Pack, Customers, Vendors, Settings, plus the public landing page at `/` and `/pitch`. SvelteKit 3, Svelte 5 runes, Tailwind v4 (tokens in `src/app.css`).
 
 ```sh
 pnpm -F @luyten/web dev      # Demo mode: in-browser mock, nothing else needed

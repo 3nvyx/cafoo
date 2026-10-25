@@ -118,7 +118,7 @@
 					</div>
 				{/if}
 				{#if s.kind === 'demo'}
-					<a href="/dashboard" class="btn btn-primary btn-lg mt-10">Open the Dashboard <Icon name="arrowRight" size={18} /></a>
+					<a href="/dashboard" class="btn btn-primary btn-lg mt-10">Open the Overview <Icon name="arrowRight" size={18} /></a>
 				{/if}
 			</section>
 		{/key}

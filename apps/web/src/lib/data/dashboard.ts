@@ -1,4 +1,4 @@
-// The Dashboard's figures for any date range: what one company earned and spent between two days, and where its
+// The Overview's figures for any date range: what one company earned and spent between two days, and where its
 // balance sheet stood on the last one. Pure maths over DataSource rows, like derive.ts; the group view (translation,
 // eliminations) is the Board Pack's, in group.ts.
 import type { Account, Contract, JournalEntry, JournalLine, Minor } from './types';
@@ -85,7 +85,7 @@ export function previousRange(r: DateRange): DateRange {
 // business. Balance sheet lines by their codes.
 const isCostOfRevenue = (a: Account) => a.type === 'expense' && a.code.startsWith('5');
 // Fees between group companies are real for the company but not for the business: the Board Pack eliminates them,
-// so the Dashboard leaves them out of revenue and expenses and reports them on their own.
+// so the Overview leaves them out of revenue and expenses and reports them on their own.
 const isOperating = (a: Account) => (a.type === 'revenue' || a.type === 'expense') && !a.isIntercompany;
 const CASH = ['1000'];
 const RECEIVABLES = ['1100'];

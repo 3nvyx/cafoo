@@ -79,7 +79,7 @@
 		heads: number;
 		rpe: bigint | null;
 		r40: ReturnType<typeof ruleOf40>;
-		/** Runway and its burn: always the last BURN_MONTHS, the Dashboard's definition. */
+		/** Runway and its burn: always the last BURN_MONTHS, the Overview's definition. */
 		runway: BurnReading;
 	}
 

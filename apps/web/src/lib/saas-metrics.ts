@@ -110,7 +110,7 @@ export const revenuePerEmployeeHealth = (v: bigint | null): Health => (v === nul
 /** Months of operating cash flow that burn and runway average over, on every page. */
 export const BURN_MONTHS = 3;
 
-/** Burn and runway as one reading, so the Dashboard and the Metrics page can never disagree. */
+/** Burn and runway as one reading, so the Overview and the Metrics page can never disagree. */
 export interface BurnReading {
 	/** The months averaged ("yyyy-mm"), oldest first. */
 	yms: string[];

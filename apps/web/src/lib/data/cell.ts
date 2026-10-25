@@ -1,4 +1,4 @@
-// How the Dash bar shows one stored value. Rows come straight from the source: in live mode they are SpacetimeDB
+// How the Tables page shows one stored value. Rows come straight from the source: in live mode they are SpacetimeDB
 // values (bigint, Timestamp, Identity, tagged enums, optional fields); in Demo mode they are the UI's own rows
 // (strings for money and ids, ISO strings for times). Both are read here, never changed.
 import { dateTime, roleName } from '../labels';

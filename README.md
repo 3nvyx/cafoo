@@ -219,7 +219,7 @@ Open http://localhost:5173. The landing page is at `/`, the ten-slide pitch at `
 ![The Luyten landing page: Automated finance for 10x growth startups, with a Get started button and a product preview](docs/screenshots/landing.webp)
 
 In this mode the whole ledger runs in your browser from seed data, and you already hold the CFO seat, so there is nothing to claim.
-Click **Close September** on the Dashboard and watch a scripted close play out in about 22 seconds, then follow [the guided tour](#a-guided-tour).
+Click **Close September** on the Overview and watch a scripted close play out in about 22 seconds, then follow [the guided tour](#a-guided-tour).
 Reload the page to start over.
 
 ### Path 2: the full stack, still zero keys (10 minutes)
@@ -270,7 +270,7 @@ PUBLIC_DATA_SOURCE=spacetime pnpm -F @luyten/web dev
 - `pnpm cfo:bootstrap` arms a new link while the seat is still empty, for example after it expired.
 - A fresh publish wipes identities, so claim the seat again after each `pnpm demo:fresh`.
 
-**5. Run a close.** Click **Close September** on the Dashboard, or from a shell:
+**5. Run a close.** Click **Close September** on the Overview, or from a shell:
 
 ```sh
 curl -X POST http://localhost:8787/close -H 'content-type: application/json' -d '{"periodYm":"2026-09"}'
@@ -312,14 +312,14 @@ pnpm proof                              # one minimal real call per configured p
 
 ### A guided tour
 
-With the app open on the Dashboard (Path 1 or 2), this is the story the demo tells. It is the same sequence as the three-minute pitch in [docs/pitch.md](docs/pitch.md).
+With the app open on the Overview (Path 1 or 2), this is the story the demo tells. It is the same sequence as the three-minute pitch in [docs/pitch.md](docs/pitch.md).
 
 1. **Start the close.** Click **Close September**. Close Tasks turn to in progress and the agents come online. Open **Agents** to watch their messages stream in.
 2. **Watch the Bookkeeper.** One Proposal matches nine vendor payments to their bills. Two less certain matches arrive separately, and say so. A duplicate payment is caught and booked as a refund owed back. An unknown vendor gets a web lookup.
 3. **Watch Revenue.** A contract that was never on a revenue schedule gets a 12-month schedule rebuilt, and subscription and usage revenue are recognised against deferred revenue.
 4. **Watch Credit & Risk.** Every guarantor gets the cascade. Open **Customers** to see Risk Tiers and Allowances, including the fully reserved $48,000. Open **Vendors** to see the two blocked before payment.
 5. **Watch the Red Team push back.** Open **Proposals**, pick a weak match, and read the Debate: Grok's critique, Gemini's addition, the Advisor's ruling with its rationale.
-6. **Clear your queue.** The Dashboard's **Needs your OK** card counts what waits for you. Open one: one sentence, the amount, the Advisor's ruling. **Confirm** it, or **Send back** with a note and watch it return to the worker.
+6. **Clear your queue.** The Overview's **Needs your OK** card counts what waits for you. Open one: one sentence, the amount, the Advisor's ruling. **Confirm** it, or **Send back** with a note and watch it return to the worker.
 7. **Lock the month.** When the Advisor requests the lock, open **Close** and lock September. If any bank lines are still unmatched, you must accept that exact set with a reason first.
 8. **Read the Board Pack.** Switch between **Consolidated** (a column per company, an Eliminations column and the CTA) and a single company in its own currency.
 9. **Drill down.** Click revenue in the Board Pack, land on the journal lines, then the Proposal, then the Debate that produced it.
@@ -349,7 +349,7 @@ With the app open on the Dashboard (Path 1 or 2), this is the story the demo tel
 ```mermaid
 flowchart TB
     subgraph Browser
-        UI["SvelteKit CFO app<br/>Dashboard · Proposals · Close · Ledger<br/>Board Pack · Charters · Settings"]
+        UI["SvelteKit CFO app<br/>Overview · Proposals · Close · Ledger<br/>Board Pack · Charters · Settings"]
     end
     subgraph DB["SpacetimeDB module (the ledger and the agent bus)"]
         T[("Ledger, Proposals, Approvals,<br/>agent messages, Charter versions,<br/>feed log, audit trail")]
@@ -553,7 +553,7 @@ GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all
 ## Repo layout
 
 ```
-apps/web/                 SvelteKit CFO app: landing page (/), pitch (/pitch), Dashboard, Proposals, Agents, Close,
+apps/web/                 SvelteKit CFO app: landing page (/), pitch (/pitch), Overview, Proposals, Agents, Close,
                           Ledger, Board Pack, Metrics, Financing, People, Customers, Vendors, Charters, Settings, /claim
 apps/agents/              Orchestrator, gateway (:8787), agent Charters, scripted Demo mode close
   src/charters/           The shipped (built-in) Charters, one per agent

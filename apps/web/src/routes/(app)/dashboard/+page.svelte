@@ -106,13 +106,13 @@
 	});
 </script>
 
-<svelte:head><title>Dashboard · Luyten</title></svelte:head>
+<svelte:head><title>Overview · Luyten</title></svelte:head>
 
 {#if period && root}
 	<header class="flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between">
 		<div class="flex min-w-0 flex-col gap-1">
 			<p class="text-body-sm text-ink-2">{root.name} · {periodLabel(period)}</p>
-			<h1 class="text-display">Dashboard</h1>
+			<h1 class="text-display">Overview</h1>
 			<LiveActivity periodId={period.id} />
 		</div>
 		{#if period.status === 'open' && !started}

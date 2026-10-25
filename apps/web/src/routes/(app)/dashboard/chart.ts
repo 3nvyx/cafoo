@@ -1,4 +1,4 @@
-// Small helpers the Dashboard's charts share. The line charts use shadcn-svelte's chart (LayerChart underneath, in
+// Small helpers the Overview's charts share. The line charts use shadcn-svelte's chart (LayerChart underneath, in
 // $lib/components/ui/chart); the KPI sparklines stay hand-drawn SVG.
 import { formatMoney, fromMajor } from '#lib/data/money.js';
 

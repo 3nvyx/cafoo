@@ -172,7 +172,7 @@
 	<!-- Toolbar. It wraps by the space it has, not the window: with the sidebar open the middle is narrow. -->
 	<div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2">
 		<h1 id="dash-bar-h" class="flex min-w-0 items-baseline gap-2 font-sans text-body font-medium">
-			<span>Dash bar</span><span class="text-ink-3" aria-hidden="true">/</span><span class="truncate text-ink-2">{set.label}</span>
+			<span>Tables</span><span class="text-ink-3" aria-hidden="true">/</span><span class="truncate text-ink-2">{set.label}</span>
 		</h1>
 		<label class="md:hidden">
 			<span class="sr-only">Data set</span>

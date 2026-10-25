@@ -46,7 +46,7 @@ export function toCsv(tables: ExportTable[]): string {
 }
 
 /**
- * A Dash bar cell as a spreadsheet cell: money in major units and whole numbers as numbers, times as ISO text, long
+ * A Tables page cell as a spreadsheet cell: money in major units and whole numbers as numbers, times as ISO text, long
  * ids whole (the grid shortens them), everything else as the grid shows it.
  */
 export function gridCell(c: Cell): ExportCell {

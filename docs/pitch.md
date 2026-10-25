@@ -4,7 +4,7 @@ A three-minute spoken script, a demo cue list, and the ten slides for the in-app
 
 ## Before you start
 
-Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Dashboard (`/dashboard`). Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
+Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Overview (`/dashboard`). Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
 
 ## Script
 
@@ -28,7 +28,7 @@ Let me close September for a SaaS group: a US company with twenty customers and 
 
 | Cue | On screen | Say |
 |---|---|---|
-| 1 | Dashboard. Click Close September. Close Tasks turn to in progress. | "One click. Six agents come online." |
+| 1 | Overview. Click Close September. Close Tasks turn to in progress. | "One click. Six agents come online." |
 | 2 | Bookkeeper files one Proposal matching 9 vendor payments to their bills, every match at least 80% confident. | "Nine payments matched in one Proposal." |
 | 3 | Two more matches below 75% arrive as separate Proposals. | "Two it is unsure about. It says so." |
 | 4 | Duplicate payment to Northwind Cloud, booked as money due back from the vendor. | "Same bill paid twice. Caught and booked as a refund owed to us." |

@@ -141,7 +141,7 @@
 					width="2000"
 					height="1253"
 					fetchpriority="high"
-					alt="The Luyten Dashboard for September 2026: cash, income and spend, three items waiting for the CFO's OK, nine bank lines to decide before the close, the KPIs, proposals by status, close progress, agent status and customer credit."
+					alt="The Luyten Overview for September 2026: cash, income and spend, three items waiting for the CFO's OK, nine bank lines to decide before the close, the KPIs, proposals by status, close progress, agent status and customer credit."
 					class="block w-full rounded-lg border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
 				/>
 				</div>

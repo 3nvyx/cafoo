@@ -1,5 +1,5 @@
 // When can the CFO lock a Period, and what to say about it. Shared by the
-// Dashboard and the Close checklist so both screens agree.
+// Overview and the Close checklist so both screens agree.
 import type { DataSource } from './data/source';
 import type { AgentMessage, Period } from './data/types';
 import { bankExceptionAcceptance, bankExceptionSnapshot, closeOrderRefusal, currentBankExceptions, isBankReconciliationTask } from '@luyten/ledger-core';

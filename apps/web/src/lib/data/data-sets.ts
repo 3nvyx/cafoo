@@ -1,4 +1,4 @@
-// Naming and ordering for the Dash bar's table list, shared by both data sources.
+// Naming and ordering for the Tables page's table list, shared by both data sources.
 import type { DataSet } from './source';
 
 /** "journalLine", "journal_line" and "JournalLine" all become "Journal line"; "fxRate" becomes "FX rate";

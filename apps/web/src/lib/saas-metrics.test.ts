@@ -57,7 +57,7 @@ describe('burn and runway', () => {
 		expect(burnReading(ps, '2026-05', '2026-06')).toMatchObject({ yms: [], monthlyBurn: 0n, runwayMonths: null });
 	});
 
-	it("gives the Dashboard's health tiles the same burn and runway", () => {
+	it("gives the Overview's health tiles the same burn and runway", () => {
 		const tiles = efficiencyTiles({ ps, endYm: '2026-09', firstYm: '2026-06', contracts: [], employees: [] });
 		const runway = tiles.find((t) => t.key === 'runway')!;
 		expect(runway.value).toBe(runwayLabel(burnReading(ps, '2026-09', '2026-06')));
