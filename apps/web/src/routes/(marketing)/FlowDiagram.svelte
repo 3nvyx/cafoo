@@ -175,12 +175,18 @@
 	</svg>
 {/snippet}
 
-{#if !still}
-	<div class="-mt-2 mb-2 flex justify-end">
-		<button class="btn btn-quiet px-2 text-sm text-ink-3" onclick={() => (paused = !paused)}>
-			<Icon name={paused ? 'play' : 'pause'} size={16} />{paused ? 'Play animation' : 'Pause animation'}
+<!-- The drawing fills the box; the pause control sits in its empty bottom-right corner. -->
+<div class="relative">
+	<div class="hidden lg:block">{@render diagram(wide, false)}</div>
+	<div class="mx-auto w-full max-w-[560px] lg:hidden">{@render diagram(tall, true)}</div>
+	{#if !still}
+		<button
+			class="btn btn-quiet absolute right-0 bottom-0 w-11 px-0 text-ink-3"
+			aria-label={paused ? 'Play animation' : 'Pause animation'}
+			title={paused ? 'Play animation' : 'Pause animation'}
+			onclick={() => (paused = !paused)}
+		>
+			<Icon name={paused ? 'play' : 'pause'} size={16} />
 		</button>
-	</div>
-{/if}
-<div class="hidden lg:block">{@render diagram(wide, false)}</div>
-<div class="mx-auto max-w-[420px] lg:hidden">{@render diagram(tall, true)}</div>
+	{/if}
+</div>

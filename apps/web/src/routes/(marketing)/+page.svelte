@@ -1,7 +1,6 @@
 <script lang="ts">
 	// The public landing page: what Cafoo does, how the gate works, and two small demos on
 	// sample data. It never touches the data source; the work happens in /dashboard.
-	import { PUBLIC_DATA_SOURCE } from '$app/env/public';
 	import Icon from '#lib/components/Icon.svelte';
 	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
@@ -11,8 +10,6 @@
 	import ModeDemo from './ModeDemo.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
-
-	const live = PUBLIC_DATA_SOURCE === 'spacetime';
 
 	const anchors = [
 		{ href: '#how', label: 'How it works' },
@@ -90,16 +87,16 @@
 
 	<main id="main">
 		<div id="hero">
-		<!-- A split hero on Harvey's grid: columns 2–11 from lg up, the heading over five columns and
-		     the pitch and one action over four, set to the heading's last line. -->
+		<!-- A split hero on Harvey's grid: columns 2–11 from lg up, the heading over six columns and
+		     the pitch and one action over four, set to the heading's last line. Stacked below lg. -->
 		<section class="wide grid grid-cols-2 gap-[14px] pt-16 pb-12 sm:pt-24 sm:pb-16 md:grid-cols-6 md:gap-4 lg:grid-cols-12 lg:gap-[18px] xl:gap-5">
 			<div class="col-span-2 grid grid-cols-subgrid md:col-span-6 lg:col-start-2 lg:col-end-12">
-				<h1 class="col-span-full text-[48px] leading-[0.98] font-medium text-balance sm:text-[72px] md:col-span-3 lg:col-span-5" style="letter-spacing:-0.035em">Agents do your <span class="whitespace-nowrap">month-end</span> close</h1>
-				<div class="col-span-full mt-6 flex flex-col gap-6 md:col-span-3 md:col-start-4 md:mt-0 md:self-end lg:col-span-4 lg:col-start-7">
+				<h1 class="col-span-full text-[48px] leading-[0.98] font-medium text-balance sm:text-[64px] lg:col-span-6 xl:text-[72px]" style="letter-spacing:-0.035em">Let expert agents do your <span class="whitespace-nowrap">month-end</span> close</h1>
+				<div class="col-span-full mt-6 flex flex-col gap-6 md:col-span-4 lg:col-span-4 lg:col-start-7 lg:mt-0 lg:self-end">
 					<p class="text-lg text-pretty text-ink-2">
-						Cafoo is an agentic ERP for finance teams. Its agents match bank deposits to invoices, book accruals, schedule revenue, check new customers' credit and consolidate every subsidiary into one set of books. A second AI challenges each change before it posts, and anything over your limit waits for your click.
+						Cafoo’s agents match payments, book accruals and consolidate your books. A second AI checks every entry, and anything big waits for your OK.
 					</p>
-					<a href="/dashboard" {...newTab} class="cta">{live ? 'Get started' : 'Try the live demo'}{@render tabNote()}</a>
+					<a href="/dashboard" {...newTab} class="pill pill-primary pill-lg self-start">Get started now{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 				</div>
 			</div>
 		</section>
@@ -137,17 +134,14 @@
 		</section>
 		-->
 
-		<section id="how" class="content scroll-mt-24 pt-32" aria-labelledby="how-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
+		<section id="how" class="calm-section content relative isolate scroll-mt-24 pt-32" aria-labelledby="how-h">
+			<div class="relative flex flex-col items-center text-center">
 				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Propose, critique, rule, confirm</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Finance cannot let a model write straight to the books. So Cafoo was built approval gate first, agents second.</p>
 			</div>
-			<PaintedFrame seed={23} class="mt-14 p-2 sm:p-6">
-				<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
-					{@render marks()}
-					<FlowDiagram />
-				</div>
-			</PaintedFrame>
+			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-3 sm:p-5">
+				{@render marks()}
+				<FlowDiagram />
+			</div>
 		</section>
 
 		<section id="demo" class="content scroll-mt-24 pt-32" aria-labelledby="demo-h">
@@ -176,7 +170,7 @@
 
 		<section class="content pt-32" aria-labelledby="credit-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="credit-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">A small business is only as good as its owner</h2>
+				<h2 id="credit-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">A startup is only as good as its founder</h2>
 				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Cafoo checks the owner behind each customer, sets payment terms from the Risk Tier and proposes the Allowance. Vendors are checked before their first payment.</p>
 			</div>
 			<ul class="mt-14 grid gap-2 sm:grid-cols-2">
@@ -220,8 +214,7 @@
 </div>
 
 <style>
-	/* Behind a section's heading the river's hairlines go soft: a blur that feathers out to
-	   nothing, so there is no panel, edge or border, only quieter lines under the words. */
+	/* Blur the river behind headings, or across the whole workflow section, with feathered edges. */
 	/* One 12-column grid, after Harvey's: a frame padded 28 / 32 / 36 / 40px (by breakpoint) with
 	   14 / 16 / 18 / 20px gaps. Wide things (the header, the painted hero panel) use the whole
 	   frame; copy and sections sit on columns 2–11 from lg up, so they line up with the hero. */
@@ -269,21 +262,36 @@
 		}
 	}
 
-	.calm::before {
+	.calm::before,
+	.calm-section::before {
 		content: '';
 		position: absolute;
 		inset: -48px -96px;
 		z-index: -1;
 		pointer-events: none;
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-		background: radial-gradient(closest-side, color-mix(in srgb, var(--canvas) 55%, transparent), transparent);
-		mask-image: radial-gradient(closest-side, black 45%, transparent);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
+		background: color-mix(in srgb, var(--canvas) 60%, transparent);
+		/* A rectangular falloff: a horizontal and a vertical fade multiplied together, strongest in
+		   the middle and easing out evenly toward all four edges. */
+		mask-image:
+			linear-gradient(to right, transparent, black 35%, black 65%, transparent),
+			linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+		-webkit-mask-composite: source-in;
+		mask-composite: intersect;
+	}
+	.calm-section::before {
+		inset: 0 calc(50% - 50vw) -64px;
+		background: color-mix(in srgb, var(--canvas) 30%, transparent);
+		/* Strongest in the middle of the section, easing out toward all four edges. */
+		mask-image:
+			linear-gradient(to right, transparent, black 30%, black 70%, transparent),
+			linear-gradient(to bottom, transparent, black 96px, black calc(100% - 64px), transparent);
 	}
 
 	/* In the components layer so Tailwind utilities (hidden, border, text color) still win. */
 	@layer components {
-		/* Pill buttons in mono type. Press scales slightly; colors ease, nothing else moves. */
+		/* The page's buttons, softly squared. Press scales slightly; colors ease, nothing else moves. */
 		.pill {
 			display: inline-flex;
 			align-items: center;
@@ -291,9 +299,9 @@
 			gap: 0.5rem;
 			min-height: 44px;
 			padding: 0 1.125rem;
-			border-radius: 9999px;
-			font-family: var(--font-mono);
-			font-size: 0.8125rem;
+			border-radius: 8px;
+			font-family: var(--font-sans);
+			font-size: 0.9375rem;
 			font-weight: 500;
 			white-space: nowrap;
 			transition:
@@ -307,7 +315,7 @@
 		.pill-lg {
 			min-height: 52px;
 			padding: 0 1.5rem;
-			font-size: 0.875rem;
+			font-size: 1rem;
 		}
 		.pill-primary {
 			background: var(--accent);
@@ -323,24 +331,6 @@
 		}
 		.pill-outline:hover {
 			background: var(--subtle);
-		}
-		/* The hero's one action: a squared, inverted button that sits under the pitch. */
-		.cta {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			width: max-content;
-			height: 48px;
-			padding: 0 1.25rem;
-			border-radius: 6px;
-			background: var(--ink);
-			color: var(--canvas);
-			font-weight: 500;
-			white-space: nowrap;
-			transition: background-color 300ms ease-out;
-		}
-		.cta:hover {
-			background: color-mix(in srgb, var(--ink) 72%, var(--canvas));
 		}
 		.pill-quiet {
 			color: var(--ink-2);
