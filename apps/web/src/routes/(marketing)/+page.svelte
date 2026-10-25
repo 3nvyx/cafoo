@@ -5,7 +5,7 @@
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import DrillDemo from './DrillDemo.svelte';
 	import AgentWorkflows from './AgentWorkflows.svelte';
-	import GateStack from './GateStack.svelte';
+	import FeatureCarousel from './FeatureCarousel.svelte';
 	import LogoWall from './LogoWall.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
@@ -187,15 +187,13 @@
 			</div>
 		</section>
 
+		<!-- One card for the gate and the sponsors' APIs behind it, as a carousel; the first slide is the gate. -->
 		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="gate-h" class="section-h max-w-[20ch]">Multi-layer agent security starts in the database</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">A worker agent proposes. The Red Team critiques, Grok first and then Gemini. The Advisor rules and writes down why. The CFO confirms anything at or above Materiality. Under all of it, SpacetimeDB reducers check every caller’s identity, so no prompt can talk its way into the ledger. The feeds can only add raw bank lines and invoices.</p>
-			</div>
-			<PaintedFrame seed={37} class="mt-14 p-2 sm:p-6">
+			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
+			<PaintedFrame seed={37} class="p-2 sm:p-6">
 				<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
 					{@render marks()}
-					<GateStack />
+					<FeatureCarousel />
 				</div>
 			</PaintedFrame>
 		</section>
@@ -241,14 +239,12 @@
 			<p class="mx-auto mt-6 max-w-[64ch] text-center text-ink-2">The gate does not loosen as volume grows: the Materiality threshold and Charters scale with the company, and every number still drills down to its journal lines.</p>
 		</section>
 
-		<!-- A rounded accent block inside the page width closes the page; the river runs down to its top edge. -->
+		<!-- A short accent band inside the page width closes the page: the heading on the left, one action on the right.
+		     The river runs down to its top edge. -->
 		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
-			<div class="flex flex-col items-center rounded-xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
-				<h2 id="cta-h" class="section-h max-w-[16ch]">Close your next month with us</h2>
-				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
-					<a href="/dashboard" {...newTab} class="pill pill-lg bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
-					<a href="/pitch" class="pill pill-lg border border-on-accent/30 text-on-accent hover:bg-on-accent/10">Watch the pitch</a>
-				</div>
+			<div class="flex flex-col items-start gap-6 rounded-xl bg-accent px-6 py-10 text-on-accent sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-12">
+				<h2 id="cta-h" class="cta-h max-w-[18ch]">Close your next month with us</h2>
+				<a href="/dashboard" {...newTab} class="pill pill-lg shrink-0 bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 			</div>
 		</section>
 	</main>
@@ -339,6 +335,18 @@
 	@media (min-width: 640px) {
 		.section-h {
 			font-size: 56px;
+		}
+	}
+
+	/* The closing band's heading: smaller than a section heading, so the band stays short. */
+	.cta-h {
+		font-size: 30px;
+		line-height: 1.05;
+		letter-spacing: -0.025em;
+	}
+	@media (min-width: 640px) {
+		.cta-h {
+			font-size: 40px;
 		}
 	}
 
