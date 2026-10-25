@@ -9,6 +9,7 @@
 		inputLabel,
 		inputPlaceholder = '',
 		inputRequired = false,
+		warning,
 		onconfirm
 	}: {
 		open?: boolean;
@@ -19,12 +20,16 @@
 		inputLabel?: string;
 		inputPlaceholder?: string;
 		inputRequired?: boolean;
+		/** A caution shown above the buttons, for something the CFO should see before confirming. */
+		warning?: string;
 		onconfirm: (value: string) => void | Promise<void>;
 	} = $props();
 
 	let el: HTMLDialogElement | undefined = $state();
 	let value = $state('');
 	let busy = $state(false);
+	/** The longest reason the field takes. It shows a count so a long reason is never cut off without the CFO seeing it. */
+	const MAX_REASON = 600;
 	const id = `dlg-${Math.random().toString(36).slice(2, 8)}`;
 
 	$effect(() => {
@@ -58,11 +63,15 @@
 	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6 sm:p-7">
 		<h2 id="{id}-t" class="text-2xl">{title}</h2>
 		<p id="{id}-b" class="text-ink-2">{body}</p>
+		{#if warning}
+			<p class="rounded-card bg-warning-container px-3 py-2 text-sm text-on-warning-container" role="alert">{warning}</p>
+		{/if}
 		{#if inputLabel}
 			<label class="flex flex-col gap-1.5 text-sm font-medium">
 				{inputLabel}
 				<!-- svelte-ignore a11y_autofocus -->
-				<input class="field text-base font-normal" bind:value placeholder={inputPlaceholder} maxlength="160" required={inputRequired} autofocus />
+				<textarea class="field min-h-[88px] py-2 text-base font-normal" rows="3" bind:value placeholder={inputPlaceholder} maxlength={MAX_REASON} required={inputRequired} autofocus></textarea>
+				<span class="num self-end text-xs font-normal text-ink-3" aria-live="polite">{value.length} / {MAX_REASON}</span>
 			</label>
 		{/if}
 		<div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

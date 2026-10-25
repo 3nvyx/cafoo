@@ -1,6 +1,7 @@
 <script lang="ts">
 	// The Debate feed: one thread per Proposal, the ruling pinned on top.
 	import { db } from '#lib/data/index.js';
+	import { reportingText } from '#lib/currency-text.js';
 	import type { AgentMessage } from '#lib/data/types.js';
 	import DebateMessage from '#lib/components/DebateMessage.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -83,7 +84,7 @@
 						<p class="text-sm text-ink-3">
 							{KIND[t.proposal.kind]} by {roleName(t.proposal.proposerRole)}{#if ui.expert}<span class="num"> · {t.proposal.id}</span>{/if}
 						</p>
-						<p class="mt-0.5 text-[17px] leading-snug font-medium">{t.proposal.summaryPlain}</p>
+						<p class="mt-0.5 text-[17px] leading-snug font-medium">{reportingText(db, t.proposal.summaryPlain, t.proposal.periodId)}</p>
 					{:else}
 						<p class="text-sm text-ink-3">Close thread</p>
 						<p class="mt-0.5 text-[17px] leading-snug font-medium">Advisor coordination</p>

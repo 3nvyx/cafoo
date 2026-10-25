@@ -19,7 +19,10 @@
 		{ "id": "c17", "name": "Riverside Tutoring", "domain": "riversidetutoring.example", "guarantorPersonaId": "per-17", "guarantorName": "Mei Chen", "creditTier": "B", "paymentTermsDays": 30 },
 		{ "id": "c18", "name": "Foxglove Catering", "domain": "foxglovecatering.example", "guarantorPersonaId": "per-18", "guarantorName": "Hugo Laurent", "paymentTermsDays": 30 },
 		{ "id": "c19", "name": "Bansho Ramen", "domain": "banshoramen.com", "guarantorPersonaId": "per-19", "guarantorName": "Zoe Adams", "creditTier": "A", "paymentTermsDays": 30, "yelpUrl": "https://www.yelp.com/biz/bansho-ramen-berkeley-3" },
-		{ "id": "c20", "name": "Velvet Hour Salon", "domain": "velvethour.example", "guarantorPersonaId": "per-20", "guarantorName": "Imani Brooks", "paymentTermsDays": 30 }
+		{ "id": "c20", "name": "Velvet Hour Salon", "domain": "velvethour.example", "guarantorPersonaId": "per-20", "guarantorName": "Imani Brooks", "paymentTermsDays": 30 },
+		{ "id": "c21", "subsidiaryId": "sub-uk", "name": "Harrowgate Joinery", "domain": "harrowgatejoinery.co.uk", "guarantorPersonaId": "per-21", "guarantorName": "Gareth Pugh", "paymentTermsDays": 14 },
+		{ "id": "c22", "subsidiaryId": "sub-uk", "name": "Pembroke Dental Care", "domain": "pembrokedental.co.uk", "guarantorPersonaId": "per-22", "guarantorName": "Fiona Whitcombe", "paymentTermsDays": 14 },
+		{ "id": "c23", "subsidiaryId": "sub-uk", "name": "Larkspur Bakery", "domain": "larkspurbakery.co.uk", "guarantorPersonaId": "per-23", "guarantorName": "Tess Aldridge", "paymentTermsDays": 14 }
 	],
 	"contracts": [
 		{ "id": "k01", "customerId": "c01", "startAt": "2025-03-01T00:00:00Z", "billing": "monthly", "arrMinor": "3000000" },
@@ -41,7 +44,10 @@
 		{ "id": "k17", "customerId": "c17", "startAt": "2026-03-02T00:00:00Z", "billing": "monthly", "arrMinor": "900000" },
 		{ "id": "k18", "customerId": "c18", "startAt": "2026-09-01T00:00:00Z", "billing": "monthly", "arrMinor": "3000000" },
 		{ "id": "k19", "customerId": "c19", "startAt": "2026-09-05T00:00:00Z", "billing": "annual", "arrMinor": "2400000" },
-		{ "id": "k20", "customerId": "c20", "startAt": "2026-08-10T00:00:00Z", "billing": "monthly", "arrMinor": "720000" }
+		{ "id": "k20", "customerId": "c20", "startAt": "2026-08-10T00:00:00Z", "billing": "monthly", "arrMinor": "720000" },
+		{ "id": "k21", "customerId": "c21", "startAt": "2026-07-01T00:00:00Z", "billing": "monthly", "arrMinor": "10800000" },
+		{ "id": "k22", "customerId": "c22", "startAt": "2026-07-01T00:00:00Z", "billing": "monthly", "arrMinor": "7320000" },
+		{ "id": "k23", "customerId": "c23", "startAt": "2026-07-01T00:00:00Z", "billing": "monthly", "arrMinor": "4920000" }
 	],
 	"invoices": [
 		{ "id": "i01", "number": "INV-1001", "customerId": "c15", "issuedAt": "2026-06-05T00:00:00Z", "dueAt": "2026-07-05T00:00:00Z", "amountMinor": "50000", "status": "overdue" },
@@ -73,7 +79,16 @@
 		{ "id": "i27", "number": "INV-1059", "customerId": "c07", "issuedAt": "2026-09-30T00:00:00Z", "dueAt": "2026-11-14T00:00:00Z", "amountMinor": "400000", "status": "open" },
 		{ "id": "i28", "number": "INV-1060", "customerId": "c04", "issuedAt": "2026-09-30T00:00:00Z", "dueAt": "2026-10-30T00:00:00Z", "amountMinor": "600000", "status": "open" },
 		{ "id": "i29", "number": "INV-1061", "customerId": "c19", "issuedAt": "2026-09-05T00:00:00Z", "dueAt": "2026-10-05T00:00:00Z", "amountMinor": "2400000", "status": "open" },
-		{ "id": "i30", "number": "INV-1031", "customerId": "c01", "issuedAt": "2026-08-01T00:00:00Z", "dueAt": "2026-08-31T00:00:00Z", "amountMinor": "250000", "status": "paid" }
+		{ "id": "i30", "number": "INV-1031", "customerId": "c01", "issuedAt": "2026-08-01T00:00:00Z", "dueAt": "2026-08-31T00:00:00Z", "amountMinor": "250000", "status": "paid" },
+		{ "id": "i31", "number": "UK-2001", "customerId": "c21", "issuedAt": "2026-07-01T00:00:00Z", "dueAt": "2026-07-15T00:00:00Z", "amountMinor": "900000", "status": "paid" },
+		{ "id": "i32", "number": "UK-2002", "customerId": "c22", "issuedAt": "2026-07-01T00:00:00Z", "dueAt": "2026-07-15T00:00:00Z", "amountMinor": "610000", "status": "paid" },
+		{ "id": "i33", "number": "UK-2003", "customerId": "c23", "issuedAt": "2026-07-01T00:00:00Z", "dueAt": "2026-07-15T00:00:00Z", "amountMinor": "410000", "status": "paid" },
+		{ "id": "i34", "number": "UK-2004", "customerId": "c21", "issuedAt": "2026-08-01T00:00:00Z", "dueAt": "2026-08-15T00:00:00Z", "amountMinor": "900000", "status": "paid" },
+		{ "id": "i35", "number": "UK-2005", "customerId": "c22", "issuedAt": "2026-08-01T00:00:00Z", "dueAt": "2026-08-15T00:00:00Z", "amountMinor": "610000", "status": "paid" },
+		{ "id": "i36", "number": "UK-2006", "customerId": "c23", "issuedAt": "2026-08-01T00:00:00Z", "dueAt": "2026-08-15T00:00:00Z", "amountMinor": "410000", "status": "paid" },
+		{ "id": "i37", "number": "UK-2007", "customerId": "c21", "issuedAt": "2026-09-01T00:00:00Z", "dueAt": "2026-09-15T00:00:00Z", "amountMinor": "900000", "status": "paid" },
+		{ "id": "i38", "number": "UK-2008", "customerId": "c22", "issuedAt": "2026-09-01T00:00:00Z", "dueAt": "2026-09-15T00:00:00Z", "amountMinor": "610000", "status": "paid" },
+		{ "id": "i39", "number": "UK-2009", "customerId": "c23", "issuedAt": "2026-09-01T00:00:00Z", "dueAt": "2026-09-15T00:00:00Z", "amountMinor": "410000", "status": "overdue" }
 	],
 	"creditChecks": [
 		{ "id": "cc01", "subjectKind": "customer", "subjectId": "c01", "personaId": "per-01", "tier": "A", "requestId": "req_demo_7f31a2", "checkedAt": "2026-03-01T10:00:00Z", "summaryJson": "{\"guarantor\":\"Maya Ortiz\",\"identity\":\"pass\",\"fraud\":\"low\",\"creditBand\":\"excellent\",\"scoreRange\":\"780-819\",\"latePayments90d\":0,\"publicRecords\":\"none\",\"recommendationPlain\":\"Strong owner credit. Standard 30-day terms.\"}" },

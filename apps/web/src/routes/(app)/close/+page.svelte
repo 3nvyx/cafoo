@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
 	import { monthName, periodLabel } from '#lib/data/derive.js';
+	import { reportingText } from '#lib/currency-text.js';
 	import { formatMoney } from '#lib/data/money.js';
 	import type { CloseTaskStatus } from '#lib/data/types.js';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
@@ -14,6 +15,7 @@
 	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import { lockGate, nextOpenPeriod } from '#lib/close.js';
+	import { bankHints, exactHintCount } from '#lib/bank-hints.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
 	const tasks = $derived(db.closeTasks().filter((t) => t.periodId === ui.periodId).sort((a, b) => a.order - b.order));
@@ -22,6 +24,16 @@
 	const gate = $derived(lockGate(db, ui.periodId));
 	const canLock = $derived(gate.canLock);
 	const month = $derived(period ? monthName(period.month) : '');
+
+	// For each unmatched bank line, the open invoice or bill that most likely pays it, so an obvious match is seen before
+	// the CFO accepts the line as an exception. Read-only: nothing here matches anything.
+	const hints = $derived(
+		bankHints(gate.bankExceptions.rows, { subsidiaries: db.subsidiaries(), customers: db.customers(), vendors: db.vendors(), invoices: db.invoices(), bills: db.bills() })
+	);
+	const exactCount = $derived(exactHintCount(hints));
+	const exactWarning = $derived(
+		exactCount ? `${exactCount} line${exactCount === 1 ? ' has' : 's have'} an open invoice or bill for the exact amount. Check ${exactCount === 1 ? 'it' : 'them'} before you say no open invoice exists.` : undefined
+	);
 
 	// What reversing one of this month's entries does once it is locked, from the months that exist (the module posts a
 	// correction in the earliest open month after a locked one, and refuses to undo a locked month's bank reconciliation).
@@ -76,7 +88,7 @@
 										<li in:arrive>
 											<a href="/proposals?status=all#proposal-{p.id}" class="group flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
 												<Pill tone={STATUS[p.status].tone}>{STATUS[p.status].label}</Pill>
-												<span class="drill text-ink-2 group-hover:text-ink">{p.summaryPlain}</span>
+												<span class="drill text-ink-2 group-hover:text-ink">{reportingText(db, p.summaryPlain, p.periodId)}</span>
 											</a>
 										</li>
 									{/if}
@@ -129,17 +141,27 @@
 			</div>
 			<ul class="mt-4 divide-y divide-line border-y border-line" aria-label="Unmatched bank lines">
 				{#each gate.bankExceptions.rows as line (line.id)}
-					<li class="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
-						<div>
+					<li class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 py-3 text-sm">
+						<div class="min-w-0">
 							<p class="font-medium">{line.counterparty || line.description}</p>
 							<p class="text-ink-2">Bank line {line.id} · {line.description} · {line.bookedAt.slice(0, 10)} · {subsidiaryNames.get(line.subsidiaryId) ?? line.subsidiaryId} · {line.ccy}</p>
+							{#if hints.get(line.id)}
+								{@const h = hints.get(line.id)!}
+								<p class="mt-2 rounded-btn px-3 py-2 {h.exact ? 'bg-warning-container text-on-warning-container' : 'bg-subtle text-ink-2'}">
+									<span class="font-medium">{h.exact ? 'Likely match' : 'Possible match'}:</span>
+									{h.kind === 'invoice' ? 'invoice' : 'bill'} <span class="num">{h.number}</span> from {h.counterparty}{h.exact ? ', for the exact amount' : ''}, still open. {h.why}
+								</p>
+							{/if}
 						</div>
 						<span class="font-medium">{formatMoney(line.amountMinor, { currency: line.ccy })}</span>
 					</li>
 				{/each}
 			</ul>
+			{#if exactWarning && !gate.bankExceptions.acceptance.accepted}
+				<p class="mt-4 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">{exactWarning}</p>
+			{/if}
 			{#if gate.bankExceptions.acceptance.accepted}
-				<p class="mt-4 text-sm text-ink-2">You accepted this exact set on {dateTime(gate.bankExceptions.acceptance.at)}. Reason: {gate.bankExceptions.acceptance.reasonPlain}. The lines remain unmatched.</p>
+				<p class="mt-4 text-sm break-words whitespace-pre-line text-ink-2">You accepted this exact set on {dateTime(gate.bankExceptions.acceptance.at)}. Reason: {gate.bankExceptions.acceptance.reasonPlain}. The lines remain unmatched.</p>
 			{:else if period.status !== 'closed'}
 				<button class="btn btn-primary mt-4" disabled={db.cfoSeat().status !== 'you'} onclick={() => { reviewedSnapshot = gate.bankExceptions.snapshot; acceptExceptionsOpen = true; }}>Accept these exceptions</button>
 			{/if}
@@ -180,6 +202,7 @@
 		title="Accept unmatched bank lines?"
 		body="You are accepting the exact bank lines listed above for {periodLabel(period)}. They stay unmatched and the reconciliation task stays incomplete. If the bank or ledger evidence changes, you must review and accept again."
 		confirmLabel="Accept exceptions"
+		warning={exactWarning}
 		inputLabel="Why can this Period close with these exceptions?"
 		inputPlaceholder="e.g. Remittance details are still pending"
 		inputRequired

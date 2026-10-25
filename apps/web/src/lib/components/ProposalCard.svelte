@@ -3,6 +3,7 @@
 	// Expert mode adds what the payload would change (journal lines, a Revenue Schedule's months, a Bank Match's links),
 	// the Red Team critique verbatim, the raw payload and the transcript.
 	import { db } from '#lib/data/index.js';
+	import { reportingText } from '#lib/currency-text.js';
 	import { formatMoney } from '#lib/data/money.js';
 	import type { Proposal } from '#lib/data/types.js';
 	import { KIND, STATUS, criticOf, drill, dateTime, roleName } from '#lib/labels.js';
@@ -99,7 +100,7 @@
 		{/key}
 	</header>
 
-	<p id="proposal-{p.id}-summary" class="font-display text-[22px] leading-[1.3] font-normal text-ink">{p.summaryPlain}</p>
+	<p id="proposal-{p.id}-summary" class="font-display text-[22px] leading-[1.3] font-normal text-ink">{reportingText(db, p.summaryPlain, p.periodId)}</p>
 
 	<div>
 		<p class="eyebrow">{amountLabel}</p>
@@ -168,7 +169,7 @@
 			{/if}
 			<section>
 				<p class="eyebrow mb-1">Rationale</p>
-				<p class="font-mono text-[13px] leading-5 text-ink-2">{p.rationale}</p>
+				<p class="font-mono text-[13px] leading-5 text-ink-2">{reportingText(db, p.rationale, p.periodId)}</p>
 			</section>
 			{#each critiques as c (c.id)}
 				<section aria-label="Red Team critique">

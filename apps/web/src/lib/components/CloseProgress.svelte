@@ -19,7 +19,9 @@
 		<ol class="flex gap-1" aria-hidden="true">
 			{#each tasks as t (t.id)}
 				<li
-					class="h-1 flex-1 rounded-full transition-colors duration-300 {t.status === 'done'
+					class="h-1 flex-1 rounded-full transition-colors duration-300 {done === 0
+						? 'bg-line'
+						: t.status === 'done'
 						? 'bg-pos'
 						: t.status === 'blocked'
 							? 'bg-warn'

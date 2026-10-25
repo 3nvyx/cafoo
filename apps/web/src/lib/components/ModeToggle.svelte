@@ -9,10 +9,10 @@
 	];
 </script>
 
-<div class="segmented" role="group" aria-label="View mode">
+<div class="segmented" role="group" aria-label="View mode" title="Press E to switch between Simple and Expert">
 	{#each opts as o (o.id)}
 		<button type="button" aria-pressed={ui.mode === o.id} onclick={() => ui.setMode(o.id)}>
-			{#if ui.mode === o.id}<Icon name="check" size={16} class="hidden sm:block" />{/if}{o.label}
+			{#if ui.mode === o.id}<Icon name="check" size={16} class="hidden sm:block" />{/if}<span>{o.label}</span>
 		</button>
 	{/each}
 </div>

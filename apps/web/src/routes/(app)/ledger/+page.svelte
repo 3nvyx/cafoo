@@ -8,6 +8,8 @@
 	import { functionalNet } from '#lib/data/group.js';
 	import type { JournalEntry, Period } from '#lib/data/types.js';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
+	import ExportButtons from '#lib/components/ExportButtons.svelte';
+	import { decimal, type CsvTable } from '#lib/csv.js';
 	import Icon from '#lib/components/Icon.svelte';
 	import JournalLines, { type LineView } from '#lib/components/JournalLines.svelte';
 	import Pill from '#lib/components/Pill.svelte';
@@ -230,6 +232,22 @@
 		return `${what}${where}${autos} The original stays on the record.`;
 	});
 
+	/** The CSV the Demo-mode button saves: every line of the entries listed below, as filtered. */
+	const csvTables = (): CsvTable[] => [
+		{
+			title: `Ledger, ${periodValue}`,
+			header: ['Entry', 'Posted', 'Period', 'Memo', 'Source', 'Account', 'Account name', 'Debit', 'Credit', 'Currency'],
+			rows: entries.flatMap((j) =>
+				(linesByJe.get(j.id) ?? []).map((l) => {
+					const a = byId.get(l.accountId);
+					return [j.id, j.postedAt.slice(0, 10), j.periodId, j.memo, SOURCE[j.source], a?.code ?? '', a?.name ?? l.accountId, decimal(l.debitMinor), decimal(l.creditMinor), l.ccy || ccyOf(l.accountId)];
+				})
+			)
+		}
+	];
+	/** The gateway exports one month; a range or all periods falls back to the month selected in the header. */
+	const exportPeriod = $derived(/^\d{4}-\d{2}$/.test(periodValue) ? periodValue : ui.periodId);
+
 	function setPeriod(v: string) {
 		const u = new URL(page.url.href);
 		u.searchParams.set('period', v);
@@ -244,6 +262,7 @@
 	<div>
 		<h1 class="text-[34px] sm:text-[42px]">Ledger</h1>
 		<p class="mt-2 text-ink-2">Every Journal Entry, line by line. Click any amount to see what is behind it.</p>
+		<div class="mt-3"><ExportButtons dataset="ledger" period={exportPeriod} tables={csvTables} disabled={!entries.length} /></div>
 	</div>
 	<div class="flex flex-col gap-2 sm:flex-row">
 		<label class="flex flex-col gap-1 text-sm text-ink-2">

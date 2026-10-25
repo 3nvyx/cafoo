@@ -2,6 +2,7 @@
 	// "Confirm all N": confirms every ruling waiting for the CFO, one by one, with a progress toast.
 	// Shared by the Launchpad queue and the Proposals page's Needs-your-OK view.
 	import { db } from '#lib/data/index.js';
+	import { formatMoney, sumMinor } from '#lib/data/money.js';
 	import type { Proposal } from '#lib/data/types.js';
 	import { confirmEffect } from '#lib/proposals.js';
 	import { toasts } from '#lib/toast.svelte.js';
@@ -14,6 +15,9 @@
 	let open = $state(false);
 	let busy = $state(false);
 	const n = $derived(proposals.length);
+	const reportingCcy = $derived(db.settings().reportingCcy || 'USD');
+	const total = $derived(formatMoney(sumMinor(proposals.map((p) => p.amountMinor)), { currency: reportingCcy }));
+	const posting = $derived(proposals.filter((p) => confirmEffect(p, db).posts).length);
 
 	async function confirmAll() {
 		const items = proposals.filter((p) => p.status === 'awaiting_cfo');
@@ -54,7 +58,8 @@
 <ConfirmDialog
 	bind:open
 	title="Confirm all {n}?"
-	body="Confirm all {n} items the Advisor already approved?"
+	body="You are about to confirm {n} items the Advisor already approved, {total} in total. {posting === 0 ? 'None of them posts to the books.' : posting === n ? 'Each one posts to the books.' : `${posting} of them post to the books.`}"
+	warning="All {n} are confirmed in one step. A posted entry is undone by reversing it, one at a time. To read each one first, cancel and confirm them individually."
 	confirmLabel="Confirm all {n}"
 	onconfirm={() => {
 		void confirmAll();

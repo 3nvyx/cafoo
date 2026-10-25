@@ -29,7 +29,9 @@
 		{ "id": "bt27", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "-80000", "description": "MEADOWLARK INS INSTALLMENT", "counterparty": "Meadowlark Insurance Group", "matched": true },
 		{ "id": "bt28", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "180000", "description": "DEPOSIT WILLOW ST VET", "counterparty": "Willow Street Vet", "matched": true },
 		{ "id": "bt29", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "1250", "description": "INTEREST PAID", "counterparty": "Bank", "matched": false },
-		{ "id": "bt30", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "90000", "description": "DEPOSIT IRONWOOD AUTO", "counterparty": "Ironwood Auto Repair", "matched": false }
+		{ "id": "bt30", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "90000", "description": "DEPOSIT IRONWOOD AUTO", "counterparty": "Ironwood Auto Repair", "matched": false },
+		{ "id": "bt31", "bookedAt": "2026-09-27T00:00:00Z", "amountMinor": "40000", "description": "DEPOSIT CEDAR PINE DENT", "counterparty": "Cedar & Pine Dental", "matched": false },
+		{ "id": "bt32", "bookedAt": "2026-09-29T00:00:00Z", "amountMinor": "125000", "description": "DEPOSIT PINE & WILLOW", "counterparty": "Pine & Willow", "matched": false }
 	],
 	"bankMatches": [
 		{ "id": "bm01", "bankTransactionId": "bt01", "targetKind": "journal_entry", "targetId": "je-0901", "scoreBp": 9950, "bucket": "exact" },

@@ -32,7 +32,8 @@ import { toCore } from '../group';
 import { roleName } from '../../labels';
 import catalogJson from './seed/charters.json';
 import { formatMoney, toBig } from '../money';
-import { journalLinesOf, parsePayload } from '../payload';
+import { journalLinesOf, matchesOf, parsePayload } from '../payload';
+import { reviseForNote } from './send-back';
 import { accountIdFor, loadSeed, type Tables } from './seed';
 import { CLOSE_SCRIPT, type ScriptLine, type Step } from './script';
 
@@ -44,7 +45,7 @@ const PROVIDERS: ProviderStatus[] = [
 	{ id: 'advisor-model', name: 'Advisor and worker models', purpose: 'Proposals, rulings and Plain summaries', mode: 'demo', detail: 'Recorded transcript replayed on Close' },
 	{ id: 'redteam-model', name: 'Red Team model', purpose: 'Critiques on a second model', mode: 'demo', detail: 'Recorded critiques' },
 	{ id: 'gemini', name: 'Google Gemini', purpose: "The Red Team's second critic: adds what the first critique missed", mode: 'demo', detail: 'Scripted critiques' },
-	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '30 September transactions from fixtures' },
+	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '32 September transactions from fixtures' },
 	{ id: 'credit-cascade', name: 'Credit check cascade', purpose: 'Identity, fraud, credit report, public records', mode: 'demo', detail: 'Sandbox personas, stored request ids' },
 	{ id: 'public-web', name: 'Public web data', purpose: 'What a logged-out visitor sees about a customer or vendor', mode: 'demo', detail: 'Recorded Yelp, job board and LinkedIn pages' },
 	{ id: 'email', name: 'Email delivery', purpose: 'Board Pack and dunning emails', mode: 'demo', detail: 'Emails are written to the audit log, not sent' }
@@ -158,8 +159,8 @@ export class MockDataSource implements DataSource {
 				proposalId,
 				role: p.proposerRole,
 				kind: 'statement',
-				body: `Acknowledged CFO note on ${proposalId}: "${note}". Gathering evidence; will resubmit as a new proposal.`,
-				summary: 'Understood. I will look again and resubmit.'
+				body: `Acknowledged CFO note on ${proposalId}: "${note}". Checking whether I can apply it as written.`,
+				summary: 'Understood. I will check whether I can apply that.'
 			})
 		);
 		this.#later(4500, () => this.#resubmit(p, note));
@@ -548,7 +549,8 @@ export class MockDataSource implements DataSource {
 	/**
 	 * The Consolidation agent's three Proposals for the month, computed from the books as they stand by the ledger engine
 	 * (the same revaluation() and eliminations() the scripted close and the module use): Cafoo Ltd's dollar balances
-	 * revalued at the closing rate, the balances the companies owe each other, and the month's service fees.
+	 * revalued at the closing rate, the balances the companies owe each other, and the month's service fees. The Red Team
+	 * critiques each from the same computation, 0.4 to 1.2 s later, so the Advisor never rules on one unreviewed.
 	 */
 	#consolidate(periodId: string, taskId: string) {
 		const t = this.#t;
@@ -568,23 +570,50 @@ export class MockDataSource implements DataSource {
 			);
 			this.#message({ proposalId: id, role: 'consolidation', kind: 'statement', body, summary });
 		};
+		const critique = (n: number, id: string, body: string, summary: string) =>
+			this.#later(400 * n, () => this.#message({ proposalId: id, role: 'redteam', kind: 'critique', body, summary }));
+		const usd = (n: bigint) => formatMinor(n, t.settings.reportingCcy);
 		if (uk && fx) {
 			const rev = revaluation({ entity: uk, lines: core.lines, accountsById: byId, rates: core.rates, ym, periodId: 0n, fxGainLossAccountId: fx.id });
 			if (rev.entry) {
 				const gain = formatMinor(rev.gainMinor, uk.functionalCcy);
 				propose('pr-c1', 'fx_revaluation', rev.entry, uk.functionalCcy, `Restate what ${uk.name} owes in dollars at the month's closing rate, a ${gain} gain.`, `Revaluation of ${rev.items.length} foreign-currency balances at the closing rate.`, `PROPOSE pr-c1: ${rev.entry.memo}; gain ${gain}.`);
+				const money = (n: bigint, ccy: string) => formatMinor(n, ccy);
+				const parent = core.entities.find((e) => e.id === uk.parentId)?.name ?? 'the parent company';
+				const rate = rev.items[0] ? (Number(rev.items[0].closingRateE6) / 1e6).toFixed(6) : '';
+				const word = rev.gainMinor >= 0n ? 'gain' : 'loss';
+				critique(
+					1,
+					'pr-c1',
+					`Rate source: the recorded ${periodId} closing rate, 1 ${rev.items[0]?.ccy} = ${rate} ${uk.functionalCcy}, the same table the Board Pack uses. It restates the ${rev.items.length} dollar balance${rev.items.length === 1 ? '' : 's'} ${uk.name} owes ${parent}: ${rev.items.map((i) => `${i.code} ${money(i.txnBalanceMinor, i.ccy)} is ${money(i.targetFunctionalMinor, uk.functionalCcy)} at that rate against ${money(i.bookedFunctionalMinor, uk.functionalCcy)} booked`).join('; ')}. The changes add up to the ${gain} ${word} on the FX line. Pound balances are untouched. One check I would still make: this ${word} is unrealised and moves again at next month's rate.`,
+					`Red Team checked the rate and the ${rev.items.length} dollar balances behind the ${gain} ${word}. They tie; the amount is not final until the dollars are settled.`
+				);
 			}
 		}
 		const el = eliminations({ entities: core.entities, accounts: core.accounts, lines: core.lines, rates: core.rates, reportingCcy: t.settings.reportingCcy, ym, periodId: 0n });
-		const usd = (n: bigint) => formatMinor(n, t.settings.reportingCcy);
 		if (el.balance.entry) {
 			const total = el.balance.pairs.reduce((s, p) => s + p.amountMinor, 0n);
+			const off = el.balance.pairs.reduce((s, p) => s + p.differenceMinor, 0n);
+			const back = el.balance.reversesInYm ? `${el.balance.reversesInYm.year}-${String(el.balance.reversesInYm.month).padStart(2, '0')}` : 'next month';
 			propose('pr-c2', 'ic_elimination', el.balance.entry, t.settings.reportingCcy, `Remove the ${usd(total)} the group companies owe each other from the group's reports; it reverses next month.`, 'Balance elimination, posted to the Elimination subsidiary.', `PROPOSE pr-c2: ${el.balance.entry.memo}.`);
+			critique(
+				2,
+				'pr-c2',
+				`Both sides agree: ${el.balance.pairs.map((p) => `${p.label} ${usd(p.amountMinor)} against ${usd(p.counterTranslatedMinor)} on the other company's books`).join('; ')}. ${off === 0n ? 'They tie to the cent.' : `They differ by ${usd(off < 0n ? -off : off)}.`} The entry posts to the Elimination company only, so neither company's own books change, and it reverses in ${back} so the balances are not removed twice. One check I would still make: the pound side is only right after the revaluation (pr-c1) posts, so this should not be approved without it.`,
+				`Red Team confirmed both companies show the same ${usd(total)}, and that this only hides it from the group reports and reverses next month.`
+			);
 		}
 		if (el.activity.entry) {
 			const total = el.activity.pairs.reduce((s, p) => s + p.amountMinor, 0n);
 			const diff = el.activity.pairs.reduce((s, p) => s + p.differenceMinor, 0n);
 			propose('pr-c3', 'ic_elimination', el.activity.entry, t.settings.reportingCcy, `Remove this month's ${usd(total)} of service fees between the group companies from the group's reports.`, `Activity elimination; the two sides differ by ${usd(diff < 0n ? -diff : diff)} of translation rounding.`, `PROPOSE pr-c3: ${el.activity.entry.memo}.`);
+			const gap = diff < 0n ? -diff : diff;
+			critique(
+				3,
+				'pr-c3',
+				`${el.activity.pairs.map((p) => `${p.label}: ${usd(p.amountMinor)} charged against ${usd(p.counterTranslatedMinor)} as the other company booked it, translated at the ${periodId} average rate`).join('; ')}. ${gap === 0n ? 'The two sides agree to the cent.' : `The ${usd(gap)} difference is translation rounding, under the $1 tolerance, and the entry posts at the charged amount so it balances.`} Removing the fees takes the same amount out of one company's revenue and the other's expense, so group profit does not change. One check I would still make: July and August were eliminated when they closed, so this keeps the run unbroken; next month's fee needs the same entry.`,
+				`Red Team confirmed the fee is the same on both sides${gap === 0n ? '' : `; the ${usd(gap)} gap is rounding, under the $1 tolerance`}.`
+			);
 		}
 	}
 
@@ -618,19 +647,56 @@ export class MockDataSource implements DataSource {
 		this.#settle(p.periodId);
 	}
 
-	/** After a send-back, the worker agent resubmits a revised Proposal that supersedes the old one. */
+	/**
+	 * After a send-back, the worker agent either resubmits a revised Proposal that supersedes the old one, or says why it
+	 * cannot. It only revises what the note states in numbers (see send-back.ts); it never claims a note was addressed when
+	 * the entry is unchanged. A revised Proposal gets a Red Team critique before the Advisor rules on it.
+	 */
 	#resubmit(old: Proposal, note: string) {
 		if (old.status !== 'sent_back') return;
+		const outcome = reviseForNote(old, note, {
+			openReceivable: (customerId) => this.#t.invoice.filter((i) => i.customerId === customerId && i.status !== 'paid').reduce((s, i) => s + toBig(i.amountMinor), 0n),
+			customerName: (customerId) => this.#t.customer.find((c) => c.id === customerId)?.name ?? customerId,
+			materiality: toBig(this.#t.settings.materialityThresholdMinor)
+		});
+		if (!outcome.ok) return this.#decline(old, outcome.reason);
+		const rev = outcome.revision;
 		let n = 2;
 		while (this.#t.proposal.some((p) => p.id === `${old.id}-v${n}`)) n++;
 		const id = `${old.id}-v${n}`;
 		const task = this.#t.close_task.find((t) => t.proposalIds.includes(old.id));
-		const fresh = this.#addProposal({ ...old, id, status: 'open', createdAt: this.#now(), summaryPlain: `Resubmitted after your note ("${note}"): ${old.summaryPlain}`, supersededBy: undefined }, task?.id);
+		const fresh = this.#addProposal(
+			{ ...old, id, status: 'open', createdAt: this.#now(), payloadJson: JSON.stringify(rev.payload), amountMinor: rev.amountMinor, summaryPlain: rev.summaryPlain, rationale: rev.rationale, supersededBy: undefined },
+			task?.id
+		);
 		old.status = 'superseded';
 		old.supersededBy = id;
 		this.#emit('proposal', 'update', old);
-		this.#message({ proposalId: id, role: old.proposerRole, kind: 'statement', body: `Resubmission of ${old.id} after CFO note: "${note}". Evidence re-checked; same entry proposed.`, summary: 'I looked again and resubmitted it with your note addressed.' });
-		this.#later(1500, () => this.#rule(fresh, `APPROVE ${id}.`, 'Advisor approved the resubmission.', `Resubmitted after CFO note: ${note}`));
+		this.#message({ proposalId: id, role: old.proposerRole, kind: 'statement', body: rev.body, summary: rev.summaryPlain });
+		this.#later(1300, () => {
+			this.#show('redteam', `Checking the revised ${id}`, id, 1000);
+			this.#later(900, () => this.#message({ proposalId: id, role: 'redteam', kind: 'critique', body: rev.critique.body, summary: rev.critique.summary }));
+		});
+		this.#later(3200, () => this.#rule(fresh, `APPROVE ${id}.`, 'Advisor approved the revised proposal.', `Revised at the CFO's instruction ("${note}"); the Red Team re-checked the new figures.`));
+	}
+
+	/** The note cannot be applied honestly: say so, and reject the Proposal so it never posts but the close can still lock. */
+	#decline(old: Proposal, why: string) {
+		old.status = 'rejected';
+		this.#emit('proposal', 'update', old);
+		const text = `I can't apply that note automatically: ${why}. Leaving it rejected so it doesn't post; amend it in Expert mode or ask me in chat.`;
+		this.#message({ proposalId: old.id, role: old.proposerRole, kind: 'statement', body: text, summary: text });
+		this.#audit(old.proposerRole, 'proposal.send_back_declined', 'proposal', old.id, { why });
+		this.#settle(old.periodId);
+	}
+
+	/** Show an agent as busy for a moment, unless the close script already has the activity bar. */
+	#show(role: AgentRole, labelPlain: string, proposalId: string, ms: number) {
+		if (this.#activity) return;
+		this.#activity = { role, labelPlain, proposalId };
+		this.#later(ms, () => {
+			if (this.#activity?.role === role && this.#activity.proposalId === proposalId) this.#activity = null;
+		});
 	}
 
 	#addProposal(p: Proposal, taskId?: string): Proposal {
@@ -648,7 +714,7 @@ export class MockDataSource implements DataSource {
 
 	// Effects of an approved Proposal on the books
 	#applyApproved(p: Proposal) {
-		let payload: { memo?: string; lines?: ScriptLine[]; bankTransactionId?: string; invoiceId?: string; scoreBp?: number; bucket?: 'exact' | 'strong' | 'weak' } = {};
+		let payload: { memo?: string; lines?: ScriptLine[]; bankTransactionId?: string; bankTransactionIds?: string[]; scoreBp?: number; bucket?: 'exact' | 'strong' | 'weak'; returned?: boolean } = {};
 		try {
 			payload = JSON.parse(p.payloadJson);
 		} catch {
@@ -657,29 +723,42 @@ export class MockDataSource implements DataSource {
 		const jeId = !payload.lines?.length
 			? undefined
 			: this.#postEntry({
-				periodId: p.periodId,
-				memo: payload.memo ?? p.summaryPlain,
-				source: 'agent',
-				postedByRole: 'advisor',
-				proposalId: p.id,
-				lines: payload.lines.map((l) => ({ id: '', jeId: '', accountId: accountIdFor(l.account), debitMinor: l.debitMinor, creditMinor: l.creditMinor, customerId: l.customerId, vendorId: l.vendorId }))
-			});
-		if (p.kind === 'bank_match' && payload.bankTransactionId) {
-			const bt = this.#t.bank_transaction.find((b) => b.id === payload.bankTransactionId);
-			if (bt) {
-				bt.matched = true;
-				this.#emit('bank_transaction', 'update', bt);
-			}
-			if (payload.invoiceId) {
-				const inv = this.#t.invoice.find((i) => i.id === payload.invoiceId);
-				if (inv) {
-					inv.status = 'paid';
-					this.#emit('invoice', 'update', inv);
+					periodId: p.periodId,
+					memo: payload.memo ?? p.summaryPlain,
+					source: 'agent',
+					postedByRole: 'advisor',
+					proposalId: p.id,
+					lines: payload.lines.map((l) => ({ id: '', jeId: '', accountId: accountIdFor(l.account), debitMinor: l.debitMinor, creditMinor: l.creditMinor, customerId: l.customerId, vendorId: l.vendorId }))
+				});
+		const matched = (id: string) => {
+			const bt = this.#t.bank_transaction.find((b) => b.id === id);
+			if (!bt) return;
+			bt.matched = true;
+			this.#emit('bank_transaction', 'update', bt);
+		};
+		const link = (m: Omit<BankMatch, 'id' | 'proposalId' | 'paymentJeId'>) => {
+			const row = { id: this.#id('bm'), ...m, proposalId: p.id, paymentJeId: jeId };
+			this.#t.bank_match.push(row);
+			this.#emit('bank_match', 'insert', row);
+		};
+		const bucket = payload.bucket ?? 'strong';
+		const scoreBp = payload.scoreBp ?? 9000;
+		if (p.kind === 'bank_match') {
+			// A Match settles the invoice or bill it names, unless the money came back (a returned payment leaves the bill unpaid).
+			const targets = matchesOf(parsePayload(p.payloadJson));
+			for (const id of new Set([payload.bankTransactionId, ...(payload.bankTransactionIds ?? []), ...targets.map((m) => m.bankTxId)])) if (id) matched(id);
+			for (const m of targets) {
+				const doc = m.targetKind === 'invoice' ? this.#t.invoice.find((i) => i.id === m.targetId) : m.targetKind === 'bill' ? this.#t.bill.find((b) => b.id === m.targetId) : undefined;
+				if (doc && !payload.returned) {
+					doc.status = 'paid';
+					this.#emit(m.targetKind === 'invoice' ? 'invoice' : 'bill', 'update', doc);
 				}
-				const m = { id: this.#id('bm'), bankTransactionId: payload.bankTransactionId, targetKind: 'invoice' as const, targetId: payload.invoiceId, scoreBp: payload.scoreBp ?? 9000, bucket: payload.bucket ?? 'strong', proposalId: p.id, paymentJeId: jeId };
-				this.#t.bank_match.push(m);
-				this.#emit('bank_match', 'insert', m);
+				link({ bankTransactionId: m.bankTxId, targetKind: m.targetKind, targetId: m.targetId, scoreBp: m.scoreBp ?? scoreBp, bucket });
 			}
+		} else if (p.kind === 'journal_entry' && payload.bankTransactionId && jeId) {
+			// A bank line with no invoice or bill behind it (a fee, interest) is reconciled by the entry that books it.
+			matched(payload.bankTransactionId);
+			link({ bankTransactionId: payload.bankTransactionId, targetKind: 'journal_entry', targetId: jeId, scoreBp: scoreBp, bucket: payload.bucket ?? 'exact' });
 		}
 	}
 
