@@ -11,6 +11,9 @@
 	import { drill } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import AdvisorChat from './AdvisorChat.svelte';
+	import AgentsPanel from './AgentsPanel.svelte';
+	import CreditPanel from './CreditPanel.svelte';
+	import ProposalsPanel from './ProposalsPanel.svelte';
 	import CashChart from './CashChart.svelte';
 	import ClosePanel from './ClosePanel.svelte';
 	import CloseCard from './CloseCard.svelte';
@@ -29,6 +32,12 @@
 	let mode = $state<'month' | 'range'>('month');
 	let from = $state('');
 	let to = $state('');
+	/** A month clicked on a chart becomes the shown month (and the app-wide Period, like the sidebar's picker). */
+	function pickMonth(ym: string) {
+		if (!months.includes(ym)) return;
+		ui.periodId = ym;
+		mode = 'month';
+	}
 	function pickRange() {
 		mode = 'range';
 		if (!from || !to) ({ from, to } = monthRange(ui.periodId));
@@ -162,10 +171,17 @@
 		</div>
 	</div>
 
-	<!-- Then a question box for the Advisor, and where the close stands. -->
+	<!-- Then a question box for the Advisor, and the Proposals by status. -->
 	<div class="mt-8 grid gap-8 lg:grid-cols-3">
 		<div class="min-w-0 lg:col-span-2"><AdvisorChat /></div>
+		<div class="min-w-0"><ProposalsPanel /></div>
+	</div>
+
+	<!-- What the rest of the app holds, one panel per page: the close, the agents, customer credit. -->
+	<div class="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-3">
 		<div class="min-w-0"><ClosePanel {period} /></div>
+		<div class="min-w-0"><AgentsPanel /></div>
+		<div class="min-w-0 md:col-span-2 xl:col-span-1"><CreditPanel /></div>
 	</div>
 
 	{#if health.length}
@@ -219,11 +235,11 @@
 			<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<section aria-labelledby="trend-h" class="card flex flex-col gap-4 p-5">
 					<h3 id="trend-h" class="text-subtitle">Revenue and expenses by month</h3>
-					<MonthlyChart points={series} {selected} />
+					<MonthlyChart points={series} {selected} onpick={pickMonth} />
 				</section>
 				<section aria-labelledby="cash-h" class="card flex flex-col gap-4 p-5">
 					<h3 id="cash-h" class="text-subtitle">Book cash at month end</h3>
-					<CashChart points={series} {selected} />
+					<CashChart points={series} {selected} onpick={pickMonth} />
 				</section>
 			</div>
 		{/if}

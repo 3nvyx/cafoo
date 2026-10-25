@@ -41,7 +41,7 @@
 			</ol>
 		</div>
 
-		<dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+		<dl class="grid grid-cols-2 gap-3">
 			{#each [['Done', p.done], ['In progress', p.inProgress], ['Waiting', p.blocked], ['To do', p.todo]] as [k, v] (k)}
 				<div class="flex flex-col rounded-md bg-subtle px-3 py-2">
 					<dt class="text-caption text-ink-2">{k}</dt>
@@ -54,7 +54,7 @@
 			{#each p.steps as t (t.id)}
 				<li class="flex items-center gap-3 border-t border-line py-2 first:border-t-0">
 					<RoleAvatar role={t.ownerRole} size={24} />
-					<span class="min-w-0 flex-1 truncate text-body-sm" title="{t.title} · {roleName(t.ownerRole)}">{t.title}</span>
+					<span class="min-w-0 flex-1 text-body-sm" title="{t.title} · {roleName(t.ownerRole)}">{t.title}</span>
 					<Pill tone={TASK_STATUS[t.status].tone}>{TASK_STATUS[t.status].label}</Pill>
 				</li>
 			{/each}
