@@ -9,7 +9,7 @@ AI agents close your books every month. They can only propose. An Advisor agent 
 ![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 ![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
 
-![The Luyten dashboard after the September close: cash, income and spend, two items waiting for the CFO, KPIs, and Proposals by status](apps/web/static/product/launchpad.webp)
+![The Luyten dashboard after the September close: cash, income and spend, nothing left waiting for the CFO, the month locked, KPIs, Proposals by status and customer credit](docs/screenshots/dashboard.webp)
 
 > **Try it in one minute, no keys, no database:**
 >
@@ -29,6 +29,7 @@ AI agents close your books every month. They can only propose. An Advisor agent 
 - [The answer: propose, critique, rule, confirm](#the-answer-propose-critique-rule-confirm)
 - [Why you can trust it](#why-you-can-trust-it)
 - [What one close does](#what-one-close-does)
+- [A look inside](#a-look-inside)
 - [Meet the agents](#meet-the-agents)
 - [Why now](#why-now)
 - [Try it](#try-it)
@@ -77,6 +78,9 @@ flowchart LR
 
 Every Proposal, critique and ruling carries a **Plain summary**: one jargon-free sentence for the CFO. The technical rationale stays on the record one click away.
 
+![A debate thread: Credit & Risk proposes blocking a vendor, the Red Team critiques, the Advisor asks for a narrower block, and the ruling is pinned on top](docs/screenshots/debate-thread.webp)
+<sub>A Debate: Credit & Risk proposes stopping payments to a vendor whose bank details changed, the Red Team says to stop payments but not deliveries, the Advisor asks for the narrower block, then rules.</sub>
+
 ## Why you can trust it
 
 The gate is enforced **in the database, not in prompts.** The ledger is a [SpacetimeDB](https://spacetimedb.com) module, and every reducer (the database's write function) checks the caller's identity. Each agent role connects with its own identity.
@@ -113,6 +117,45 @@ The demo group is a SaaS company with a UK subsidiary: **Cafoo Inc** (USD, the p
 | Reporting | After the CFO locks the month: P&L, Balance Sheet, ARR waterfall and NRR, consolidated or per company, with the currency translation adjustment computed and never posted |
 
 Then the books keep moving. Once September is locked, switch the **live feed** on and October's bank lines and invoices arrive one by one. The continuous Bookkeeper matches exact receipts as they land, leaves a partial payment open, and holds the $48,600 payroll run for the CFO.
+
+## A look inside
+
+These screenshots come from [Path 1](#path-1-the-app-on-its-own-1-minute), the in-browser Demo mode, so you can reproduce every one of them in a minute. Its scripted close is shorter than the full-stack close described above, so the figures differ.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/agent-activity.webp" alt="Agent activity during the close: what each agent proposed, the tools behind it, and the Ask the Advisor chat"></td>
+    <td width="50%"><img src="docs/screenshots/needs-your-ok.webp" alt="The CFO's Needs your OK queue: a $245,000 intercompany elimination with the Advisor's ruling and Confirm and Send back buttons"></td>
+  </tr>
+  <tr>
+    <td><b>Agent activity.</b> Each agent's Proposals as they arrive, the tools behind each one, and the Advisor chat beside them.</td>
+    <td><b>Needs your OK.</b> Material rulings wait here. One sentence, the amount, the Advisor's reasoning, and Confirm or Send back.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/lock-the-month.webp" alt="The close page: nine unmatched bank lines accepted by the CFO with a reason, and the Advisor asking the CFO to lock September"></td>
+    <td><img src="docs/screenshots/board-pack-consolidated.webp" alt="The consolidated Board Pack for September: a column per company, an Eliminations column removing $15,000 of intercompany fees, and the consolidated total"></td>
+  </tr>
+  <tr>
+    <td><b>Lock the month.</b> Unmatched bank lines stay visible until the CFO accepts that exact set with a reason. The Advisor asks; only the CFO locks.</td>
+    <td><b>Consolidated Board Pack.</b> A column per company, an Eliminations column, and the group total in the Reporting currency.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/ledger-drilldown.webp" alt="The ledger after clicking Subscription Revenue in the Board Pack: the four journal entries behind the figure, marked Agent or Imported"></td>
+    <td><img src="docs/screenshots/customer-credit.webp" alt="A customer on BLOCK: identity mismatch, high fraud risk, a dissolved business, and a 100% allowance; beside it the public footprint panel"></td>
+  </tr>
+  <tr>
+    <td><b>Every number drills down.</b> Click a Board Pack figure and land on the journal entries behind it, then the Proposal and its Debate.</td>
+    <td><b>Credit on the owner.</b> The cascade found an identity mismatch, high fraud risk and a dissolved business: BLOCK, fully reserved.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/charters.webp" alt="The Charters page: the Bookkeeper's built-in Charter in plain English, split into May propose, Must never, and Leaves for a person"></td>
+    <td><img src="docs/screenshots/dashboard-dark.webp" alt="The dashboard in dark mode"></td>
+  </tr>
+  <tr>
+    <td><b>Charters.</b> Each agent's rules in plain English: what it may propose, what it must never do, what it leaves for a person.</td>
+    <td><b>Dark mode</b>, following the system setting or the toggle.</td>
+  </tr>
+</table>
 
 ## Meet the agents
 
@@ -172,6 +215,9 @@ pnpm -F @luyten/web dev
 ```
 
 Open http://localhost:5173. The landing page is at `/`, the ten-slide pitch at `/pitch`, and the CFO app at `/dashboard`.
+
+![The Luyten landing page: Automated finance for 10x growth startups, with a Get started button and a product preview](docs/screenshots/landing.webp)
+
 In this mode the whole ledger runs in your browser from seed data, and you already hold the CFO seat, so there is nothing to claim.
 Click **Close September** on the Dashboard and watch a scripted close play out in about 22 seconds, then follow [the guided tour](#a-guided-tour).
 Reload the page to start over.
@@ -234,7 +280,7 @@ Agent role identities are kept per database in `.secrets/<db>/` (`advisor.token`
 
 To reset everything and go again, stop the orchestrator, rerun `pnpm demo:fresh`, restart the orchestrator, and claim the seat with the new link.
 
-> **Larger demo company.** `pnpm demo:quillmesh` loads the same books scaled up and renamed to Quillmesh Inc and Quillmesh Ltd, the company in the screenshot above.
+> **Larger demo company.** `pnpm demo:quillmesh` loads the same books scaled up and renamed to Quillmesh Inc and Quillmesh Ltd, the company shown on the landing page.
 
 ### Path 3: live models
 
@@ -279,7 +325,7 @@ With the app open on the Dashboard (Path 1 or 2), this is the story the demo tel
 9. **Drill down.** Click revenue in the Board Pack, land on the journal lines, then the Proposal, then the Debate that produced it.
 10. **Turn on the feed.** In **Settings**, switch the live feed on. October's bank lines and invoices arrive every few seconds and match themselves as they land, while the $48,600 payroll run waits for you.
 11. **Tighten a Charter.** Open **Charters** (`/charters`), raise the Bookkeeper's batch-match threshold or add an amount cap, map the line, save a draft, and run the full eval. Only a passing full eval lets you publish it.
-12. **Ask the Advisor.** Use the Advisor chat to ask how cash looks, what is overdue, or why a Proposal was rejected. It answers from the live books and never posts.
+12. **Ask the Advisor.** On the **Agents** page, ask the Advisor how cash looks per company, what needs your OK, or which customers are high risk. It answers from the live books and never posts. In Path 1 the suggested questions show a lookup from the demo books; with the gateway running it asks the specialist agents.
 
 ### Troubleshooting
 
@@ -328,7 +374,7 @@ flowchart TB
     G --> T
     O --> Tools
     OW["Open WebUI (optional)"] -->|OpenAI-compatible /v1| Agents
-    ASI["ASI:One / Agentverse uAgents"] -->|read-only questions| Agents
+    ASI["ASI:One / Agentverse uAgents"] -->|questions, start a close| Agents
 ```
 
 - **`spacetimedb/`**: the module. Tables for the ledger, Proposals, Approvals, agent messages, Charter versions, the feed log and the audit trail, and the reducers that enforce the gate. See [ADR 0001](docs/adr/0001-two-tier-approval-gate-enforced-in-reducers.md) and [ADR 0002](docs/adr/0002-spacetimedb-as-ledger-and-agent-bus.md).

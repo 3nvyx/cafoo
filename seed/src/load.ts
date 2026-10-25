@@ -71,7 +71,7 @@ function connect(): Promise<DbConnection> {
 /** SEED_PROFILE=quillmesh names the group after the demo company in plan.md; the default keeps the test fixture's names. */
 const PROFILE = process.env.SEED_PROFILE ?? 'default';
 /** An intercompany account name ("Due from Cafoo Ltd") with the profile's company names. */
-const named = (name: string) => (PROFILE === 'quillmesh' ? name.replace(/\bLuyten (Inc|Ltd)\b/g, 'Quillmesh $1') : name);
+const named = (name: string) => (PROFILE === 'quillmesh' ? name.replace(/\bCafoo (Inc|Ltd)\b/g, 'Quillmesh $1') : name);
 const chart = (accounts: SeedAccount[]) => accounts.map(a => ({ ...a, name: named(a.name) }));
 
 /** Charts of accounts come from code (accounts.ts), not seed.json, so a stale seed.json cannot leave an account out. */

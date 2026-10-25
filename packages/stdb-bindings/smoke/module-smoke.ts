@@ -1205,8 +1205,12 @@ async function legacy() {
     const oldModule = join(dir, 'spacetimedb', 'spacetimedb');
     symlinkSync(join(moduleDir, 'node_modules'), join(oldModule, 'node_modules'));
     symlinkSync(join(repo, 'packages', 'stdb-bindings', 'node_modules'), join(dir, 'packages', 'stdb-bindings', 'node_modules'));
-    mkdirSync(join(dir, 'seed', 'node_modules', '@luyten'), { recursive: true });
-    symlinkSync(join(dir, 'packages', 'stdb-bindings'), join(dir, 'seed', 'node_modules', '@luyten', 'stdb-bindings'));
+    // That commit's loader imports the bindings by its own package name (@cafoo/... before the rename to Luyten).
+    const oldSeed = JSON.parse(readFileSync(join(dir, 'seed', 'package.json'), 'utf8'));
+    const bindings = Object.keys({ ...oldSeed.dependencies, ...oldSeed.devDependencies }).find(n => n.endsWith('/stdb-bindings'));
+    if (!bindings) throw new Error(`${LEGACY_REF}'s seed/package.json does not depend on the stdb bindings`);
+    mkdirSync(dirname(join(dir, 'seed', 'node_modules', bindings)), { recursive: true });
+    symlinkSync(join(dir, 'packages', 'stdb-bindings'), join(dir, 'seed', 'node_modules', bindings));
     symlinkSync(realpathSync(join(repo, 'seed', 'node_modules', 'spacetimedb')), join(dir, 'seed', 'node_modules', 'spacetimedb'));
     if (!existsSync(join(repo, 'seed', 'out', 'seed.json'))) run('pnpm', ['-F', '@luyten/seed', 'generate']);
     mkdirSync(join(dir, 'seed', 'out'), { recursive: true });
