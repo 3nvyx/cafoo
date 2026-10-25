@@ -19,6 +19,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DbConnection } from '../src/index';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '../../ledger-core/src/bank-exceptions';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
@@ -220,6 +221,31 @@ async function main() {
   const CN = workers.consolidation!;
   const F = workers.feed!;
   const db = X.conn.db;
+  /** Review the current fixture state immediately before a successful lock; previous consent cannot survive changes. */
+  const acceptFixtureBankExceptions = async (periodYm: string) => {
+    const input = () => ({
+      periodYm,
+      bankRows: [...db.bankTransaction.iter()].map(row => ({
+        id: String(row.id), subsidiaryId: String(row.subsidiaryId), ym: row.ym,
+        bookedAt: new Date(Number(row.bookedAt.microsSinceUnixEpoch / 1000n)).toISOString(),
+        amountMinor: String(row.amountMinor), ccy: row.ccy, description: row.description,
+        counterparty: row.counterparty, matched: row.matched,
+      })),
+      auditEvents: [...db.auditEvent.iter()].map(event => ({
+        id: String(event.id), actorRole: event.actorRole, action: event.action, targetTable: event.targetTable,
+        targetId: String(event.targetId), detail: event.detail,
+        at: new Date(Number(event.at.microsSinceUnixEpoch / 1000n)).toISOString(),
+      })),
+    });
+    const exceptions = currentBankExceptions(input());
+    if (exceptions.length === 0) return;
+    await accepts(`fixture CFO explicitly accepts ${exceptions.length} bank exception(s) through ${periodYm}`, () => X.conn.reducers.acceptBankExceptions({
+      periodYm,
+      expectedSnapshot: bankExceptionSnapshot(input()),
+      reasonPlain: 'Smoke fixture CFO reviewed these unmatched bank lines and accepts carrying them as explicit exceptions for the lock probe.',
+    }));
+    await waitFor(() => bankExceptionAcceptance(input()).accepted, `fixture CFO bank exception acceptance for ${periodYm}`);
+  };
   await sleep(300);
   // The root company: no parent and not the elimination company (iteration order is not guaranteed once UK/ELIM exist).
   const root = [...db.subsidiary.iter()].find(s => s.parentId === undefined && !s.isElimination)!;
@@ -261,6 +287,14 @@ async function main() {
   await X.conn.reducers.seedFxRate({ fromCcy: 'jpy', toCcy: 'usd', ym: NEXT, rateE6: 6_700n, kind: 'spot' });
   const cust0 = [...db.customer.iter()].find(c => c.subsidiaryId === root.id)!;
   await X.conn.reducers.seedInvoice({ customerId: cust0.id, contractCode: undefined, number: 'SMOKE-EUR-1', ym: CLOSE, issuedAtMicros: 1788000000000000n, dueAtMicros: 1799000000000000n, amountMinor: 110000n, status: 'open' });
+  // These probes wait for the real once-a-minute scheduler while the other smoke cases run.
+  for (const probe of [
+    { number: 'SMOKE-OVERDUE-TICK', dueAtMicros: 1n, status: 'open' },
+    { number: 'SMOKE-OVERDUE-FUTURE', dueAtMicros: 7_258_118_400_000_000n, status: 'open' },
+    { number: 'SMOKE-OVERDUE-PAID', dueAtMicros: 1n, status: 'paid' },
+  ]) {
+    await X.conn.reducers.seedInvoice({ customerId: cust0.id, contractCode: undefined, ym: CLOSE, issuedAtMicros: 0n, amountMinor: 1n, ...probe });
+  }
   const bds = await waitFor(() => [...db.vendor.iter()].find(v => v.name.startsWith('Brennan')), 'BDS vendor');
   await X.conn.reducers.seedBankTransactions({
     subsidiaryCode: 'US',
@@ -847,7 +881,7 @@ async function main() {
     // A foreign schedule line in a month without its own rate is sized at the latest earlier closing rate, never 1:1.
     let ukCustomer = [...db.customer.iter()].find(c => c.subsidiaryId === uk.id);
     if (!ukCustomer) {
-      await X.conn.reducers.seedCustomers({ subsidiaryCode: uk.code, customers: [{ name: 'Smoke UK Customer', domain: 'smoke.example', guarantorPersonaId: 'P01', guarantorName: 'Smoke Guarantor', paymentTermsDays: 30 }] });
+      await X.conn.reducers.seedCustomers({ subsidiaryCode: uk.code, customers: [{ name: 'Smoke UK Customer', domain: 'smoke.example', guarantorPersonaId: 'P01', guarantorName: 'Smoke Guarantor', paymentTermsDays: 30, yelpUrl: '', jobBoard: '', linkedinUrl: '' }] });
       ukCustomer = await waitFor(() => [...db.customer.iter()].find(c => c.subsidiaryId === uk.id), 'UK customer');
     }
     await X.conn.reducers.seedContract({ customerId: ukCustomer.id, code: 'SMOKE-UK-C1', startYm: '2027-01', endYm: '2027-12', totalMinor: 10_800_000n, plan: { tag: 'Annual' }, items: [{ kind: { tag: 'Subscription' }, priceMinor: 10_800_000n, qty: 1n, sspMinor: 10_800_000n, description: 'Smoke UK subscription' }] });
@@ -965,7 +999,7 @@ async function main() {
     // The conflict that can still arise while the CFO waits: its payee gets blocked.
     let payee = [...db.vendor.iter()].find(v => v.name.trim().toLowerCase() === payroll.counterparty.trim().toLowerCase());
     if (!payee) {
-      await X.conn.reducers.seedVendors({ subsidiaryCode: root.code, vendors: [{ name: payroll.counterparty, domain: 'smoke.example', category: 'smoke', ownerPersonaId: undefined }] });
+      await X.conn.reducers.seedVendors({ subsidiaryCode: root.code, vendors: [{ name: payroll.counterparty, domain: 'smoke.example', category: 'smoke', ownerPersonaId: undefined, yelpUrl: '', jobBoard: '', linkedinUrl: '' }] });
       payee = await waitFor(() => [...db.vendor.iter()].find(v => v.name === payroll.counterparty), 'payee vendor');
     }
     // The payee has no owner on file, so no owner check is possible and the block stands on its reason alone.
@@ -1006,6 +1040,7 @@ async function main() {
     await refuses('CFO locks while a close task is blocked', () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke lock' }), blockedRe);
     await B.conn.reducers.updateCloseTask({ taskId: task.id, status: 'in_progress', note: 'smoke: unblocked' });
     await waitFor(() => db.closeTask.id.find(task.id)!.status.tag === 'InProgress', 'unblocked task');
+    await acceptFixtureBankExceptions(CLOSE);
     await accepts(`finding 1: CFO locks ${CLOSE} once its revenue is recognized and no task is blocked`, () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke lock' }));
     await accepts(`CFO reverses a ${CLOSE} entry after the lock`, () => X.conn.reducers.cfoReverse({ jeId: feeJe.id, reasonPlain: 'smoke correction' }));
     const rev = [...db.journalEntry.iter()].find(j => j.reversalOf === feeJe.id);
@@ -1042,7 +1077,9 @@ async function main() {
     const first = [...db.period.iter()].map(x => x.ym).sort()[0]!;
     await accepts(`CFO unlocks the first month of the books (${first})`, () => X.conn.reducers.unlockPeriod({ periodYm: first, rationale: 'smoke: feed probe' }));
     await refuses(`the feed books into ${first}, which has no locked month before it`, () => bank(F, [tx('smk-first', first, 1000n)]), new RegExp(`the books have no ${ymAdd(first, -1)} period before ${first}`));
+    await acceptFixtureBankExceptions(first);
     await accepts(`CFO locks ${first} again`, () => X.conn.reducers.lockPeriod({ periodYm: first, rationale: 'smoke relock' }));
+    await acceptFixtureBankExceptions(CLOSE);
     await accepts(`CFO locks ${CLOSE} again`, () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke relock' }));
     await refuses(`the feed books into locked ${CLOSE}`, () => bank(F, [tx('smk-2', CLOSE, 1000n)]), new RegExp(`${CLOSE} is closed; the feed books only into the open month`));
     await refuses('the feed books into a month the books do not have', () => bank(F, [tx('smk-3', ymAdd(NEXT, 6), 1000n)]), /books have no/);
@@ -1080,6 +1117,18 @@ async function main() {
     await accepts('the CFO switches the feed off', () => X.conn.reducers.setFeedEnabled({ enabled: false }));
     await waitFor(() => !feedOn(), 'feed off');
     await refuses('the feed ingests after it is switched off', () => bank(F, [tx('smk-c', NEXT, 1000n)]), /live feed is off/);
+  });
+
+  await section('Overdue aging: the real scheduled tick updates unpaid invoices', async () => {
+    const overdue = await waitFor(
+      () => [...db.invoice.iter()].find(i => i.number === 'SMOKE-OVERDUE-TICK' && i.status.tag === 'Overdue'),
+      'the scheduler to mark its past-due probe overdue',
+      75_000
+    );
+    check(overdue.status.tag === 'Overdue', 'the real scheduler marks a past-due open invoice overdue');
+    check([...db.invoice.iter()].find(i => i.number === 'SMOKE-OVERDUE-FUTURE')?.status.tag === 'Open', 'the scheduler leaves a future invoice open');
+    check([...db.invoice.iter()].find(i => i.number === 'SMOKE-OVERDUE-PAID')?.status.tag === 'Paid', 'the scheduler leaves a paid invoice paid');
+    check([...db.auditEvent.iter()].some(e => e.action === 'overdue_sweep' && e.detail.includes('SMOKE-OVERDUE-TICK')), 'the scheduler records the aging change in the audit trail');
   });
 
   await section('resetDemo clears the books and the feed log, keeps charters and the CFO', async () => {

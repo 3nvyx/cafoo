@@ -172,7 +172,7 @@
 						<p class="text-sm text-ink-2">{p.purpose}</p>
 						<p class="truncate text-sm text-ink-3">{p.detail}</p>
 					</div>
-					<Pill tone={p.mode === 'live' ? 'pos' : 'neutral'}>{p.mode === 'live' ? 'Live' : 'Demo mode'}</Pill>
+					<Pill tone={p.mode === 'live' ? 'pos' : 'neutral'}>{p.mode === 'live' ? (p.id.startsWith('gw-') ? 'Configured' : 'Live') : 'Demo mode'}</Pill>
 				</li>
 			{/each}
 		</ul>

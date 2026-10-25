@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
 	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, nrrBp, periodEnd, periodLabel } from '#lib/data/derive.js';
-	import { atClosingRate, boardPack, rateText, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
+	import { boardPack, rateText, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
+	import { inReportScope } from '#lib/data/report-scope.js';
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
@@ -11,9 +12,11 @@
 	import { dateTime, drill } from '#lib/labels.js';
 	import type { DrillPeriod } from '#lib/drill.js';
 	import { ui } from '#lib/ui.svelte.js';
+	import { bankExceptionState } from '#lib/close.js';
 	import ArrWaterfall from './ArrWaterfall.svelte';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
+	const bankExceptions = $derived(period ? bankExceptionState(db, period.id) : null);
 	const subsidiaries = $derived(db.subsidiaries());
 	const root = $derived(rootOf(subsidiaries));
 	const isGroup = $derived(subsidiaries.length > 1);
@@ -52,24 +55,26 @@
 	// currency. The group: every company's, translated at the month's closing rate.
 	const customerSub = $derived(new Map(db.customers().map((c) => [c.id, c.subsidiaryId ?? root?.id ?? ''])));
 	const subCcy = $derived(new Map(subsidiaries.map((s) => [s.id, s.baseCurrency])));
-	function inScope<T>(rows: T[], customerOf: (r: T) => string, amountOf: (r: T) => string, withAmount: (r: T, a: string) => T): T[] {
-		if (!period) return [];
-		return rows.flatMap((r) => {
-			const sub = customerSub.get(customerOf(r)) ?? root?.id ?? '';
-			if (!consolidated) return sub === scope ? [r] : [];
-			const from = subCcy.get(sub) ?? reportingCcy;
-			if (from === reportingCcy) return [r];
-			try {
-				return [withAmount(r, atClosingRate(toBig(amountOf(r)), db.fxRates(), from, reportingCcy, period.id).toString())];
-			} catch {
-				return [];
-			}
-		});
-	}
-	const invoices = $derived(inScope<Invoice>(db.invoices(), (i) => i.customerId, (i) => i.amountMinor, (i, a) => ({ ...i, amountMinor: a })));
-	const contracts = $derived(
-		inScope<Contract>(db.contracts(), (c) => c.customerId, (c) => c.arrMinor, (c, a) => ({ ...c, arrMinor: a, priorArrMinor: c.priorArrMinor && period ? atClosingRate(toBig(c.priorArrMinor), db.fxRates(), subCcy.get(customerSub.get(c.customerId) ?? '') ?? reportingCcy, reportingCcy, period.id).toString() : c.priorArrMinor }))
-	);
+	type Supplemental = { kind: 'ready'; invoices: Invoice[]; contracts: Contract[] } | { kind: 'error'; message: string };
+	const supplemental = $derived.by((): Supplemental => {
+		if (!period) return { kind: 'ready', invoices: [], contracts: [] };
+		const input = { scope, rootId: root?.id, reportingCcy, periodYm: period.id, customerSubs: customerSub, subCcy, rates: db.fxRates() };
+		try {
+			return {
+				kind: 'ready',
+				invoices: inReportScope(db.invoices(), input, (invoice) => invoice.customerId, (invoice, convert) => ({ ...invoice, amountMinor: convert(invoice.amountMinor) })),
+				contracts: inReportScope(db.contracts(), input, (contract) => contract.customerId, (contract, convert) => ({
+					...contract,
+					arrMinor: convert(contract.arrMinor),
+					priorArrMinor: contract.priorArrMinor ? convert(contract.priorArrMinor) : contract.priorArrMinor
+				}))
+			};
+		} catch (error) {
+			return { kind: 'error', message: error instanceof Error ? error.message : String(error) };
+		}
+	});
+	const invoices = $derived(supplemental.kind === 'ready' ? supplemental.invoices : []);
+	const contracts = $derived(supplemental.kind === 'ready' ? supplemental.contracts : []);
 
 	const asOf = $derived(period ? periodEnd(period) : '');
 	const quarterStart = $derived.by(() => {
@@ -77,7 +82,7 @@
 		const qm = Math.floor((period.month - 1) / 3) * 3;
 		return new Date(Date.UTC(period.year, qm, 0)).toISOString().slice(0, 10);
 	});
-	const arr = $derived(period ? arrWaterfall(contracts, quarterStart, asOf) : null);
+	const arr = $derived(period && supplemental.kind === 'ready' ? arrWaterfall(contracts, quarterStart, asOf) : null);
 	const nrr = $derived(arr ? nrrBp(arr) : null);
 	const ag = $derived(aging(invoices, asOf));
 	const customers = $derived(new Map(db.customers().map((c) => [c.id, c])));
@@ -145,11 +150,21 @@
 			<p class="mt-1 text-sm text-ink-3">Rendered {dateTime(renderedAt)} from {db.journalEntries().length} Journal Entries</p>
 		</div>
 		{#if period.status === 'closed'}
-			<Pill tone="pos">Final · locked {period.lockedAt ? dateTime(period.lockedAt) : ''}</Pill>
+			<Pill tone={bankExceptions?.rows.length ? 'warn' : 'pos'}>Final{bankExceptions?.rows.length ? ' · bank exceptions' : ''} · locked {period.lockedAt ? dateTime(period.lockedAt) : ''}</Pill>
 		{:else}
 			<Pill tone="warn">Draft · {period.status === 'closing' ? 'close in progress' : 'period open'}</Pill>
 		{/if}
 	</div>
+	{#if bankExceptions?.rows.length}
+		<div class="mt-5 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">
+			<p class="font-medium">{bankExceptions.rows.length} bank line{bankExceptions.rows.length === 1 ? ' remains' : 's remain'} unmatched.</p>
+			{#if bankExceptions.acceptance.accepted}
+				<p class="mt-1">The CFO accepted this exact exception set on {dateTime(bankExceptions.acceptance.at)}. Reason: {bankExceptions.acceptance.reasonPlain}. Acceptance does not reconcile the bank.</p>
+			{:else}
+				<p class="mt-1">No current CFO exception acceptance is recorded. Review the lines on the <a class="drill" href="/close#bank-exceptions">close checklist</a> before treating this pack as reconciled.</p>
+			{/if}
+		</div>
+	{/if}
 
 	{#if isGroup}
 		<div class="mt-5 flex flex-wrap gap-2" role="group" aria-label="Company">
@@ -160,7 +175,7 @@
 		</div>
 		<p class="mt-2 text-sm text-ink-3">
 			{#if consolidated}
-				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. What the companies owe and charge each other is removed in the Eliminations column.
+				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. The Eliminations column shows entries posted so far. Draft totals may still include intercompany activity.
 			{:else if selected?.isElimination}
 				The bookkeeping-only company that holds every Elimination, in {selected.baseCurrency}.
 			{:else}
@@ -168,11 +183,20 @@
 			{/if}
 		</p>
 	{/if}
+	{#if consolidated && period.status !== 'closed'}
+		<p class="mt-4 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">Draft group totals may include intercompany charges until the elimination entries post. Review the Eliminations column before using these figures.</p>
+	{/if}
 
 	{#if result && 'error' in result}
 		<div class="mt-6 rounded-card bg-error-container px-4 py-3 text-on-error-container" role="alert">
 			<p class="font-medium">This Board Pack cannot be drawn yet.</p>
 			<p class="mt-1 text-[15px]">{result.error}</p>
+		</div>
+	{/if}
+	{#if supplemental.kind === 'error'}
+		<div class="mt-6 rounded-card bg-error-container px-4 py-3 text-on-error-container" role="alert">
+			<p class="font-medium">This Board Pack cannot be drawn yet.</p>
+			<p class="mt-1 text-[15px]">{supplemental.message} The invoice and contract totals are withheld until the source data is complete.</p>
 		</div>
 	{/if}
 

@@ -16,7 +16,7 @@ import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
 import { labeled, scriptedGeminiCritique, unlabeled } from './gemini';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
-import { eliminationCritique } from './scripted/rulings';
+import { eliminationCritique, weakBankMatchCritique } from './scripted/rulings';
 import { statusKey } from './harness/rules';
 import { Cast, repoRoot, type RoleConn } from './stdb';
 
@@ -88,7 +88,7 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   const payload = JSON.parse(p.payloadJson);
   const kind = p.kind.tag;
   if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
-    return { body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty only partly matches. A wrong match shows an invoice as paid when it is not. Ask the customer for remittance detail instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` };
+    return weakBankMatchCritique(payload.matches[0].scoreBp);
   }
   if (kind === 'RevenueSchedule') return { body: `Straight-line is right for a flat annual subscription. Confirm the schedule starts in the invoice month and runs 12 months inclusive.`, summaryPlain: `The Red Team agrees with straight-line and asks to confirm the start month.` };
   if (kind === 'VendorVerify') return { body: `The owner's identity and fraud checks are clean, so verification is reasonable. Before the first payment, confirm the bank account on the bill belongs to the vendor and not to a look-alike.`, summaryPlain: `The Red Team agrees and asks to confirm the bank details before the first payment.` };
@@ -103,6 +103,15 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   if (kind === 'IcElimination') return eliminationCritique(payload);
   if (kind === 'JournalEntry' && p.amountMinor >= materiality) return { body: `Material entry. Confirm the account coding against the policy and that the bank transactions it explains are not also matched to a bill.`, summaryPlain: `The Red Team asks for a second look at a large entry.` };
   return null;
+}
+
+/** Per-critique model deadline, shared by both critics; a timed-out critic falls back like any other failure. */
+function redTeamTimeoutMs(): number {
+  const timeoutMs = Number(process.env.REDTEAM_TIMEOUT_MS?.trim() || 30_000);
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+    throw new Error('REDTEAM_TIMEOUT_MS must be a positive integer no greater than 2147483647');
+  }
+  return timeoutMs;
 }
 
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
@@ -126,6 +135,7 @@ async function modelCritique(A: RoleConn, p: ProposalRow, materiality: bigint, c
   const charter = red(A);
   let submitted: Critique | null = null;
   await generateText({
+    abortSignal: AbortSignal.timeout(redTeamTimeoutMs()),
     model,
     // The harness instructions say how to use the tools; the charter and the gate formats follow them.
     system: brief ? `${charter.prompt}\n\n${brief}` : charter.prompt,

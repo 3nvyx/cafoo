@@ -6,6 +6,7 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AcceptBankExceptionsReducer from "../accept_bank_exceptions_reducer";
 import ApproveProposalReducer from "../approve_proposal_reducer";
 import ArmCfoBootstrapReducer from "../arm_cfo_bootstrap_reducer";
 import CfoConfirmReducer from "../cfo_confirm_reducer";
@@ -50,6 +51,7 @@ import SetMaterialityReducer from "../set_materiality_reducer";
 import UnlockPeriodReducer from "../unlock_period_reducer";
 import UpdateCloseTaskReducer from "../update_close_task_reducer";
 
+export type AcceptBankExceptionsParams = __Infer<typeof AcceptBankExceptionsReducer>;
 export type ApproveProposalParams = __Infer<typeof ApproveProposalReducer>;
 export type ArmCfoBootstrapParams = __Infer<typeof ArmCfoBootstrapReducer>;
 export type CfoConfirmParams = __Infer<typeof CfoConfirmReducer>;

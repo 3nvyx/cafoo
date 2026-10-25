@@ -13,6 +13,9 @@ Agents propose, an Advisor rules, the CFO confirms, and every number drills down
 Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) create Proposals and can never commit them. A Red Team on two other model vendors critiques each Proposal: Grok first, then Gemini adds what Grok missed. The Advisor approves, rejects, or amends it, always with a rationale. Any ruling at or above the Materiality threshold (default $10,000) waits in the CFO's "Needs your OK" queue. The CFO confirms or sends it back, can reverse any entry, and always confirms the period lock.
 The Advisor rules and never proposes, and no identity approves or confirms a Proposal it proposed.
 An amendment (the Advisor rewriting a worker's Proposal) always waits for the CFO, whatever its amount, and only the CFO or the database owner can release the CFO seat.
+Unmatched bank lines stay visible as exceptions, and their reconciliation task remains incomplete.
+The CFO may accept the exact reviewed exceptions with a reason before locking the month.
+Changed bank or ledger evidence invalidates that acceptance, and neither an agent nor an ordinary task-status change can substitute for it.
 A credit tier is computed in the module from the recorded cascade facts, and a credit decision must cite the customer's latest check at that tier, with payment terms no longer than the tier allows.
 A vendor block whose owner is on file needs that owner's latest recorded check to derive BLOCK; a vendor with no owner on file can be blocked on its stated reason.
 
@@ -176,6 +179,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs all of these on every push to `
 
 ```sh
 pnpm test        # every package's tests, including the ledger engine and the credit cascade
+pnpm -F @cafoo/agents test:module  # real datastore regressions for scheduled overdue updates and CFO bank exceptions
 pnpm check       # reference lint plus type checks
 ```
 

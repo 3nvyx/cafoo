@@ -91,7 +91,7 @@
 
 	<section aria-label="Key numbers" class="grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
 		<!-- Balances as of the month end drill through that month; ARR comes from the contracts, not the ledger, so it has no drill. -->
-		{#each [{ label: 'Cash', minor: cash, href: drill({ account: '1000' }, { to: period.id }), hint: `in the bank at the end of ${month}` }, { label: 'ARR', minor: arr, href: '', hint: 'annual recurring revenue, from the contracts' }, { label: 'Open receivables', minor: openAr, href: drill({ account: '1100' }, { to: period.id }), hint: 'owed to us by customers' }] as k (k.label)}
+		{#each [{ label: 'Book cash', minor: cash, href: drill({ account: '1000' }, { to: period.id }), hint: `posted through the end of ${month}; bank reconciliation may be incomplete` }, { label: 'ARR', minor: arr, href: '', hint: 'annual recurring revenue, from the contracts' }, { label: 'Book receivables', minor: openAr, href: drill({ account: '1100' }, { to: period.id }), hint: 'posted receivables, before the allowance' }] as k (k.label)}
 			<svelte:element this={k.href ? 'a' : 'div'} href={k.href || undefined} class="group flex flex-col gap-1 py-5 sm:px-6 sm:first:pl-0">
 				<span class="eyebrow">{k.label}</span>
 				<span class="text-[28px] leading-9 font-medium sm:text-[32px] {k.href ? 'group-hover:text-accent-ink' : ''}"><CountUp minor={k.minor} /></span>

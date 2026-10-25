@@ -114,8 +114,8 @@ describe('Gemini provider status', () => {
   it('is live only with a key and without DEMO_MODE, and defaults the model', () => {
     const gem = (env: NodeJS.ProcessEnv) => providers(env).find(p => p.name.startsWith('Google Gemini'))!;
     expect(gem({}).mode).toBe('demo');
-    expect(gem({ GEMINI_API_KEY: 'k' })).toMatchObject({ mode: 'live', detail: `${DEFAULT_GEMINI_MODEL} critiques` });
-    expect(gem({ GOOGLE_GENERATIVE_AI_API_KEY: 'k', GEMINI_MODEL: 'gemini-pro-latest' })).toMatchObject({ mode: 'live', detail: 'gemini-pro-latest critiques' });
+    expect(gem({ GEMINI_API_KEY: 'k' })).toMatchObject({ mode: 'live', detail: `configured for ${DEFAULT_GEMINI_MODEL} critiques; status does not verify a call` });
+    expect(gem({ GOOGLE_GENERATIVE_AI_API_KEY: 'k', GEMINI_MODEL: 'gemini-pro-latest' })).toMatchObject({ mode: 'live', detail: 'configured for gemini-pro-latest critiques; status does not verify a call' });
     expect(gem({ GEMINI_API_KEY: 'k', DEMO_MODE: '1' }).mode).toBe('demo');
     // geminiLive() reads the list by position.
     expect(providers({})[2]!.name).toMatch(/^Google Gemini/);

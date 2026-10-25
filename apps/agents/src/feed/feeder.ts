@@ -1,7 +1,9 @@
 /**
  * The live feed, run by the gateway: once the CFO switches it on, bank lines and invoices for the first open month
  * after a locked month (October once September is locked) arrive one by one, as a bank and a billing system would send
- * them. The events come from the deterministic plan in @cafoo/seed/feed and enter the books only through the module's
+ * them. Without Nessie configuration, events come from the deterministic plan in @cafoo/seed/feed. With Nessie,
+ * bank lines come from its account transaction IDs while invoices remain on the separate deterministic billing plan.
+ * Every event enters the books only through the module's
  * two ingest reducers under the `feed` identity, which may never propose or commit. The continuous Bookkeeper
  * (src/continuous/bookkeeper.ts) reacts to what lands.
  *
@@ -13,9 +15,11 @@ import { closeOpened, lockedByCfo, previousYm } from '../close-state';
 import { json, type Route } from '../http';
 import { rootSubsidiary } from '../snapshot';
 import type { Cast, RoleConn } from '../stdb';
+import { fetchNessieBankEvents, nessieConfig, type NessieConfig } from '../nessie';
 
 export interface FeedStatus {
   enabled: boolean;
+  source?: 'simulated' | 'nessie';
   /** The month the feed fills, when there is one. */
   ym?: string;
   planned: number;
@@ -84,6 +88,9 @@ export interface FeederOptions {
   onStep?: (m: string) => void;
   /** Plan seed (default the plan's own). */
   seed?: number;
+  /** Explicit source for tests; undefined reads local configuration. Null forces the simulated bank source. */
+  nessie?: NessieConfig | null;
+  fetcher?: typeof fetch;
 }
 
 export interface Feeder {
@@ -99,28 +106,60 @@ export interface Feeder {
 
 export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
   const A = cast.advisor;
+  const nessie = opts.nessie === undefined ? nessieConfig(process.env) : opts.nessie;
   const log = (m: string) => {
     opts.onStep?.(m);
     console.log(`[feed] ${m}`);
   };
   const idleMs = opts.idleMs ?? Math.max(opts.intervalMs, 1000);
   const plans = new Map<string, FeedEvent[]>();
+  const loading = new Map<string, Promise<FeedEvent[]>>();
   /** Events the module accepted in this process (an invoice whose number already exists leaves no feed_event row). */
   const sent = new Set<string>();
   let lastError: string | undefined;
+  let nessieAuthFailed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   let busy = false;
 
   const ingestedIds = () => new Set([...A.db.feedEvent.iter()].map(e => e.externalId));
+  const assertSourceConsistent = (ym: string) => {
+    const priorBank = [...A.db.feedEvent.iter()].filter(e => e.ym === ym && e.kind.tag === 'BankTx');
+    const wrong = priorBank.find(e => e.externalId.startsWith('nessie:') !== !!nessie);
+    if (wrong) throw new Error(`${ym} already has bank lines from a different feed source. Finish this month without switching sources.`);
+  };
   const planFor = (ym: string) => {
     let p = plans.get(ym);
     if (!p) {
+      assertSourceConsistent(ym);
       p = feedPlan(feedContext(A, ym), opts.seed === undefined ? {} : { seed: opts.seed });
       plans.set(ym, p);
       log(`planned ${p.length} event(s) for ${ym}`);
     }
     return p;
+  };
+  const ensurePlanFor = (ym: string): Promise<FeedEvent[]> => {
+    if (!nessie) return Promise.resolve(planFor(ym));
+    const existing = plans.get(ym);
+    if (existing) return Promise.resolve(existing);
+    const pending = loading.get(ym);
+    if (pending) return pending;
+    const next = (async () => {
+      assertSourceConsistent(ym);
+      const simulatedInvoices = feedPlan(feedContext(A, ym), opts.seed === undefined ? {} : { seed: opts.seed }).filter(e => e.kind === 'invoice');
+      const bank = await fetchNessieBankEvents(nessie, {
+        ym,
+        subsidiaries: [...A.db.subsidiary.iter()].filter(sub => !sub.isElimination).map(sub => ({ code: sub.code, functionalCcy: sub.functionalCcy })),
+        materialityMinor: A.db.settings.key.find('materiality_threshold_minor')?.valueI64 ?? 1_000_000n,
+      }, opts.fetcher);
+      const p: FeedEvent[] = [...simulatedInvoices, ...bank].sort((a, b) => a.atMicros < b.atMicros ? -1 : a.atMicros > b.atMicros ? 1 : a.externalId.localeCompare(b.externalId));
+      plans.set(ym, p);
+      log(`planned ${bank.length} Nessie bank line(s) and ${simulatedInvoices.length} simulated billing event(s) for ${ym}`);
+      return p;
+    })();
+    loading.set(ym, next);
+    void next.finally(() => loading.delete(ym)).catch(() => undefined);
+    return next;
   };
   /** Why the feed cannot send right now, or the month and its next event. */
   const state = (): { blocked: string; ym?: string } | { ym: string; next?: FeedEvent; events: FeedEvent[] } => {
@@ -128,18 +167,36 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
     const ym = feedCandidateYm(A);
     if (!ym) return { blocked: 'No open month follows a month the CFO locked yet; the feed starts once the CFO locks the close month.' };
     if (closeOpened(A, ym)) return { blocked: `The ${monthName(ym)} close has started, so the feed waits for the next month.`, ym };
-    const events = planFor(ym);
+    const events = nessie ? (plans.get(ym) ?? []) : planFor(ym);
     const done = ingestedIds();
     return { ym, events, next: events.find(e => !done.has(e.externalId) && !sent.has(e.externalId)) };
   };
 
   const tick = async (): Promise<boolean> => {
-    if (busy) return false;
+    if (busy || nessieAuthFailed) return false;
     busy = true;
     try {
-      const st = state();
-      if ('blocked' in st || !st.next) return false;
-      const e = st.next;
+      let st: ReturnType<typeof state>;
+      try {
+        st = state();
+      } catch (err) {
+        lastError = `The feed cannot plan this month: ${(err as Error).message}`;
+        log(lastError);
+        return false;
+      }
+      if ('blocked' in st) return false;
+      try {
+        await ensurePlanFor(st.ym);
+        assertSourceConsistent(st.ym);
+      } catch (err) {
+        lastError = `Nessie feed could not load ${st.ym}: ${(err as Error).message}`;
+        if (/HTTP (401|403)\b/.test(lastError)) nessieAuthFailed = true;
+        log(lastError);
+        return false;
+      }
+      const ready = state();
+      if ('blocked' in ready || !ready.next) return false;
+      const e = ready.next;
       try {
         if (e.kind === 'bank_tx') await cast.feed.reducers.ingestBankTransactions({ subsidiaryCode: e.subsidiaryCode, txs: [e.tx] });
         else await cast.feed.reducers.ingestInvoices({ invoices: [e.invoice] });
@@ -174,17 +231,17 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
       try {
         st = state();
       } catch (e) {
-        return { enabled, planned: 0, ingested: 0, blockedReason: `The feed cannot plan this month: ${(e as Error).message}` };
+        return { enabled, source: nessie ? 'nessie' : 'simulated', planned: 0, ingested: 0, blockedReason: `The feed cannot plan this month: ${(e as Error).message}` };
       }
       const ym = st.ym;
       const events = ym ? (plans.get(ym) ?? ('events' in st ? st.events : [])) : [];
       const done = ingestedIds();
       const rows = ym ? [...A.db.feedEvent.iter()].filter(r => r.ym === ym) : [];
       const last = rows.reduce<bigint | undefined>((m, r) => (m === undefined || r.ingestedAt.microsSinceUnixEpoch > m ? r.ingestedAt.microsSinceUnixEpoch : m), undefined);
-      const out: FeedStatus = { enabled, planned: events.length, ingested: events.filter(e => done.has(e.externalId) || sent.has(e.externalId)).length };
+      const out: FeedStatus = { enabled, source: nessie ? 'nessie' : 'simulated', planned: events.length, ingested: events.filter(e => done.has(e.externalId) || sent.has(e.externalId)).length };
       if (ym) out.ym = ym;
       if (last !== undefined) out.lastEventAt = new Date(Number(last / 1000n)).toISOString();
-      const blocked = 'blocked' in st ? st.blocked : lastError;
+      const blocked = 'blocked' in st ? st.blocked : lastError ?? (nessie && ym && !plans.has(ym) ? 'Nessie transactions have not been fetched yet.' : undefined);
       if (blocked) out.blockedReason = blocked;
       return out;
     },
@@ -196,7 +253,7 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
     },
     plan() {
       const ym = feedTargetYm(A);
-      return ym ? planFor(ym) : [];
+      return ym ? nessie ? (plans.get(ym) ?? []) : planFor(ym) : [];
     },
     stop() {
       stopped = true;

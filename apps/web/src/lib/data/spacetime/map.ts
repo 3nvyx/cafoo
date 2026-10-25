@@ -167,9 +167,11 @@ export const bill = (r: B.Bill): U.Bill => ({
 
 export const bankTransaction = (r: B.BankTransaction): U.BankTransaction => ({
 	id: String(r.id),
+	subsidiaryId: String(r.subsidiaryId),
 	bookedAt: iso(r.bookedAt),
 	ym: r.ym,
 	amountMinor: r.amountMinor.toString(),
+	ccy: r.ccy,
 	description: r.description,
 	counterparty: r.counterparty,
 	matched: r.matched

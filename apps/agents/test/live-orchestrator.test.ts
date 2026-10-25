@@ -64,7 +64,7 @@ function setup(r: Rows = books()) {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-02T12:00:00Z'));
-  for (const k of ['CLOSE_BUDGET_USD', 'CLOSE_NO_WAIT', 'ADVISOR_MODEL', 'WORKER_MODEL', 'CHARTER_OVERRIDE_JSON', 'CHARTER_OVERRIDE_DB']) vi.stubEnv(k, undefined);
+  for (const k of ['CLOSE_BUDGET_USD', 'CHAT_BUDGET_USD', 'CLOSE_CFO_WAIT_MS', 'CLOSE_NO_WAIT', 'ADVISOR_MODEL', 'WORKER_MODEL', 'CHARTER_OVERRIDE_JSON', 'CHARTER_OVERRIDE_DB']) vi.stubEnv(k, undefined);
   vi.stubEnv('DEMO_MODE', '1');
   vi.stubEnv('CRS_REPLAY', '1');
   vi.stubEnv('CRS_USERNAME', '');
@@ -338,15 +338,44 @@ describe('what the live close does with work the Advisor leaves', () => {
     expect(runs[1]!.prompt).toMatch(/1 proposals are still open/);
   });
 
-  it('when the Advisor errors, rejects with the error, stops the Red Team and rules nothing', async () => {
+  it('when the Advisor errors, rules only open proposals in this period without another model call', async () => {
     scripts.push(async function* () {
       yield { type: 'assistant', message: { content: [{ type: 'text', text: 'Starting.' }] } };
+      fx.insert('proposal', proposal(14n));
+      fx.insert('proposal', proposal(15n, { status: { tag: 'AwaitingCfo' } }));
+      fx.insert('proposal', proposal(16n, { periodId: 10n }));
       throw new Error('Claude Code process exited with code 1');
     });
-    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('Claude Code process exited with code 1');
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 0 });
     expect(stopCritic).toHaveBeenCalledTimes(1);
-    expect(ruleOpen).not.toHaveBeenCalled();
-    expect(steps).toEqual(['advisor: Starting.']);
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(ruleOpen).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ruleOpen).mock.calls[0]![1].map(p => p.id)).toEqual([14n]);
+    expect(steps).toContain('Advisor run failed: Claude Code process exited with code 1; applying standard rulings to remaining proposals');
+    expect(fx.callsTo('cfoConfirm')).toHaveLength(0);
+    expect(fx.callsTo('requestPeriodLock')).toHaveLength(0);
+  });
+
+  it('waits for a late worker proposal after the Advisor fails before applying standard rulings', async () => {
+    scripts.push(async function* () { throw new Error('SDK unavailable'); });
+    const sleep = vi.mocked(stdbSleep);
+    const real = sleep.getMockImplementation()!;
+    let filed = false;
+    sleep.mockImplementation(async (ms: number) => {
+      await real(ms);
+      if (!filed && Date.now() >= Date.parse('2026-10-02T12:00:10Z')) {
+        filed = true;
+        fx.insert('proposal', proposal(14n));
+      }
+    });
+    try {
+      await runLiveClose(fx.cast, '2026-09', onStep);
+    } finally {
+      sleep.mockImplementation(real);
+    }
+    expect(filed).toBe(true);
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ruleOpen).mock.calls[0]![1].map(p => p.id)).toEqual([14n]);
   });
 
   it('when a run ends in an error result, still rules on what is open', async () => {
@@ -422,6 +451,43 @@ describe('the revenue catch-up', () => {
     expect(stopCritic).toHaveBeenCalledTimes(1);
   });
 
+  it('returns with catch-up pending when the configured CFO wait expires', async () => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', '1000');
+    rows.proposal = [approvedSchedule('AwaitingCfo')];
+    const sleep = vi.mocked(stdbSleep);
+    const real = sleep.getMockImplementation()!;
+    let waited = 0;
+    sleep.mockImplementation(async (ms: number) => {
+      if (steps.includes('waiting for the CFO to decide the revenue schedules before the revenue catch-up')) waited += ms;
+      await real(ms);
+    });
+    try {
+      await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 0 });
+    } finally {
+      sleep.mockImplementation(real);
+    }
+    expect(waited).toBe(1000);
+    expect(runs).toHaveLength(1);
+    expect(steps).toContain('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+    expect(fx.callsTo('requestPeriodLock')).toHaveLength(0);
+    expect(rows.proposal![0].status.tag).toBe('AwaitingCfo');
+  });
+
+  it('allows a zero CFO wait without advancing the clock for a pending schedule', async () => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', '0');
+    rows.proposal = [approvedSchedule('AwaitingCfo')];
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(Date.now()).toBe(Date.parse('2026-10-02T12:00:30Z'));
+    expect(steps).toContain('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+  });
+
+  it.each(['-1', '0.5', 'Infinity', 'not a number'])('rejects invalid CFO wait %s before starting the close', async value => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', value);
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('CLOSE_CFO_WAIT_MS must be a non-negative safe integer');
+    expect(sdk.query).not.toHaveBeenCalled();
+    expect(fx.calls).toHaveLength(0);
+  });
+
   it('otherwise waits for the CFO to decide the schedule, then catches up', async () => {
     rows.proposal = [approvedSchedule('AwaitingCfo')];
     rows.revenueScheduleLine!.push({ id: 91n, contractItemId: 80n, customerId: 20n, ym: '2026-09', amountMinor: 100000n, recognized: false });
@@ -443,6 +509,32 @@ describe('the revenue catch-up', () => {
 });
 
 describe('liveAnswer', () => {
+  it('caps the default spend of one answer at fifty cents', async () => {
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.5);
+  });
+
+  it.each(['', '   '])('uses the default answer budget when CHAT_BUDGET_USD is blank', async value => {
+    vi.stubEnv('CHAT_BUDGET_USD', value);
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.5);
+  });
+
+  it('uses the configured answer budget', async () => {
+    vi.stubEnv('CHAT_BUDGET_USD', ' 0.25 ');
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.25);
+  });
+
+  it.each(['0', '-1', 'Infinity', 'not a number'])('rejects invalid answer budget %s before calling the SDK', async value => {
+    vi.stubEnv('CHAT_BUDGET_USD', value);
+    const consume = async () => {
+      for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    };
+    await expect(consume()).rejects.toThrow('CHAT_BUDGET_USD must be a positive finite number');
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
   it('answers from the books tools only, streaming the text deltas', async () => {
     scripts.push(async function* () {
       yield { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Cash is ' } } };

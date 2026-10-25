@@ -628,10 +628,15 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
 
   // ---------------- Red Team (scripted) then Advisor rulings ----------------
   const ruled = await ruleOpenProposals();
+  const unmatchedBankLines = [...A.db.bankTransaction.iter()].filter(tx => !tx.matched && tx.ym <= closeYm).length;
   for (const t of [...[1, 2, 3, 4, 5].map(task), consolidationTask]) {
     if (t === undefined) continue;
     const blocked = refused.filter(r => r.closeTaskId === t).length;
-    await A.reducers.updateCloseTask(blocked ? { taskId: t, status: 'blocked', note: `${blocked} proposal(s) refused by the books; a person must fix and resubmit` } : { taskId: t, status: 'done', note: 'Rulings issued' });
+    await A.reducers.updateCloseTask(blocked
+      ? { taskId: t, status: 'blocked', note: `${blocked} proposal(s) refused by the books; a person must fix and resubmit` }
+      : t === task(1) && unmatchedBankLines
+        ? { taskId: t, status: 'in_progress', note: `${unmatchedBankLines} unmatched bank line(s) still need reconciliation or explicit CFO exception acceptance` }
+        : { taskId: t, status: 'done', note: 'Rulings issued' });
   }
 
   const awaiting = [...A.db.proposal.iter()].filter(p => p.periodId === period.id && p.status.tag === 'AwaitingCfo');
@@ -656,7 +661,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     await waitForCfo(A, period.id);
   }
   // Request the lock, unless something is left for a person (a refusal, a blocked task) or the books refuse it.
-  await requestLock(`All ${ruled} proposals are decided and the bank feed is reconciled.`);
+  await requestLock(`All ${ruled} proposals are decided. Any remaining bank exceptions require the CFO's explicit acceptance before locking.`);
   return { proposals: ruled, awaitingCfo: awaiting.length, refused: refused.length };
 }
 
