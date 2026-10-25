@@ -21,6 +21,7 @@
     "publish:local": "cd spacetimedb && spacetime publish luyten --server local --yes",
     "cfo:bootstrap": "pnpm -F @luyten/seed bootstrap",
     "proof": "pnpm -F @luyten/agents proof",
-    "demo:quillmesh": "SEED_PROFILE=quillmesh pnpm demo:fresh"
+    "demo:quillmesh": "SEED_PROFILE=quillmesh pnpm demo:fresh",
+    "demo:prep": "SEED_PROFILE=quillmesh SPACETIMEDB_DB_NAME=cafoo-demo PUBLIC_WEB_ORIGIN=http://localhost:5180 pnpm demo:fresh"
   }
 }
