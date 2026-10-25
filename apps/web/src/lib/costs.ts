@@ -3,6 +3,7 @@
 // packs and stock lots are worth as they are used up or expire. No side effects; money stays in bigint minor units.
 import type { Account, Batch, CloudCost, CostCategory, CostProvider, Employee, JournalEntry, JournalLine, Minor } from './data/types';
 import { toBig } from './data/money';
+import { monthlyLoadedCost } from './payroll';
 
 /** The products cost and revenue are tagged with. */
 export const PRODUCTS = ['Scheduling', 'Copilot', 'Insights'] as const;
@@ -16,6 +17,22 @@ export const REVENUE_MIX_BP: Record<Product, number> = { Scheduling: 6000, Copil
 
 export const MODEL_PROVIDERS: CostProvider[] = ['openai', 'anthropic', 'together'];
 export const CATEGORIES: CostCategory[] = ['cost_of_revenue', 'r_and_d', 'g_and_a'];
+
+export const PROVIDER_LABEL: Record<CostProvider, string> = {
+	aws: 'AWS',
+	gcp: 'Google Cloud',
+	azure: 'Azure',
+	openai: 'OpenAI',
+	anthropic: 'Anthropic',
+	together: 'Together',
+	vercel: 'Vercel',
+	datadog: 'Datadog',
+	snowflake: 'Snowflake',
+	github: 'GitHub',
+	other: 'Other'
+};
+export const CATEGORY_LABEL: Record<CostCategory, string> = { cost_of_revenue: 'Cost of revenue', r_and_d: 'R&D', g_and_a: 'G&A' };
+export const ENVIRONMENT_LABEL: Record<CloudCost['environment'], string> = { production: 'Production', staging: 'Staging', development: 'Development', shared: 'Shared' };
 
 /** One unit of `ccy` in US dollars for month `ym`, scaled by 1e6 (1_000_000n is 1:1). */
 export type RateE6 = (ccy: string, ym: string) => bigint;
@@ -55,12 +72,6 @@ export function employedIn(e: Pick<Employee, 'startAt' | 'endAt' | 'status'>, ym
 	return !(e.status === 'terminated' && !e.endAt);
 }
 
-/** A month's employer cost of one person in their own currency: salary (or 160 hours at the hourly rate), retirement, benefits. */
-export function monthlyEmployerCost(e: Pick<Employee, 'annualSalaryMinor' | 'hourlyRateMinor' | 'retirementBp' | 'benefitsMonthlyMinor'>): bigint {
-	const salary = toBig(e.annualSalaryMinor) > 0n ? toBig(e.annualSalaryMinor) / 12n : toBig(e.hourlyRateMinor) * 160n;
-	return salary + (salary * BigInt(e.retirementBp)) / 10000n + toBig(e.benefitsMonthlyMinor);
-}
-
 export interface ServicePerson {
 	employee: Employee;
 	/** Employer cost for the month, in US dollars. */
@@ -69,12 +80,15 @@ export interface ServicePerson {
 	serviceMinor: Minor;
 }
 
-/** Each person's service share of their pay for the month (employees × serviceShareBp), largest first, in US dollars. */
-export function serviceEngineering(employees: Employee[], ym: string, rate: RateE6 = USD_ONLY): { totalMinor: Minor; people: ServicePerson[] } {
+/**
+ * Each person's service share of their loaded monthly cost (payroll.ts's monthlyLoadedCost × serviceShareBp), largest
+ * first, in US dollars. `payrollOnly` leaves out contractors, who are paid on invoice rather than through 6000 Payroll.
+ */
+export function serviceEngineering(employees: Employee[], ym: string, rate: RateE6 = USD_ONLY, opts: { payrollOnly?: boolean } = {}): { totalMinor: Minor; people: ServicePerson[] } {
 	const people = employees
-		.filter((e) => e.serviceShareBp > 0 && employedIn(e, ym))
+		.filter((e) => e.serviceShareBp > 0 && employedIn(e, ym) && !(opts.payrollOnly && e.type === 'contractor'))
 		.map((e) => {
-			const usd = (monthlyEmployerCost(e) * rate(e.ccy, ym)) / 1_000_000n;
+			const usd = (toBig(monthlyLoadedCost(e)) * rate(e.ccy, ym)) / 1_000_000n;
 			return { employee: e, monthly: usd, service: (usd * BigInt(e.serviceShareBp)) / 10000n };
 		})
 		.sort((a, b) => (b.service > a.service ? 1 : b.service < a.service ? -1 : 0));
@@ -103,14 +117,24 @@ export interface CostOfService {
 	totalMinor: Minor;
 }
 
-/** What it took to run, build and support the product in month `ym`, split cost of revenue / R&D / G&A. */
-export function costOfService(cloudCosts: CloudCost[], employees: Employee[], ym: string, rate: RateE6 = USD_ONLY): CostOfService {
+/** Share of month `ym` elapsed at `asOf`, in parts per million: 1e6 once the month is over, 0 before it starts. */
+export function monthElapsedPpm(ym: string, asOf: string): bigint {
+	const [y, m] = ym.split('-').map(Number);
+	const start = Date.UTC(y, m - 1, 1), end = Date.UTC(y, m, 1), t = Date.parse(asOf);
+	return t >= end ? 1_000_000n : t <= start ? 0n : BigInt(Math.round(((t - start) / (end - start)) * 1_000_000));
+}
+
+/**
+ * What it took to run, build and support the product in month `ym`, split cost of revenue / R&D / G&A. With `asOf`
+ * inside the month, the service share of pay is counted only for the part of the month gone, like the usage rows.
+ */
+export function costOfService(cloudCosts: CloudCost[], employees: Employee[], ym: string, rate: RateE6 = USD_ONLY, asOf?: string): CostOfService {
 	const month = cloudCosts.filter((r) => r.ym === ym);
 	const usd = (r: CloudCost) => (toBig(r.amountMinor) * rate(r.ccy, ym)) / 1_000_000n;
 	const of = (pred: (r: CloudCost) => boolean) => sum(month.filter(pred).map(usd));
 	const hosting = of(isHosting);
 	const inference = of(isInference);
-	const svc = toBig(serviceEngineering(employees, ym, rate).totalMinor);
+	const svc = (toBig(serviceEngineering(employees, ym, rate).totalMinor) * (asOf ? monthElapsedPpm(ym, asOf) : 1_000_000n)) / 1_000_000n;
 	const rAndD = of((r) => r.category === 'r_and_d');
 	const gAndA = of((r) => r.category === 'g_and_a');
 	const cor = hosting + inference + svc;

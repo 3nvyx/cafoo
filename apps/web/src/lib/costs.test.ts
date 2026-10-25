@@ -14,11 +14,12 @@ import {
 	hostingTieOut,
 	ledgerByMonth,
 	marginByProduct,
-	monthlyEmployerCost,
 	serviceEngineering,
 	unusedValue,
 	usedValue
 } from './costs';
+import { toBig } from './data/money';
+import { monthlyLoadedCost } from './payroll';
 
 const cc = (p: Partial<CloudCost>): CloudCost => ({
 	id: 'x',
@@ -109,24 +110,31 @@ describe('cost of service maths', () => {
 		cc({ ym: '2026-08', amountMinor: '9999' })
 	];
 
-	it('splits by category and adds the service share of pay', () => {
+	it('splits by category and adds the service share of loaded pay', () => {
+		const svc = (toBig(monthlyLoadedCost(person({}))) * 2500n) / 10000n;
 		const cos = costOfService(rows, [person({})], '2026-09');
-		// 120,000/12 = 10,000; + 4% = 400; + 500 benefits = 10,900; 25% = 2,725.00.
-		expect(cos.serviceEngineeringMinor).toBe('272500');
-		expect(cos.costOfRevenueMinor).toBe(String(1000 + 600 + 272500));
+		expect(cos.serviceEngineeringMinor).toBe(svc.toString());
+		expect(cos.costOfRevenueMinor).toBe((1600n + svc).toString());
 		expect(cos.rAndDMinor).toBe('400');
 		expect(cos.gAndAMinor).toBe('100');
-		expect(cos.totalMinor).toBe(String(1000 + 600 + 272500 + 400 + 100));
+		expect(cos.totalMinor).toBe((2100n + svc).toString());
 	});
 
-	it('converts foreign pay and skips people not on payroll that month', () => {
-		const gbp = person({ id: 'uk', ccy: 'GBP', annualSalaryMinor: '6000000', retirementBp: 0, benefitsMonthlyMinor: '0', serviceShareBp: 10000 });
+	it('converts foreign pay, skips people not on payroll that month, and can leave out contractors', () => {
+		const gbp = person({ id: 'uk', ccy: 'GBP', serviceShareBp: 10000 });
 		const later = person({ id: 'new', startAt: '2026-10-05T00:00:00Z' });
 		const gone = person({ id: 'gone', endAt: '2026-08-31T00:00:00Z' });
-		const r = serviceEngineering([gbp, later, gone], '2026-09', (ccy) => (ccy === 'GBP' ? 1_270_000n : 1_000_000n));
-		expect(r.people.map((p) => p.employee.id)).toEqual(['uk']);
-		expect(r.totalMinor).toBe('635000');
-		expect(monthlyEmployerCost(person({ annualSalaryMinor: '0', hourlyRateMinor: '5000', retirementBp: 0, benefitsMonthlyMinor: '0' }))).toBe(800000n);
+		const contractor = person({ id: 'c', type: 'contractor' });
+		const r = serviceEngineering([gbp, later, gone, contractor], '2026-09', (ccy) => (ccy === 'GBP' ? 1_270_000n : 1_000_000n));
+		expect(r.people.map((p) => p.employee.id)).toEqual(['uk', 'c']);
+		expect(r.people[0].serviceMinor).toBe(((toBig(monthlyLoadedCost(gbp)) * 1_270_000n) / 1_000_000n).toString());
+		expect(serviceEngineering([gbp, contractor], '2026-09', undefined, { payrollOnly: true }).people.map((p) => p.employee.id)).toEqual(['uk']);
+	});
+
+	it('counts the service share only for the part of a month in progress', () => {
+		const full = toBig(costOfService([], [person({})], '2026-09').serviceEngineeringMinor);
+		expect(costOfService([], [person({})], '2026-09', undefined, '2026-09-16T00:00:00Z').serviceEngineeringMinor).toBe(((full * 500_000n) / 1_000_000n).toString());
+		expect(costOfService([], [person({})], '2026-09', undefined, '2026-10-02T00:00:00Z').serviceEngineeringMinor).toBe(full.toString());
 	});
 
 	it('margin without revenue is null, not a division by zero', () => {

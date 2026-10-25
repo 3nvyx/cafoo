@@ -18,7 +18,8 @@ export interface ProposeInput {
 	rationale: string;
 	/** `lines` post as one journal entry when the Proposal is approved; `memo` names it. */
 	payload: Record<string, unknown> & { memo?: string; lines?: ScriptLine[] };
-	/** The month it books into; default the earliest open month. */
+	/** The month it books into; default `ctx.openPeriodId()`. A September Proposal joins September's close and, at or
+	 * above materiality, blocks its lock until the CFO confirms it. */
 	periodId?: string;
 	/** The proposing agent's message in the thread (technical voice). */
 	body: string;
@@ -43,7 +44,7 @@ export interface MockContext {
 	/** Raises a Proposal; the Red Team and Advisor follow on the usual timing. Returns its id. */
 	propose(p: ProposeInput): string;
 	later(ms: number, fn: () => void): void;
-	/** The earliest month not yet locked ("2026-10"). */
+	/** The month the demo clock is in while it is open, otherwise the earliest month not locked ("2026-10"). */
 	openPeriodId(): string;
 	/** Marks an integration as just synced (lastSyncAt = now, recordsSynced += n). */
 	synced(integrationId: string, n?: number): void;

@@ -1,12 +1,12 @@
 // Demo behaviour for Financing: the Seed 2026 round's paperwork and wires, and what keeps arriving from the cap table
 // tool. The Funding desk matches money to investors; the Capital accountant keeps the instrument register, the
 // classification and the cap table. Raising money is never income: SAFEs and notes are liabilities, shares are equity.
-import type { BankTransaction, CapTableEntry, Commitment, Instrument, UploadedDocument } from '../../types';
+import type { BankTransaction, Commitment, UploadedDocument } from '../../types';
 import { formatMoney, toBig } from '../../money';
 import { SUBSIDIARY_ID } from '../seed';
 import type { ScriptLine } from '../script';
 import type { LiveTicker, MockContext, UploadHandler } from './types';
-import { accruedInterestMinor, classify, daysBetween, formatPriceE4, fullyDilutedShares, parValueMinor, pricedRound, toConvertible } from '../../../financing';
+import { accruedInterestMinor, classify, daysBetween, formatPriceE4, fullyDilutedShares, fundedDates, parValueMinor, roundPlan } from '../../../financing';
 
 const UK = 'sub-uk';
 const SEED = 'rd-seed-2026';
@@ -158,7 +158,7 @@ const closingTracker: UploadHandler = {
 					amountMinor: '100000000',
 					summaryPlain: "Record Harrow Lane Capital's $1,000,000 SAFE: $999,965 arrived, and the $35 a bank took on the way is still owed by them. It is money we may owe back in shares, not income.",
 					rationale: "Payer HLC FUND II is on file for Harrow Lane Capital. Received 999,965.00 against 1,000,000.00 committed; the 35.00 gap is an intermediary bank fee, held as subscription receivable until collected or waived.",
-					payload: { key: 'ins-harrow', instrumentId: 'ins-harrow', commitmentId: 'cm-harrow', bankTransactionId: bt.id, memo: 'Harrow Lane Capital SAFE received, $35 short after a wire fee', lines: [L('1000', '99996500', '0'), L('1060', '3500', '0'), L('2600', '0', '100000000')] },
+					payload: { key: 'ins-harrow', instrumentId: 'ins-harrow', fundedAt: FIRST_CLOSE, commitmentId: 'cm-harrow', bankTransactionId: bt.id, memo: 'Harrow Lane Capital SAFE received, $35 short after a wire fee', lines: [L('1000', '99996500', '0'), L('1060', '3500', '0'), L('2600', '0', '100000000')] },
 					body: `${bt.id} +999,965.00 'HLC FUND II' matched to cm-harrow (payer name on file). Shortfall 35.00 = intermediary fee. Dr 1000 999,965.00 / Dr 1060 Subscriptions receivable 35.00 / Cr 2600 SAFEs 1,000,000.00.`,
 					critique: { summary: 'The Red Team asked whether the $35 should just be expensed.', body: 'Why carry 35.00 as a receivable instead of expensing it to 6400? The SAFE says the purchase amount is 1,000,000.00; if the investor never tops up, the receivable is overstated.' },
 					onApproved: (c) => {
@@ -178,7 +178,7 @@ const closingTracker: UploadHandler = {
 					amountMinor: '100000000',
 					summaryPlain: "Record Orrin Strategic Partners' $1,000,000 convertible note. It is a loan that turns into shares later, not income; interest starts today.",
 					rationale: 'Exact amount from the payer on file. The note is a liability at amortized cost; 6% simple interest accrues from the funding date.',
-					payload: { key: 'ins-orrin', instrumentId: 'ins-orrin', commitmentId: 'cm-orrin', bankTransactionId: bt.id, memo: 'Orrin Strategic Partners convertible note received', lines: [L('1000', '100000000', '0'), L('2650', '0', '100000000')] },
+					payload: { key: 'ins-orrin', instrumentId: 'ins-orrin', fundedAt: FIRST_CLOSE, commitmentId: 'cm-orrin', bankTransactionId: bt.id, memo: 'Orrin Strategic Partners convertible note received', lines: [L('1000', '100000000', '0'), L('2650', '0', '100000000')] },
 					body: `${bt.id} +1,000,000.00 'Orrin Strategic Partners Inc' matched to cm-orrin. Dr 1000 / Cr 2650 Convertible notes 1,000,000.00. Interest from 2026-10-01.`,
 					onApproved: (c) => {
 						matchWire(c, bt.id);
@@ -212,7 +212,7 @@ const closingTracker: UploadHandler = {
 					amountMinor: '20000000',
 					summaryPlain: "Record Fenwick Row Ventures' $200,000 SAFE in Cafoo Inc, with the money held for it by Cafoo Ltd. Not income.",
 					rationale: 'Purchase amount 200,000.00 USD per the SAFE, settled as 156,250.00 GBP at 1.2800. Cafoo Inc records the SAFE and a receivable from Cafoo Ltd; the pair eliminates on consolidation.',
-					payload: { key: 'ins-fenwick', instrumentId: 'ins-fenwick', commitmentId: 'cm-fenwick', memo: 'Fenwick Row SAFE, money held by Cafoo Ltd', lines: [L('1900', '20000000', '0'), L('2600', '0', '20000000')] },
+					payload: { key: 'ins-fenwick', instrumentId: 'ins-fenwick', fundedAt: FIRST_CLOSE, commitmentId: 'cm-fenwick', memo: 'Fenwick Row SAFE, money held by Cafoo Ltd', lines: [L('1900', '20000000', '0'), L('2600', '0', '20000000')] },
 					body: 'Dr 1900 Due from Cafoo Ltd 200,000.00 / Cr 2600 SAFEs 200,000.00. Pairs with the Cafoo Ltd entry above.',
 					onApproved: (c) => funded(c, 'ins-fenwick', 15_625_000n, 'funded', "Paid £156,250 into Cafoo Ltd's account; Cafoo Ltd owes it to Cafoo Inc.")
 				})
@@ -254,7 +254,7 @@ const wireConfirmation: UploadHandler = {
 				amountMinor: '55000000',
 				summaryPlain: "Record Tidewater Angels' $550,000 SAFE, paid through their SPV under the name TWA Series 14 LLC. Money owed back in shares, not income.",
 				rationale: `Payer ${PAYER} is not on file. Matched on exact amount (550,000.00 = commitment), the reference "TIDEWATER ANGELS SPV", and the closing tracker's note that the SPV closes this week. Sender paid all fees.`,
-				payload: { key: 'ins-tidewater', instrumentId: 'ins-tidewater', commitmentId: c.id, bankTransactionId: bt.id, payerName: PAYER, memo: 'Tidewater Angels SAFE received via TWA Series 14 LLC', lines: [L('1000', '55000000', '0'), L('2600', '0', '55000000')] },
+				payload: { key: 'ins-tidewater', instrumentId: 'ins-tidewater', fundedAt: '2026-10-02T00:00:00Z', commitmentId: c.id, bankTransactionId: bt.id, payerName: PAYER, memo: 'Tidewater Angels SAFE received via TWA Series 14 LLC', lines: [L('1000', '55000000', '0'), L('2600', '0', '55000000')] },
 				body: `${bt.id} +550,000.00 '${PAYER}' -> cm-tidewater. Name mismatch; amount and reference exact. Dr 1000 / Cr 2600 SAFEs 550,000.00. Adds ${PAYER} to Tidewater's payer names once approved.`,
 				critique: { summary: 'The Red Team checked the payer is really Tidewater.', body: `"${PAYER}" is not a payer name on file. Amount and reference match only one open commitment, so the risk of a wrong match is low, but a person should confirm the SPV before money from an unknown sender is booked to an investor.` },
 				onApproved: (x) => {
@@ -381,7 +381,8 @@ const convertibleNote: UploadHandler = {
 			const [y, m] = period.split('-').map(Number);
 			const monthStart = `${period}-01`;
 			const next = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-			const from = FIRST_CLOSE.slice(0, 10) > monthStart ? FIRST_CLOSE.slice(0, 10) : monthStart;
+			const fundedAt = (fundedDates(ctx.t.proposal).get('ins-orrin') ?? FIRST_CLOSE).slice(0, 10);
+			const from = fundedAt > monthStart ? fundedAt : monthStart;
 			const days = daysBetween(from, next);
 			const interest = accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, from, next);
 			if (interest > 0n) {
@@ -525,17 +526,20 @@ const capTable: UploadHandler = {
 // ---------------------------------------------------------------------------------------------------------------
 // Term sheet: the Series A, and the SAFEs and note converting into it
 
-/** Every Seed 2026 SAFE and note that will convert, priced on the term sheet's terms. Shared with the page. */
-export function seriesAPlan(t: { instrument: Instrument[]; cap_table_entry: CapTableEntry[]; investor: { id: string; name: string }[] }) {
-	const converting = t.instrument.filter((i) => i.roundId === SEED && (i.status === 'outstanding' || i.status === 'draft'));
-	const name = (id: string) => t.investor.find((x) => x.id === id)?.name ?? id;
-	const plan = pricedRound({
-		preRoundShares: fullyDilutedShares(t.cap_table_entry),
+/** Every Seed 2026 SAFE and note that will convert, priced on the term sheet's terms. */
+function seriesAPlan(ctx: MockContext) {
+	const converting = ctx.t.instrument.filter((i) => i.roundId === SEED && (i.status === 'outstanding' || i.status === 'draft'));
+	const funded = fundedDates(ctx.t.proposal);
+	const plan = roundPlan({
+		capTable: ctx.t.cap_table_entry,
+		converting,
+		holderName: (id) => nameOf(ctx, id),
+		fundedAt: (id) => funded.get(id),
 		preMoneyMinor: SERIES_A_PRE_MONEY,
 		newMoneyMinor: SERIES_A_NEW_MONEY,
-		convertibles: converting.map((i) => toConvertible(i, name(i.investorId), i.kind === 'convertible_note' ? FIRST_CLOSE : undefined, SERIES_A_CLOSE))
+		closeAt: SERIES_A_CLOSE
 	});
-	return { converting, plan };
+	return { converting, plan, funded };
 }
 
 const termSheet: UploadHandler = {
@@ -544,7 +548,7 @@ const termSheet: UploadHandler = {
 	sizeBytes: 176_045,
 	readByRole: 'capital',
 	read(ctx) {
-		const { plan } = seriesAPlan(ctx.t);
+		const { plan } = seriesAPlan(ctx);
 		return {
 			extracted: { lead: 'Saltmarsh Partners', security: 'Series A preferred', investment: '12,000,000.00 USD', preMoney: '60,000,000.00 USD, including converting SAFEs and notes and the unallocated pool', liquidationPreference: '1x, non-participating', optionPool: 'Top up to 10% of post-money, inside the pre-money', board: 'One seat for Saltmarsh', legalFees: 'Company pays investor counsel up to 40,000.00 USD', expectedClose: '2026-12-15', pricePerShare: formatPriceE4(plan.roundPriceE4) },
 			summaryPlain: `Saltmarsh Partners offers $12M at a $60M pre-money, about ${formatPriceE4(plan.roundPriceE4)} a share. The Seed SAFEs and note convert into Series A preferred at their $24M cap; the Capital accountant worked out the shares and proposes the conversion.`,
@@ -556,7 +560,7 @@ const termSheet: UploadHandler = {
 		};
 	},
 	apply(ctx, doc) {
-		const { converting, plan } = seriesAPlan(ctx.t);
+		const { converting, plan, funded } = seriesAPlan(ctx);
 		let lead = inv(ctx, 'inv-saltmarsh');
 		if (!lead) lead = ctx.insert('investor', { id: 'inv-saltmarsh', name: 'Saltmarsh Partners', kind: 'fund', country: 'US', payerNames: ['Saltmarsh Partners Fund III LP'], contactName: 'Imogen Tate' });
 		let round = ctx.t.funding_round.find((r) => r.id === SERIES_A);
@@ -577,7 +581,8 @@ const termSheet: UploadHandler = {
 		const notes = balance(ctx, '2650');
 		const accrued = balance(ctx, '2660');
 		const note = ready.find((i) => i.kind === 'convertible_note');
-		const interestToClose = note ? accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, FIRST_CLOSE, SERIES_A_CLOSE) : 0n;
+		const noteFrom = note && funded.get(note.id);
+		const interestToClose = note && noteFrom ? accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, noteFrom, SERIES_A_CLOSE) : 0n;
 		const moreInterest = interestToClose > accrued ? interestToClose - accrued : 0n;
 		const carrying = safes + notes + accrued + moreInterest;
 		const par = parValueMinor(shares);

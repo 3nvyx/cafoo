@@ -66,10 +66,6 @@
 		"bracket-size": 4,
 		"unknown-class": 4
 	},
-	"routes/(app)/customers/+page.svelte": {
-		"bracket-size": 10,
-		"unknown-class": 6
-	},
 	"routes/(app)/customers/[id]/+page.svelte": {
 		"bracket-size": 5,
 		"unknown-class": 12

@@ -105,7 +105,8 @@ const cloudBill: UploadHandler = {
 				})
 			);
 		}
-		const svc = serviceEngineering(ctx.t.employee, '2026-09', rateFrom(ctx));
+		// Contractors are paid on invoice, not through 6000 Payroll, so only employees are reclassed.
+		const svc = serviceEngineering(ctx.t.employee, '2026-09', rateFrom(ctx), { payrollOnly: true });
 		const svcAmt = toBig(svc.totalMinor);
 		if (svcAmt > 0n && !alreadyProposed(ctx, 'service-share-2026-09')) {
 			ids.push(

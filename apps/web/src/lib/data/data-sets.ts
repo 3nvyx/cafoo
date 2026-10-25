@@ -16,7 +16,7 @@ export function tableLabel(name: string): string {
 	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-const ACRONYMS = new Set(['fx', 'cfo', 'ar', 'ap', 'id', 'url', 'gl', 'arr', 'nrr', 'crs', 'ic']);
+const ACRONYMS = new Set(['fx', 'cfo', 'ar', 'ap', 'id', 'url', 'gl', 'arr', 'nrr', 'crs', 'ic', 'pto']);
 const SPELLED: Record<string, string> = { je: 'journal entry', ccy: 'currency', bp: 'basis points', ym: 'month' };
 
 export function byLabel(a: DataSet, b: DataSet): number {
