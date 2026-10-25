@@ -6,7 +6,7 @@
  */
 import { query, type AgentDefinition, type HookCallback, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
 import { say, sleep, type Cast } from '../stdb';
-import { closeHasWork, openingMarker } from '../close-state';
+import { closeHasWork, closeStartRefusal, openingMarker } from '../close-state';
 import { advisorServer, booksServer, consolidationServer, crsServer, workerServer } from './tools';
 import { startCritic } from '../redteam';
 import { HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from '../harness';
@@ -38,6 +38,9 @@ function subagent(conn: RoleConn, role: WorkerRole): AgentDefinition {
 export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: string) => void) {
   const cfoWaitMs = Number(process.env.CLOSE_CFO_WAIT_MS?.trim() || 45 * 60_000);
   if (!Number.isSafeInteger(cfoWaitMs) || cfoWaitMs < 0) throw new Error('CLOSE_CFO_WAIT_MS must be a non-negative safe integer');
+  // A locked month, or an earlier month not locked yet (months close in order), is refused before anything runs.
+  const refusal = closeStartRefusal(cast.advisor, periodYm);
+  if (refusal) throw new Error(refusal);
   // Resume only a close that has work of its own (src/close-state.ts): not the live feed's Proposals of an open month,
   // and not a close that failed right after opening, before it filed anything.
   if (closeHasWork(cast.advisor, periodYm)) {
@@ -180,7 +183,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (!open.length) return;
     onStep(`${open.length} proposal(s) still open after delegation; the Advisor rules on them now`);
     await run(
-      `Delegation is finished for ${periodYm}. ${open.length} proposals are still open. Call list_proposals for ${periodYm} with status Open, weigh each Red Team critique, and rule on every one with approve_proposal or reject_proposal (technical rationale plus a one-sentence plain summary). Do not delegate again and do not propose anything. Then mark the close tasks done and call request_period_lock.`
+      `Delegation is finished for ${periodYm}. ${open.length} proposals are still open. Call list_proposals for ${periodYm} with status Open (it returns a page of 10; pass id to read one payload in full), weigh each Red Team critique, and rule on every one on the page with approve_proposal or reject_proposal (technical rationale plus a one-sentence plain summary). A ruled proposal leaves Open, so call list_proposals with status Open again until total is 0. Do not delegate again and do not propose anything. Then mark the close tasks done and call request_period_lock.`
     );
     open = openProposals();
     if (open.length) {
@@ -192,10 +195,16 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // Started only now, so a close that fails while setting up (a charter that does not build) leaves no critic running.
   const stopCritic = startCritic(cast);
   try {
+    // Opening the close is a soft close (docs/adr/0014): with a task out of todo the books stop the feed booking into
+    // the month, as the scripted close does. The tasks move before the opening message, so the feed has stopped by the
+    // time the close is announced; a rerun after a failure here finds no todo task left and goes on.
+    for (const t of A.db.closeTask.iter()) {
+      if (t.periodId === periodId && t.status.tag === 'Todo') await A.reducers.updateCloseTask({ taskId: t.id, status: 'in_progress', note: 'Close started' });
+    }
     // The opening message marks the close as started, so a second run resumes instead of proposing twice.
     await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     await run(
-      `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification)${group ? ', 4) consolidation (revalue Cafoo Ltd\'s foreign-currency balances at the closing rate and propose the balance and activity eliminations; it raises any intercompany difference in the close thread first)' : ''}. Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
+      `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification)${group ? ', 4) consolidation (revalue Cafoo Ltd\'s foreign-currency balances at the closing rate and propose the balance and activity eliminations; it raises any intercompany difference in the close thread first)' : ''}. Wait for each report. Then list proposals with status Open (a page at a time; ruled ones leave Open, so call again until total is 0), consider critiques, rule on every one, mark tasks done, and request the lock.`
     );
     await ruleRemaining();
     // Revenue catch-up, as in the scripted close: the recognition entry had to leave out any customer whose new
@@ -222,7 +231,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
       const lines = [...due].map(([cid, amt]) => `${s.customerName.get(cid) ?? 'customer'} (customerId ${cid}): ${amt} minor units`).join('; ');
       onStep(`revenue catch-up for ${due.size} customer(s)`);
       await runAndRule(
-        `Revenue catch-up for ${periodYm}: the revenue schedules for these customers were approved after the recognition entry had to leave them out: ${lines}. Delegate to revenue: propose one recognition journal entry for ${periodYm} with recognizeScheduleYm ${periodYm} that, for each customer, debits 2400 and credits 4000 by exactly that amount on lines tagged with the customerId. Then list proposals, consider the critique, rule on it, and request the lock (the books refuse the lock until this revenue is recognized).`
+        `Revenue catch-up for ${periodYm}: the revenue schedules for these customers were approved after the recognition entry had to leave them out: ${lines}. Delegate to revenue: propose one recognition journal entry for ${periodYm} with recognizeScheduleYm ${periodYm} that, for each customer, debits 2400 and credits 4000 by exactly that amount on lines tagged with the customerId. Then list proposals with status Open, consider the critique, rule on the new one, and request the lock (the books refuse the lock until this revenue is recognized).`
       );
     }
   } finally {

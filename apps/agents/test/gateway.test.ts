@@ -330,3 +330,24 @@ describe('starting a close after the continuous Bookkeeper', () => {
     expect(runClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a close the books refuse to start', () => {
+  const why = 'The September 2026 close cannot start while August 2026 is not locked: months close in order. Lock August 2026 first.';
+
+  it('answers POST /close with 409 and the plain reason, and never runs the close', async () => {
+    const closes = new Map();
+    const { base, runClose } = await gateway({ closes, refuseClose: ym => (ym === '2026-09' ? why : undefined) });
+    const r = await fetch(`${base}/close`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ periodYm: '2026-09' }) });
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({ error: why });
+    expect(closes.size).toBe(0);
+    expect(runClose).not.toHaveBeenCalled();
+    expect((await fetch(`${base}/close`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ periodYm: '2026-10' }) })).status).toBe(202);
+  });
+
+  it('tells chat the close failed, with the reason', async () => {
+    const { base, runClose } = await gateway({ refuseClose: () => why });
+    expect(await reply(await chat(base, 'start the close'))).toBe('close: failed');
+    expect(runClose).not.toHaveBeenCalled();
+  });
+});

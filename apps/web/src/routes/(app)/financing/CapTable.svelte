@@ -7,6 +7,9 @@
 	import { formatPpm, formatPriceE4, fullyDilutedPpm, fullyDilutedShares, fundedDates, rollForward, roundPlan } from '#lib/financing.js';
 	import { shortDate } from '#lib/labels.js';
 	import Notice from '#lib/components/Notice.svelte';
+	import { rootOf } from '#lib/data/group.js';
+
+	const company = $derived(rootOf(db.subsidiaries())?.name ?? 'the company');
 
 	const SECURITY: Record<SecurityClass, string> = {
 		common: 'Common',
@@ -83,7 +86,7 @@
 	<div class="flex flex-col gap-1">
 		<h2 id="cap-h" class="text-title">Cap table</h2>
 		<p class="max-w-prose text-body-sm text-ink-2">
-			Who owns Cafoo Inc, fully diluted: shares, options granted and the unallocated pool, {total.toLocaleString('en-US')} in all. The founders hold {formatPpm(fullyDilutedPpm(founders, total), 1)}. SAFEs and notes own nothing yet; they turn into shares at the next priced round.
+			Who owns {company}, fully diluted: shares, options granted and the unallocated pool, {total.toLocaleString('en-US')} in all. The founders hold {formatPpm(fullyDilutedPpm(founders, total), 1)}. SAFEs and notes own nothing yet; they turn into shares at the next priced round.
 		</p>
 	</div>
 	<div class="overflow-x-auto">

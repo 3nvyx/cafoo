@@ -1,0 +1,108 @@
+{
+  "commit": "579ee2d",
+  "proofs": [
+    {
+      "id": "spacetimedb",
+      "name": "SpacetimeDB",
+      "status": "proved",
+      "at": "2026-10-25T11:24:47.095Z",
+      "ms": 10,
+      "evidence": {
+        "endpoint": "http://localhost:3000/v1/ping",
+        "http": 200
+      }
+    },
+    {
+      "id": "agents",
+      "name": "Claude Agent SDK (openai)",
+      "status": "proved",
+      "at": "2026-10-25T11:24:47.105Z",
+      "ms": 1274,
+      "evidence": {
+        "model": "opus",
+        "session": "085eb310-dfe3-480f-868d-848343598e35",
+        "costUsd": 0.000125,
+        "reply": "ready"
+      }
+    },
+    {
+      "id": "grok",
+      "name": "xAI Grok (Red Team)",
+      "status": "proved",
+      "at": "2026-10-25T11:24:48.379Z",
+      "ms": 1202,
+      "evidence": {
+        "model": "grok-4.7",
+        "responseId": "346f2681-be3c-9e8f-ad14-334836b5c773",
+        "reply": "ready",
+        "tokens": 1308
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini (second critic)",
+      "status": "skipped",
+      "at": "2026-10-25T11:24:49.581Z",
+      "reason": "not configured on this machine"
+    },
+    {
+      "id": "moss",
+      "name": "Moss (policy search)",
+      "status": "proved",
+      "at": "2026-10-25T11:24:49.581Z",
+      "ms": 3078,
+      "evidence": {
+        "index": "cafoo-proof",
+        "topHit": "accruals",
+        "score": 0.887
+      }
+    },
+    {
+      "id": "brightdata",
+      "name": "Bright Data (Web Unlocker)",
+      "status": "failed",
+      "at": "2026-10-25T11:24:52.659Z",
+      "ms": 295,
+      "reason": "Zone \"mcp_unlocker\" does not exist on this Bright Data account. Add a Web Unlocker zone in the control panel (Proxies & Scraping → Add → Web Unlocker API)."
+    },
+    {
+      "id": "apify",
+      "name": "Apify (Website Content Crawler)",
+      "status": "proved",
+      "at": "2026-10-25T11:24:52.954Z",
+      "ms": 6891,
+      "evidence": {
+        "domain": "example.com",
+        "pages": 1,
+        "firstUrl": "https://example.com/"
+      }
+    },
+    {
+      "id": "nessie",
+      "name": "Capital One Nessie",
+      "status": "skipped",
+      "at": "2026-10-25T11:24:59.845Z",
+      "reason": "configuration refused: NESSIE_ACCOUNT_IDS is required when NESSIE_API_KEY is set."
+    },
+    {
+      "id": "crs",
+      "name": "CRS Credit API (sandbox)",
+      "status": "proved",
+      "at": "2026-10-25T11:24:59.845Z",
+      "ms": 986,
+      "evidence": {
+        "persona": "P01",
+        "tier": "A",
+        "decision": "APPROVE",
+        "requestIds": 8
+      }
+    },
+    {
+      "id": "slides",
+      "name": "Google Slides (export)",
+      "status": "skipped",
+      "at": "2026-10-25T11:25:00.831Z",
+      "reason": "pass --slides to create and share one small deck"
+    }
+  ]
+}

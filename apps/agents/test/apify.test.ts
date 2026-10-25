@@ -34,6 +34,18 @@ describe('crawlLive', () => {
     const wrong = vi.fn(async () => new Response(JSON.stringify({ error: 'x' }), { status: 200 }));
     await expect(crawlLive('example-co.com', { APIFY_TOKEN: 't' }, wrong as unknown as typeof fetch)).rejects.toThrow('expected url and text');
   });
+
+  it('accepts the null fields the real crawler sends for what it did not save', async () => {
+    const real = [{ url: 'https://example-co.com/', text: 'We build furniture.', markdown: null, html: null, screenshotUrl: null, metadata: { title: 'Example Co', author: null } }];
+    const f = vi.fn(async () => new Response(JSON.stringify(real), { status: 201 }));
+    const site = await crawlLive('example-co.com', { APIFY_TOKEN: 't' }, f as unknown as typeof fetch);
+    expect(site.pages).toEqual([{ url: 'https://example-co.com/', title: 'Example Co', text: 'We build furniture.' }]);
+  });
+
+  it('treats a crawl with no readable page text as a failure', async () => {
+    const empty = vi.fn(async () => new Response(JSON.stringify([{ url: 'https://example-co.com/', text: null, markdown: null }]), { status: 201 }));
+    await expect(crawlLive('example-co.com', { APIFY_TOKEN: 't' }, empty as unknown as typeof fetch)).rejects.toThrow('no page text');
+  });
 });
 
 describe('customerSite', () => {

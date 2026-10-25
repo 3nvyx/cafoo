@@ -28,7 +28,7 @@ _Avoid_: transaction, JE batch
 
 **Journal Line**: One debit or credit on one Account, in minor units, with an FX rate to functional currency.
 
-**Period**: A calendar month of the whole group, shared by every Subsidiary, that is open, closing, or locked; the CFO locks it once for all of them.
+**Period**: A calendar month of the whole group, shared by every Subsidiary, that is open, closing, or locked; the CFO locks it once for all of them. Months close in order: a Period's close starts and it locks only once every earlier Period is locked. A group Period locks only once consolidated: every foreign-currency balance stands at its closing rate and every intercompany pair is eliminated.
 _Avoid_: group period, company month
 
 **Close Task**: A checklist item in the month-end close with an owner (human or agent role), a status, and evidence.
@@ -37,6 +37,9 @@ _Avoid_: group period, company month
 
 **Bank Exception Acceptance**: The CFO's recorded decision to close a Period with a specific set of Bank Exceptions and a stated reason.
 It leaves those bank lines unmatched and requires renewed acceptance when the reviewed books change.
+
+**Soft close**: The state of a Period from the Advisor's opening of its close (a Close Task has left todo): only the close's own work posts to it, and the live feed stops booking into it. Not a Period status; the Period stays open until the lock is requested.
+_Avoid_: cutoff, pre-lock
 
 **Board Pack**: The deterministic report bundle (P&L, Balance Sheet, ARR waterfall, NRR) rendered after a Period locks, consolidated for the group or for one Subsidiary.
 
@@ -149,6 +152,7 @@ _Avoid_: scrape, enrichment, score
 - A **Customer** has one **Guarantor**; a **Guarantor** has many **Credit Checks**; the latest yields the **Risk Tier**
 - A **Risk Tier** drives the customer's payment terms and its **Allowance** Proposal
 - A **Subsidiary** with a foreign-currency balance gets one **Revaluation** Proposal per **Period**; each pair of **Intercompany accounts** is cleared by an **Elimination** posted to the **Elimination subsidiary**
+- A group **Period** locks only once its **Revaluation** and **Elimination** Proposals match the posted books; a later decision that moves a foreign-currency or intercompany balance makes them stale until they are redone
 - A **Charter** has many **Charter versions**, at most one live; a **Charter version** has many **Charter evals**
 
 ## Example dialogue

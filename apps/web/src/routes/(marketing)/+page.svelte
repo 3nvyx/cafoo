@@ -2,19 +2,18 @@
 	// The public landing page: what Cafoo does, how the gate works, and two small demos on
 	// sample data. It never touches the data source; the work happens in /dashboard.
 	import Icon from '#lib/components/Icon.svelte';
-	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
-	import DrillDemo from './DrillDemo.svelte';
 	import AgentWorkflows from './AgentWorkflows.svelte';
-	import GateStack from './GateStack.svelte';
+	import FeatureCards from './FeatureCards.svelte';
 	import LogoWall from './LogoWall.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
 
+
 	const anchors = [
 		{ href: '#how', label: 'Agents' },
-		{ href: '#demo', label: 'Demo' },
-		{ href: '#gate', label: 'The gate' }
+		{ href: '#gate', label: 'Security' },
+		{ href: '#growth', label: 'Your 10x' }
 	];
 
 	// Shown in the stats strip, which is commented out in the markup for now.
@@ -23,6 +22,35 @@
 		{ value: '52', label: 'Proposals in one sample September close, across two companies' },
 		{ value: '$10,000', label: 'default Materiality threshold: anything at or above it waits for the CFO' },
 		{ value: '0', label: 'ledger writes a worker agent can make. Only a ruling or your OK posts' }
+	];
+
+	// The growth story from plan.md, "How Cafoo grows with a startup". `now` marks what ships
+	// today; the last stage is on the roadmap (docs/roadmap.md).
+	const stages = [
+		{
+			range: '$10M to $50M',
+			round: 'Seed to Series A',
+			changes: 'One or two entities, a few hundred customers, and the founder still approves spend.',
+			cafoo: 'Agents propose, the Advisor rules, and the CFO confirms anything material. Close in days, not weeks. Cap table and round modeling.',
+			now: true,
+			quillmesh: ''
+		},
+		{
+			range: '$50M to $250M',
+			round: 'Series A to Series B',
+			changes: 'A second country and currency, usage pricing, enterprise contracts, and a first controller.',
+			cafoo: 'Multi-currency consolidation, revaluation and eliminations as Proposals. Revenue schedules rebuilt automatically. Credit checks on customers and vendors. Custom Charters that only tighten the gate.',
+			now: true,
+			quillmesh: 'a UK subsidiary in GBP, per-page usage pricing, about 15 enterprise contracts and a finance team of three.'
+		},
+		{
+			range: '$250M to $1B',
+			round: 'Series B to growth',
+			changes: 'Many entities, tens of thousands of transactions a month, audit and SOC 2.',
+			cafoo: 'Continuous bookkeeping between closes, per-subsidiary locks, a dedicated evaluator identity, real bank and billing feeds, hosted deployment and SOC 2 controls.',
+			now: false,
+			quillmesh: ''
+		}
 	];
 
 	// There is no sign-in yet: both entry points open the dashboard, in its own tab so the
@@ -140,7 +168,7 @@
 
 		<section id="how" class="calm-section content relative isolate scroll-mt-24 pt-32" aria-labelledby="how-h">
 			<div class="relative flex flex-col items-center text-center">
-				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Our agent workflows</h2>
+				<h2 id="how-h" class="section-h max-w-[18ch]">Our automated agent workflow</h2>
 			</div>
 			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-4 sm:p-8">
 				{@render marks()}
@@ -148,70 +176,91 @@
 			</div>
 		</section>
 
-		<section id="demo" class="content scroll-mt-24 pt-32" aria-labelledby="demo-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="demo-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Every figure, down to its entries</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">On sample numbers: follow a Board Pack figure down to the journal lines and the agent that wrote them.</p>
-			</div>
-			<div class="mt-14">
-				<DrillDemo />
-			</div>
-		</section>
-
+		<!-- The gate and the sponsors' APIs behind Cafoo, as two rows of two cards that widen on hover,
+		     set into the hero's painted sky. -->
 		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="gate-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Enforced in the database, not in a prompt</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Everything an agent does passes the Red Team, the Advisor and the gate before it touches the ledger. The feeds can only add raw bank lines and invoices.</p>
-			</div>
-			<PaintedFrame seed={37} class="mt-14 p-2 sm:p-6">
-				<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
-					{@render marks()}
-					<GateStack />
-				</div>
+			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
+			<PaintedFrame seed={23} class="p-3 sm:p-6 lg:p-8">
+				<FeatureCards />
 			</PaintedFrame>
 		</section>
 
-		<section class="content pt-32" aria-labelledby="credit-h">
+		<section id="growth" class="content scroll-mt-24 pt-32" aria-labelledby="growth-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="credit-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">A startup is only as good as its founder</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Cafoo checks the owner behind each customer, sets payment terms from the Risk Tier and proposes the Allowance. Vendors are checked before their first payment.</p>
+				<h2 id="growth-h" class="section-h max-w-[20ch]">Built for your 10x</h2>
+				<p class="mt-5 max-w-[56ch] text-subtitle text-ink-2">A startup that grows 10x outgrows its finance stack on the way. Cafoo grows with you from a $10M seed to a $1B growth round, and the gate never loosens as the volume climbs.</p>
 			</div>
-			<ul class="mt-14 grid gap-2 sm:grid-cols-2">
-				<li class="flex items-start gap-4 rounded-2xl border border-line bg-surface p-5">
-					<RoleAvatar role="credit" />
-					<div>
-						<p class="num text-2xl font-medium">$48,000</p>
-						<p class="text-ink-2">reserved in full for a customer whose owner is in an active bankruptcy plan</p>
-					</div>
-				</li>
-				<li class="flex items-start gap-4 rounded-2xl border border-line bg-surface p-5">
-					<RoleAvatar role="credit" />
-					<div>
-						<p class="num text-2xl font-medium">2 vendors</p>
-						<p class="text-ink-2">blocked before their first payment: one owner is a synthetic identity, the other is deceased</p>
-					</div>
-				</li>
-			</ul>
+			<div class="mt-14 flex flex-col gap-1 rounded-lg border border-line bg-subtle p-5 sm:flex-row sm:items-baseline sm:gap-4">
+				<p class="shrink-0 font-medium">Worked example: Quillmesh</p>
+				<p class="text-ink-2">Our sample company sells a document-automation API. Series A at $50M post-money, about $4.8M ARR growing about 3x a year, a US parent and a UK subsidiary. It has just entered stage 2.</p>
+			</div>
+			<ol class="mt-2 grid gap-2 md:grid-cols-3">
+				{#each stages as st, i (st.range)}
+					<li class="flex flex-col gap-5 rounded-lg border border-line bg-surface p-5">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<span class="num text-body-sm text-ink-3">Stage {i + 1}</span>
+							{#if st.now}
+								<span class="rounded-md bg-pos-soft px-2 py-0.5 text-caption font-medium text-on-pos-soft">Available now</span>
+							{:else}
+								<span class="rounded-md bg-info-soft px-2 py-0.5 text-caption font-medium text-on-info-soft">On the roadmap</span>
+							{/if}
+						</div>
+						<div>
+							<h3 class="num text-title font-medium">{st.range}</h3>
+							<p class="text-body-sm text-ink-3">{st.round}</p>
+						</div>
+						<div class="flex flex-col gap-1">
+							<p class="eyebrow">What changes for finance</p>
+							<p class="text-ink-2">{st.changes}</p>
+						</div>
+						<div class="flex flex-col gap-1">
+							<p class="eyebrow">What Cafoo does</p>
+							<p>{st.cafoo}</p>
+						</div>
+						{#if st.quillmesh}
+							<p class="mt-auto rounded-md bg-subtle px-3 py-2 text-body-sm text-ink-2"><span class="font-medium text-ink">Quillmesh is here:</span> {st.quillmesh}</p>
+						{/if}
+					</li>
+				{/each}
+			</ol>
+			<p class="mx-auto mt-6 max-w-[64ch] text-center text-ink-2">The gate does not loosen as volume grows: the Materiality threshold and Charters scale with the company, and every number still drills down to its journal lines.</p>
 		</section>
 
-		<!-- A rounded accent block inside the page width closes the page; the river runs down to its top edge. -->
+		<!-- A short accent band inside the page width closes the page: the heading on the left, one action on the right.
+		     The river runs down to its top edge. -->
 		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
-			<div class="flex flex-col items-center rounded-xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
-				<h2 id="cta-h" class="max-w-[16ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Close your next month with us</h2>
-				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
-					<a href="/dashboard" {...newTab} class="pill pill-lg bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
-					<a href="/pitch" class="pill pill-lg border border-on-accent/30 text-on-accent hover:bg-on-accent/10">Watch the pitch</a>
-				</div>
+			<div class="flex flex-col items-start gap-6 rounded-xl bg-accent px-6 py-10 text-on-accent sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-12">
+				<h2 id="cta-h" class="max-w-[18ch] text-display-sm font-medium sm:text-display">Close your next month with us</h2>
+				<a href="/dashboard" {...newTab} class="pill pill-lg shrink-0 bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 			</div>
 		</section>
 	</main>
 
-	<footer class="content flex flex-col gap-2 py-8 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between">
-		<Wordmark size={18} class="self-start sm:self-auto" />
-		<nav aria-label="Footer" class="flex flex-wrap gap-x-1">
-			<a href="/dashboard" {...newTab} class="flex min-h-11 items-center px-2 hover:text-ink">Sign in{@render tabNote()}</a>
-			<a href="/pitch" class="flex min-h-11 items-center px-2 hover:text-ink">Pitch</a>
-		</nav>
+	<!-- A standard site footer: brand and one line on the left, link columns on the right, then a legal row. -->
+	<footer class="content mt-24 border-t border-line pt-12 pb-8 text-body-sm">
+		<div class="flex flex-col gap-10 md:flex-row md:justify-between">
+			<div class="flex max-w-xs flex-col gap-3">
+				<a href="/" class="self-start" aria-label="Cafoo home"><Wordmark size={20} /></a>
+				<p class="text-ink-3">The agentic finance ERP. Agents propose, an Advisor rules, and you confirm anything material.</p>
+			</div>
+			<div class="grid grid-cols-2 gap-10 sm:gap-16">
+				<nav aria-labelledby="footer-product" class="flex flex-col gap-1">
+					<p id="footer-product" class="eyebrow mb-1">Product</p>
+					{#each anchors as a (a.href)}
+						<a href={a.href} class="flex min-h-9 items-center text-ink-2 hover:text-ink">{a.label}</a>
+					{/each}
+				</nav>
+				<nav aria-labelledby="footer-start" class="flex flex-col gap-1">
+					<p id="footer-start" class="eyebrow mb-1">Get started</p>
+					<a href="/dashboard" {...newTab} class="flex min-h-9 items-center text-ink-2 hover:text-ink">Sign in{@render tabNote()}</a>
+					<a href="/dashboard" {...newTab} class="flex min-h-9 items-center text-ink-2 hover:text-ink">Open the app{@render tabNote()}</a>
+					<a href="/pitch" class="flex min-h-9 items-center text-ink-2 hover:text-ink">Watch the pitch</a>
+				</nav>
+			</div>
+		</div>
+		<div class="mt-12 border-t border-line pt-6 text-ink-3">
+			<p>© {new Date().getFullYear()} Cafoo</p>
+		</div>
 	</footer>
 </div>
 
@@ -261,6 +310,18 @@
 		}
 		.wide-content {
 			width: calc(100% * 10 / 12 - var(--gap) / 6);
+		}
+	}
+
+	/* Every section heading: 36px on phones, 56px from sm up, set tight. */
+	.section-h {
+		font-size: 36px;
+		line-height: 1.02;
+		letter-spacing: -0.03em;
+	}
+	@media (min-width: 640px) {
+		.section-h {
+			font-size: 56px;
 		}
 	}
 

@@ -1,10 +1,11 @@
 <script lang="ts">
 	// Shortcuts to the jobs a CFO comes back to, each with its live state so the card says whether it needs a visit.
+	// Closing the month, the approval queue and the metrics have their own sections above, so they are not repeated here;
+	// cards that need the CFO come first.
 	import { db } from '#lib/data/index.js';
 	import { monthName } from '#lib/data/derive.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import type { Period } from '#lib/data/types.js';
-	import { lockGate } from '#lib/close.js';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import { shortDate } from '#lib/labels.js';
 	import { usdRate } from '#lib/kpis.js';
@@ -15,11 +16,6 @@
 	const mon = $derived(monthName(period.month));
 	const today = $derived(db.now().slice(0, 10));
 
-	const gate = $derived(lockGate(db, period.id));
-	const tasks = $derived(db.closeTasks().filter((t) => t.periodId === period.id));
-	const done = $derived(tasks.filter((t) => t.status === 'done').length);
-	const needs = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
-	const debating = $derived(db.proposals().filter((p) => p.status === 'open').length);
 	const unmatched = $derived(db.bankTransactions().filter((b) => !b.matched).length);
 
 	const round = $derived(db.fundingRounds().find((r) => r.status === 'open'));
@@ -48,6 +44,7 @@
 	const expiring = $derived(db.batches().filter((b) => b.status !== 'expired' && b.status !== 'depleted' && b.expiresAt && b.expiresAt.slice(0, 10) <= in30).length);
 
 	const tickets = $derived(db.supportTickets().filter((t) => t.status === 'new' || t.status === 'open').length);
+	const newTickets = $derived(db.supportTickets().filter((t) => t.status === 'new').length);
 	const pipeline = $derived(
 		db
 			.deals()
@@ -66,16 +63,8 @@
 		needsYou?: boolean;
 	}
 
-	const cards = $derived<Card[]>([
-		{
-			title: `Close ${mon}`,
-			icon: 'checklist',
-			href: '/close',
-			status: period.status === 'closed' ? 'Locked. The Board Pack is final' : gate.canLock ? 'Ready to lock' : gate.started ? `${done} of ${tasks.length} checklist tasks done` : 'Not started; the agents close it for you',
-			needsYou: gate.canLock && period.status !== 'closed'
-		},
-		{ title: 'Review Proposals', icon: 'inbox', href: '/proposals', status: needs ? `${plural(needs, 'item')} need your OK · ${debating} in debate` : `Nothing waiting · ${debating} in debate`, needsYou: needs > 0 },
-		{ title: 'Bank and ledger', icon: 'book', href: '/ledger', status: unmatched ? `${plural(unmatched, 'bank line')} not matched yet · upload a statement` : 'Every bank line matched · upload a statement' },
+	const all = $derived<Card[]>([
+		{ title: 'Bank and ledger', icon: 'book', href: '/ledger', status: unmatched ? `${plural(unmatched, 'bank line')} not matched yet · upload a statement` : 'Every bank line matched · upload a statement', needsYou: unmatched > 0 },
 		{
 			title: 'Fundraising',
 			icon: 'coins',
@@ -92,12 +81,17 @@
 		},
 		{ title: 'Cost of service', icon: 'cloud', href: '/costs', status: spend ? `${money(spend)} of cloud and model spend so far this month` : 'Cloud, model and engineering cost by product' },
 		{ title: 'Credits and stock', icon: 'box', href: '/batches', status: expiring ? `${plural(expiring, 'batch', 'batches')} expire in the next 30 days` : 'Nothing expires in the next 30 days', needsYou: expiring > 0 },
-		{ title: 'Customers and support', icon: 'users', href: '/customers', status: `${plural(tickets, 'open ticket')} · ${money(pipeline)} weighted pipeline` },
+		{
+			title: 'Customers and support',
+			icon: 'users',
+			href: '/customers',
+			status: `${plural(tickets, 'open ticket')}${newTickets ? `, ${newTickets} unanswered` : ''} · ${money(pipeline)} weighted pipeline`,
+			needsYou: newTickets > 0
+		},
 		{ title: 'Board Pack', icon: 'chart', href: '/reports', status: period.status === 'closed' ? `${mon} is final` : `Final once ${mon} is locked` },
-		{ title: 'Metrics', icon: 'gauge', href: '/metrics', status: 'Burn, runway, retention and AI unit economics' },
-		{ title: 'Agent rules', icon: 'shield', href: '/charters', status: 'What each agent may and may not do' },
-		{ title: 'Approval threshold', icon: 'sliders', href: '/settings', status: `Above ${money(db.settings().materialityThresholdMinor)} waits for you` }
+		{ title: 'Agent rules', icon: 'shield', href: '/charters', status: 'What each agent may and may not do' }
 	]);
+	const cards = $derived([...all.filter((c) => c.needsYou), ...all.filter((c) => !c.needsYou)]);
 </script>
 
 <section aria-labelledby="workflows-h" class="mt-12">

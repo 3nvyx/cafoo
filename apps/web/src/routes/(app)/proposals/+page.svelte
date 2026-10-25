@@ -59,34 +59,37 @@
 
 <svelte:head><title>Proposals · Cafoo</title></svelte:head>
 
-<h1 class="text-[34px] sm:text-[42px]">Proposals</h1>
-<p class="mt-2 max-w-[60ch] text-ink-2">
-	Every change an agent wants to make to the books. Nothing touches a balance until the Advisor approves it, and anything over your threshold waits for you.
-</p>
+<!-- One centered column: heading, tabs and cards share an edge on both sides. 4xl fits all seven tabs without scrolling. -->
+<div class="mx-auto max-w-4xl">
+	<h1 class="text-[34px] sm:text-[42px]">Proposals</h1>
+	<p class="mt-2 max-w-[60ch] text-ink-2">
+		Every change an agent wants to make to the books. Nothing touches a balance until the Advisor approves it, and anything over your threshold waits for you.
+	</p>
 
-<div bind:this={tablist} class="-mx-4 mt-6 overflow-x-auto px-4" role="tablist" aria-label="Proposal status">
-	<div class="flex min-w-max gap-1 border-b border-line">
-		{#each TABS as t, i (t.id)}
-			<button
-				id="tab-{t.id}"
-				role="tab"
-				aria-selected={tab.id === t.id}
-				aria-controls="tab-panel"
-				tabindex={tab.id === t.id ? 0 : -1}
-				onclick={() => select(t.id)}
-				onkeydown={(e) => onTabKey(e, i)}
-				class="-mb-px flex min-h-[44px] items-center gap-2 border-b-2 px-3 text-[15px] transition-colors duration-150 {tab.id === t.id
-					? 'border-accent font-medium text-ink'
-					: 'border-transparent text-ink-2 hover:text-ink'}"
-			>
-				{t.label}
-				<span class="num rounded-full bg-subtle px-1.5 text-xs leading-5 text-ink-2">{count(t)}</span>
-			</button>
-		{/each}
+	<div bind:this={tablist} class="-mx-4 mt-6 overflow-x-auto px-4" role="tablist" aria-label="Proposal status">
+		<div class="flex min-w-max gap-1 border-b border-line">
+			{#each TABS as t, i (t.id)}
+				<button
+					id="tab-{t.id}"
+					role="tab"
+					aria-selected={tab.id === t.id}
+					aria-controls="tab-panel"
+					tabindex={tab.id === t.id ? 0 : -1}
+					onclick={() => select(t.id)}
+					onkeydown={(e) => onTabKey(e, i)}
+					class="-mb-px flex min-h-[44px] items-center gap-2 border-b-2 px-3 text-[15px] transition-colors duration-150 {tab.id === t.id
+						? 'border-accent font-medium text-ink'
+						: 'border-transparent text-ink-2 hover:text-ink'}"
+				>
+					{t.label}
+					<span class="num rounded-full bg-subtle px-1.5 text-xs leading-5 text-ink-2">{count(t)}</span>
+				</button>
+			{/each}
+		</div>
 	</div>
-</div>
 
-<div id="tab-panel" role="tabpanel" aria-labelledby="tab-{tab.id}" class="mt-6 max-w-[820px]">
-	{#if tab.id === 'awaiting_cfo'}<ConfirmAll proposals={awaiting} class="mb-4 flex justify-end" />{/if}
-	<ProposalList proposals={shown} empty={tab.id === 'awaiting_cfo' ? 'Nothing needs your OK right now.' : 'No Proposals with this status.'} />
+	<div id="tab-panel" role="tabpanel" aria-labelledby="tab-{tab.id}" class="mt-6">
+		{#if tab.id === 'awaiting_cfo'}<ConfirmAll proposals={awaiting} class="mb-4 flex justify-end" />{/if}
+		<ProposalList proposals={shown} empty={tab.id === 'awaiting_cfo' ? 'Nothing needs your OK right now.' : 'No Proposals with this status.'} />
+	</div>
 </div>

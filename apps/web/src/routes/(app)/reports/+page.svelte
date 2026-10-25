@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
 	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, nrrBp, periodEnd, periodLabel } from '#lib/data/derive.js';
-	import { boardPack, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
+	import { boardPack, eliminationStatus, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
@@ -46,6 +46,17 @@
 		}
 	});
 	const pack = $derived(result && 'pack' in result ? result.pack : null);
+	/** Whether this month's Eliminations are posted and still match the books; drives the draft note, not the lock. */
+	const elimStatus = $derived(period && isGroup ? eliminationStatus(books, period.id) : 'none');
+	const elimNote = $derived(
+		elimStatus === 'pending'
+			? 'Group totals may still include intercompany charges until the elimination entries post. Check the Eliminations column before using these figures.'
+			: elimStatus === 'stale'
+				? 'Intercompany entries changed after the eliminations posted, so the Eliminations column no longer matches the books. Group totals may include intercompany charges until the eliminations are redone.'
+				: elimStatus === 'unknown'
+					? 'The eliminations for this month cannot be checked yet, so group totals may still include intercompany charges.'
+					: null
+	);
 	const ccy = $derived(pack?.ccy ?? reportingCcy);
 	const tk = $derived(pack?.totalKey ?? 'total');
 	const consolidated = $derived(pack?.scope === 'group');
@@ -196,10 +207,10 @@
 	{/if}
 
 	<!-- At most three notices stack here: the draft note, and one of the two failures (the second needs a pack). -->
-	{#if (consolidated && period.status !== 'closed') || (result && 'error' in result) || (pack && supplemental.kind === 'error')}
+	{#if (consolidated && elimNote) || (result && 'error' in result) || (pack && supplemental.kind === 'error')}
 		<div class="mt-5 flex flex-col gap-3">
-			{#if consolidated && period.status !== 'closed'}
-				<Notice tone="info">Draft group totals may still include intercompany charges until the elimination entries post. Check the Eliminations column before using these figures.</Notice>
+			{#if consolidated && elimNote}
+				<Notice tone="info">{elimNote}</Notice>
 			{/if}
 			{#if result && 'error' in result}
 				<Notice tone="neg" title="This Board Pack cannot be drawn yet">{result.error}</Notice>

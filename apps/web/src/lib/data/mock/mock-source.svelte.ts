@@ -3,7 +3,8 @@
 //
 // Period status follows the live module: 'open' while agents work, 'closing' once
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
-// CFO locks it.
+// CFO locks it. The close order is the module's too (docs/adr/0014): months start
+// their close and lock only after every earlier month is locked.
 import type { CfoSeat, ChangeEvent, ConnectionState, DataSet, DataSource } from '../source';
 import { byLabel, tableLabel } from '../data-sets';
 import type {
@@ -29,7 +30,18 @@ import type {
 	TableName
 } from '../types';
 import { editorProblems } from '../../charter';
-import { eliminations, formatMinor, isBankReconciliationTask, revaluation, translate, ymFromString, type JournalEntryInput } from '@cafoo/ledger-core';
+import {
+	closeMonthLabel,
+	closeOrderRefusal,
+	eliminations,
+	formatMinor,
+	isBankReconciliationTask,
+	isConsolidationKind,
+	revaluation,
+	translate,
+	ymFromString,
+	type JournalEntryInput
+} from '@cafoo/ledger-core';
 import { bankExceptionState } from '../../close';
 import { toCore } from '../group';
 import { DOCUMENT, KIND, roleName } from '../../labels';
@@ -37,7 +49,7 @@ import catalogJson from './seed/charters.json';
 import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
 import { accountIdFor, loadSeed, SUBSIDIARY_ID, type Tables } from './seed';
-import { CLOSE_SCRIPT, type ScriptLine, type Step } from './script';
+import { CLOSE_SCRIPT, SCRIPT_PERIOD, type ScriptLine, type Step } from './script';
 import { currentOpenPeriodId, entryProblem, monthEnded } from './periods';
 import { HANDLERS, TICKERS } from './uploads';
 import type { ArrayTable, MockContext, ProposeInput, RowOf } from './uploads/types';
@@ -61,6 +73,19 @@ const PROVIDERS: ProviderStatus[] = [
 const RESOLVED: Proposal['status'][] = ['approved', 'rejected', 'amended', 'superseded'];
 const UNRESOLVED: Proposal['status'][] = ['open', 'awaiting_cfo', 'sent_back'];
 const closeThread = (ym: string) => `close:${ym}`;
+/** pr-c2-v2 → pr-c2: a resubmission keeps its original's place in the Consolidation agent's set. */
+const baseId = (id: string) => id.replace(/-v\d+$/, '');
+
+/** One of the Consolidation agent's Proposals, computed from the books as they stand. */
+interface ConsolidationDraft {
+	id: string;
+	kind: Proposal['kind'];
+	payloadJson: string;
+	amountMinor: Minor;
+	summary: string;
+	rationale: string;
+	body: string;
+}
 
 export class MockDataSource implements DataSource {
 	readonly kind = 'mock' as const;
@@ -166,7 +191,12 @@ export class MockDataSource implements DataSource {
 		if (!period) throw new Error(`Unknown period ${periodId}`);
 		if (period.status !== 'open') throw new Error('This period is already locked or waiting for your lock.');
 		if (this.#closes.some((c) => c.periodYm === periodId)) return;
+		const order = closeOrderRefusal(this.#months(), periodId, 'start');
+		if (order) throw new Error(order);
 		if (!monthEnded(periodId, this.#now())) throw new Error(`${monthName(period.year, period.month)} is not over yet. Close it once the month has ended.`);
+		if (periodId !== SCRIPT_PERIOD) {
+			throw new Error(`Demo mode has a recorded close for ${closeMonthLabel(SCRIPT_PERIOD)} only, so it cannot close ${closeMonthLabel(periodId)}. Connect the live ledger and agents to close other months.`);
+		}
 		this.#closes.push({ periodYm: periodId, status: 'running' });
 		this.#audit('cfo', 'close.start', 'period', periodId, {});
 		for (const step of CLOSE_SCRIPT) {
@@ -177,6 +207,12 @@ export class MockDataSource implements DataSource {
 	async cfoConfirm(proposalId: string): Promise<void> {
 		const p = this.#proposal(proposalId);
 		if (p.status !== 'awaiting_cfo') throw new Error('Only rulings awaiting your confirmation can be confirmed.');
+		if (isConsolidationKind(p.kind)) {
+			// As the module does (docs/adr/0008): consolidation posts only with figures that still match the books.
+			if (this.#consolidationDrafts(p.periodId).find((d) => d.id === baseId(p.id))?.payloadJson !== p.payloadJson) {
+				throw new Error('The books changed after the Consolidation agent computed this, so it no longer matches the ledger. Send it back and the Consolidation agent will recompute it from the posted books.');
+			}
+		}
 		p.status = 'approved';
 		this.#emit('proposal', 'update', p);
 		const approval = this.#t.approval.find((a) => a.proposalId === proposalId);
@@ -299,6 +335,8 @@ export class MockDataSource implements DataSource {
 		const period = this.#t.period.find((p) => p.id === periodId);
 		if (!period) throw new Error(`Unknown period ${periodId}`);
 		if (period.status === 'closed') throw new Error('This period is already locked.');
+		const order = closeOrderRefusal(this.#months(), periodId, 'lock');
+		if (order) throw new Error(order);
 		const unresolved = this.#t.proposal.filter((p) => p.periodId === periodId && UNRESOLVED.includes(p.status));
 		if (unresolved.length) {
 			const sentBack = unresolved.filter((p) => p.status === 'sent_back').length;
@@ -312,7 +350,10 @@ export class MockDataSource implements DataSource {
 		if (blocked.length) throw new Error(`${blocked.length} Close Task${blocked.length === 1 ? ' is' : 's are'} blocked.`);
 		const bank = bankExceptionState(this, periodId);
 		if (bank.rows.length && !bank.acceptance.accepted) throw new Error('Unmatched bank lines need your explicit acceptance before locking.');
-		const pending = this.#t.close_task.filter((t) => t.periodId === periodId && t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done');
+		// Accepted exceptions (checked above) stand in for the bank task, which stays in progress on purpose, as lockGate and the module treat it.
+		const pending = this.#t.close_task.filter(
+			(t) => t.periodId === periodId && t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done' && !(bank.rows.length && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title }))
+		);
 		if (period.status !== 'closing' && pending.length) throw new Error('Finish every close task before locking.');
 		period.status = 'closed';
 		period.lockedAt = this.#now();
@@ -324,6 +365,8 @@ export class MockDataSource implements DataSource {
 		}
 		this.#message({ role: 'cfo', kind: 'statement', body: `LOCK ${periodId}.`, summary: 'You locked the period. The Board Pack is final.', threadId: closeThread(periodId) });
 		this.#audit('cfo', 'period.lock', 'period', periodId, {});
+		// A later month's close may have been waiting for this one before asking for its lock.
+		for (const c of this.#closes) this.#settle(c.periodYm);
 	}
 
 	async unlockPeriod(periodId: string, reasonPlain: string): Promise<void> {
@@ -687,10 +730,23 @@ export class MockDataSource implements DataSource {
 					kind: 'statement',
 					threadId: closeThread(periodId),
 					body: `Rulings complete for ${periodId}. ${n} item${n === 1 ? '' : 's'} at or above materiality await CFO: ${waiting.map((p) => p.id).join(', ') || 'none'}.`,
-					summary: n ? `Every item has a ruling. ${n} ${n === 1 ? 'is' : 'are'} over your threshold and need${n === 1 ? 's' : ''} your OK.` : 'Every item has a ruling and nothing needs you.'
+					summary: n
+						? `Every item has a ruling. ${n} ${n === 1 ? 'is' : 'are'} over your threshold and need${n === 1 ? 's' : ''} your OK.`
+						: 'Every item has a ruling and nothing needs you.'
 				});
 				break;
 			}
+		}
+	}
+
+	/** File the Consolidation agent's Proposals for the month (consolidationDrafts). */
+	#consolidate(periodId: string, taskId: string) {
+		for (const d of this.#consolidationDrafts(periodId)) {
+			this.#addProposal(
+				{ id: d.id, periodId, kind: d.kind, payloadJson: d.payloadJson, rationale: d.rationale, summaryPlain: d.summary, amountMinor: d.amountMinor, proposerRole: 'consolidation', status: 'open', createdAt: this.#now() },
+				taskId
+			);
+			this.#message({ proposalId: d.id, role: 'consolidation', kind: 'statement', body: d.body, summary: d.summary });
 		}
 	}
 
@@ -699,7 +755,7 @@ export class MockDataSource implements DataSource {
 	 * (the same revaluation() and eliminations() the scripted close and the module use): Cafoo Ltd's dollar balances
 	 * revalued at the closing rate, the balances the companies owe each other, and the month's service fees.
 	 */
-	#consolidate(periodId: string, taskId: string) {
+	#consolidationDrafts(periodId: string): ConsolidationDraft[] {
 		const t = this.#t;
 		const core = toCore({ subsidiaries: t.subsidiary, accounts: t.account, entries: t.journal_entry, lines: t.journal_line, rates: t.fx_rate, reportingCcy: t.settings.reportingCcy });
 		const ym = ymFromString(periodId);
@@ -710,13 +766,9 @@ export class MockDataSource implements DataSource {
 			entry.lines.map((l) => ({ account: byId.get(l.accountId)!.code, debitMinor: l.debitMinor.toString(), creditMinor: l.creditMinor.toString() }));
 		const debits = (entry: JournalEntryInput, ccy: string) =>
 			translate(entry.lines.reduce((s, l) => s + l.debitMinor, 0n), core.rates, ccy, t.settings.reportingCcy, ym, 'closing');
-		const propose = (id: string, kind: Proposal['kind'], entry: JournalEntryInput, ccy: string, summary: string, rationale: string, body: string) => {
-			this.#addProposal(
-				{ id, periodId, kind, payloadJson: JSON.stringify({ memo: entry.memo, lines: lines(entry) }), rationale, summaryPlain: summary, amountMinor: debits(entry, ccy).toString(), proposerRole: 'consolidation', status: 'open', createdAt: this.#now() },
-				taskId
-			);
-			this.#message({ proposalId: id, role: 'consolidation', kind: 'statement', body, summary });
-		};
+		const drafts: ConsolidationDraft[] = [];
+		const propose = (id: string, kind: Proposal['kind'], entry: JournalEntryInput, ccy: string, summary: string, rationale: string, body: string) =>
+			drafts.push({ id, kind, payloadJson: JSON.stringify({ memo: entry.memo, lines: lines(entry) }), amountMinor: debits(entry, ccy).toString(), summary, rationale, body });
 		if (uk && fx) {
 			const rev = revaluation({ entity: uk, lines: core.lines, accountsById: byId, rates: core.rates, ym, periodId: 0n, fxGainLossAccountId: fx.id });
 			if (rev.entry) {
@@ -735,6 +787,7 @@ export class MockDataSource implements DataSource {
 			const diff = el.activity.pairs.reduce((s, p) => s + p.differenceMinor, 0n);
 			propose('pr-c3', 'ic_elimination', el.activity.entry, t.settings.reportingCcy, `Remove this month's ${usd(total)} of service fees between the group companies from the group's reports.`, `Activity elimination; the two sides differ by ${usd(diff < 0n ? -diff : diff)} of translation rounding.`, `PROPOSE pr-c3: ${el.activity.entry.memo}.`);
 		}
+		return drafts;
 	}
 
 	/** Advisor ruling: posts below materiality, waits for the CFO at or above it. */
@@ -774,7 +827,20 @@ export class MockDataSource implements DataSource {
 		while (this.#t.proposal.some((p) => p.id === `${old.id}-v${n}`)) n++;
 		const id = `${old.id}-v${n}`;
 		const task = this.#t.close_task.find((t) => t.proposalIds.includes(old.id));
-		const fresh = this.#addProposal({ ...old, id, status: 'open', createdAt: this.#now(), summaryPlain: `Resubmitted after your note ("${note}"): ${old.summaryPlain}`, supersededBy: undefined }, task?.id);
+		// A revaluation or elimination is recomputed from the books as they now stand; anything else is resubmitted as is.
+		const draft = isConsolidationKind(old.kind) ? this.#consolidationDrafts(old.periodId).find((d) => d.id === baseId(old.id)) : undefined;
+		const fresh = this.#addProposal(
+			{
+				...old,
+				...(draft && { payloadJson: draft.payloadJson, amountMinor: draft.amountMinor, rationale: draft.rationale }),
+				id,
+				status: 'open',
+				createdAt: this.#now(),
+				summaryPlain: `Resubmitted after your note ("${note}"): ${draft?.summary ?? old.summaryPlain}`,
+				supersededBy: undefined
+			},
+			task?.id
+		);
 		old.status = 'superseded';
 		old.supersededBy = id;
 		this.#emit('proposal', 'update', old);
@@ -788,7 +854,7 @@ export class MockDataSource implements DataSource {
 			d.proposalIds.push(id);
 			this.#emit('document', 'update', d);
 		}
-		this.#message({ proposalId: id, role: old.proposerRole, kind: 'statement', body: `Resubmission of ${old.id} after CFO note: "${note}". Evidence re-checked; same entry proposed.`, summary: 'I looked again and resubmitted it with your note addressed.' });
+		this.#message({ proposalId: id, role: old.proposerRole, kind: 'statement', body: `Resubmission of ${old.id} after CFO note: "${note}". ${draft ? 'Recomputed from the posted books.' : 'Evidence re-checked; same entry proposed.'}`, summary: 'I looked again and resubmitted it with your note addressed.' });
 		this.#later(1500, () => this.#rule(fresh, `APPROVE ${id}.`, 'Advisor approved the resubmission.', `Resubmitted after CFO note: ${note}`));
 	}
 
@@ -888,7 +954,7 @@ export class MockDataSource implements DataSource {
 		for (const t of tasks.filter((t) => t.ownerRole === 'advisor')) {
 			set(t, close.status === 'running' ? 'in_progress' : unresolved.some((p) => p.status === 'awaiting_cfo') ? 'blocked' : unresolved.length ? 'in_progress' : 'done');
 		}
-		if (close.status === 'done' && !unresolved.length && period.status === 'open' && (!bank.rows.length || bank.acceptance.accepted)) {
+		if (close.status === 'done' && !unresolved.length && period.status === 'open' && (!bank.rows.length || bank.acceptance.accepted) && !closeOrderRefusal(this.#months(), periodId, 'request_lock')) {
 			period.status = 'closing';
 			this.#emit('period', 'update', period);
 			const month = new Date(Date.UTC(period.year, period.month - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
@@ -1081,6 +1147,11 @@ export class MockDataSource implements DataSource {
 	}
 
 	// Helpers
+	/** The months as the close-order rules read them (a demo Period's id is its month). */
+	#months() {
+		return this.#t.period.map((p) => ({ ym: p.id, status: p.status }));
+	}
+
 	#later(ms: number, fn: () => void) {
 		this.#timers.push(setTimeout(fn, ms));
 	}

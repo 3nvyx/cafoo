@@ -11,6 +11,7 @@
 	import Calendar from '#lib/components/Calendar.svelte';
 	import { calendarItems, payrollItems, shiftMonth } from '#lib/calendar.js';
 	import TimeOffList from './TimeOffList.svelte';
+	import { countryOf, headcountByMonth, monthsBetween, payrollByMonth } from './headcount';
 	import { DEPARTMENT, EMPLOYEE_STATUS, EMPLOYMENT, RUN_STATUS, companyName, convert, dayLabel, latestRate, money, payText, ptoText, range } from './people.js';
 
 	const now = $derived(db.now());
@@ -132,15 +133,56 @@
 	const deptMax = $derived(byDept.reduce((m, d) => (toBig(d.monthlyMinor) > m ? toBig(d.monthlyMinor) : m), 1n));
 	const pctOf = (minor: string) => Number((toBig(minor) * 1000n) / deptMax) / 10;
 
+	// Headcount over time: month ends from the first start, at most the last 18 months.
+	const COUNTRY_FILL: Record<string, string> = { US: 'bg-ink-2', UK: 'bg-line-strong' };
+	const span = $derived.by(() => {
+		const first = people.reduce((m, e) => (e.startAt < m ? e.startAt : m), now).slice(0, 7);
+		const all = monthsBetween(first, now);
+		return all.slice(-18);
+	});
+	const headcount = $derived(headcountByMonth(people, span, countryOf));
+	const headMax = $derived(headcount.reduce((m, h) => Math.max(m, h.total), 1));
+	const countries = $derived([...new Set(staff.map(countryOf))].sort((a, b) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b))));
+	const byCountry = $derived(countries.map((c) => ({ c, n: staff.filter((e) => countryOf(e) === c).length })));
+	const headDept = $derived(
+		[...new Set(staff.map((e) => e.department))]
+			.map((d) => ({ d, n: staff.filter((e) => e.department === d).length, uk: staff.filter((e) => e.department === d && countryOf(e) === 'UK').length }))
+			.sort((a, b) => b.n - a.n || DEPARTMENT[a.d].localeCompare(DEPARTMENT[b.d]))
+	);
+	const headDeptMax = $derived(headDept[0]?.n ?? 1);
+	const ymLabel = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+
+	// Payroll by pay month, in the reporting currency, each month tied to the entries it posted.
+	const payroll = $derived(payrollByMonth(runs, toReporting).slice(-12));
+	const payMax = $derived(payroll.reduce((m, p) => (p.loadedMinor > m ? p.loadedMinor : m), 1n));
+	const providers = $derived([...new Set(runs.map((r) => r.provider))]);
+
+	// Time off coming up: approved or waiting, ending today or later, soonest first.
+	const upcomingPto = $derived(
+		db
+			.ptoRequests()
+			.filter((r) => (r.status === 'approved' || r.status === 'pending') && r.endAt.slice(0, 10) >= now.slice(0, 10))
+			.sort((a, b) => a.startAt.localeCompare(b.startAt))
+	);
+	const outToday = $derived(upcomingPto.filter((r) => r.status === 'approved' && r.startAt.slice(0, 10) <= now.slice(0, 10)).length);
+	let ptoShown = $state(8);
+
 	const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 </script>
 
 <svelte:head><title>People · Cafoo</title></svelte:head>
 
 <header class="flex flex-col gap-1 pb-6">
-	<p class="text-body-sm text-ink-2">{companies.map((c) => c.name).join(' and ')} · payroll through Gusto</p>
+	<p class="text-body-sm text-ink-2">{companies.map((c) => c.name).join(' and ')}{providers.length ? ` · payroll through ${providers.join(' and ')}` : ''}</p>
 	<h1 class="text-display">People</h1>
 </header>
+
+{#if people.length === 0}
+	<div class="card flex flex-col gap-1 p-5">
+		<p class="font-medium">No people records yet</p>
+		<p class="max-w-prose text-body-sm text-ink-2">Connect Gusto, Deel or another payroll tool below, or upload a payroll register. Headcount, payroll by month, time off and the pay calendar appear here once the team is in.</p>
+	</div>
+{:else}
 
 <section aria-label="Team at a glance" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 	<div class="card flex flex-col gap-1 p-5">
@@ -172,18 +214,98 @@
 		<p class="text-body-sm text-ink-2">Next payroll debit</p>
 		{#if nextRun}
 			<p class="num text-display-sm">{money(loadedCost(nextRun), nextRun.ccy)}</p>
-			<p class="text-caption text-ink-3">Gusto draws pay, taxes and benefits on {dayLabel(nextRun.debitDate)}, two banking days before payday.</p>
+			<p class="text-caption text-ink-3">{nextRun.provider} draws pay, taxes and benefits on {dayLabel(nextRun.debitDate)}, two banking days before payday.</p>
 		{:else}
 			<p class="text-body text-ink-3">Nothing due</p>
 		{/if}
 	</div>
 </section>
 
-<div class="mt-8">
-	<Calendar items={entries} today={now.slice(0, 10)} />
+<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+	<section aria-labelledby="hc-h" class="card flex min-w-0 flex-col gap-3 p-5">
+		<div class="flex flex-wrap items-baseline justify-between gap-2">
+			<h2 id="hc-h" class="text-subtitle">Headcount over time</h2>
+			<span class="text-caption text-ink-3">{byCountry.map((c) => `${c.n} ${c.c}`).join(' · ')}</span>
+		</div>
+		<div class="flex h-32 items-end gap-0.5 sm:gap-1" role="img" aria-label="Headcount at each month end: {headcount.map((h) => `${ymLabel(h.ym)} ${h.total}`).join(', ')}">
+			{#each headcount as h (h.ym)}
+				<div class="flex h-full min-w-0 flex-1 flex-col-reverse" title="{ymLabel(h.ym)}: {h.total} people">
+					{#each countries as c (c)}
+						<span class="block w-full {COUNTRY_FILL[c] ?? 'bg-ink-3'}" style="height: {((h.by.get(c) ?? 0) / headMax) * 100}%"></span>
+					{/each}
+				</div>
+			{/each}
+		</div>
+		<div class="flex justify-between text-caption text-ink-3">
+			<span>{span[0] ? ymLabel(span[0]) : ''} · {headcount[0]?.total ?? 0}</span>
+			<span>{span.at(-1) ? ymLabel(span.at(-1) ?? '') : ''} · {headcount.at(-1)?.total ?? 0}</span>
+		</div>
+		<ul class="flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-2">
+			{#each countries as c (c)}
+				<li class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm border border-line {COUNTRY_FILL[c] ?? 'bg-ink-3'}" aria-hidden="true"></span>{c === 'UK' ? 'United Kingdom' : 'United States'}</li>
+			{/each}
+		</ul>
+		<p class="text-caption text-ink-3">Employees on the payroll at each month end; contractors are left out.</p>
+	</section>
+
+	<section aria-labelledby="hd-h" class="card flex min-w-0 flex-col gap-3 p-5">
+		<h2 id="hd-h" class="text-subtitle">Headcount by department</h2>
+		<ul class="flex flex-col gap-2">
+			{#each headDept as d (d.d)}
+				<li class="flex flex-col gap-1">
+					<div class="flex items-baseline justify-between gap-3 text-body-sm">
+						<button class="drill text-left" onclick={() => (department = d.d)}>{DEPARTMENT[d.d]}</button>
+						<span class="num">{d.n}{d.uk ? ` · ${d.uk} UK` : ''}</span>
+					</div>
+					<div class="flex h-1.5 overflow-hidden rounded-sm bg-subtle" aria-hidden="true">
+						<span class="h-full bg-ink-2" style="width: {((d.n - d.uk) / headDeptMax) * 100}%"></span>
+						<span class="h-full bg-line-strong" style="width: {(d.uk / headDeptMax) * 100}%"></span>
+					</div>
+				</li>
+			{/each}
+		</ul>
+	</section>
+
+	<section aria-labelledby="pm-h" class="card flex min-w-0 flex-col gap-3 p-5">
+		<div class="flex flex-col gap-1">
+			<h2 id="pm-h" class="text-subtitle">Payroll by month</h2>
+			<p class="text-caption text-ink-3">Pay, employer taxes and benefits from every pay run, in {reporting} at the latest closing rate, with the journal entry each month's runs posted.</p>
+		</div>
+		<ul class="flex flex-col gap-2">
+			{#each [...payroll].reverse() as m (m.ym)}
+				<li class="flex flex-col gap-1">
+					<div class="flex flex-wrap items-baseline justify-between gap-x-3 text-body-sm">
+						<span>{ymLabel(m.ym)} <span class="text-caption text-ink-3">· {m.runs.length} run{m.runs.length === 1 ? '' : 's'}</span></span>
+						<span class="flex items-baseline gap-2">
+							{#if m.jeIds.length}
+								{#each m.jeIds as je, k (je)}<a class="drill text-caption text-ink-2" href="/ledger?drill=je:{encodeURIComponent(je)}">{m.jeIds.length > 1 ? `Entry ${k + 1}` : 'Journal entry'}</a>{/each}
+							{:else}
+								<span class="text-caption text-ink-3">Not posted yet</span>
+							{/if}
+							<span class="num">{money(m.loadedMinor.toString(), reporting)}</span>
+						</span>
+					</div>
+					<div class="h-1.5 w-full rounded-sm bg-subtle" aria-hidden="true"><div class="h-1.5 rounded-sm bg-ink-3" style="width: {Number((m.loadedMinor * 1000n) / payMax) / 10}%"></div></div>
+				</li>
+			{:else}
+				<li class="text-body-sm text-ink-3">No pay runs yet.</li>
+			{/each}
+		</ul>
+	</section>
+
+	<section aria-labelledby="up-h" class="card flex min-w-0 flex-col gap-2 p-5">
+		<div class="flex flex-wrap items-baseline justify-between gap-2">
+			<h2 id="up-h" class="text-subtitle">Time off coming up</h2>
+			<span class="text-caption text-ink-3">{outToday} out today · {upcomingPto.length} booked or asked</span>
+		</div>
+		<TimeOffList requests={upcomingPto.slice(0, ptoShown)} empty="Nobody has time off booked." />
+		{#if upcomingPto.length > ptoShown}
+			<button class="btn btn-quiet self-start" onclick={() => (ptoShown = upcomingPto.length)}>Show all {upcomingPto.length}</button>
+		{/if}
+	</section>
 </div>
 
-<div class="mt-8 grid gap-8 lg:grid-cols-3 lg:items-start">
+<div class="mt-8 grid gap-8 lg:grid-cols-3">
 	<section aria-labelledby="roster-h" class="flex min-w-0 flex-col gap-4 lg:col-span-2">
 		<div class="flex flex-wrap items-end justify-between gap-3">
 			<h2 id="roster-h" class="text-title">Team</h2>
@@ -285,7 +407,7 @@
 <section aria-labelledby="cal-h" class="mt-12 flex flex-col gap-4">
 	<div class="flex flex-col gap-1">
 		<h2 id="cal-h" class="text-title">Pay calendar</h2>
-		<p class="text-body-sm text-ink-2">Cafoo Inc pays on the 15th and the last day of the month; Cafoo Ltd on the last working day. Either moves earlier when it lands on a weekend or bank holiday.</p>
+		<p class="text-body-sm text-ink-2">US companies pay on the 15th and the last day of the month; UK companies on the last working day. Either moves earlier when it lands on a weekend or bank holiday.</p>
 	</div>
 	<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 		{#each calendar as cal (cal.c.id)}
@@ -337,6 +459,8 @@
 		{/each}
 	</div>
 </section>
+
+{/if}
 
 <div class="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-2">
 	<UploadDemo kinds={['payroll_register', 'pto_report']} title="Upload a Gusto export" />

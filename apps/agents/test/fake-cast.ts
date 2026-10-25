@@ -13,10 +13,12 @@ const pascal = (kind: string) => kind.replace(/(^|_)([a-z])/g, (_m, _u, c: strin
  * A whole cast over one in-memory database. Every reducer call is recorded (role, reducer, args) and resolves, except:
  * - `propose` inserts an Open Proposal row the way the module would (proposedBy the caller's identity), so stdb's
  *   propose() finds it;
- * - a reducer named in `failing` (as "role.reducer" or "*.reducer") rejects with that message, like a module refusal.
+ * - a reducer named in `failing` (as "role.reducer" or "*.reducer") rejects with that message, like a module refusal;
+ * - with `rulings`, approveProposal and rejectProposal set the Proposal's status as the module would (approved below the
+ *   materiality threshold, awaiting the CFO at or above it; rejected).
  * Inserted rows reach `onInsert` listeners, as the SpacetimeDB client cache does.
  */
-export function fakeCast(rows: Rows) {
+export function fakeCast(rows: Rows, opts: { rulings?: boolean } = {}) {
   const calls: ReducerCall[] = [];
   const failing = new Map<string, string>();
   const listeners = new Map<string, Set<Listener>>();
@@ -42,6 +44,11 @@ export function fakeCast(rows: Rows) {
         calls.push({ role, reducer, args });
         const why = failing.get(`${role}.${reducer}`) ?? failing.get(`*.${reducer}`);
         if (why) throw new Error(why);
+        if (opts.rulings && (reducer === 'approveProposal' || reducer === 'rejectProposal')) {
+          const p = rows.proposal?.find(x => x.id === args.proposalId);
+          const threshold = rows.settings?.find(r => r.key === 'materiality_threshold_minor')?.valueI64 ?? 1_000_000n;
+          if (p) p.status = { tag: reducer === 'rejectProposal' ? 'Rejected' : p.amountMinor >= threshold ? 'AwaitingCfo' : 'Approved' };
+        }
         if (reducer === 'propose') {
           const period = rows.period?.find(p => p.ym === args.periodYm);
           insert('proposal', {

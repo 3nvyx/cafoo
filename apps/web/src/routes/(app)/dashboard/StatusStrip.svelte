@@ -5,7 +5,7 @@
 	import { db } from '#lib/data/index.js';
 	import { addDays, monthRange, type Summary } from '#lib/data/dashboard.js';
 	import { monthName } from '#lib/data/derive.js';
-	import { formatMoney, toBig } from '#lib/data/money.js';
+	import { formatMoney } from '#lib/data/money.js';
 	import type { Period } from '#lib/data/types.js';
 	import { lockGate } from '#lib/close.js';
 	import { drill } from '#lib/labels.js';
@@ -35,41 +35,35 @@
 	const FILL: Record<'warn' | 'neg', string> = { warn: 'bg-warn-soft text-on-warn-soft', neg: 'bg-neg-soft text-on-neg-soft' };
 
 	// The close, from most to least urgent: a stopped run, then a decision the CFO owes, then progress.
-	const close = $derived.by<{ value: string; note: string; tone: Tone; num?: boolean }>(() => {
-		if (period.status === 'closed') return { value: 'Locked', note: bank ? `${bank} bank line${bank === 1 ? '' : 's'} locked unmatched` : 'The Board Pack is final', tone: null };
-		if (run?.status === 'error') return { value: progress, note: 'The close run stopped on an error', tone: 'neg', num: true };
+	const close = $derived.by<{ value: string; tone: Tone; num?: boolean }>(() => {
+		if (period.status === 'closed') return { value: 'Locked', tone: null };
+		if (run?.status === 'error') return { value: 'Stopped on an error', tone: 'neg' };
 		// Locking needs the CFO, not the agents, so a lockable month says so even with the agents offline.
-		if (gate.canLock) return { value: 'Ready to lock', note: 'Every item is resolved', tone: 'warn' };
-		if (gate.started && conn.agents === 'offline') return { value: progress, note: 'The agents are unreachable', tone: 'neg', num: true };
-		if (bankDecision) return { value: progress, note: `${bank} bank line${bank === 1 ? '' : 's'} to decide`, tone: 'warn', num: true };
-		if (gate.started) return { value: progress, note: 'Checklist tasks done', tone: null, num: true };
-		return { value: 'Not started', note: 'The agents close it for you', tone: null };
+		if (gate.canLock) return { value: 'Ready to lock', tone: 'warn' };
+		if (gate.started && conn.agents === 'offline') return { value: 'Agents offline', tone: 'neg' };
+		if (bankDecision) return { value: `${bank} bank line${bank === 1 ? '' : 's'} to decide`, tone: 'warn', num: true };
+		if (gate.started) return { value: `${progress} done`, tone: null, num: true };
+		return { value: 'Not started', tone: null };
 	});
 
-	type Item = { label: string; value: string; note: string; href: string; tone: Tone; num?: boolean };
+	type Item = { label: string; value: string; href: string; tone: Tone; num?: boolean };
 	const cash = $derived<Item[]>([
-		{ label: 'Opening balance', value: money(month.openingCash), note: `Book cash on ${mon} 1`, href: drill({ account: '1000' }, { to: before }), tone: null },
-		// Money raised is not income: SAFEs, notes and shares show beside the closing balance, never in Income.
-		{ label: 'Income', value: money(month.cashIn), note: `Cash from customers and operations in ${mon}`, href: drill({ account: '1000' }, period.id), tone: null },
-		{
-			label: 'Expenditure',
-			value: money(month.cashOut),
-			note: `Cash paid out${toBig(month.financingCash) !== 0n ? ` · ${money(month.financingCash)} raised` : ''} · ${money(month.cash)} at month end`,
-			href: drill({ account: '1000' }, period.id),
-			tone: null
-		}
+		{ label: `Cash on ${mon} 1`, value: money(month.openingCash), href: drill({ account: '1000' }, { to: before }), tone: null },
+		// Money raised is not income: SAFEs, notes and shares never count in Income.
+		{ label: `Income in ${mon}`, value: money(month.cashIn), href: drill({ account: '1000' }, period.id), tone: null },
+		{ label: `Spent in ${mon}`, value: money(month.cashOut), href: drill({ account: '1000' }, period.id), tone: null }
 	]);
-	// The queue below and the sidebar badge count every month, so these two do as well.
+	// The Proposals page and the sidebar badge count every month, so these two do as well.
 	const work = $derived<Item[]>([
-		{ label: 'Needs your OK', value: `${needs}`, note: needs ? 'Across every month' : 'Nothing waiting', href: '/proposals?status=awaiting_cfo', tone: needs ? 'warn' : null, num: true },
-		{ label: 'In debate', value: `${debating}`, note: 'Across every month', href: '/proposals?status=open', tone: null, num: true },
-		{ label: `Close ${mon}`, ...close, href: '/close' }
+		{ label: 'Needs your OK', value: `${needs}`, href: '/proposals?status=awaiting_cfo', tone: needs ? 'warn' : null, num: true },
+		{ label: 'In debate', value: `${debating}`, href: '/proposals?status=open', tone: null, num: true },
+		{ label: `${mon} close`, ...close, href: '/close' }
 	]);
 </script>
 
 <!-- Two groups of three, money then work: stacked, then side by side only where six tiles have room for the amounts.
      On phones each group's third tile spans the row, so a row never mixes the two. -->
-<div class="grid gap-3 2xl:grid-cols-2 2xl:gap-6">
+<div class="grid gap-3 2xl:grid-cols-2">
 	{@render group(cash, `${monthName(period.month)} cash`)}
 	{@render group(work, `${monthName(period.month)} work`)}
 </div>
@@ -81,7 +75,6 @@
 				<a href={it.href} class="group card flex h-full min-w-0 flex-col gap-1 p-4 transition-colors {it.tone ? FILL[it.tone] : 'hover:bg-subtle'}">
 					<span class="text-body-sm {it.tone ? 'group-hover:underline' : 'text-ink-2'}">{it.label}</span>
 					<span class="text-title font-medium break-words {it.num ? 'num' : ''} {it.tone ? '' : 'text-ink'}">{it.value}</span>
-					<span class="text-caption {it.tone ? '' : 'text-ink-3'}">{it.note}</span>
 				</a>
 			</li>
 		{/each}

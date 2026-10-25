@@ -4,7 +4,7 @@
  * feed during an open month, before anyone starts that month's close. Opening pauses the feed and the continuous
  * Bookkeeper for that month; a close only resumes when it has work of its own to resume.
  */
-import { bankExceptionAcceptance, currentBankExceptions } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, closeMonthLabel, closeOrderRefusal, currentBankExceptions } from '@cafoo/ledger-core';
 import type { RoleConn } from './stdb';
 
 /** The start of the Advisor's first message in close:<ym>; its presence marks that month's close as opened. */
@@ -115,4 +115,18 @@ export function bankExceptionsOf(c: RoleConn, ym: string) {
     })),
   };
   return { rows: currentBankExceptions(input), accepted: bankExceptionAcceptance(input).accepted };
+}
+
+/**
+ * Why the close of `ym` cannot start, in words for the CFO: the month is not in the books, is already locked or waiting
+ * for its lock, or an earlier month is not locked yet (months close in order, docs/adr/0014). Undefined when it can.
+ * A close already under way for the month is not refused: running it again resumes it.
+ */
+export function closeStartRefusal(c: RoleConn, ym: string): string | undefined {
+  const periods = [...c.db.period.iter()];
+  const period = periods.find(p => p.ym === ym);
+  const month = closeMonthLabel(ym);
+  if (!period) return `The books have no ${month} yet, so there is nothing to close.`;
+  if (period.status.tag === 'Closed') return `${month} is already locked. Unlock it before running its close again.`;
+  return closeOrderRefusal(periods.map(p => ({ ym: p.ym, status: p.status })), ym, 'start');
 }

@@ -7,11 +7,14 @@ import {
 	ccyKey,
 	FX_SCALE,
 	consolidate,
+	eliminations,
 	fxRate,
 	groupCode,
 	LedgerError,
 	translate,
 	translateBooks,
+	ymCompare,
+	ymEquals,
 	ymFromString,
 	ymToString,
 	type Account as CoreAccount,
@@ -392,4 +395,49 @@ export function rateText(rateE6: string): string {
 export function functionalNet(l: Pick<JournalLine, 'debitMinor' | 'creditMinor' | 'fxRateE6'>): bigint {
 	const rate = l.fxRateE6 ? BigInt(l.fxRateE6) : FX_SCALE;
 	return applyFx(BigInt(l.debitMinor), rate) - applyFx(BigInt(l.creditMinor), rate);
+}
+
+/**
+ * Whether a month's Eliminations are on the books and still match them:
+ * - 'none': the group companies have nothing to eliminate this month (or there is no group);
+ * - 'pending': something should be eliminated and no Elimination has posted;
+ * - 'stale': Eliminations posted, but the intercompany books have moved since, so they no longer match what the
+ *   engine would eliminate now;
+ * - 'current': the posted Eliminations match the books exactly;
+ * - 'unknown': the engine cannot compute them (a missing rate, an ambiguous pair).
+ * The comparison is per elimination-company account: balance accounts through the month (each month's balance
+ * elimination reverses the next month, so only this month's remains), income and expense within the month.
+ */
+export type EliminationStatus = 'none' | 'pending' | 'stale' | 'current' | 'unknown';
+
+export function eliminationStatus(books: GroupBooks, periodYm: string): EliminationStatus {
+	if (!books.subsidiaries.some((s) => s.isElimination) || books.subsidiaries.filter(isTrading).length < 2) return 'none';
+	const core = toCore(books);
+	const ym = ymFromString(periodYm);
+	let el: ReturnType<typeof eliminations>;
+	try {
+		el = eliminations({ entities: core.entities, accounts: core.accounts, lines: core.lines, rates: core.rates, reportingCcy: books.reportingCcy, ym, periodId: 0n });
+	} catch {
+		return 'unknown';
+	}
+	const elimIds = new Set(core.entities.filter((e) => e.isElimination).map((e) => e.id));
+	const accountsById = new Map(core.accounts.map((a) => [a.id, a]));
+	const add = (m: Map<bigint, bigint>, id: bigint, v: bigint) => m.set(id, (m.get(id) ?? 0n) + v);
+	const expected = new Map<bigint, bigint>();
+	for (const entry of [el.balance.entry, el.activity.entry]) for (const l of entry?.lines ?? []) add(expected, l.accountId, l.debitMinor - l.creditMinor);
+	const posted = new Map<bigint, bigint>();
+	for (const l of core.lines) {
+		const a = accountsById.get(l.accountId);
+		if (!a || !elimIds.has(a.subsidiaryId) || ymCompare(l.ym, ym) > 0) continue;
+		const pnl = a.type === 'revenue' || a.type === 'expense';
+		if (pnl && !ymEquals(l.ym, ym)) continue;
+		add(posted, a.id, applyFx(l.debitMinor, l.fxRateE6) - applyFx(l.creditMinor, l.fxRateE6));
+	}
+	const nonZero = (m: Map<bigint, bigint>) => [...m].filter(([, v]) => v !== 0n);
+	const want = nonZero(expected);
+	const have = nonZero(posted);
+	if (want.length === 0 && have.length === 0) return 'none';
+	// A posted figure that differs from today's books is stale; one basis posted and the other still to come is pending.
+	if (have.some(([id, v]) => (expected.get(id) ?? 0n) !== v)) return 'stale';
+	return want.length > have.length ? 'pending' : 'current';
 }

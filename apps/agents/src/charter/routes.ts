@@ -1,6 +1,7 @@
 /**
  * Gateway routes for custom charters: the catalog the charter editor maps lines against, and the eval runner.
- *   GET  /charters/catalog            templates, scenarios, and each role's built-in charter with its default mapping
+ *   GET  /charters/catalog            templates, scenarios, each role's built-in charter with its default mapping, and
+ *                                     the tools each role may call (tools.ts)
  *   POST /charters/:versionId/eval    start an eval of a saved version ({mode?: 'dry_run' | 'snapshot'}); 202, 409 while
  *                                     one runs or when the version is already published, 404 when there is no such version
  *   GET  /charters/:versionId/eval    {versionId, status: idle | running | done | error, steps[], error?}
@@ -16,6 +17,7 @@ import { builtinCharter } from './active';
 import { defaultMapping } from './build';
 import { evaluateCharterVersion, type EvalMode, type EvaluateOptions } from './evaluate';
 import { allTemplates } from './library';
+import { toolCatalog } from './tools';
 
 export interface EvalStatus {
   versionId?: string;
@@ -44,6 +46,7 @@ export function charterCatalog() {
       .filter(s => s.suite === 'charters')
       .map(s => ({ id: s.id, agent: s.agent, charterLine: s.charter_line })),
     builtin: Object.fromEntries(roles.map(role => [role, { bodyMd: builtinCharter(role).bodyMd, mapping: defaultMapping(role) }])),
+    tools: toolCatalog(),
   };
 }
 

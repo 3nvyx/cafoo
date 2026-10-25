@@ -139,6 +139,8 @@ export class SpacetimeDataSource implements DataSource {
 	readonly kind = 'live' as const;
 
 	#t: Mirror = $state(empty());
+	#company: M.Company = $state(M.emptyCompany());
+	#companyDirty = false;
 	#conn: ConnectionState = $state({ ledger: 'connecting', agents: 'unknown', closes: [] });
 	#seat: CfoSeat = $state({ status: 'checking' });
 	#tokenSaved = false;
@@ -240,25 +242,25 @@ export class SpacetimeDataSource implements DataSource {
 	}
 
 	// Actions
-	// Financing, People, Cost of service, batches and the CRM run in Demo mode only until the ledger module has their
-	// tables; live mode shows them empty and refuses their actions.
+	// Financing, People, Cost of service, batches and the CRM are read-only in live mode: the module seeds them as
+	// company records, and their actions (uploads, edits) still run in Demo mode only.
 	documents = (): U.UploadedDocument[] => [];
-	fundingRounds = (): U.FundingRound[] => [];
-	investors = (): U.Investor[] => [];
-	commitments = (): U.Commitment[] => [];
-	instruments = (): U.Instrument[] => [];
-	capTable = (): U.CapTableEntry[] => [];
-	employees = (): U.Employee[] => [];
-	ptoRequests = (): U.PtoRequest[] => [];
-	calendarEvents = (): U.CalendarEvent[] => [];
-	payRuns = (): U.PayRun[] => [];
-	payslips = (): U.Payslip[] => [];
-	cloudCosts = (): U.CloudCost[] => [];
-	batches = (): U.Batch[] => [];
-	integrations = (): U.Integration[] => [];
-	deals = (): U.Deal[] => [];
-	promotions = (): U.Promotion[] => [];
-	supportTickets = (): U.SupportTicket[] => [];
+	// Company records outside the ledger, seeded as JSON rows of the company_record table (read-only here).
+	fundingRounds = () => this.#company.funding_round;
+	investors = () => this.#company.investor;
+	commitments = () => this.#company.commitment;
+	instruments = () => this.#company.instrument;
+	capTable = () => this.#company.cap_table_entry;
+	employees = () => this.#company.employee;
+	ptoRequests = () => this.#company.pto_request;
+	payRuns = () => this.#company.pay_run;
+	payslips = () => this.#company.payslip;
+	cloudCosts = () => this.#company.cloud_cost;
+	batches = () => this.#company.batch;
+	integrations = () => this.#company.integration;
+	deals = () => this.#company.deal;
+	promotions = () => this.#company.promotion;
+	supportTickets = () => this.#company.support_ticket;
 
 	async uploadDemoDocument(): Promise<U.UploadedDocument> {
 		throw new Error('Uploads work in Demo mode only for now.');
@@ -304,7 +306,15 @@ export class SpacetimeDataSource implements DataSource {
 		if (!res.ok) {
 			this.#conn.agents = 'online';
 			const text = await res.text().catch(() => '');
-			throw new Error(text || `The agent gateway could not start the close (${res.status}).`);
+			// The gateway answers a refusal (an earlier month not locked, a locked month) as { error: "<plain reason>" }.
+			let reason = text;
+			try {
+				const body = JSON.parse(text) as { error?: unknown };
+				if (typeof body?.error === 'string' && body.error.trim()) reason = body.error;
+			} catch {
+				/* not JSON: show the text as it came */
+			}
+			throw new Error(reason || `The agent gateway could not start the close (${res.status}).`);
 		}
 		this.#conn.agents = 'online';
 		void this.#pollStatus();
@@ -492,6 +502,7 @@ export class SpacetimeDataSource implements DataSource {
 					.subscriptionBuilder()
 					.onApplied(() => {
 						for (const a of Object.keys(ACCESSORS) as Accessor[]) this.#dirty.add(a);
+						this.#companyDirty = true;
 						this.#flush();
 						this.#listVersion++;
 						for (const id of Object.keys(conn.db)) this.#rawVersions[id] = (this.#rawVersions[id] ?? 0) + 1;
@@ -528,6 +539,12 @@ export class SpacetimeDataSource implements DataSource {
 			table.onDelete?.(mark('delete'));
 			table.onUpdate?.(mark('update'));
 		}
+		const companyChanged = () => {
+			this.#companyDirty = true;
+			this.#queue();
+		};
+		conn.db.companyRecord.onInsert(companyChanged);
+		conn.db.companyRecord.onDelete(companyChanged);
 		// Any table, mapped or not, keeps the Dash bar's raw view current.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const view = conn.db as any;
@@ -630,6 +647,10 @@ export class SpacetimeDataSource implements DataSource {
 		}
 		if (d.has('fxRate')) t.fx_rate = all(c.db.fxRate.iter()).map(M.fxRate);
 		if (d.has('charterVersion')) t.charter_version = all(c.db.charterVersion.iter()).map(M.charterVersion).sort((a, b) => a.role.localeCompare(b.role) || b.version - a.version);
+		if (this.#companyDirty) {
+			this.#companyDirty = false;
+			this.#company = M.company(c.db.companyRecord.iter());
+		}
 		if (d.has('charterEval')) t.charter_eval = all(c.db.charterEval.iter()).map(M.charterEval).sort(byTime('ranAt'));
 	}
 

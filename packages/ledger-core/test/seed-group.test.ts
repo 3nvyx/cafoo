@@ -126,9 +126,21 @@ describe('group seed', () => {
   it('leaves September looking un-eliminated to the module: no ELIM balance through September, no ELIM activity in it', () => {
     const elim = subId('ELIM');
     const elimLines = LINES.filter((l) => BY_ID.get(l.accountId)!.subsidiaryId === elim);
-    expect(group.journalEntries.filter((je) => je.subsidiaryCode === 'ELIM').map((je) => je.periodYm)).toEqual(['2026-07', '2026-08']);
+    // Each closed month: its activity and balance eliminations, and the balance elimination's reversal the next month.
+    expect(group.journalEntries.filter((je) => je.subsidiaryCode === 'ELIM').map((je) => je.periodYm)).toEqual(['2026-07', '2026-07', '2026-08', '2026-08', '2026-08', '2026-09']);
     const net = (pred: (l: JournalLine) => boolean) => elimLines.filter(pred).reduce((m, l) => m.set(l.accountId, (m.get(l.accountId) ?? 0n) + l.debitMinor - l.creditMinor), new Map<bigint, bigint>());
-    expect([...net((l) => BY_ID.get(l.accountId)!.type === 'asset' || BY_ID.get(l.accountId)!.type === 'liability').values()].every((v) => v === 0n)).toBe(true);
-    expect(net((l) => l.ym.month === 9).size).toBe(0);
+    const balanceSheet = (l: JournalLine) => BY_ID.get(l.accountId)!.type === 'asset' || BY_ID.get(l.accountId)!.type === 'liability';
+    expect([...net(balanceSheet).values()].every((v) => v === 0n)).toBe(true);
+    expect(net((l) => l.ym.month === 9 && !balanceSheet(l)).size).toBe(0);
+  });
+
+  it('keeps each closed month consolidated: ELIM carries exactly what Cafoo Inc shows on 1900 and 1950 through it', () => {
+    const through = (code: string, month: number) =>
+      LINES.filter((l) => l.accountId === byCode.get(code)!.id && l.ym.month <= month).reduce((a, l) => a + l.debitMinor - l.creditMinor, 0n);
+    for (const month of [7, 8]) {
+      expect([through('1900', month) + through('1900-ELIM', month), through('1950', month) + through('1950-ELIM', month)]).toEqual([0n, 0n]);
+      expect(through('1950', month)).toBe(20_000_000n);
+    }
+    expect([through('1900', 7), through('1900', 8)]).toEqual([1_500_000n, 3_000_000n]);
   });
 });

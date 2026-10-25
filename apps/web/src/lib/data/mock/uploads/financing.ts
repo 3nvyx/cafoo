@@ -392,9 +392,12 @@ const convertibleNote: UploadHandler = {
 	readByRole: 'capital',
 	read(ctx) {
 		const isFunded = ins(ctx, 'ins-orrin')?.status === 'outstanding';
+		const held = isFunded && inPendingConversion(ctx).has('ins-orrin');
 		return {
 			extracted: { holder: 'Orrin Strategic Partners Inc', principal: '1,000,000.00 USD', interest: '6.00% simple, actual/365', maturity: '2028-10-01 (24 months)', valuationCap: '24,000,000.00 USD', discount: '20%', qualifiedFinancing: 'Equity round of at least 5,000,000.00 USD', atMaturity: 'Holder may convert at the cap or demand repayment', changeOfControl: '2x principal in cash, or conversion at the cap, at the holder’s choice' },
-			summaryPlain: isFunded
+			summaryPlain: held
+				? "Orrin's $1M note at 6% a year for 24 months. A conversion is waiting; interest is included in it, so none is booked separately."
+				: isFunded
 				? "Orrin's $1M note at 6% a year for 24 months. It stays a liability until it converts; October's interest is an expense, not a reduction of what was raised."
 				: "Orrin's $1M note at 6% a year for 24 months. Interest starts when the money arrives; upload the closing tracker to record it.",
 			flagsPlain: ['On a sale of the company before conversion, Orrin can take twice its principal in cash. That premium may need to be valued on its own; Cafoo will not invent a number. Upload the valuation report, and a person decides.']
@@ -428,7 +431,8 @@ const convertibleNote: UploadHandler = {
 		// Interest accrues to the day it is booked, never ahead of it. Nothing new while an accrual is still in debate.
 		const note = ins(ctx, 'ins-orrin');
 		const pending = proposalsOf(ctx, 'interest_accrual', ['open', 'awaiting_cfo']).some((x) => x.payload.instrumentId === 'ins-orrin');
-		const due = note?.status === 'outstanding' && !pending ? interestDue(ctx, note) : null;
+		// A pending conversion already carries the note's interest through the day it was proposed.
+		const due = note?.status === 'outstanding' && !pending && !inPendingConversion(ctx).has(note.id) ? interestDue(ctx, note) : null;
 		if (due && due.minor > 0n && !alreadyProposed(ctx, 'interest_accrual', `interest-ins-orrin-${due.to}`)) {
 			ids.push(
 				ctx.propose({
@@ -492,6 +496,21 @@ const sideLetter: UploadHandler = {
 // ---------------------------------------------------------------------------------------------------------------
 // Valuation report: the 409A and the SAFEs' fair value
 
+/** SAFEs and notes in the round's conversion that is in debate, waiting for the CFO or approved. */
+function inPendingConversion(ctx: MockContext): Set<string> {
+	const conv = conversionFor(ctx);
+	const rows = conv ? ((payloadOf(conv.payloadJson).conversions as { instrumentId: string }[] | undefined) ?? []) : [];
+	return new Set(rows.map((r) => r.instrumentId));
+}
+
+/** SAFEs on the books the report can restate: not restated already and not in a pending conversion (`held`). */
+function restatable(ctx: MockContext) {
+	const done = fairValueAdjustments(ctx, LIVE);
+	const converting = inPendingConversion(ctx);
+	const onBooks = ctx.t.instrument.filter((i) => i.roundId === SEED && i.kind === 'safe_post_money' && i.status === 'outstanding' && !done.has(i.id));
+	return { fresh: onBooks.filter((i) => !converting.has(i.id)), held: onBooks.some((i) => converting.has(i.id)) };
+}
+
 const valuationReport: UploadHandler = {
 	kind: 'valuation_report',
 	fileName: 'Cafoo Inc 409A and SAFE fair value report, 2 October 2026.pdf',
@@ -499,9 +518,12 @@ const valuationReport: UploadHandler = {
 	readByRole: 'capital',
 	read(ctx) {
 		const book = balance(ctx, '2600');
+		const held = restatable(ctx).held;
 		return {
 			extracted: { preparer: 'Ashgrove Valuation Advisors', asOf: '2026-10-02', method: 'Probability-weighted expected return (Series A within 6 months 70%, later financing 20%, sale 10%)', commonFairValuePerShare: '$1.15', commonFairValuePerShareE4: '1150000', safeFairValueOfPurchaseAmount: '106.2%', safeFairValueBp: Number(SAFE_FV_BP), noteChangeOfControlPremium: '6,000.00 USD (management treats as immaterial)' },
-			summaryPlain: book > 0n
+			summaryPlain: held && !restatable(ctx).fresh.length
+				? 'The report values the SAFEs at 106.2% of what was paid and common stock at $1.15 a share. The SAFEs on the books are in a conversion that is waiting, so they are not restated separately.'
+				: book > 0n
 				? `The report values the SAFEs at 106.2% of what was paid and common stock at $1.15 a share. The Capital accountant proposes moving the SAFEs on the books to that value; the change is a non-cash loss, not money out.`
 				: 'The report values the SAFEs at 106.2% of what was paid and common stock at $1.15 a share. No SAFE money is on the books yet, so nothing to restate today.',
 			flagsPlain: ["The report puts the note's 2x payout on a sale at $6,000 and calls it immaterial. Leaving it out of the books is a judgement a person should sign off."]
@@ -509,8 +531,7 @@ const valuationReport: UploadHandler = {
 	},
 	apply(ctx, doc) {
 		// Only SAFEs on the books that this report has not already restated.
-		const done = fairValueAdjustments(ctx, LIVE);
-		const fresh = ctx.t.instrument.filter((i) => i.roundId === SEED && i.kind === 'safe_post_money' && i.status === 'outstanding' && !done.has(i.id));
+		const { fresh } = restatable(ctx);
 		const adjustments = Object.fromEntries(fresh.map((i) => [i.id, ((toBig(i.principalMinor) * (SAFE_FV_BP - 10_000n)) / 10_000n).toString()]));
 		const delta = Object.values(adjustments).reduce((t, v) => t + toBig(v), 0n);
 		const principal = fresh.reduce((t, i) => t + toBig(i.principalMinor), 0n);
@@ -628,6 +649,11 @@ const termSheet: UploadHandler = {
 		const notesReady = ready.filter((i) => i.kind === 'convertible_note');
 		if (proposalsOf(ctx, 'interest_accrual', ['open', 'awaiting_cfo']).some((x) => notesReady.some((n) => n.id === x.payload.instrumentId))) {
 			ctx.message({ role: 'capital', kind: 'statement', body: 'Conversion held: an interest accrual on a converting note is still in debate.', summary: 'I will propose the conversion once the open interest accrual on the note is decided.' });
+			return [];
+		}
+		const fvPending = fairValueAdjustments(ctx, ['open', 'awaiting_cfo']);
+		if (ready.some((i) => fvPending.has(i.id))) {
+			ctx.message({ role: 'capital', kind: 'statement', body: 'Conversion held: a fair-value restatement of a converting SAFE is still in debate.', summary: 'I will propose the conversion once the open fair-value change on the SAFEs is decided.' });
 			return [];
 		}
 		const rows = plan.rows.filter((r) => ready.some((i) => i.id === r.id));

@@ -1,5 +1,8 @@
-// The scripted September close the mock source replays when the CFO clicks
+// The scripted September 2026 close the mock source replays when the CFO clicks
 // "Close September". About 23 seconds end to end. Times are ms after start.
+//
+// It describes September 2026 only (Bansho Ramen's deferral, September's support hours, its bank lines), so Demo mode
+// refuses to replay it for any other month (SCRIPT_PERIOD).
 import type { AgentRole, CloseTaskStatus, MessageKind, Minor, ProposalKind, ProposalStatus, VendorVerification } from '../types';
 
 export interface ScriptLine {
@@ -33,6 +36,9 @@ export type Step =
 	| { at: number; type: 'wrapup' }
 	/** The Consolidation agent proposes the month's Revaluation and Eliminations, computed from the books by the ledger engine. */
 	| { at: number; type: 'consolidate'; taskId: string };
+
+/** The only month CLOSE_SCRIPT describes. */
+export const SCRIPT_PERIOD = '2026-09';
 
 const L = (account: string, debitMinor: Minor, creditMinor: Minor, extra: Partial<ScriptLine> = {}): ScriptLine => ({
 	account,

@@ -12,6 +12,7 @@
 		CATEGORY_LABEL,
 		ENVIRONMENT_LABEL,
 		PROVIDER_LABEL,
+		PRODUCTS,
 		REVENUE_MIX_BP,
 		costByProvider,
 		costOfService,
@@ -19,6 +20,7 @@
 		creditPricePerM,
 		grossMarginAfterInference,
 		hostingTieOut,
+		isInference,
 		ledgerByMonth,
 		marginByProduct,
 		monthsOf,
@@ -31,6 +33,7 @@
 	import { ui } from '#lib/ui.svelte.js';
 	import KpiCard from '../dashboard/KpiCard.svelte';
 	import Freshness from './Freshness.svelte';
+	import { seriesBy, spikes, topInferenceProduct } from './trends';
 
 	const money = (m: Minor | bigint) => formatMoney(m.toString(), { whole: true });
 	const pct = (bp: number | null) => (bp === null ? 'n/a' : `${(bp / 100).toFixed(1)}%`);
@@ -58,12 +61,33 @@
 	const series = $derived(months.map((m) => ({ cos: costOfService(rows, employees, m, rate, m === current ? db.now() : undefined), revenue: revenueOf(m) })));
 	const at = $derived(series.find((x) => x.cos.ym === ym) ?? series.at(-1));
 	const margin = $derived(at ? grossMarginAfterInference(at.revenue, at.cos) : null);
-	const tokens = $derived(costPerMTokens(rows, ym, 'Copilot'));
+	// The per-token figure follows whichever product carries the most model usage (Copilot in the small demo, the
+	// Extract API for Quillmesh).
+	const tokenProduct = $derived(topInferenceProduct(rows, ym, isInference));
+	const tokens = $derived(costPerMTokens(rows, ym, tokenProduct));
 	const price = $derived(creditPricePerM(db.batches()));
 	const tokenMarginBp = $derived(tokens.perMMinor && price && toBig(price) > 0n ? Number(((toBig(price) - toBig(tokens.perMMinor)) * 10000n) / toBig(price)) : null);
 	const svc = $derived(serviceEngineering(employees, ym, rate));
 	const providers = $derived(costByProvider(rows, ym));
-	const products = $derived(at ? marginByProduct(rows, ym, at.revenue) : []);
+	// Revenue is split by the billing mix only when the usage is tagged with those products; otherwise show the cost of
+	// revenue each product tag carries.
+	const mixTagged = $derived(rows.some((r) => r.product && (PRODUCTS as readonly string[]).includes(r.product)));
+	const products = $derived(at && mixTagged ? marginByProduct(rows, ym, at.revenue) : []);
+	const productCost = $derived.by(() => {
+		const by = new Map<string, bigint>();
+		for (const r of rows) if (r.ym === ym && r.category === 'cost_of_revenue') by.set(r.product ?? 'Untagged', (by.get(r.product ?? 'Untagged') ?? 0n) + toBig(r.amountMinor));
+		const total = [...by.values()].reduce((a, b) => a + b, 0n);
+		return [...by].map(([product, amount]) => ({ product, amount, shareBp: total > 0n ? Number((amount * 10000n) / total) : 0 })).sort((a, b) => (b.amount > a.amount ? 1 : -1));
+	});
+
+	// Spend over time by provider, the top four and the rest.
+	const FILLS = ['bg-ink', 'bg-ink-2', 'bg-ink-3', 'bg-line-strong', 'bg-subtle'];
+	const byProvider = $derived(seriesBy(rows, months, (r) => r.provider, 4));
+	const monthTotals = $derived(months.map((_, i) => byProvider.reduce((t, p) => t + p.values[i], 0n)));
+	const monthMax = $derived(monthTotals.reduce((m, v) => (v > m ? v : m), 1n));
+	const providerLabel = (k: string) => (k === 'other' ? 'Other' : (PROVIDER_LABEL[k as keyof typeof PROVIDER_LABEL] ?? k));
+	// Lines that jumped against their own previous three months.
+	const jumps = $derived(spikes(rows));
 	const ledger5000 = $derived(ledgerByMonth(db.accounts(), db.journalEntries(), db.journalLines(), '5000'));
 	const tie = $derived(hostingTieOut(rows, ledger5000, months));
 	const lines = $derived(
@@ -88,11 +112,27 @@
 		<Freshness ids={['aws', 'vercel', 'openai', 'anthropic']} label="Meters live" />
 	</header>
 
-	<div class="flex flex-wrap gap-2" role="group" aria-label="Month">
-		{#each months as m (m)}
-			<button class="chip" aria-pressed={m === ym} onclick={() => (picked = m)}>{ymShort(m)}{m === current ? ' (to date)' : ''}</button>
-		{/each}
-	</div>
+	{#if rows.length === 0}
+		<div class="card flex flex-col gap-1 p-5">
+			<p class="font-medium">No cloud or model bills yet</p>
+			<p class="max-w-prose text-body-sm text-ink-2">Connect AWS, GCP or a model provider below, or upload a bill. Spend by provider and category, margin after inference and cost spikes appear here as the first month arrives.</p>
+		</div>
+	{:else if months.length > 6}
+		<label class="flex max-w-xs flex-col gap-1 text-caption text-ink-2">
+			Month
+			<select class="field text-body" value={ym} onchange={(e) => (picked = e.currentTarget.value)}>
+				{#each [...months].reverse() as m (m)}
+					<option value={m}>{ymShort(m)}{m === current ? ' (to date)' : ''}</option>
+				{/each}
+			</select>
+		</label>
+	{:else}
+		<div class="flex flex-wrap gap-2" role="group" aria-label="Month">
+			{#each months as m (m)}
+				<button class="chip" aria-pressed={m === ym} onclick={() => (picked = m)}>{ymShort(m)}{m === current ? ' (to date)' : ''}</button>
+			{/each}
+		</div>
+	{/if}
 
 	{#if at && margin}
 		<section aria-label="Key figures for {ymShort(ym)}" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -100,15 +140,67 @@
 			<KpiCard label="Model inference" value={money(at.cos.inferenceMinor)} hint="{pct(margin.inferenceShareBp)} of revenue" spark={spark((x) => major(x.cos.inferenceMinor))} />
 			<KpiCard label="Gross margin after inference" value={pct(margin.afterInferenceBp)} hint="{pct(margin.beforeInferenceBp)} before inference" spark={spark((x) => grossMarginAfterInference(x.revenue, x.cos).afterInferenceBp ?? 0)} />
 			<KpiCard
-				label="Copilot cost per million tokens"
+				label="{tokenProduct ?? 'Model'} cost per million tokens"
 				value={tokens.perMMinor ? formatMoney(tokens.perMMinor) : 'n/a'}
 				hint={price ? `Credits sell at ${formatMoney(price)} per million: ${pct(tokenMarginBp)} margin` : 'No credit packs sold'}
-				spark={spark((x) => major(costPerMTokens(rows, x.cos.ym, 'Copilot').perMMinor ?? '0'))}
+				spark={spark((x) => major(costPerMTokens(rows, x.cos.ym, tokenProduct).perMMinor ?? '0'))}
 			/>
 		</section>
 		{#if partial}
 			<p class="-mt-4 text-caption text-ink-3">{ymShort(ym)} is month to date: the meters add to it every few seconds and revenue books as invoices go out.</p>
 		{/if}
+	{/if}
+
+	{#if months.length > 1}
+		<section class="card flex flex-col gap-4 p-5" aria-labelledby="trend-h">
+			<div class="flex flex-col gap-1">
+				<h2 id="trend-h" class="text-title">Spend by provider over time</h2>
+				<p class="text-body-sm text-ink-2">Every cloud and model bill, {ymShort(months[0])} to {ymShort(months.at(-1) ?? months[0])}. Pick a bar to see that month.</p>
+			</div>
+			<div class="flex h-40 items-end gap-0.5 sm:gap-1" role="img" aria-label="Monthly spend by provider: {months.map((m, i) => `${ymShort(m)} ${money(monthTotals[i])}`).join(', ')}">
+				{#each months as m, i (m)}
+					<button
+						class="flex h-full min-w-0 flex-1 flex-col-reverse rounded-sm {m === ym ? 'bg-accent-soft' : ''}"
+						onclick={() => (picked = m)}
+						aria-label="{ymShort(m)}: {money(monthTotals[i])}"
+						title="{ymShort(m)}: {money(monthTotals[i])}"
+					>
+						{#each byProvider as p, k (p.key)}
+							<span class="block w-full {FILLS[k]}" style="height: {(Number(p.values[i]) / Number(monthMax)) * 100}%"></span>
+						{/each}
+					</button>
+				{/each}
+			</div>
+			<div class="flex justify-between text-caption text-ink-3"><span>{ymShort(months[0])}</span><span>{ymShort(months.at(-1) ?? months[0])}</span></div>
+			<ul class="flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-2">
+				{#each byProvider as p, k (p.key)}
+					<li class="flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-sm border border-line {FILLS[k]}" aria-hidden="true"></span>{providerLabel(p.key)} <span class="num text-ink-3">{money(p.total)}</span></li>
+				{/each}
+			</ul>
+		</section>
+
+		<section class="card flex flex-col gap-3 p-5" aria-labelledby="spike-h">
+			<div class="flex flex-col gap-1">
+				<h2 id="spike-h" class="text-title">Cost spikes</h2>
+				<p class="text-body-sm text-ink-2">Bill lines at least 25% and $1,000 above their own average for the three months before. Often a job left running or a price change; the Bookkeeper asks before booking them.</p>
+			</div>
+			<ul class="flex flex-col divide-y divide-line text-body-sm">
+				{#each jumps.slice(0, 8) as j (`${j.ym}|${j.provider}|${j.service}`)}
+					<li class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+						<span class="min-w-0">
+							<button class="drill block text-left font-medium" onclick={() => (picked = j.ym)}>{PROVIDER_LABEL[j.provider]} · {j.service}</button>
+							<span class="block text-caption text-ink-3">{ymShort(j.ym)} · usual {money(j.baselineMinor)}</span>
+						</span>
+						<span class="flex items-center gap-2">
+							<Pill tone="warn">Up {(j.upBp / 100).toFixed(0)}%</Pill>
+							<span class="num">{money(j.amountMinor)}</span>
+						</span>
+					</li>
+				{:else}
+					<li class="py-2 text-ink-3">No line jumped against its recent months.</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 
 	<section class="card flex flex-col gap-4 p-5" aria-labelledby="month-h">
@@ -193,6 +285,7 @@
 
 			<section class="card flex flex-col gap-3 p-5" aria-labelledby="prod-h">
 				<h2 id="prod-h" class="text-title">By product</h2>
+				{#if products.length}
 				<p class="text-body-sm text-ink-2">Revenue split by the billing plan mix ({Object.entries(REVENUE_MIX_BP).map(([k, v]) => `${k} ${v / 100}%`).join(', ')}), against the cloud and inference tagged to each product.</p>
 				<table class="w-full text-body-sm">
 					<thead class="text-caption text-ink-3">
@@ -214,6 +307,22 @@
 						{/each}
 					</tbody>
 				</table>
+				{:else}
+					<p class="text-body-sm text-ink-2">Cost of revenue by the product each bill line is tagged with.</p>
+					<ul class="flex flex-col gap-3">
+						{#each productCost as p (p.product)}
+							<li class="flex flex-col gap-1">
+								<div class="flex justify-between gap-4 text-body-sm">
+									<span>{p.product}</span>
+									<span class="num">{money(p.amount)} <span class="text-ink-3">· {pct(p.shareBp)}</span></span>
+								</div>
+								<div class="h-1.5 w-full rounded-sm bg-subtle" aria-hidden="true"><div class="h-1.5 rounded-sm bg-ink-3" style="width: {p.shareBp / 100}%"></div></div>
+							</li>
+						{:else}
+							<li class="text-body-sm text-ink-3">No cost of revenue for {ymShort(ym)}.</li>
+						{/each}
+					</ul>
+				{/if}
 			</section>
 		</div>
 	{/if}
