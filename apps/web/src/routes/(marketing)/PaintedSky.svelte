@@ -2,13 +2,15 @@
 	// A painted night sky in the manner of Van Gogh, made the way painterly shaders are made:
 	// a source image (pass 1) run through an anisotropic, generalized Kuwahara filter (pass 2)
 	// whose kernel is stretched along the local flow, so the paint lays down in strokes that
-	// follow the swirl. The source is generated in the shader, so the flow direction is known
-	// exactly and no structure-tensor pass is needed. Rendered once at reduced resolution, again
-	// only on resize or theme change. Without WebGL it falls back to the hairline sky.
-	import { rng } from './flow';
+	// follow the wind. The source is generated in the shader, so the flow direction is known
+	// exactly and no structure-tensor pass is needed. Low in the frame the wind gathers into the
+	// river's current (riverPath, the same course River draws), so the page's hairlines pour out
+	// of the paint. Rendered once at reduced resolution, again only on resize or theme change.
+	// Without WebGL it falls back to the hairline sky.
+	import { riverPath } from './flow';
 	import Swirls from './Swirls.svelte';
 
-	let { seed = 11, quality = 0.5 }: { seed?: number; quality?: number } = $props();
+	let { seed = 11, riverSeed = 5, quality = 0.5 }: { seed?: number; riverSeed?: number; quality?: number } = $props();
 	let failed = $state(false);
 
 	const VERT = `attribute vec2 a; void main() { gl_Position = vec4(a, 0.0, 1.0); }`;
@@ -20,7 +22,7 @@ uniform vec2 uSize;     // css px
 uniform vec2 uBuf;      // drawing-buffer px
 uniform float uSeed;
 uniform vec3 uC0, uC1, uC2, uC3; // page, soft, deep, neon
-uniform vec4 uV[4];     // vortex: x, y, radius (css px), turn direction
+uniform vec2 uR[24];    // the river down the canvas: centre x and half width (css px) at 23 even steps of y
 
 vec2 hash2(vec2 p) {
 	p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -37,18 +39,37 @@ float fbm(vec2 p) {
 	for (int i = 0; i < 4; i++) { s += a * gnoise(p); p = p * 2.03 + 17.1; a *= 0.5; }
 	return s;
 }
-// The swirl: slow noise drift bent around each vortex, spiralling slightly inward.
-vec2 flow(vec2 p) {
-	float base = gnoise(p * 0.0016) * 3.14159;
-	vec2 v = vec2(cos(base), sin(base));
-	for (int i = 0; i < 4; i++) {
-		vec2 d = p - uV[i].xy;
-		float r = uV[i].z;
-		float k = 2.2 * exp(-dot(d, d) / (2.0 * r * r));
-		float t = atan(d.y, d.x) + uV[i].w * (1.5708 - 0.25);
-		v += k * vec2(cos(t), sin(t));
+// The river at height y: centre x, half width, and slope (dx/dy).
+vec3 river(float y) {
+	float f = clamp(y / uSize.y, 0.0, 1.0) * 23.0;
+	float i0 = min(floor(f), 22.0);
+	vec2 a = uR[0], b = uR[1];
+	for (int i = 0; i < 23; i++) {
+		if (float(i) == i0) { a = uR[i]; b = uR[i + 1]; }
 	}
+	vec2 r = mix(a, b, f - i0);
+	return vec3(r, (b.x - a.x) / (uSize.y / 23.0));
+}
+// How strongly the current holds at height y: nothing up top, all of it by the lower part,
+// where River's hairlines fade in along the same course.
+float gather(float y) { return smoothstep(0.4, 0.85, y / uSize.y); }
+// The wind: slow noise drift that, lower down, leans into the river and runs along it.
+vec2 flow(vec2 p) {
+	float base = gnoise(p * 0.0014) * 2.4 + 0.5;
+	vec2 v = vec2(cos(base), sin(base));
+	vec3 r = river(p.y);
+	float d = p.x - r.x;
+	float g = gather(p.y);
+	float core = exp(-d * d / (2.0 * r.y * r.y * 0.4));
+	float reach = exp(-d * d / (2.0 * r.y * r.y * 6.0));
+	v += g * (3.0 * core * normalize(vec2(r.z, 1.0)) + 1.4 * reach * normalize(vec2(-d / (abs(d) + 1.0), 1.1)));
 	return normalize(v);
+}
+// The river's own paint: a brighter stream along its centre.
+float current(vec2 p) {
+	vec3 r = river(p.y);
+	float d = p.x - r.x;
+	return gather(p.y) * exp(-d * d / (2.0 * r.y * r.y * 0.25));
 }
 vec3 palette(float t) {
 	t = clamp(t, 0.0, 1.0);
@@ -60,21 +81,14 @@ vec3 palette(float t) {
 vec2 cssPos() { return vec2(gl_FragCoord.x, uBuf.y - gl_FragCoord.y) * (uSize / uBuf); }
 `;
 
-	// Pass 1, the source painting: colour regions from warped clouds and bands that wind around
-	// the vortices, broken into brushwork by line integral convolution (fine noise smeared
+	// Pass 1, the source painting: colour regions from warped clouds and the river's brighter
+	// stream, broken into brushwork by line integral convolution (fine noise smeared
 	// along the flow, which is what turns it into streaks).
 	const SOURCE = COMMON + `
 float regions(vec2 p) {
 	vec2 q = p * 0.0032;
 	float t = fbm(q + 1.6 * vec2(fbm(q + 3.1), fbm(q + 7.7)));
-	float rings = 0.0;
-	for (int i = 0; i < 4; i++) {
-		vec2 d = p - uV[i].xy;
-		float dist = length(d);
-		float r = uV[i].z;
-		rings += exp(-dist * dist / (2.0 * r * r)) * (0.5 + 0.5 * sin(dist * 0.11 - atan(d.y, d.x) * uV[i].w * 2.0));
-	}
-	return 0.42 + 1.1 * t + 0.6 * rings;
+	return 0.42 + 1.1 * t + 0.75 * current(p);
 }
 float strokes(vec2 p) {
 	float sum = 0.5 + 0.5 * gnoise(p * 0.19);
@@ -187,15 +201,20 @@ void main() {
 
 			const css = getComputedStyle(canvas);
 			const colors = ['--canvas', '--accent-soft', '--accent-deep', '--accent'].map((t) => hex(css.getPropertyValue(t)));
-			const r = rng(seed);
-			const vortices: number[] = [];
-			// Two vortices on each side: the middle sits under the headline, where the mask clears the paint.
-			for (let i = 0; i < 4; i++) vortices.push((i % 2 ? 0.74 + r() * 0.22 : 0.04 + r() * 0.22) * w, (0.12 + r() * 0.76) * h, (0.05 + r() * 0.05) * Math.max(w, h), r() < 0.5 ? 1 : -1);
+			// The river's course across this canvas, in page coordinates: River lays it out against the page width.
+			const path = riverPath(window.innerWidth, riverSeed);
+			const top = canvas.getBoundingClientRect().top + window.scrollY;
+			const left = canvas.getBoundingClientRect().left;
+			const course: number[] = [];
+			for (let i = 0; i < 24; i++) {
+				const y = top + (i / 23) * h;
+				course.push(path.centre(y) - left, path.breadth(y) / 2);
+			}
 			const uniforms = (prog: WebGLProgram) => {
 				gl.useProgram(prog);
 				const u = (name: string) => gl.getUniformLocation(prog, name);
 				colors.forEach((c, i) => gl.uniform3fv(u(`uC${i}`), c));
-				gl.uniform4fv(u('uV'), vortices);
+				gl.uniform2fv(u('uR'), course);
 				gl.uniform2f(u('uSize'), w, h);
 				gl.uniform2f(u('uBuf'), bw, bh);
 				gl.uniform1f(u('uSeed'), seed * 0.618);

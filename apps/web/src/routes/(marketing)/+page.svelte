@@ -4,6 +4,7 @@
 	import { PUBLIC_DATA_SOURCE } from '$app/env/public';
 	import Icon from '#lib/components/Icon.svelte';
 	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
+	import Wordmark from '#lib/components/Wordmark.svelte';
 	import DrillDemo from './DrillDemo.svelte';
 	import FlowDiagram from './FlowDiagram.svelte';
 	import GateStack from './GateStack.svelte';
@@ -46,10 +47,6 @@
 	}
 </script>
 
-{#snippet eyebrow(n: string, text: string)}
-	<p class="mb-4 font-mono text-[13px] text-ink-3">{n} / {text}</p>
-{/snippet}
-
 {#snippet tabNote()}<span class="sr-only"> (opens in a new tab)</span>{/snippet}
 
 <!-- Drafting-sheet crosshairs on a panel's corners; the panel must be relative. -->
@@ -78,10 +75,7 @@
 		onfocusout={() => (navFocused = false)}
 	>
 		<div class="mx-auto flex h-14 max-w-[1120px] items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
-			<a href="/" class="flex min-h-11 items-center gap-2.5" aria-label="Cafoo home">
-				<span class="grid size-7 place-items-center rounded-full bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-				<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>
-			</a>
+			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
 					<a href={a.href} class="flex min-h-11 items-center rounded-full px-3.5 text-[15px] text-ink-2 transition-colors duration-150 hover:text-ink">{a.label}</a>
@@ -98,18 +92,15 @@
 		<!-- The brushwork runs up behind the floating header (68px) and clears away under the headline. -->
 		<div id="hero" class="relative isolate -mt-[68px] overflow-hidden pt-[68px]">
 			<div class="sky absolute inset-0 -z-10"><PaintedSky seed={11} /></div>
-		<section class="mx-auto flex max-w-[1120px] flex-col items-center px-4 pt-20 pb-24 text-center sm:px-8 sm:pt-32 sm:pb-32">
-			<h1 class="max-w-[15ch] text-[48px] leading-[0.95] font-medium sm:text-[84px]" style="letter-spacing:-0.035em">Agents close your books. You keep the last word.</h1>
-			<p class="mt-8 max-w-[54ch] text-lg text-ink-2">
-				Agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything at or above your threshold waits for your one click.
-			</p>
-			<div class="mt-10 flex flex-col gap-3 sm:flex-row">
-				<a href="/dashboard" {...newTab} class="pill pill-primary pill-lg">{live ? 'Get started' : 'Try the live demo'}{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
-				<a href="#how" class="pill pill-outline pill-lg">See how it works</a>
+		<!-- A split hero: the heading on the left, the pitch and one action on the right, set to its baseline. -->
+		<section class="mx-auto grid max-w-[1120px] grid-cols-2 gap-x-[14px] px-4 pt-32 pb-28 sm:px-8 sm:pt-56 sm:pb-44 md:grid-cols-6 md:gap-x-4 lg:grid-cols-12 lg:gap-x-[18px]">
+			<h1 class="col-span-full text-[52px] leading-[0.95] font-medium text-balance sm:text-[88px] md:col-span-4 lg:col-span-7" style="letter-spacing:-0.035em">Agents close your books</h1>
+			<div class="col-span-full mt-8 flex flex-col gap-6 md:col-span-2 md:col-start-5 md:mt-0 md:mb-2 md:self-end lg:col-span-4 lg:col-start-9">
+				<p class="max-w-[46ch] text-lg text-pretty text-ink-2 md:max-w-none">
+					Agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything at or above your threshold waits for your one click.
+				</p>
+				<a href="/dashboard" {...newTab} class="cta">{live ? 'Get started' : 'Try the live demo'}{@render tabNote()}</a>
 			</div>
-			{#if !live}
-				<p class="mt-5 text-sm text-ink-3">Runs in your browser on a sample SaaS group. No sign-up.</p>
-			{/if}
 		</section>
 		</div>
 
@@ -128,8 +119,7 @@
 		</section>
 
 		<section id="how" class="mx-auto max-w-[1120px] scroll-mt-24 px-4 pt-32 sm:px-8" aria-labelledby="how-h">
-			<div class="flex flex-col items-center text-center">
-				{@render eyebrow('01', 'How it works')}
+			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Propose, critique, rule, confirm</h2>
 				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Finance cannot let a model write straight to the books. So Cafoo was built approval gate first, agents second.</p>
 			</div>
@@ -140,8 +130,7 @@
 		</section>
 
 		<section id="demo" class="mx-auto max-w-[1120px] scroll-mt-24 px-4 pt-32 sm:px-8" aria-labelledby="demo-h">
-			<div class="flex flex-col items-center text-center">
-				{@render eyebrow('02', 'Try it here')}
+			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="demo-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">One sentence for you. Every line for your controller.</h2>
 				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Both run on sample numbers. Switch the view, then follow a Board Pack figure down to its entries.</p>
 			</div>
@@ -152,8 +141,7 @@
 		</section>
 
 		<section id="gate" class="mx-auto max-w-[1120px] scroll-mt-24 px-4 pt-32 sm:px-8" aria-labelledby="gate-h">
-			<div class="flex flex-col items-center text-center">
-				{@render eyebrow('03', 'The gate')}
+			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="gate-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Enforced in the database, not in a prompt</h2>
 				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Everything an agent does passes the Red Team, the Advisor and the gate before it touches the ledger. The feeds can only add raw bank lines and invoices.</p>
 			</div>
@@ -164,8 +152,7 @@
 		</section>
 
 		<section class="mx-auto max-w-[1120px] px-4 pt-32 sm:px-8" aria-labelledby="credit-h">
-			<div class="flex flex-col items-center text-center">
-				{@render eyebrow('04', 'Credit and risk, built in')}
+			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="credit-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">A small business is only as good as its owner</h2>
 				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Cafoo checks the owner behind each customer, sets payment terms from the Risk Tier and proposes the Allowance. Vendors are checked before their first payment.</p>
 			</div>
@@ -201,7 +188,7 @@
 	</main>
 
 	<footer class="mx-auto flex max-w-[1120px] flex-col gap-2 px-4 pb-10 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-		<span>Cafoo</span>
+		<Wordmark size={18} />
 		<nav aria-label="Footer" class="flex flex-wrap gap-x-1">
 			<a href="/dashboard" {...newTab} class="flex min-h-11 items-center px-2 hover:text-ink">Sign in{@render tabNote()}</a>
 			<a href="/pitch" class="flex min-h-11 items-center px-2 hover:text-ink">Pitch</a>
@@ -216,6 +203,19 @@
 		mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, transparent 0%, transparent 30%, rgb(0 0 0 / 0.45) 70%, black 100%),
 			linear-gradient(to bottom, black 70%, transparent);
 		mask-composite: intersect;
+	}
+	/* Behind a section's heading the river's hairlines go soft: a blur that feathers out to
+	   nothing, so there is no panel, edge or border, only quieter lines under the words. */
+	.calm::before {
+		content: '';
+		position: absolute;
+		inset: -48px -96px;
+		z-index: -1;
+		pointer-events: none;
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		background: radial-gradient(closest-side, color-mix(in srgb, var(--canvas) 55%, transparent), transparent);
+		mask-image: radial-gradient(closest-side, black 45%, transparent);
 	}
 	.sky-panel {
 		mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 0%, rgb(0 0 0 / 0.25) 50%, black 100%);
@@ -263,6 +263,24 @@
 		}
 		.pill-outline:hover {
 			background: var(--subtle);
+		}
+		/* The hero's one action: a squared, inverted button that sits under the pitch. */
+		.cta {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			width: max-content;
+			height: 48px;
+			padding: 0 1.25rem;
+			border-radius: 6px;
+			background: var(--ink);
+			color: var(--canvas);
+			font-weight: 500;
+			white-space: nowrap;
+			transition: background-color 300ms ease-out;
+		}
+		.cta:hover {
+			background: color-mix(in srgb, var(--ink) 72%, var(--canvas));
 		}
 		.pill-quiet {
 			color: var(--ink-2);

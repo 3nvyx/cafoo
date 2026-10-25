@@ -3,6 +3,7 @@
 	import { fade } from 'svelte/transition';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import Icon from '#lib/components/Icon.svelte';
+	import Wordmark from '#lib/components/Wordmark.svelte';
 
 	interface Slide {
 		kicker: string;
@@ -76,10 +77,7 @@
 
 <div class="flex min-h-dvh flex-col bg-canvas">
 	<header class="flex h-16 items-center justify-between px-4 sm:px-8">
-		<a href="/" class="flex min-h-[44px] items-center gap-2.5" aria-label="Back to Cafoo">
-			<span class="grid size-7 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-			<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>
-		</a>
+		<a href="/" class="flex min-h-[44px] items-center" aria-label="Back to Cafoo"><Wordmark size={22} /></a>
 		<span class="num text-sm text-ink-3" aria-live="polite">{i + 1} / {slides.length}</span>
 	</header>
 

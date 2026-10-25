@@ -236,3 +236,23 @@ export function drawLines(ctx: CanvasRenderingContext2D, lines: Line[], o: DrawO
 	ctx.setLineDash([]);
 	ctx.globalAlpha = 1;
 }
+
+/**
+ * The river's course down the page: its centre and full width at each page y. Shared by the
+ * River's hairlines and the hero's painted sky, which paints the same current so the river
+ * visibly pours out of the brushwork.
+ */
+export function riverPath(w: number, seed = 5) {
+	const n = noise2(seed);
+	const meander = (y: number) => w * 0.5 + w * 0.28 * Math.sin(y / 620 + 1.1) + w * 0.05 * n(0.5, y / 380);
+	// The source comes in at the hero's right edge; below it the river eases into its meander.
+	const SOURCE_X = 1;
+	const hold = (y: number) => {
+		const t = Math.max(0, Math.min(1, (y - 700) / 1100));
+		return 1 - t * t * (3 - 2 * t);
+	};
+	return {
+		centre: (y: number) => meander(y) + (w * SOURCE_X - meander(y)) * hold(y),
+		breadth: (y: number) => Math.min(300, Math.max(130, w * 0.2)) * (1 + 0.28 * Math.sin(y / 470 + 0.6))
+	};
+}

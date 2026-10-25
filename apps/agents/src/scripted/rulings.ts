@@ -26,6 +26,8 @@ export interface RuleOpenOptions {
   pause?: (mult?: number) => Promise<void>;
   /** Refusals are pushed here. */
   refused?: Refusal[];
+  /** Write Gemini's scripted second critique after the first. Default true; false when the live critic (startCritic) already ran Gemini on these. */
+  secondCritic?: boolean;
 }
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
@@ -82,6 +84,7 @@ export async function ruleOpen(cast: Cast, proposals: readonly ProposalRow[], op
   const rulings: { id: bigint; action: 'approve' | 'reject'; rationale: string; plain: string }[] = [];
   /** Gemini's scripted second critique, after the first one on the same Proposal. */
   const second = async (p: ProposalRow) => {
+    if (opts.secondCritic === false) return;
     const g = scriptedGeminiCritique(p, s.materiality, id => s.vendorName.get(id));
     if (g) await RT.reducers.critique({ proposalId: p.id, ...g });
   };

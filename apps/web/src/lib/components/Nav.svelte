@@ -6,6 +6,7 @@
 	import { ui } from '#lib/ui.svelte.js';
 	import Icon, { type IconName } from './Icon.svelte';
 	import ProfileMenu from './ProfileMenu.svelte';
+	import Wordmark from './Wordmark.svelte';
 
 	interface Item {
 		href: string;
@@ -69,10 +70,7 @@
 <nav aria-label="Main" class="flex h-full flex-col">
 	<div class="flex h-16 shrink-0 items-center gap-1 px-3 {compact ? 'justify-center' : 'justify-between'}">
 		{#if !compact}
-			<a href="/dashboard" class="flex min-h-[44px] items-center gap-2.5 rounded-card px-2" aria-label="Cafoo Launchpad">
-				<span class="grid size-7 shrink-0 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
-				<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>
-			</a>
+			<a href="/dashboard" class="flex min-h-[44px] items-center rounded-card px-2" aria-label="Cafoo Launchpad"><Wordmark size={22} /></a>
 		{/if}
 		{#if drawer}
 			<button class="btn btn-quiet w-11 px-0" aria-label="Close navigation" onclick={() => (ui.navOpenMobile = false)}><Icon name="x" /></button>

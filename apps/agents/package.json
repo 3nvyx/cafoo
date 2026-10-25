@@ -13,7 +13,7 @@
     "smoke:charter": "node --env-file-if-exists=../../.env --import tsx src/charter/smoke.ts"
   },
   "dependencies": {
-    "@ai-sdk/google": "4.0.94",
+    "@ai-sdk/google": "^4.0.94",
     "@ai-sdk/mcp": "^2.0.83",
     "@ai-sdk/xai": "^5.0.29",
     "@anthropic-ai/claude-agent-sdk": "^0.3.309",

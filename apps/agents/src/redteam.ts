@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
-import { labeled, scriptedGeminiCritique } from './gemini';
+import { labeled, scriptedGeminiCritique, unlabeled } from './gemini';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
 import { eliminationCritique } from './scripted/rulings';
@@ -107,7 +107,9 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
 
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
-  return modelCritique(A, p, materiality, ctx, xai.responses(modelFor(red(A).harness)));
+  const c = await modelCritique(A, p, materiality, ctx, xai.responses(modelFor(red(A).harness)));
+  // Only Gemini's own critiques carry its label.
+  return c && unlabeled(c);
 }
 
 /** Gemini as the second critic: it sees the first critique and submits only what that critique missed. */

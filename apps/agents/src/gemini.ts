@@ -13,8 +13,11 @@ type ProposalRow = NonNullable<ReturnType<RoleConn['db']['proposal']['id']['find
 
 export const GEMINI_LABEL = 'Gemini: ';
 export const GEMINI_SCRIPTED_LABEL = 'Gemini (scripted): ';
+const LABEL = /^\s*gemini(\s*\(scripted\))?\s*:\s*/i;
+/** A model's critique with any Gemini label it wrote itself removed, so no critic can pass as Gemini (or double the label). */
+export const unlabeled = (c: Critique): Critique => ({ ...c, body: c.body.replace(LABEL, '') });
 /** A Gemini critique as written to the ledger: the label, then the critique. */
-export const labeled = (c: Critique, scripted: boolean): Critique => ({ ...c, body: `${scripted ? GEMINI_SCRIPTED_LABEL : GEMINI_LABEL}${c.body}` });
+export const labeled = (c: Critique, scripted: boolean): Critique => ({ ...c, body: `${scripted ? GEMINI_SCRIPTED_LABEL : GEMINI_LABEL}${unlabeled(c).body}` });
 
 export type GeminiScenario =
   | 'bank_match_weak'
@@ -58,7 +61,8 @@ export function scriptedGeminiCritique(p: ProposalRow, materiality: bigint, vend
   const payload = JSON.parse(p.payloadJson);
   const vendor = (/^\d+$/.test(String(payload.vendorId ?? '')) && vendorName?.(BigInt(payload.vendorId))) || 'this vendor';
   const period = String(payload.periodYm ?? 'month-end');
-  const fill = (s: string) => s.replaceAll('{vendor}', vendor).replaceAll('{period}', period);
+  // Function replacers: a vendor name is ledger data, and "$&" in a string replacement would be expanded.
+  const fill = (s: string) => s.replaceAll('{vendor}', () => vendor).replaceAll('{period}', () => period);
   const c = geminiFixtures()[scenario];
   return labeled({ body: fill(c.body), summaryPlain: fill(c.summaryPlain) }, true);
 }

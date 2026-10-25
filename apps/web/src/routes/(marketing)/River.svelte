@@ -1,11 +1,12 @@
 <script lang="ts">
-	// A river winding down the page behind the content. It rises to a point where the element
-	// matched by `from` ends, widens, meanders, and narrows away before `to`. Its currents are
+	// A river winding down the page behind the content. It rises under the lower half of the
+	// element matched by `from` (the hero, whose painted sky paints the same current, so the
+	// hairlines pour out of the brushwork), meanders, and narrows away before `to`. Its currents are
 	// evenly spaced hairlines (flow.ts); scrolling slides a glint along each one downstream, a
 	// little faster than the page moves. The lines themselves never move, so nothing pops.
 	// Under reduced motion the glints stay put. One viewport-sized canvas draws the visible part.
 	import { prefersReducedMotion } from 'svelte/motion';
-	import { drawLines, noise2, streamlines, type Line } from './flow';
+	import { drawLines, noise2, riverPath, streamlines, type Line } from './flow';
 
 	let {
 		from = '',
@@ -20,10 +21,9 @@
 
 	function river(w: number, start: number, end: number): Line[] {
 		const n = noise2(seed);
-		const centre = (y: number) => w * 0.5 + w * 0.28 * Math.sin(y / 620 + 1.1) + w * 0.05 * n(0.5, y / 380);
-		const breadth = (y: number) => Math.min(300, Math.max(130, w * 0.2)) * (1 + 0.28 * Math.sin(y / 470 + 0.6));
-		// Narrow to a point at the source and the mouth.
-		const taper = (y: number) => Math.max(0, Math.min(1, (y - start) / 420, (end - y) / 420));
+		const { centre, breadth } = riverPath(w, seed);
+		// Full width soon after the source, which sits under the paint; narrow to a point at the mouth.
+		const taper = (y: number) => Math.max(0, Math.min(1, (y - start) / 120, (end - y) / 420));
 		const slope = (y: number) => (centre(y + 2) - centre(y - 2)) / 4;
 		const field = (x: number, y: number) => Math.atan2(1, slope(y)) + 0.32 * n(x * 0.006, y * 0.0035);
 		const inside = (x: number, y: number) => Math.abs(x - centre(y)) < (breadth(y) / 2) * taper(y);
@@ -50,7 +50,11 @@
 			const scroll = window.scrollY;
 			const fromEl = from ? document.querySelector(from) : null;
 			const toEl = to ? document.querySelector(to) : null;
-			const start = Math.round(fromEl ? fromEl.getBoundingClientRect().bottom + scroll - 160 : 0);
+			const fromBox = fromEl?.getBoundingClientRect();
+			// The source sits under the hero's paint; the lines fade in across its lower part, where
+			// the painted current runs, so they come out of the brushwork rather than out of nothing.
+			const start = Math.round(fromBox ? fromBox.top + fromBox.height * 0.55 + scroll : 0);
+			const emerged = Math.round(fromBox ? fromBox.top + fromBox.height * 0.92 + scroll : 0);
 			const end = Math.round(toEl ? toEl.getBoundingClientRect().top + scroll : document.documentElement.scrollHeight);
 			// Lay the river out again only when the page's width or length changes.
 			const key = `${w}:${start}:${end}`;
@@ -71,6 +75,15 @@
 				top: scroll - 40,
 				bottom: scroll + vh + 40
 			});
+			if (emerged > scroll) {
+				const fade = ctx.createLinearGradient(0, start, 0, emerged);
+				fade.addColorStop(0, 'rgb(0 0 0 / 0)');
+				fade.addColorStop(1, 'rgb(0 0 0 / 1)');
+				ctx.globalCompositeOperation = 'destination-in';
+				ctx.fillStyle = fade;
+				ctx.fillRect(0, scroll, w, vh);
+				ctx.globalCompositeOperation = 'source-over';
+			}
 		};
 
 		const request = () => (raf ||= requestAnimationFrame(draw));

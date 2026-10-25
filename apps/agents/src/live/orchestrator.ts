@@ -159,7 +159,8 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     open = openProposals();
     if (open.length) {
       onStep(`${open.length} proposal(s) left unruled by the Advisor; applying the standard rulings`);
-      await ruleOpen(cast, open, { thread: `close:${periodYm}`, snapshot: snapshot(A, periodYm), log: onStep });
+      // startCritic already ran Gemini on these, live or scripted; no second scripted Gemini critique.
+      await ruleOpen(cast, open, { thread: `close:${periodYm}`, snapshot: snapshot(A, periodYm), log: onStep, secondCritic: false });
     }
   };
   try {

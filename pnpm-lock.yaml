@@ -11,7 +11,7 @@ importers:
   apps/agents:
     dependencies:
       '@ai-sdk/google':
-        specifier: 4.0.94
+        specifier: ^4.0.94
         version: 4.0.94(zod@4.6.7)
       '@ai-sdk/mcp':
         specifier: ^2.0.83

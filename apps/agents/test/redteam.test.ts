@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { checkCall, HARNESSES } from '../src/harness';
 import { DEFAULT_GEMINI_MODEL, providers } from '../src/env';
-import { GEMINI_LABEL, GEMINI_SCRIPTED_LABEL, geminiFixtures, geminiScenario, labeled, scriptedGeminiCritique, type GeminiScenario } from '../src/gemini';
+import { GEMINI_LABEL, GEMINI_SCRIPTED_LABEL, geminiFixtures, geminiScenario, labeled, scriptedGeminiCritique, unlabeled, type GeminiScenario } from '../src/gemini';
 import { call, ruleSuite } from './helpers';
 
 const h = HARNESSES.redteam;
@@ -87,6 +87,18 @@ describe('Gemini, the second critic (Demo mode fixtures)', () => {
     expect(c?.summaryPlain).toContain('Quillstack');
     expect(c?.body).not.toContain('{vendor}');
     expect(labeled({ body: 'x', summaryPlain: 'y' }, false).body).toBe(`${GEMINI_LABEL}x`);
+  });
+
+  it('strips a label a model wrote itself, so the first critic cannot pass as Gemini and the label is never doubled', () => {
+    expect(unlabeled({ body: 'Gemini (scripted): agree', summaryPlain: 's' }).body).toBe('agree');
+    expect(unlabeled({ body: ' gemini: agree', summaryPlain: 's' }).body).toBe('agree');
+    expect(labeled({ body: 'Gemini: agree', summaryPlain: 's' }, false).body).toBe(`${GEMINI_LABEL}agree`);
+    expect(unlabeled({ body: 'Unlike Gemini: this stays', summaryPlain: 's' }).body).toBe('Unlike Gemini: this stays');
+  });
+
+  it('fills a vendor name literally, even one with replacement patterns', () => {
+    const c = scriptedGeminiCritique(row('VendorVerify', { vendorId: '7' }), 1_000_000n, () => 'A $& B');
+    expect(c?.summaryPlain).toContain('A $& B');
   });
 
   it('picks the same cases as the first critic and stays quiet on the rest', () => {
