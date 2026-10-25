@@ -1,10 +1,11 @@
 <script lang="ts">
 	// A river winding down the page behind the content. It rises under the lower half of the
 	// element matched by `from` (the hero, whose painted sky paints the same current, so the
-	// hairlines pour out of the brushwork), meanders, and narrows away before `to`. Its currents are
-	// evenly spaced hairlines (flow.ts); scrolling slides a glint along each one downstream, a
-	// little faster than the page moves. The lines themselves never move, so nothing pops.
-	// Under reduced motion the glints stay put. One viewport-sized canvas draws the visible part.
+	// hairlines pour out of the brushwork), meanders, and runs down to the top edge of `to`.
+	// Its currents are evenly spaced hairlines (flow.ts); scrolling slides a glint along each
+	// one downstream, a little faster than the page moves. The lines themselves never move, so
+	// nothing pops. Under reduced motion the glints stay put. One viewport-sized canvas draws
+	// the visible part.
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { drawLines, noise2, riverPath, streamlines, type Line } from './flow';
 
@@ -22,8 +23,9 @@
 	function river(w: number, start: number, end: number): Line[] {
 		const n = noise2(seed);
 		const { centre, breadth } = riverPath(w, seed);
-		// Full width soon after the source, which sits under the paint; narrow to a point at the mouth.
-		const taper = (y: number) => Math.max(0, Math.min(1, (y - start) / 120, (end - y) / 420));
+		// Full width soon after the source, which sits under the paint, and all the way down to the
+		// edge of `to`, so its currents end at that edge.
+		const taper = (y: number) => Math.max(0, Math.min(1, (y - start) / 120));
 		const slope = (y: number) => (centre(y + 2) - centre(y - 2)) / 4;
 		const field = (x: number, y: number) => Math.atan2(1, slope(y)) + 0.32 * n(x * 0.006, y * 0.0035);
 		const inside = (x: number, y: number) => Math.abs(x - centre(y)) < (breadth(y) / 2) * taper(y);
