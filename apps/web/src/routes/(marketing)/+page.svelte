@@ -2,7 +2,6 @@
 	// The public landing page: what Cafoo does, how the gate works, and two small demos on
 	// sample data. It never touches the data source; the work happens in /dashboard.
 	import Icon from '#lib/components/Icon.svelte';
-	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import DrillDemo from './DrillDemo.svelte';
 	import AgentWorkflows from './AgentWorkflows.svelte';
@@ -24,14 +23,6 @@
 		{ value: '52', label: 'Proposals in one sample September close, across two companies' },
 		{ value: '$10,000', label: 'default Materiality threshold: anything at or above it waits for the CFO' },
 		{ value: '0', label: 'ledger writes a worker agent can make. Only a ruling or your OK posts' }
-	];
-
-	// Money protected in the sample September close, and how payment terms follow the Risk Tier
-	// (A 45 days, B 30, C 15, D and BLOCK none: the limits in apps/agents/src/live/tools.ts).
-	const protections = [
-		{ figure: '$48,000', text: 'fully reserved for a customer whose guarantor is in an active bankruptcy plan' },
-		{ figure: '2 vendors', text: 'blocked before their first payment: one owner is a synthetic identity, the other is deceased' },
-		{ figure: 'A to D, BLOCK', text: 'payment terms follow the Risk Tier: 45 days at A, 30 at B, 15 at C, and no credit at D or BLOCK' }
 	];
 
 	// The growth story from plan.md, "How Cafoo grows with a startup". `now` marks what ships
@@ -209,25 +200,6 @@
 			</PaintedFrame>
 		</section>
 
-		<section id="credit" class="content scroll-mt-24 pt-32" aria-labelledby="credit-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="credit-h" class="section-h max-w-[20ch]">Know who you are paying, and who owes you</h2>
-				<p class="mt-5 max-w-[56ch] text-subtitle text-ink-2">Before money moves, Cafoo checks the people behind your customers and vendors: identity, fraud, all three credit bureaus and public records. What it finds becomes a Proposal, so the same layers rule on it before a dollar is reserved, blocked or extended.</p>
-			</div>
-			<ul class="mt-14 grid gap-2 md:grid-cols-3">
-				{#each protections as c (c.figure)}
-					<li class="flex items-start gap-4 rounded-lg border border-line bg-surface p-5">
-						<RoleAvatar role="credit" />
-						<div>
-							<p class="num text-display-sm font-medium">{c.figure}</p>
-							<p class="mt-1 text-ink-2">{c.text}</p>
-						</div>
-					</li>
-				{/each}
-			</ul>
-			<p class="mt-4 text-center text-body-sm text-ink-3">Figures from the sample September close.</p>
-		</section>
-
 		<section id="growth" class="content scroll-mt-24 pt-32" aria-labelledby="growth-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="growth-h" class="section-h max-w-[20ch]">Built for your 10x</h2>
@@ -281,12 +253,32 @@
 		</section>
 	</main>
 
-	<footer class="content flex flex-col gap-2 py-8 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between">
-		<Wordmark size={18} class="self-start sm:self-auto" />
-		<nav aria-label="Footer" class="flex flex-wrap gap-x-1">
-			<a href="/dashboard" {...newTab} class="flex min-h-11 items-center px-2 hover:text-ink">Sign in{@render tabNote()}</a>
-			<a href="/pitch" class="flex min-h-11 items-center px-2 hover:text-ink">Pitch</a>
-		</nav>
+	<!-- A standard site footer: brand and one line on the left, link columns on the right, then a legal row. -->
+	<footer class="content mt-24 border-t border-line pt-12 pb-8 text-body-sm">
+		<div class="flex flex-col gap-10 md:flex-row md:justify-between">
+			<div class="flex max-w-xs flex-col gap-3">
+				<a href="/" class="self-start" aria-label="Cafoo home"><Wordmark size={20} /></a>
+				<p class="text-ink-3">The agentic finance ERP. Agents propose, an Advisor rules, and you confirm anything material.</p>
+			</div>
+			<div class="grid grid-cols-2 gap-10 sm:gap-16">
+				<nav aria-labelledby="footer-product" class="flex flex-col gap-1">
+					<p id="footer-product" class="eyebrow mb-1">Product</p>
+					{#each anchors as a (a.href)}
+						<a href={a.href} class="flex min-h-9 items-center text-ink-2 hover:text-ink">{a.label}</a>
+					{/each}
+				</nav>
+				<nav aria-labelledby="footer-start" class="flex flex-col gap-1">
+					<p id="footer-start" class="eyebrow mb-1">Get started</p>
+					<a href="/dashboard" {...newTab} class="flex min-h-9 items-center text-ink-2 hover:text-ink">Sign in{@render tabNote()}</a>
+					<a href="/dashboard" {...newTab} class="flex min-h-9 items-center text-ink-2 hover:text-ink">Open the app{@render tabNote()}</a>
+					<a href="/pitch" class="flex min-h-9 items-center text-ink-2 hover:text-ink">Watch the pitch</a>
+				</nav>
+			</div>
+		</div>
+		<div class="mt-12 flex flex-col gap-2 border-t border-line pt-6 text-ink-3 sm:flex-row sm:justify-between">
+			<p>© {new Date().getFullYear()} Cafoo</p>
+			<p>Figures on this page come from sample data.</p>
+		</div>
 	</footer>
 </div>
 
