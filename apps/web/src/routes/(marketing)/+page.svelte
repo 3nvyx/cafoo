@@ -71,7 +71,7 @@
 		onfocusin={() => (navFocused = true)}
 		onfocusout={() => (navFocused = false)}
 	>
-		<div class="content flex h-14 items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
+		<div class="content flex h-14 items-center justify-between gap-3 rounded-full bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}

@@ -19,10 +19,12 @@
     "baseline": "node scripts/baseline.mjs"
   },
   "devDependencies": {
+    "@tailwindcss/node": "^4.3.3",
     "@terrazzo/cli": "2.10.0",
     "@terrazzo/parser": "2.10.0",
     "@terrazzo/plugin-css": "2.10.0",
     "@terrazzo/token-tools": "2.10.0",
+    "tailwindcss": "^4.3.3",
     "vitest": "^5.0.5"
   }
 }

@@ -133,6 +133,9 @@ importers:
 
   packages/design-tokens:
     devDependencies:
+      '@tailwindcss/node':
+        specifier: ^4.3.3
+        version: 4.3.3
       '@terrazzo/cli':
         specifier: 2.10.0
         version: 2.10.0(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
@@ -145,6 +148,9 @@ importers:
       '@terrazzo/token-tools':
         specifier: 2.10.0
         version: 2.10.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.5)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
