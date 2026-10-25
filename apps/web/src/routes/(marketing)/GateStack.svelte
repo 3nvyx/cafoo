@@ -10,6 +10,9 @@
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { smil } from './smil';
 
+	// Closed when another carousel slide is open: the drawing is still laid out, so it stops itself.
+	let { active = true }: { active?: boolean } = $props();
+
 	interface Layer {
 		name: string;
 		title: string;
@@ -97,7 +100,7 @@
 	onMount(() => {
 		if (prefersReducedMotion.current) return;
 		const t = setInterval(() => {
-			if (onScreen && !document.hidden) seq += 1;
+			if (active && onScreen && !document.hidden) seq += 1;
 		}, 2400);
 		return () => clearInterval(t);
 	});
@@ -181,7 +184,7 @@
 
 <div use:scrub use:watch>
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
-	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil role="img" aria-labelledby="stack-title">
+	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
 		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}

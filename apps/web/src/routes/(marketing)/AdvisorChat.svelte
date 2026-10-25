@@ -31,7 +31,7 @@
 	</div>
 	{#key active}
 		<div class="chat flex flex-col gap-3 p-4" class:run={active}>
-			<p class="msg self-end rounded-lg bg-accent px-3 py-2 text-on-accent" style="--i:0">How are we doing?</p>
+			<p class="msg self-end rounded-lg bg-inverse px-3 py-2 text-on-inverse" style="--i:0">How are we doing?</p>
 			<div class="msg flex flex-wrap items-center gap-2 text-body-sm text-ink-3" style="--i:1">
 				<span>Asking four specialists at once:</span>
 				{#each desks as d (d.name)}

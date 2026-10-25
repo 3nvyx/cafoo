@@ -84,10 +84,6 @@
 	},
 	"routes/(marketing)/+page.svelte": {
 		"bracket-size": 7,
-		"unknown-class": 7
-	},
-	"routes/(marketing)/DrillDemo.svelte": {
-		"bracket-size": 5,
 		"unknown-class": 6
 	},
 	"routes/(marketing)/GateStack.svelte": {

@@ -3,7 +3,8 @@
 	// sponsor's API does inside Cafoo. It moves only when the visitor asks (the tabs, the arrows, or
 	// arrow keys on the tabs); nothing advances on its own, so there is nothing to pause.
 	// From lg up every slide shares one grid cell, so the card keeps the tallest slide's height and
-	// does not jump; below lg only the open slide is laid out.
+	// does not jump; below lg only the open slide is laid out. Each slide's visual is told whether it
+	// is open, so a closed one stops animating.
 	import Icon from '#lib/components/Icon.svelte';
 	import GateStack from './GateStack.svelte';
 	import CreditCascade from './CreditCascade.svelte';
@@ -51,14 +52,18 @@
 	];
 
 	let current = $state(0);
-	const tabs: HTMLButtonElement[] = [];
 
 	function go(i: number, focus = false) {
 		current = (i + slides.length) % slides.length;
-		if (focus) tabs[current]?.focus();
+		if (focus) document.getElementById(`tab-${slides[current].id}`)?.focus();
 	}
-	// Arrow keys, Home and End move between tabs and open the one they land on.
+	// From lg up the page draws the arrows in the painted gutters beside the card and calls these.
+	export const prev = () => go(current - 1);
+	export const next = () => go(current + 1);
+	// Arrow keys, Home and End move between tabs and open the one they land on. With a modifier held
+	// the key is the browser's (Alt+Left is back), so it is left alone.
 	function onKey(e: KeyboardEvent) {
+		if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 		const to = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: slides.length - 1 }[e.key];
 		if (to === undefined) return;
 		e.preventDefault();
@@ -72,7 +77,7 @@
 	{:else}
 		<span class="flex items-center gap-1.5">
 			<span class="logo mark" aria-hidden="true" style="--logo: url(/logos/{b.file}.svg)"></span>
-			<span class="text-body-sm font-medium">{b.name}</span>
+			<span class="text-caption">{b.name}</span>
 		</span>
 	{/if}
 {/snippet}
@@ -81,7 +86,6 @@
 	<div role="tablist" aria-label="Features" tabindex="-1" class="grid grid-cols-2 gap-1 rounded-lg bg-subtle p-1 lg:grid-cols-4" onkeydown={onKey}>
 		{#each slides as s, i (s.id)}
 			<button
-				bind:this={tabs[i]}
 				role="tab"
 				id="tab-{s.id}"
 				aria-selected={i === current}
@@ -105,14 +109,15 @@
 				class="slide flex flex-col"
 				class:on={i === current}
 				inert={i !== current}
+				tabindex="0"
 			>
 				<div class="flex flex-col items-center text-center">
-					<h3 class="slide-h max-w-[24ch]">{s.title}</h3>
+					<h3 class="max-w-[24ch] text-display-sm font-medium text-balance sm:text-display">{s.title}</h3>
 					<p class="mt-4 max-w-[64ch] text-ink-2">{s.body}</p>
 				</div>
 				<div class="mt-10 flex flex-1 flex-col justify-center">
 					{#if s.id === 'security'}
-						<GateStack />
+						<GateStack active={i === current} />
 					{:else if s.id === 'credit'}
 						<CreditCascade active={i === current} />
 					{:else if s.id === 'advisor'}
@@ -127,7 +132,8 @@
 
 	<div class="mt-8 flex items-center justify-between gap-3 border-t border-line pt-4">
 		<p class="num text-body-sm text-ink-3" aria-live="polite">{current + 1} of {slides.length} · {slides[current].topic}</p>
-		<div class="flex gap-1">
+		<!-- Wide screens get these beside the card, at its middle, from the page. -->
+		<div class="flex gap-1 lg:hidden">
 			<button class="btn btn-quiet px-2.5" aria-label="Previous feature" onclick={() => go(current - 1)}><Icon name="chevronLeft" size={18} /></button>
 			<button class="btn btn-quiet px-2.5" aria-label="Next feature" onclick={() => go(current + 1)}><Icon name="chevronRight" size={18} /></button>
 		</div>
@@ -135,19 +141,6 @@
 </div>
 
 <style>
-	.slide-h {
-		font-size: 28px;
-		line-height: 1.08;
-		letter-spacing: -0.025em;
-		font-weight: 500;
-		text-wrap: balance;
-	}
-	@media (min-width: 640px) {
-		.slide-h {
-			font-size: 40px;
-		}
-	}
-
 	.tab {
 		transition:
 			background-color 150ms cubic-bezier(0.23, 1, 0.32, 1),
@@ -192,7 +185,8 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.slide {
+		.slide,
+		.tab {
 			transition: none;
 		}
 	}

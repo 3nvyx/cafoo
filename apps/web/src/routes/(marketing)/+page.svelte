@@ -3,16 +3,16 @@
 	// sample data. It never touches the data source; the work happens in /dashboard.
 	import Icon from '#lib/components/Icon.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
-	import DrillDemo from './DrillDemo.svelte';
 	import AgentWorkflows from './AgentWorkflows.svelte';
 	import FeatureCarousel from './FeatureCarousel.svelte';
 	import LogoWall from './LogoWall.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
 
+	let carousel = $state<FeatureCarousel>();
+
 	const anchors = [
 		{ href: '#how', label: 'Agents' },
-		{ href: '#demo', label: 'Demo' },
 		{ href: '#gate', label: 'Security' },
 		{ href: '#growth', label: 'Your 10x' }
 	];
@@ -177,24 +177,20 @@
 			</div>
 		</section>
 
-		<section id="demo" class="content scroll-mt-24 pt-32" aria-labelledby="demo-h">
-			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="demo-h" class="section-h max-w-[20ch]">Every figure, down to its entries</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">On sample numbers: follow a Board Pack figure down to the journal lines and the agent that wrote them.</p>
-			</div>
-			<div class="mt-14">
-				<DrillDemo />
-			</div>
-		</section>
-
 		<!-- One card for the gate and the sponsors' APIs behind it, as a carousel; the first slide is the gate. -->
-		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
+		<!-- Laid out like the hero: the paint fills the whole frame and the card sits on the content columns inside it,
+		     with the carousel's arrows in the painted gutters at the card's middle. -->
+		<section id="gate" class="wide scroll-mt-24 pt-32" aria-labelledby="gate-h">
 			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
-			<PaintedFrame seed={37} class="p-2 sm:p-6">
-				<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
-					{@render marks()}
-					<FeatureCarousel />
+			<PaintedFrame seed={37} class="py-[7%]">
+				<div class="wide-content px-3 sm:px-6 lg:px-0">
+					<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
+						{@render marks()}
+						<FeatureCarousel bind:this={carousel} />
+					</div>
 				</div>
+				<button class="gutter-arrow prev" aria-label="Previous feature" onclick={() => carousel?.prev()}><Icon name="chevronLeft" /></button>
+				<button class="gutter-arrow next" aria-label="Next feature" onclick={() => carousel?.next()}><Icon name="chevronRight" /></button>
 			</PaintedFrame>
 		</section>
 
@@ -243,7 +239,7 @@
 		     The river runs down to its top edge. -->
 		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
 			<div class="flex flex-col items-start gap-6 rounded-xl bg-accent px-6 py-10 text-on-accent sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-12">
-				<h2 id="cta-h" class="cta-h max-w-[18ch]">Close your next month with us</h2>
+				<h2 id="cta-h" class="max-w-[18ch] text-display-sm font-medium sm:text-display">Close your next month with us</h2>
 				<a href="/dashboard" {...newTab} class="pill pill-lg shrink-0 bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 			</div>
 		</section>
@@ -326,6 +322,37 @@
 		}
 	}
 
+	/* The security carousel's arrows, from lg up: one in each painted gutter beside the card, at its middle. A gutter is
+	   a 24th of the frame (the card takes 10 of 12 columns), so each 40px arrow is centred on 1/48 of the frame. */
+	.gutter-arrow {
+		position: absolute;
+		top: 50%;
+		translate: 0 -50%;
+		display: none;
+		place-items: center;
+		width: 40px;
+		height: 40px;
+		border-radius: 999px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		color: var(--ink);
+		transition: background-color 120ms ease-out;
+	}
+	.gutter-arrow:hover {
+		background: var(--subtle);
+	}
+	.gutter-arrow.prev {
+		left: calc(100% / 48 - 20px);
+	}
+	.gutter-arrow.next {
+		right: calc(100% / 48 - 20px);
+	}
+	@media (min-width: 1024px) {
+		.gutter-arrow {
+			display: grid;
+		}
+	}
+
 	/* Every section heading: 36px on phones, 56px from sm up, set tight. */
 	.section-h {
 		font-size: 36px;
@@ -335,18 +362,6 @@
 	@media (min-width: 640px) {
 		.section-h {
 			font-size: 56px;
-		}
-	}
-
-	/* The closing band's heading: smaller than a section heading, so the band stays short. */
-	.cta-h {
-		font-size: 30px;
-		line-height: 1.05;
-		letter-spacing: -0.025em;
-	}
-	@media (min-width: 640px) {
-		.cta-h {
-			font-size: 40px;
 		}
 	}
 
