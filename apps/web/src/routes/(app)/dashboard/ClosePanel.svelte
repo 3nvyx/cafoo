@@ -7,11 +7,17 @@
 	import { TASK_STATUS, roleName } from '#lib/labels.js';
 	import Pill from '#lib/components/Pill.svelte';
 	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
+	import { bankExceptionState } from '#lib/close.js';
+	import { checklistProgress } from '#lib/close-steps.js';
 	import { closeProgress, proposalCounts } from './insights.js';
 
 	let { period }: { period: Period } = $props();
 
-	const p = $derived(closeProgress(db.closeTasks(), period.id));
+	const steps = $derived(closeProgress(db.closeTasks(), period.id));
+	// The bank task stays open once the CFO accepts the bank lines as exceptions; the count says so, as on Close.
+	const exceptions = $derived(bankExceptionState(db, period.id));
+	const settled = $derived(checklistProgress(db.closeTasks(), period.id, exceptions.rows.length > 0 && exceptions.acceptance.accepted));
+	const p = $derived({ ...steps, pct: settled.pct, accepted: settled.accepted });
 	const counts = $derived(proposalCounts(db.proposals(), period.id));
 	const resolved = $derived(counts.approved + counts.rejected);
 	const SEG: Record<string, string> = { done: 'bg-pos', blocked: 'bg-warn', in_progress: 'bg-accent', todo: 'bg-line' };
@@ -29,7 +35,7 @@
 		<div class="flex flex-col gap-2">
 			<div class="flex items-baseline justify-between text-body-sm">
 				<span class="text-ink-2">Checklist</span>
-				<span class="num text-ink"><span class="font-medium">{p.done} of {p.total}</span> done · {p.pct}%</span>
+				<span class="num text-ink"><span class="font-medium">{p.done} of {p.total}</span> done{#if p.accepted}{' '}· bank lines accepted as exceptions{/if} · {p.pct}%</span>
 			</div>
 			<div class="h-2 overflow-hidden rounded-full bg-subtle" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={p.pct} aria-label="Close checklist {p.pct}% done">
 				<div class="h-full rounded-full bg-accent transition-[width] duration-500 ease-out" style="width:{p.pct}%"></div>

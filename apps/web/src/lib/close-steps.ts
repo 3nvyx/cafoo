@@ -1,6 +1,7 @@
 // The close status bar: the month-end close as six steps in the order the agents work them, Bookkeeper, Revenue,
 // Credit & Risk, Consolidation, CFO review, Lock, each with a state and its Proposal counts. Pure: derived from the
 // Period, its close tasks and Proposals, and the lock gate (#lib/close.js), so the Close page and its tests agree.
+import { isBankReconciliationTask } from '@cafoo/ledger-core';
 import type { AgentRole, CloseTask, Period, Proposal } from './data/types';
 
 export type StepState = 'done' | 'running' | 'waiting' | 'not_started';
@@ -128,4 +129,27 @@ export function closeSteps(input: CloseStepsInput): CloseStatus {
 	const steps = [...workers, review, lock];
 	const score = steps.reduce((s, st) => s + (st.state === 'done' ? 1 : st.state === 'not_started' ? 0 : 0.5), 0);
 	return { steps, percent: Math.round((score / steps.length) * 100) };
+}
+
+export interface ChecklistProgress {
+	total: number;
+	done: number;
+	/** Bank reconciliation tasks left open on purpose because the CFO accepted the remaining bank lines as exceptions. */
+	accepted: number;
+	/** Whole percent of tasks settled: done, or stood in for by an accepted exception set. */
+	pct: number;
+}
+
+/**
+ * The close checklist's count. The bank task stays open after the CFO accepts exceptions (the lines are still
+ * unreconciled), and the lock counts that acceptance in its place (#lib/close.js lockGate); the checklist says so
+ * instead of reading "6 of 7 done" next to a locked month.
+ */
+export function checklistProgress(tasks: CloseTask[], periodId: string, exceptionsAccepted: boolean): ChecklistProgress {
+	const own = tasks.filter((t) => t.periodId === periodId);
+	const done = own.filter((t) => t.status === 'done').length;
+	const accepted = exceptionsAccepted
+		? own.filter((t) => t.status !== 'done' && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })).length
+		: 0;
+	return { total: own.length, done, accepted, pct: own.length ? Math.round(((done + accepted) / own.length) * 100) : 0 };
 }

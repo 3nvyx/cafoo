@@ -1,9 +1,13 @@
 <script lang="ts">
 	// The signed-in person at the foot of the sidebar. There is no sign-in yet, so this is a
 	// fictitious CFO profile; the menu holds the links that used to sit loose in the nav.
+	import { db } from '#lib/data/index.js';
+	import { rootOf } from '#lib/data/group.js';
 	import Icon, { type IconName } from './Icon.svelte';
 
-	const PROFILE = { name: 'Avery Lin', role: 'CFO · Cafoo Inc', email: 'avery@cafoo.example', initials: 'AL' };
+	// The company is the books' root company, so the footer names whichever company is loaded.
+	const company = $derived(rootOf(db.subsidiaries())?.name);
+	const PROFILE = $derived({ name: 'Avery Lin', role: company ? `CFO · ${company}` : 'CFO', email: 'avery@cafoo.example', initials: 'AL' });
 
 	let { compact = false }: { compact?: boolean } = $props();
 

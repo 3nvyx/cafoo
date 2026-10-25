@@ -8,6 +8,7 @@
 	import Pill from '#lib/components/Pill.svelte';
 	import { accrualPerYear, maskedAccount, monthlyLoadedCost, payDatesLeftInYear, projectPto, regionOf, splitDeposit } from '#lib/payroll.js';
 	import TimeOffList from '../TimeOffList.svelte';
+	import { rootOf } from '#lib/data/group.js';
 	import { DEPARTMENT, EMPLOYEE_STATUS, EMPLOYMENT, RUN_STATUS, companyName, dayLabel, money, payText, scheduleText } from '../people.js';
 
 	/** The strike price of grants since October 2025: the 409A fair value of a common share. */
@@ -91,7 +92,7 @@
 		<div class="py-4">
 			<dt class="text-body-sm text-ink-3">Stock options</dt>
 			<dd class="num mt-1 text-subtitle">{e.optionsGranted ? e.optionsGranted.toLocaleString('en-US') : 'None'}</dd>
-			{#if e.optionsGranted}<dd class="text-caption text-ink-3">Over Cafoo Inc common, strike {money(STRIKE_MINOR, 'USD', false)}</dd>{/if}
+			{#if e.optionsGranted}<dd class="text-caption text-ink-3">Over {rootOf(subs)?.name ?? 'the company'} common, strike {money(STRIKE_MINOR, 'USD', false)}</dd>{/if}
 		</div>
 	</dl>
 

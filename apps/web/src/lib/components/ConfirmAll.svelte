@@ -3,6 +3,7 @@
 	// Shared by the Dashboard queue and the Proposals page's Needs-your-OK view.
 	import { db } from '#lib/data/index.js';
 	import type { Proposal } from '#lib/data/types.js';
+	import { formatMoney, toBig } from '#lib/data/money.js';
 	import { confirmEffect } from '#lib/proposals.js';
 	import { toasts } from '#lib/toast.svelte.js';
 	import ConfirmDialog from './ConfirmDialog.svelte';
@@ -14,6 +15,8 @@
 	let open = $state(false);
 	let busy = $state(false);
 	const n = $derived(proposals.length);
+	/** What the confirmations add up to, as each card shows its amount (the Reporting currency the gate measures in). */
+	const total = $derived(formatMoney(proposals.reduce((t, p) => t + toBig(p.amountMinor), 0n).toString()));
 
 	async function confirmAll() {
 		const items = proposals.filter((p) => p.status === 'awaiting_cfo');
@@ -54,7 +57,7 @@
 <ConfirmDialog
 	bind:open
 	title="Confirm all {n}?"
-	body="Confirm all {n} items the Advisor already approved?"
+	body="Confirm all {n} items the Advisor already approved, {total} in all?"
 	confirmLabel="Confirm all {n}"
 	onconfirm={() => {
 		void confirmAll();
