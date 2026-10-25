@@ -70,6 +70,11 @@
 		navHidden = y > 80 && y > lastY;
 		lastY = y;
 	}
+
+	// The hero walkthrough loops until paused; paused, or with reduced motion, the still shows.
+	let heroPaused = $state(false);
+	const heroAlt =
+		"The Luyten Overview for September 2026: cash, income and spend, items waiting for the CFO's OK, bank lines to decide before the close, the KPIs, proposals by status, close progress, agent status and customer credit. Playing, it shows the CFO starting the close, the agents working, and the CFO confirming a proposal.";
 </script>
 
 {#snippet tabNote()}<span class="sr-only"> (opens in a new tab)</span>{/snippet}
@@ -135,17 +140,30 @@
 		<div id="hero-art" class="wide pb-16 sm:pb-24">
 			<PaintedFrame seed={11} class="p-[7%] lg:px-0">
 				<!-- Back on the content column, so the product lines up with the headline above. -->
+				<!-- A recorded walkthrough of the demo; the still stands in for it when paused or when motion is reduced. -->
 				<div class="wide-content">
-				<img
-					src="/product/launchpad.webp"
-					width="2000"
-					height="1253"
-					fetchpriority="high"
-					alt="The Luyten Overview for September 2026: cash, income and spend, three items waiting for the CFO's OK, nine bank lines to decide before the close, the KPIs, proposals by status, close progress, agent status and customer credit."
-					class="block w-full rounded-lg border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
-				/>
+				{#if heroPaused}
+					<img src="/product/launchpad.webp" width="2000" height="1253" alt={heroAlt} class="block w-full rounded-lg border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]" />
+				{:else}
+					<picture>
+						<source media="(prefers-reduced-motion: reduce)" srcset="/product/launchpad.webp" width="2000" height="1253" />
+						<img
+							src="/product/launchpad.gif"
+							width="1740"
+							height="1090"
+							fetchpriority="high"
+							alt={heroAlt}
+							class="block w-full rounded-lg border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
+						/>
+					</picture>
+				{/if}
 				</div>
 			</PaintedFrame>
+			<div class="mt-3 flex justify-end motion-reduce:hidden">
+				<button type="button" class="pill pill-quiet" onclick={() => (heroPaused = !heroPaused)}>
+					<Icon name={heroPaused ? 'play' : 'pause'} size={16} />{heroPaused ? 'Play' : 'Pause'} the walkthrough
+				</button>
+			</div>
 		</div>
 		</div>
 
