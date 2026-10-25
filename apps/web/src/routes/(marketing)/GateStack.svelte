@@ -47,7 +47,7 @@
 
 	const FILL = {
 		plain: { top: 'fill-surface stroke-ink-3', side: 'fill-subtle stroke-ink-3', text: 'fill-ink-3' },
-		gate: { top: 'fill-accent-soft stroke-accent', side: 'fill-accent-soft stroke-accent', text: 'fill-accent-ink' },
+		gate: { top: 'fill-accent-soft stroke-ink-3', side: 'fill-accent-soft stroke-ink-3', text: 'fill-accent-ink' },
 		ledger: { top: 'fill-ink stroke-ink', side: 'fill-ink-2 stroke-ink', text: 'fill-canvas' }
 	} as const;
 
@@ -88,7 +88,7 @@
 		<g>
 			<path d={left(y)} class={f.side} stroke-width="1" stroke-linejoin="round" />
 			<path d={right(y)} class={f.side} stroke-width="1" stroke-linejoin="round" />
-			<path d={top(y)} class={f.top} stroke-width={L.tone === 'gate' ? 1.5 : 1} stroke-linejoin="round" />
+			<path d={top(y)} class={f.top} stroke-width="1" stroke-linejoin="round" />
 			<text transform={onTop(y, -56, 34)} class="{f.text} font-mono text-[15px] font-medium" style="letter-spacing:0.12em">{L.name}</text>
 			{#each L.dots as role, d (role)}
 				<!-- After the name, on the front half of the face: the plate above covers the back half. -->
@@ -114,7 +114,7 @@
 	{/if}
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
 	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={paused} role="img" aria-labelledby="stack-title">
-		<title id="stack-title">Cafoo's layers: CFO app, Advisor, Red Team, worker agents, the approval gate and the ledger</title>
+		<title id="stack-title">Cafoo’s layers: CFO app, Advisor, Red Team, worker agents, the approval gate and the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
 			<path d={feedPath(n)} fill="none" class="stroke-ink-3" stroke-width="1" stroke-dasharray="3 4" />
@@ -128,7 +128,7 @@
 				</g>
 			{/if}
 			<g transform="translate(20 {feedY(n) - 18})">
-				<rect width="130" height="36" rx="6" class="fill-surface stroke-line-strong" />
+				<rect width="130" height="36" rx="8" class="fill-surface stroke-line" />
 				<text x="14" y="23" class="fill-ink text-[13px] font-medium">{fd.label}</text>
 			</g>
 		{/each}

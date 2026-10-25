@@ -21,7 +21,7 @@
 			<Pill tone="neutral">Accrual</Pill>
 			<Pill tone="pos">Approved</Pill>
 		</div>
-		<div class="inline-flex rounded-full border border-line-strong p-0.5" role="group" aria-label="View">
+		<div class="inline-flex rounded-full border border-line p-0.5" role="group" aria-label="View">
 			{#each [{ v: false, label: 'Simple' }, { v: true, label: 'Expert' }] as o (o.label)}
 				<button
 					class="min-h-[40px] rounded-full px-3.5 font-mono text-[13px] font-medium transition-colors duration-150 {expert === o.v ? 'bg-ink text-canvas' : 'text-ink-2 hover:text-ink'}"
@@ -68,7 +68,7 @@
 			</dl>
 			<pre class="overflow-x-auto rounded-lg bg-subtle p-3 font-mono text-xs leading-5 text-ink-2">{payload}</pre>
 		{:else}
-			<p class="text-lg text-ink">The contractor did September's work but billed in October. I recorded the $8,750 cost in September so the month is right.</p>
+			<p class="text-lg text-ink">The contractor did September’s work but billed in October. I recorded the $8,750 cost in September so the month is right.</p>
 			<p class="mt-auto rounded-lg bg-accent-soft px-3 py-2 text-[15px]">
 				<span class="font-medium">Advisor:</span> approved. It is under your $10,000 threshold, so it posted without you.
 			</p>

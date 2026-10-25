@@ -37,7 +37,7 @@
 	<section class="flex flex-col gap-3 p-4" aria-labelledby="drill-pnl">
 		<h3 id="drill-pnl" class="eyebrow">Board Pack · September P&L</h3>
 		<button
-			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-lg border px-3 text-left transition-colors duration-150 {open ? 'border-accent bg-accent-soft' : 'border-line-strong hover:border-accent'}"
+			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-lg border px-3 text-left transition-colors duration-150 border-line {open ? 'bg-accent-soft' : 'hover:bg-subtle'}"
 			aria-expanded={open}
 			aria-controls="drill-entries"
 			onclick={() => {

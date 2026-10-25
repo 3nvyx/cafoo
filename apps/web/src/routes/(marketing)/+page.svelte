@@ -223,7 +223,7 @@
 			background: color-mix(in srgb, var(--accent) 88%, black);
 		}
 		.pill-outline {
-			border: 1px solid var(--line-strong);
+			border: 1px solid var(--line);
 			background: var(--surface);
 			color: var(--ink);
 		}

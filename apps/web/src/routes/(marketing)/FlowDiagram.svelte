@@ -155,9 +155,8 @@
 					width={w}
 					height={L.nh}
 					rx="12"
-					class={n.tone === 'accent' ? 'fill-accent-soft stroke-accent' : n.c === 0 ? 'fill-subtle stroke-line-strong' : 'fill-surface stroke-line-strong'}
-					stroke-width={n.tone === 'accent' ? 1.5 : 1}
-					stroke-dasharray={n.c === 0 ? '3 3' : undefined}
+					class={n.tone === 'accent' ? 'fill-accent-soft stroke-line' : n.c === 0 ? 'fill-subtle stroke-line' : 'fill-surface stroke-line'}
+					stroke-width="1"
 				/>
 				{#if vertical}
 					<text x={p.x + w / 2} y={p.y + 22} text-anchor="middle" class="fill-ink text-[14px] font-medium">{n.short ?? n.title}</text>
