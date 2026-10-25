@@ -59,7 +59,52 @@
 	const PENDING_ROWS = 3;
 	let allPeople = $state(false);
 	let allPending = $state(false);
-	const rosterShown = $derived(allPeople ? roster : roster.slice(0, ROSTER_ROWS));
+
+	// Side by side (lg and up), the roster shows as many whole rows as fit beside the right-hand column, and its card
+	// stretches so both bottoms line up; below lg it shows ROSTER_ROWS. Every row stays rendered so each can be
+	// measured: the list is clipped at the last row that fits, and the rows past it are made inert.
+	let rosterList: HTMLUListElement | undefined = $state();
+	let rosterCard: HTMLDivElement | undefined = $state();
+	let sideColumn: HTMLDivElement | undefined = $state();
+	let rosterFit = $state<{ rows: number; clipPx: number | null; cardPx: number | null }>({ rows: Infinity, clipPx: null, cardPx: null });
+
+	function fitRoster() {
+		if (!rosterList || !rosterCard) return;
+		if (allPeople) return void (rosterFit = { rows: Infinity, clipPx: null, cardPx: null });
+		const top = rosterList.getBoundingClientRect().top;
+		// Each row's bottom, measured from the top of the list. A parent's clipping does not move its rows.
+		const bottoms = [...rosterList.children].map((r) => r.getBoundingClientRect().bottom - top);
+		const sideBySide = !!sideColumn && matchMedia('(min-width: 1024px)').matches;
+		if (!sideBySide) {
+			const rows = Math.min(ROSTER_ROWS, bottoms.length);
+			return void (rosterFit = { rows, clipPx: rows < bottoms.length ? bottoms[rows - 1] : null, cardPx: null });
+		}
+		const cardTop = rosterCard.getBoundingClientRect().top;
+		const target = sideColumn!.getBoundingClientRect().bottom;
+		const BORDER = 1;
+		// The "Show all" row: 12px padding top and bottom, a 20px line and its top border.
+		const MORE = 45;
+		// Everything fits with no "Show all" row: no clipping, the card just stretches to the target.
+		if (top + (bottoms.at(-1) ?? 0) + BORDER <= target) return void (rosterFit = { rows: Infinity, clipPx: null, cardPx: target - cardTop });
+		const room = target - top - MORE - BORDER;
+		const rows = Math.max(3, bottoms.filter((b) => b <= room + 0.5).length);
+		rosterFit = { rows, clipPx: bottoms[rows - 1], cardPx: Math.max(target - cardTop, 0) };
+	}
+
+	$effect(() => {
+		// Re-fit when the roster, the filters or the expansion change; the observer covers both columns resizing.
+		void roster.length;
+		void allPeople;
+		fitRoster();
+	});
+	$effect(() => {
+		if (!sideColumn || !rosterList) return;
+		const watch = new ResizeObserver(() => fitRoster());
+		watch.observe(sideColumn);
+		watch.observe(rosterList);
+		return () => watch.disconnect();
+	});
+	const clipped = $derived(roster.length > rosterFit.rows);
 
 	// The shared calendar: holidays, time off and the pay calendar a year ahead, read live, so an approval below fills
 	// its bar in at once and a new Gusto run replaces its estimate.
@@ -143,7 +188,7 @@
 	<Calendar items={entries} today={now.slice(0, 10)} />
 </div>
 
-<div class="mt-8 grid gap-8 lg:grid-cols-3">
+<div class="mt-8 grid gap-8 lg:grid-cols-3 lg:items-start">
 	<section aria-labelledby="roster-h" class="flex min-w-0 flex-col gap-4 lg:col-span-2">
 		<div class="flex flex-wrap items-end justify-between gap-3">
 			<h2 id="roster-h" class="text-title">Team</h2>
@@ -164,15 +209,15 @@
 			</div>
 		</div>
 
-		<div class="card">
+		<div bind:this={rosterCard} class="card flex flex-col" style:min-height={rosterFit.cardPx === null ? undefined : `${rosterFit.cardPx}px`}>
 			<div class="hidden gap-4 border-b border-line px-5 py-2 text-caption text-ink-3 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]" aria-hidden="true">
 				<span>Name</span><span>Department</span><span>Type</span><span class="text-right">Time off</span><span class="text-right">Pay</span>
 			</div>
-			<ul class="flex flex-col divide-y divide-line">
-				{#each rosterShown as e (e.id)}
+			<ul bind:this={rosterList} class="flex flex-col divide-y divide-line overflow-hidden" style:max-height={rosterFit.clipPx === null ? undefined : `${rosterFit.clipPx}px`}>
+				{#each roster as e, i (e.id)}
 					{@const future = e.startAt.slice(0, 10) > now.slice(0, 10)}
 					{@const badge = future ? { tone: 'neutral' as const, label: `Starts ${fmtDay(e.startAt)}` } : e.status !== 'active' ? EMPLOYEE_STATUS[e.status] : null}
-					<li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] xl:items-center">
+					<li inert={i >= rosterFit.rows} class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] xl:items-center">
 						<div class="min-w-0">
 							<a class="drill font-medium" href="/people/{e.id}">{e.name}</a>
 							<p class="truncate text-body-sm text-ink-2">{e.title}</p>
@@ -199,15 +244,15 @@
 					<li class="px-5 py-6 text-body-sm text-ink-3">Nobody matches these filters.</li>
 				{/each}
 			</ul>
-			{#if roster.length > ROSTER_ROWS}
-				<button type="button" class="w-full border-t border-line px-5 py-3 text-left text-body-sm text-ink-2 hover:bg-subtle hover:text-ink" aria-expanded={allPeople} onclick={() => (allPeople = !allPeople)}>
+			{#if clipped || (allPeople && roster.length > ROSTER_ROWS)}
+				<button type="button" class="mt-auto w-full border-t border-line px-5 py-3 text-left text-body-sm text-ink-2 hover:bg-subtle hover:text-ink" aria-expanded={allPeople} onclick={() => (allPeople = !allPeople)}>
 					{allPeople ? 'Show fewer' : `Show all ${roster.length} people`}
 				</button>
 			{/if}
 		</div>
 	</section>
 
-	<div class="flex min-w-0 flex-col gap-8">
+	<div bind:this={sideColumn} class="flex min-w-0 flex-col gap-8">
 		<section aria-labelledby="pto-h" class="card flex flex-col gap-2 p-5">
 			<div class="flex items-baseline justify-between gap-3">
 				<h2 id="pto-h" class="text-subtitle">Time off waiting for you</h2>
