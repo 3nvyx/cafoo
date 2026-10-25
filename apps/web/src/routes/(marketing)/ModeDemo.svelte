@@ -15,16 +15,16 @@
   "amount": "8750.00", "reverse_on": "2026-10-01" }`;
 </script>
 
-<div class="card flex flex-col">
+<div class="card flex flex-col rounded-2xl">
 	<div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
 		<div class="flex items-center gap-2">
 			<Pill tone="neutral">Accrual</Pill>
 			<Pill tone="pos">Approved</Pill>
 		</div>
-		<div class="inline-flex rounded-btn border border-line-strong p-0.5" role="group" aria-label="View">
+		<div class="inline-flex rounded-full border border-line-strong p-0.5" role="group" aria-label="View">
 			{#each [{ v: false, label: 'Simple' }, { v: true, label: 'Expert' }] as o (o.label)}
 				<button
-					class="min-h-[40px] rounded-[3px] px-3 text-sm font-medium transition-colors duration-150 {expert === o.v ? 'bg-ink text-canvas' : 'text-ink-2 hover:text-ink'}"
+					class="min-h-[40px] rounded-full px-3.5 font-mono text-[13px] font-medium transition-colors duration-150 {expert === o.v ? 'bg-ink text-canvas' : 'text-ink-2 hover:text-ink'}"
 					aria-pressed={expert === o.v}
 					onclick={() => (expert = o.v)}>{o.label}</button
 				>
@@ -66,10 +66,10 @@
 				<div><dt class="inline font-medium">Red Team.</dt> <dd class="inline text-ink-2">No critique: the dates and amount agree with the statement of work.</dd></div>
 				<div><dt class="inline font-medium">Advisor.</dt> <dd class="inline text-ink-2">Approved, below the $10,000.00 Materiality threshold.</dd></div>
 			</dl>
-			<pre class="overflow-x-auto rounded-btn bg-subtle p-3 font-mono text-xs leading-5 text-ink-2">{payload}</pre>
+			<pre class="overflow-x-auto rounded-lg bg-subtle p-3 font-mono text-xs leading-5 text-ink-2">{payload}</pre>
 		{:else}
 			<p class="text-lg text-ink">The contractor did September's work but billed in October. I recorded the $8,750 cost in September so the month is right.</p>
-			<p class="mt-auto rounded-btn bg-accent-soft px-3 py-2 text-[15px]">
+			<p class="mt-auto rounded-lg bg-accent-soft px-3 py-2 text-[15px]">
 				<span class="font-medium">Advisor:</span> approved. It is under your $10,000 threshold, so it posted without you.
 			</p>
 		{/if}

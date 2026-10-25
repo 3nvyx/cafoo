@@ -33,11 +33,11 @@
 	let picked = $state<Entry | null>(null);
 </script>
 
-<div class="card grid divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+<div class="card grid divide-y divide-line rounded-2xl lg:grid-cols-3 lg:divide-x lg:divide-y-0">
 	<section class="flex flex-col gap-3 p-4" aria-labelledby="drill-pnl">
 		<h3 id="drill-pnl" class="eyebrow">Board Pack · September P&L</h3>
 		<button
-			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-btn border px-3 text-left transition-colors duration-150 {open ? 'border-accent bg-accent-soft' : 'border-line-strong hover:border-accent'}"
+			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-lg border px-3 text-left transition-colors duration-150 {open ? 'border-accent bg-accent-soft' : 'border-line-strong hover:border-accent'}"
 			aria-expanded={open}
 			aria-controls="drill-entries"
 			onclick={() => {
@@ -62,7 +62,7 @@
 				{#each entries as e (e.id)}
 					<li>
 						<button
-							class="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-btn px-3 text-left text-sm transition-colors duration-150 {picked?.id === e.id ? 'bg-subtle font-medium' : 'hover:bg-subtle'}"
+							class="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm transition-colors duration-150 {picked?.id === e.id ? 'bg-subtle font-medium' : 'hover:bg-subtle'}"
 							aria-pressed={picked?.id === e.id}
 							onclick={() => (picked = e)}
 						>

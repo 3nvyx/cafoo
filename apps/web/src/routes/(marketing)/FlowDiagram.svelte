@@ -131,7 +131,7 @@
 				{@const begin = `${a.c * 0.9}s`}
 				{#if chip && !vertical}
 					<g opacity="0">
-						<rect x={-chip.length * 3 - 6} y="-9" width={chip.length * 6 + 12} height="18" rx="4" style="fill:{color(a.tone)}" />
+						<rect x={-chip.length * 3 - 6} y="-9" width={chip.length * 6 + 12} height="18" rx="9" style="fill:{color(a.tone)}" />
 						<text text-anchor="middle" y="3.5" class="font-mono text-[10px]" style="fill:var(--canvas)">{chip}</text>
 						<animateMotion dur="1.8s" {begin} repeatCount="indefinite" path={e.d} />
 						<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.88;1" dur="1.8s" {begin} repeatCount="indefinite" />
@@ -154,7 +154,7 @@
 					y={p.y}
 					width={w}
 					height={L.nh}
-					rx="8"
+					rx="12"
 					class={n.tone === 'accent' ? 'fill-accent-soft stroke-accent' : n.c === 0 ? 'fill-subtle stroke-line-strong' : 'fill-surface stroke-line-strong'}
 					stroke-width={n.tone === 'accent' ? 1.5 : 1}
 					stroke-dasharray={n.c === 0 ? '3 3' : undefined}
