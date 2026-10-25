@@ -8,7 +8,6 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { prefersReducedMotion } from 'svelte/motion';
-	import Icon from '#lib/components/Icon.svelte';
 	import { smil } from './smil';
 
 	interface Layer {
@@ -41,7 +40,6 @@
 	const LABEL_X = 690;
 
 	let progress = $state(0);
-	let paused = $state(false);
 	const p = $derived(prefersReducedMotion.current ? 1 : progress);
 	const gap = $derived(GAP_MIN + (GAP_MAX - GAP_MIN) * p);
 	const cy = (i: number) => BOTTOM - (layers.length - 1 - i) * gap;
@@ -92,14 +90,14 @@
 	const roleColor = (r: string) => `var(--role-${r === 'feed' ? 'system' : r})`;
 	const ROWS = 5;
 
-	// The log scrolls one call at a time while the drawing is on screen and not paused.
+	// The log scrolls one call at a time while the drawing is on screen.
 	let seq = $state(ROWS);
 	const log = $derived(Array.from({ length: ROWS }, (_, k) => ({ n: seq - ROWS + k, call: CALLS[(seq - ROWS + k) % CALLS.length] })));
 	let onScreen = $state(false);
 	onMount(() => {
 		if (prefersReducedMotion.current) return;
 		const t = setInterval(() => {
-			if (onScreen && !paused && !document.hidden) seq += 1;
+			if (onScreen && !document.hidden) seq += 1;
 		}, 2400);
 		return () => clearInterval(t);
 	});
@@ -109,12 +107,17 @@
 		return { destroy: () => io.disconnect() };
 	}
 
-	// The two calls replayed on the plates, on one eight-second loop: a worker's write drops from the agents plate,
-	// meets the gate and bounces back refused; then a confirmed Proposal drops from your plate through the gate to post.
+	// The two calls replayed on the plates, on one eight-second loop: a worker calls the database directly, so its write
+	// leaves the agents plate and goes around the review layers (it never reaches the Red Team, the Advisor or you),
+	// meets the gate and bounces back refused; then a Proposal that passed every layer drops through the gate to post.
 	const LOOP = '8s';
 	const gateY = $derived(cy(4));
 	const ledgerY = $derived(cy(5));
-	const refusedPath = $derived(`M${CX + 46} ${cy(3) - 8} L${CX + 46} ${gateY - 8}`);
+	// Outside the plates' right corners and inside the part labels, so the chip covers neither.
+	const BYPASS_X = CX + A + 56;
+	const refusedPath = $derived(
+		`M${CX + 46} ${cy(0) - 8} C${CX + A + 40} ${cy(0) - 8} ${BYPASS_X} ${cy(0) + 24} ${BYPASS_X} ${cy(1)} L${BYPASS_X} ${cy(3)} C${BYPASS_X} ${gateY - 32} ${CX + A + 40} ${gateY - 8} ${CX + 46} ${gateY - 8}`
+	);
 	const postedPath = $derived(`M${CX - 46} ${cy(0) - 8} L${CX - 46} ${ledgerY - 8}`);
 
 	function scrub(node: HTMLElement) {
@@ -177,15 +180,8 @@
 {/snippet}
 
 <div use:scrub use:watch>
-	{#if !prefersReducedMotion.current}
-		<div class="mb-2 hidden justify-end lg:flex">
-			<button class="btn btn-quiet px-2 text-sm text-ink-3" onclick={() => (paused = !paused)}>
-				<Icon name={paused ? 'play' : 'pause'} size={16} />{paused ? 'Play animation' : 'Pause animation'}
-			</button>
-		</div>
-	{/if}
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
-	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={paused} role="img" aria-labelledby="stack-title">
+	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil role="img" aria-labelledby="stack-title">
 		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
@@ -209,7 +205,7 @@
 		{@render plates(true)}
 
 		{#if !prefersReducedMotion.current}
-			<!-- The gate at work: a worker's write bounces off; a confirmed Proposal passes and posts. -->
+			<!-- The gate at work: a worker's direct write skips review and bounces off; a confirmed Proposal passes and posts. -->
 			<g aria-hidden="true">
 				<path d={top(gateY)} fill="none" class="stroke-neg" stroke-width="2" stroke-linejoin="round" opacity="0">
 					<animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.21;0.24;0.36;1" dur={LOOP} repeatCount="indefinite" />
