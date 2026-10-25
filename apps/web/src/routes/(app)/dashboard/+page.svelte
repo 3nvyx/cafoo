@@ -10,7 +10,9 @@
 	import ProposalList from '#lib/components/ProposalList.svelte';
 	import { drill } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
+	import AdvisorChat from './AdvisorChat.svelte';
 	import CashChart from './CashChart.svelte';
+	import ClosePanel from './ClosePanel.svelte';
 	import CloseCard from './CloseCard.svelte';
 	import KpiCard, { type Delta } from './KpiCard.svelte';
 	import MonthlyChart from './MonthlyChart.svelte';
@@ -158,6 +160,12 @@
 		<div class="flex min-w-0 flex-col gap-8 {queue.length || period.status === 'closed' ? '' : 'order-first lg:order-none'}">
 			<CloseCard {period} />
 		</div>
+	</div>
+
+	<!-- Then a question box for the Advisor, and where the close stands. -->
+	<div class="mt-8 grid gap-8 lg:grid-cols-3">
+		<div class="min-w-0 lg:col-span-2"><AdvisorChat /></div>
+		<div class="min-w-0"><ClosePanel {period} /></div>
 	</div>
 
 	{#if health.length}
