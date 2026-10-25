@@ -51,8 +51,8 @@ describe('red team harness as a whole', () => {
     const d = checkCall(h, critique(), status('Rejected'));
     expect(d).toMatchObject({ allow: false, ruleIds: ['redteam.may.1', 'redteam.never.3'] });
   });
-  it('has only its two Vercel AI SDK tools and the step cap it ran with before', () => {
-    expect([...h.tools]).toEqual(['search_policies', 'submit_critique']);
+  it('has only its three Vercel AI SDK tools (two read-only searches and submit) and the step cap it ran with before', () => {
+    expect([...h.tools]).toEqual(['search_policies', 'search_customer_site', 'submit_critique']);
     expect(h.maxTurns).toBe(6);
   });
 });

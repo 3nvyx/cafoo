@@ -23,6 +23,7 @@ import {
 import { tracked } from '../provider-calls';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
+import { customerSite, siteSignals, sitePlain } from '../apify';
 import { STEP_MS } from '../env';
 import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
 import { monthLabel } from '../advisor-chat';
@@ -532,6 +533,22 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     } catch (e) {
       log(`footprint ${subject.name}: ${(e as Error).message}`);
     }
+  }
+  // Then each exposed customer's own website: what the business says about itself, against what it owes us.
+  const sites: string[] = [];
+  let read = 0;
+  for (const cust of exposed) {
+    const site = await customerSite(cust.domain);
+    if (!site) continue;
+    read++;
+    const signals = siteSignals(site);
+    if (signals.length) sites.push(`${sitePlain(cust.name, site, signals)} ${money(openAr.get(cust.id) ?? 0n)} is open.`);
+  }
+  if (read) {
+    await say(C, thread, sites.length
+      ? `Checked ${read} customer website(s). ${sites.join(' ')} A signal for a person to follow up, not a change to any tier.`
+      : `Checked ${read} customer website(s): none mentions closing, insolvency or a change of owner.`,
+      sites.length ? `Credit & Risk found ${sites.length} customer website(s) worth a follow-up call.` : `Credit & Risk read customer websites and found nothing worrying.`);
   }
   for (const cust of exposed) {
     const result = await cascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });

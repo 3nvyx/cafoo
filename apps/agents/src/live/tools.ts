@@ -22,6 +22,7 @@ import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 import { collectFootprint } from '../footprint';
+import { customerSite, searchSite, siteSignals, sitePlain } from '../apify';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
@@ -336,6 +337,25 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
           return fail((e as Error).message);
         }
       }
+    ),
+    tool(
+      'check_customer_site',
+      "Read a customer's public website (Apify crawl when configured, else the demo snapshot) and return any sentences about closing, insolvency, pausing service or a change of owner, with page URLs. Pass a query to search the site's pages instead. Signals for a person, not a decision; cite them in rationales, never in a tier by themselves.",
+      { customerId: z.string(), query: z.string().optional() },
+      async ({ customerId, query }) => {
+        try {
+          const c = A.db.customer.id.find(BigInt(customerId));
+          if (!c) return fail(`Unknown customer ${customerId}`);
+          const site = await customerSite(c.domain);
+          if (!site) return ok(`No website snapshot for ${c.name} (${c.domain}).`);
+          if (query) return ok({ domain: site.domain, source: site.source, hits: await searchSite(site, query) });
+          const signals = siteSignals(site);
+          return ok({ domain: site.domain, source: site.source, crawledAt: site.crawledAt, pages: site.pages.length, signals, summaryPlain: sitePlain(c.name, site, signals) });
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      },
+      readOnly
     ),
     tool(
       'collect_public_footprint',

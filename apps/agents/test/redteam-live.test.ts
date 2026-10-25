@@ -97,7 +97,7 @@ describe('live Red Team (Grok)', () => {
     expect(warn).toHaveBeenCalledWith('[redteam] proposal 14: Grok failed, using the scripted critique:', expect.stringMatching(/timeout/i));
   });
 
-  it('asks Grok about each open Proposal with the charter, the two tools and the step cap, and writes the critique it submits', async () => {
+  it('asks Grok about each open Proposal with the charter, its three tools and the step cap, and writes the critique it submits', async () => {
     grokDoes(async (_req, submit) => void (await submit(good)));
     rows.proposal = [weakMatch()];
     stop = startCritic(fx.cast);
@@ -108,7 +108,7 @@ describe('live Red Team (Grok)', () => {
     expect(req.model).toEqual({ fake: 'xai', modelId: 'grok-4.7', apiKey: 'test-key-not-real' });
     expect(req.system).toBe(builtinCharter('redteam').prompt);
     expect(req.prompt).toBe(`Proposal 14 (BankMatch, bookkeeper, amount minor units 0, materiality 1000000):\nPlain: ${weakMatch().summaryPlain}\nRationale: ${weakMatch().rationale}\nPayload: ${weakMatch().payloadJson}`);
-    expect(Object.keys(req.tools).sort()).toEqual(['search_policies', 'submit_critique']);
+    expect(Object.keys(req.tools).sort()).toEqual(['search_customer_site', 'search_policies', 'submit_critique']);
     expect(req.stopWhen).toBeDefined();
   });
 

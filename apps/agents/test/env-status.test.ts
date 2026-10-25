@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { providers } from '../src/env';
 
 describe('provider status', () => {
-  it('never reports the skipped Apify crawl as live from token presence', () => {
-    expect(providers({ APIFY_TOKEN: 'configured' }).find(p => p.name === 'Apify')).toMatchObject({ mode: 'demo', detail: 'crawl not implemented' });
+  it('reports Apify as configured, not proven, from its token, and as demo snapshots without one', () => {
+    expect(providers({ APIFY_TOKEN: 'configured' }).find(p => p.id === 'apify')).toMatchObject({ mode: 'live', detail: expect.stringContaining('status does not verify a crawl') });
+    expect(providers({ APIFY_TOKEN: 'configured', DEMO_MODE: '1' }).find(p => p.id === 'apify')).toMatchObject({ mode: 'demo', detail: 'demo website snapshots' });
   });
 
   it('requires both Moss credentials and describes configuration separately from proof', () => {

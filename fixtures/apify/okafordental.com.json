@@ -1,0 +1,16 @@
+{
+  "synthesized": "Demo snapshot of a fictional seed customer's site, written for demo mode. Not a real crawl.",
+  "crawledAt": "2026-10-20T16:00:00.000Z",
+  "pages": [
+    {
+      "url": "https://okafordental.com/",
+      "title": "Okafor Dental Group | Family dentistry in Oakland",
+      "text": "Okafor Dental Group has cared for families in Oakland since 2009. We offer cleanings, crowns, implants and pediatric dentistry. New patients welcome. Open Monday to Saturday."
+    },
+    {
+      "url": "https://okafordental.com/about",
+      "title": "About us",
+      "text": "Dr. Adaeze Okafor leads a team of four dentists and nine hygienists across two offices. We opened our second office in Emeryville in 2024."
+    }
+  ]
+}

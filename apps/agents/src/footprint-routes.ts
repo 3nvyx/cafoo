@@ -1,6 +1,7 @@
 /** Gateway routes for the public footprint: start a collection job, read job status. */
 import { json, type Route } from './http';
 import { collectFootprint, listingsOf, type SubjectKind } from './footprint';
+import { customerSite, siteSignals, sitePlain } from './apify';
 import type { Cast } from './stdb';
 
 type Job = { subjectKind: SubjectKind; subjectId: string; status: 'running' | 'done' | 'error'; startedAt: string; steps: string[]; error?: string };
@@ -36,5 +37,18 @@ export function footprintRoutes(cast: Cast): Route[] {
       },
     },
     { method: 'GET', pattern: /^\/footprint\/status$/, handle: ({ res }) => json(res, 200, { jobs: [...jobs.values()] }) },
+    {
+      // A customer's website, read-only: what it says about closing, insolvency or a new owner. Crawls once per process.
+      method: 'GET',
+      pattern: /^\/customers\/(\d+)\/site$/,
+      handle: async ({ res, params }) => {
+        const c = cast.advisor.db.customer.id.find(BigInt(params[0]!));
+        if (!c) return json(res, 404, { error: `Unknown customer ${params[0]}` });
+        const site = await customerSite(c.domain);
+        if (!site) return json(res, 200, { customerId: params[0], domain: c.domain, site: null, summaryPlain: `No website snapshot for ${c.name}.` });
+        const signals = siteSignals(site);
+        return json(res, 200, { customerId: params[0], domain: c.domain, source: site.source, crawledAt: site.crawledAt, pages: site.pages.map(p => ({ url: p.url, title: p.title })), signals, summaryPlain: sitePlain(c.name, site, signals) });
+      },
+    },
   ];
 }

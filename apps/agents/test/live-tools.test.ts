@@ -102,7 +102,7 @@ describe('tool servers match the harnesses', () => {
     for (const t of books) expect(t.annotations?.readOnlyHint, t.name).toBe(true);
     const readOnly = toolsOf(workerServer(fx.cast.credit, fx.cast)).filter(t => t.annotations?.readOnlyHint).map(t => t.name);
     // record_credit_check is not read-only on purpose: the CLI runs it serially, so the gate's history has it in time.
-    expect(readOnly).toEqual(['run_credit_cascade']);
+    expect(readOnly).toEqual(['check_customer_site', 'run_credit_cascade']);
     expect(toolsOf(advisorServer(fx.cast)).filter(t => t.annotations?.readOnlyHint)).toEqual([]);
   });
 });

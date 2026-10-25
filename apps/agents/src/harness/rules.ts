@@ -10,7 +10,7 @@ export const BOOKS_TOOLS = ['close_snapshot', 'list_proposals', 'score_bank_matc
 export const ADVISOR_TOOLS = ['approve_proposal', 'reject_proposal', 'post_ruling', 'update_close_task', 'request_period_lock'] as const;
 export const CRS_TOOLS = ['crs_personas', 'crs_credit_report', 'crs_identity_verify', 'crs_fraud_score', 'crs_public_records', 'crs_cascade'] as const;
 /** Red Team tools in redteam.ts (Vercel AI SDK, no MCP prefix). */
-export const REDTEAM_TOOLS = ['search_policies', 'submit_critique'] as const;
+export const REDTEAM_TOOLS = ['search_policies', 'search_customer_site', 'submit_critique'] as const;
 
 /** Appended to fallback prompts (used only when a charter file is missing). */
 export const PLAIN_RULE = `Every proposal, critique, and ruling carries a one-sentence plain summary for a CFO who has never seen a journal entry: no account codes, no jargon, dollar amounts spelled out (e.g. "$48,000"). The technical rationale goes in the rationale field.`;
