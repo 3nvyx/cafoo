@@ -38,12 +38,15 @@
 </script>
 
 <div class="flex flex-col gap-3">
-	<ul class="flex gap-4 text-caption text-ink-2" aria-label="Legend">
+	<ul class="flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-2" aria-label="Legend">
 		{#each Object.entries(config) as [key, s] (key)}
 			<li class="flex items-center gap-1.5">
 				<svg class="h-2 w-5" viewBox="0 0 20 8" aria-hidden="true"><line x1="0" x2="20" y1="4" y2="4" stroke={s.color} stroke-width="2" stroke-dasharray={key === 'expenses' ? '5 4' : undefined} /></svg>{s.label}
 			</li>
 		{/each}
+		{#if band.length}
+			<li class="flex items-center gap-1.5"><span class="h-3 w-4 rounded-sm bg-accent-soft"></span>Months you picked</li>
+		{/if}
 	</ul>
 
 	<Chart.Container {config} class="h-56 w-full" role="img" aria-label="Revenue and expenses by month. The table below lists every figure.">
@@ -59,15 +62,15 @@
 			]}
 			props={{
 				spline: { strokeWidth: 2 },
-				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: data.length },
-				yAxis: { format: (v: number) => tick(v), ticks: 3 },
+				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: Math.min(data.length, 6) },
+				yAxis: { format: (v: number) => tick(v), ticks: 4 },
 				highlight: { points: { r: 4 } }
 			}}
 		>
 			{#snippet tooltip()}
 				<Chart.Tooltip labelFormatter={(d: Date) => ymShort(ymOf(d))} indicator="line">
 					{#snippet formatter({ value, name, item })}
-						<span class="h-0.5 w-3 shrink-0 self-center rounded-sm" style="background:{item.color}"></span>
+						<svg class="h-2 w-3 shrink-0 self-center" viewBox="0 0 12 8" aria-hidden="true"><line x1="0" x2="12" y1="4" y2="4" stroke={item.color} stroke-width="2" stroke-dasharray={item.key === 'expenses' ? '4 3' : undefined} /></svg>
 						<span class="flex flex-1 items-center justify-between gap-4">
 							<span class="text-ink-2">{name}</span>
 							<span class="num font-medium text-ink">{money(Number(value))}</span>
@@ -87,7 +90,7 @@
 			<tbody class="num">
 				{#each points as p (p.ym)}
 					<tr class="border-t border-line {on(p.ym) ? 'text-ink' : 'text-ink-3'}">
-						<td class="py-1 font-sans">{ymShort(p.ym)}</td><td class="py-1 text-right">{money(p.revenue)}</td><td class="py-1 text-right">{money(p.expenses)}</td><td class="py-1 text-right">{money(p.netIncome)}</td>
+						<td class="py-1 font-sans">{ymShort(p.ym)}{#if p.ym === current}<span class="text-ink-3"> (so far)</span>{/if}</td><td class="py-1 text-right">{money(p.revenue)}</td><td class="py-1 text-right">{money(p.expenses)}</td><td class="py-1 text-right">{money(p.netIncome)}</td>
 					</tr>
 				{/each}
 			</tbody>

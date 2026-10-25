@@ -154,8 +154,7 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			value: runway === null ? 'Cash not falling' : runway > 36 ? 'Over 3 years' : `${Math.round(runway)} months`,
 			health: runwayHealth(runway),
 			inputs: `${money(burn)} a month of operating burn · ${money(s.cash)} cash`,
-			yardstick: 'Months your cash lasts at this rate of burn. 18 or more is comfortable; under 9 means start raising now.',
-			href: '/dashboard'
+			yardstick: 'Months your cash lasts at this rate of burn. 18 or more is comfortable; under 9 means start raising now.'
 		},
 		{
 			key: 'arr-per-employee',

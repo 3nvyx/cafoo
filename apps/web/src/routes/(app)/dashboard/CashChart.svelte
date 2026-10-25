@@ -50,7 +50,7 @@
 			series={[{ key: 'cash', label: 'Book cash', color: 'var(--color-cash)' }]}
 			props={{
 				spline: { strokeWidth: 2 },
-				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: data.length },
+				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: Math.min(data.length, 6) },
 				yAxis: { format: (v: number) => tick(v, scale.step), ticks: 3 },
 				highlight: { points: { r: 4 } }
 			}}

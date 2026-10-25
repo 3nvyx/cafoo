@@ -85,7 +85,7 @@
 			const n = Math.round(s.runwayMonths);
 			return `About ${n} month${n === 1 ? '' : 's'} of runway at this rate of spend`;
 		}
-		return toBig(s.cashChange) >= 0n ? 'Cash did not fall over this range' : 'Cash is gone at this rate of spend';
+		return toBig(s.operatingCashChange) >= 0n ? 'Running the business did not use cash over this range' : 'Cash is gone at this rate of spend';
 	});
 
 	// Keep a just-confirmed card on screen briefly so the state flip is visible.
@@ -155,7 +155,7 @@
 		</section>
 
 		<!-- With nothing waiting, the close's next step (start it, lock it) leads on narrow screens. -->
-		<div class="flex min-w-0 flex-col gap-8 {queue.length ? '' : 'order-first lg:order-none'}">
+		<div class="flex min-w-0 flex-col gap-8 {queue.length || period.status === 'closed' ? '' : 'order-first lg:order-none'}">
 			<CloseCard {period} />
 		</div>
 	</div>
@@ -168,7 +168,7 @@
 			</div>
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 				{#each health as t (t.key)}
-					<MetricTile label={t.label} value={t.value} health={t.health} inputs={t.inputs} yardstick={t.yardstick} href="/metrics" />
+					<MetricTile label={t.label} value={t.value} health={t.health} inputs={t.inputs} yardstick={t.yardstick} href={t.href ?? '/metrics'} />
 				{/each}
 			</div>
 		</section>
