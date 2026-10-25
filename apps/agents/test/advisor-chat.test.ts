@@ -503,6 +503,19 @@ describe('lock questions', () => {
     expect(await ask(books({ period: [{ id: 2n, ym: '2026-09', status: { tag: 'Closing' } }] }), 'can we lock september?')).toMatch(/lock has been requested/);
     expect(await ask(fresh(), 'Can we lock September?', { now: new Date('2026-09-20T00:00:00Z') })).toMatch(/has not ended/);
     expect(await ask(fresh(), 'Can we lock September?')).toMatch(/^Not yet: the September 2026 close has not run\. Say "start the close"/);
+    // Months lock in order, as the gate refuses.
+    const unlockedAugust = decided({ period: [{ id: 1n, ym: '2026-08', status: { tag: 'Open' } }, { id: 2n, ym: '2026-09', status: { tag: 'Open' } }] });
+    expect(await ask(unlockedAugust, 'Can we lock September?')).toBe('Not yet: September 2026 cannot be locked while August 2026 is not locked: months close in order. Lock August 2026 first.');
+  });
+
+  it('notes the consolidation check on a group month that is otherwise ready', async () => {
+    const group = decided({ subsidiary: [
+      { id: 1n, code: 'US', name: 'Cafoo Inc', functionalCcy: 'USD', isElimination: false },
+      { id: 2n, code: 'UK', name: 'Cafoo Ltd', functionalCcy: 'GBP', parentId: 1n, isElimination: false },
+      { id: 3n, code: 'ELIM', name: 'Eliminations', functionalCcy: 'USD', parentId: 1n, isElimination: true },
+    ] });
+    expect(await ask(group, 'Can we lock September?')).toMatch(/^Yes\..*As a group month, the lock also checks that the consolidation .* still matches the books\. The lock is yours to confirm/);
+    expect(await ask(decided(), 'Can we lock September?')).not.toMatch(/group month/);
   });
 });
 

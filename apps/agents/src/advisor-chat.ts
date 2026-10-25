@@ -4,7 +4,7 @@
  * A close starts only on an explicit command ("start the close") at the start of the CFO's latest message, never
  * because a question or a chat client's background prompt happens to mention the close.
  */
-import { applyFx, dateLabel, formatMinor, LedgerError, targetAllowanceMinor, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
+import { applyFx, closeOrderRefusal, dateLabel, formatMinor, isGroup, LedgerError, targetAllowanceMinor, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
 import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
@@ -402,9 +402,18 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       yield `Not yet: the ${label} close has not run. Say "start the close" to run it; I will tell you what is left before the lock.`;
       return;
     }
+    const order = closeOrderRefusal(periods.map(p => ({ ym: p.ym, status: p.status })), closeYm, 'lock');
+    if (order) {
+      yield `Not yet: ${order}`;
+      return;
+    }
     const { left, bankNote } = lockState(A, closeYm, period.id);
     if (left.length) yield `Not yet. ${left.join('; ')}.${bankNote ? ` ${bankNote}` : ''} These are the checks the lock runs.`;
-    else yield `Yes. Every item for ${label} is decided, no close task is blocked, and subscription revenue through ${label} is recognized. ${bankNote || 'Every bank line through the month is matched.'} The lock is yours to confirm on the Close page.`;
+    else {
+      yield `Yes. Every item for ${label} is decided, no close task is blocked, and subscription revenue through ${label} is recognized. ${bankNote || 'Every bank line through the month is matched.'} `;
+      if (isGroup([...A.db.subsidiary.iter()].map(s => ({ isElimination: s.isElimination === true })))) yield 'As a group month, the lock also checks that the consolidation (revaluation at closing rates and intercompany eliminations) still matches the books. ';
+      yield 'The lock is yours to confirm on the Close page.';
+    }
     return;
   }
 
