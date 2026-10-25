@@ -311,7 +311,10 @@ export class MockDataSource implements DataSource {
 		if (blocked.length) throw new Error(`${blocked.length} Close Task${blocked.length === 1 ? ' is' : 's are'} blocked.`);
 		const bank = bankExceptionState(this, periodId);
 		if (bank.rows.length && !bank.acceptance.accepted) throw new Error('Unmatched bank lines need your explicit acceptance before locking.');
-		const pending = this.#t.close_task.filter((t) => t.periodId === periodId && t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done');
+		// Accepted exceptions (checked above) stand in for the bank task, which stays in progress on purpose, as lockGate and the module treat it.
+		const pending = this.#t.close_task.filter(
+			(t) => t.periodId === periodId && t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done' && !(bank.rows.length && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title }))
+		);
 		if (period.status !== 'closing' && pending.length) throw new Error('Finish every close task before locking.');
 		period.status = 'closed';
 		period.lockedAt = this.#now();
