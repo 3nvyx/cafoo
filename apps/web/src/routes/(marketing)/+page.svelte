@@ -136,7 +136,7 @@
 
 		<section id="how" class="calm-section content relative isolate scroll-mt-24 pt-32" aria-labelledby="how-h">
 			<div class="relative flex flex-col items-center text-center">
-				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Propose, critique, rule, confirm</h2>
+				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">How we work</h2>
 			</div>
 			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-3 sm:p-5">
 				{@render marks()}
