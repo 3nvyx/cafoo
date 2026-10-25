@@ -118,7 +118,7 @@ It runs next to this stack as a mailbox agent; see [apps/asi-advisor/README.md](
 
 **The consolidated Board Pack.** The Board Pack has a company switcher: Consolidated (in the Reporting currency, USD) or one company in its own currency. The consolidated view shows each company's column, an Eliminations column, and the currency translation adjustment (CTA), which is computed when the pound balances are translated and never posted. Expert mode adds the rates used, and every figure drills down per company to its journal lines.
 
-**The October feed.** Lock September, then switch the feed on (the Launchpad's "Bank and invoice feed" card or Settings; the CFO's switch). Bank lines and new invoices for October then arrive every few seconds, and the continuous Bookkeeper proposes matches as they land; material ones still wait for the CFO. The feed only books into the month after one the CFO locked (the locks that come with the seed data do not count, so it never touches the month being closed), and it stops once that month's close opens.
+**The October feed.** Lock September, then switch the feed on (the Live feed section in Settings; only the CFO can switch it). Bank lines and new invoices for October then arrive every few seconds, and the continuous Bookkeeper proposes matches as they land; material ones still wait for the CFO. The feed only books into the month after one the CFO locked (the locks that come with the seed data do not count, so it never touches the month being closed), and it stops once that month's close opens.
 
 **Custom charters.** The Charters page (`/charters`) shows each agent's Charter. Edit one, map every line to a rule, a scenario or a custom scenario, give a plain summary of the change, and save it as a new draft version. A custom Charter can only make the gate stricter: every shipped rule stays, and lines may add rules or tighten them (a higher batch-match threshold, a lower intercompany tolerance, narrower Proposal kinds, an amount cap). Run the full eval (a whole close on a scratch database, about a minute) before the CFO can publish; the quick check against the recorded close only informs. Restoring the built-in Charter is one click for the CFO.
 
@@ -138,7 +138,7 @@ Each key you add switches that one provider to live calls.
 
 | Variable | Used for | When empty |
 |---|---|---|
-| `AGENT_PROVIDER` | `openai` (default in the example) or `anthropic`. The Claude Agent SDK still speaks the Anthropic Messages API either way. `openai` runs a local bridge that forwards those calls to OpenAI | `anthropic` when unset, unless only `OPENAI_API_KEY` is set |
+| `AGENT_PROVIDER` | `openai` or `anthropic`. The Claude Agent SDK still speaks the Anthropic Messages API either way. `openai` runs a local bridge that forwards those calls to OpenAI | `anthropic` when unset, unless only `OPENAI_API_KEY` is set |
 | `OPENAI_API_KEY` | OpenAI key for Advisor, Bookkeeper, Revenue, Credit & Risk when `AGENT_PROVIDER=openai` | Scripted close over the real accounting engines; the Advisor chat answers from the ledger tables |
 | `OPENAI_BASE_URL` | OpenAI Responses API origin, including `/v1` | `https://api.openai.com/v1` |
 | `OPENAI_REASONING_EFFORT` | Reasoning effort sent upstream (`low`, `medium`, `high`) | `low` |

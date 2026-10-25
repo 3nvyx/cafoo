@@ -37,7 +37,7 @@ Let me close September for a SaaS group: a US company with twenty customers and 
 | 13 | Open one item. Toggle Expert mode. Journal lines, codes, the critique, the raw payload. Toggle back. Confirm. | "One sentence for me. Every line for my controller." |
 | 14 | Advisor requests the lock. Click Lock September. Board Pack renders; switch it to Consolidated: a column per company, an Eliminations column, and the currency translation adjustment. | "I lock the month. Not the agent. And here is the group as one company." |
 | 15 | Click revenue in the Board Pack. Land on the journal lines, then the Proposal, then the Debate. | "Every number drills down to who proposed it and why." |
-| 16 | Back on the Launchpad, switch the feed on. October's bank lines and invoices arrive one by one; exact receipts match as they land, a partial payment stays open, the $48,600 payroll run waits for the CFO. | "September is locked, so the books keep moving. October matches itself as the money arrives, and the big one still waits for me." |
+| 16 | In Settings, switch the live feed on. October's bank lines and invoices arrive one by one; exact receipts match as they land, a partial payment stays open, the $48,600 payroll run waits for the CFO. | "September is locked, so the books keep moving. October matches itself as the money arrives, and the big one still waits for me." |
 
 ### 2:00 Why now
 

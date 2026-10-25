@@ -109,15 +109,5 @@ Live data motion only. Rows appear, statuses change, and totals count when the u
 
 ## Design tokens
 
-| Token | Value |
-|---|---|
-| Background | White `#ffffff` |
-| Text | Near-black `#18181b` |
-| Accent | Violet `#582efd` |
-| Border | `#e5e7eb` |
-| Cards | Flat, 8px radius, 1px border, no shadow |
-| Headings | Space Grotesk |
-| Body | DM Sans |
-| Numbers | JetBrains Mono, tabular figures |
-
-Tokens are defined in `apps/web/src/app.css`.
+The web app's colors, type and shape are defined once, in `apps/web/src/app.css`, which is the source of truth for the theme.
+Numbers are always set in tabular figures.
