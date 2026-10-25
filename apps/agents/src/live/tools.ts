@@ -23,7 +23,7 @@ import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 import { collectFootprint } from '../footprint';
 import { searchPolicies } from '../redteam';
-import { customerSite, searchSite, siteSignals, sitePlain } from '../apify';
+import { UNTRUSTED_SITE_NOTE, customerSite, searchSite, siteSignals, sitePlain } from '../apify';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
@@ -363,9 +363,9 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
           if (!c) return fail(`Unknown customer ${customerId}`);
           const site = await customerSite(c.domain);
           if (!site) return ok(`No website snapshot for ${c.name} (${c.domain}).`);
-          if (query) return ok({ domain: site.domain, source: site.source, hits: await searchSite(site, query) });
+          if (query) return ok({ note: UNTRUSTED_SITE_NOTE, domain: site.domain, source: site.source, hits: (await searchSite(site, query)).map(h => ({ url: h.url, excerpt: h.text })) });
           const signals = siteSignals(site);
-          return ok({ domain: site.domain, source: site.source, crawledAt: site.crawledAt, pages: site.pages.length, signals, summaryPlain: sitePlain(c.name, site, signals) });
+          return ok({ note: UNTRUSTED_SITE_NOTE, domain: site.domain, source: site.source, crawledAt: site.crawledAt, pages: site.pages.length, signals, summaryPlain: sitePlain(c.name, site, signals) });
         } catch (e) {
           return fail((e as Error).message);
         }

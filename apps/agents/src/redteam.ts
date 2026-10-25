@@ -14,7 +14,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
 import { labeled, scriptedGeminiCritique, unlabeled } from './gemini';
-import { customerSite, searchSite } from './apify';
+import { UNTRUSTED_SITE_NOTE, customerSite, searchSite } from './apify';
 import { search } from './moss';
 import { tracked } from './provider-calls';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
@@ -41,13 +41,13 @@ export async function searchPolicies(queryText: string, topK = 3): Promise<{ id:
 }
 
 /** The Red Team's site search: page excerpts with URLs, or why there is nothing to search. */
-export async function searchCustomerSite(A: RoleConn, customerId: string, queryText: string): Promise<string | { url: string; excerpt: string; source: string }[]> {
+export async function searchCustomerSite(A: RoleConn, customerId: string, queryText: string): Promise<string | { note: string; source: string; hits: { url: string; excerpt: string }[] }> {
   if (!/^\d+$/.test(customerId)) return 'customerId must be a numeric id';
   const c = A.db.customer.id.find(BigInt(customerId));
   if (!c) return `Unknown customer ${customerId}`;
   const site = await customerSite(c.domain);
   if (!site) return `No website snapshot for ${c.name}.`;
-  return (await searchSite(site, queryText)).map(h => ({ url: h.url, excerpt: h.text.slice(0, 600), source: site.source }));
+  return { note: UNTRUSTED_SITE_NOTE, source: site.source, hits: (await searchSite(site, queryText)).map(h => ({ url: h.url, excerpt: h.text })) };
 }
 
 function loadPolicyDocs() {

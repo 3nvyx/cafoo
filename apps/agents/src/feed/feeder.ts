@@ -144,10 +144,11 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
     }
     return p;
   };
-  const ensurePlanFor = (ym: string): Promise<FeedEvent[]> => {
+  /** The month's plan; `refresh` fetches Nessie again and swaps the plan in only once the fetch succeeds. */
+  const ensurePlanFor = (ym: string, refresh = false): Promise<FeedEvent[]> => {
     if (!nessie) return Promise.resolve(planFor(ym));
     const existing = plans.get(ym);
-    if (existing) return Promise.resolve(existing);
+    if (existing && !refresh) return Promise.resolve(existing);
     const pending = loading.get(ym);
     if (pending) return pending;
     const next = (async () => {
@@ -201,14 +202,25 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
         log(lastError);
         return false;
       }
-      const ready = state();
+      let ready = state();
       if ('blocked' in ready) return false;
-      if (!ready.next) {
-        // Everything fetched is in the books. Nessie may post more this month, so the next tick past the refresh
-        // interval fetches again; lines already ingested are skipped by their external IDs.
-        if (nessie && Date.now() - (fetchedAt.get(ready.ym) ?? 0) >= refreshMs) plans.delete(ready.ym);
-        return false;
+      if (!ready.next && nessie && Date.now() - (fetchedAt.get(ready.ym) ?? 0) >= refreshMs) {
+        // Everything fetched is in the books, and Nessie may post more this month: fetch again. The old plan stays
+        // until the new one arrives, and a failed refresh waits a full interval before the next try (no hammering on a
+        // rate limit); lines already ingested are skipped by their external IDs.
+        fetchedAt.set(ready.ym, Date.now());
+        try {
+          await ensurePlanFor(ready.ym, true);
+        } catch (err) {
+          lastError = `Nessie feed could not refresh ${ready.ym}: ${(err as Error).message}`;
+          if (/HTTP (401|403)\b/.test(lastError)) nessieAuthFailed = true;
+          log(lastError);
+          return false;
+        }
+        ready = state();
+        if ('blocked' in ready) return false;
       }
+      if (!ready.next) return false;
       const e = ready.next;
       try {
         if (e.kind === 'bank_tx') await cast.feed.reducers.ingestBankTransactions({ subsidiaryCode: e.subsidiaryCode, txs: [e.tx] });

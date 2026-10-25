@@ -399,6 +399,14 @@ describe('what the live close does with work the Advisor leaves', () => {
     expect(steps).toContain('done (error_during_execution), cost $0.50');
     expect(runs).toHaveLength(2);
     expect(ruleOpen).toHaveBeenCalledTimes(1);
+    // The second run succeeded, so the Advisor finished the close itself.
+    expect(runScriptedClose).not.toHaveBeenCalled();
+  });
+
+  it('hands over to the scripted close when the last run also ends in an error result', async () => {
+    scripts.push(files(0.5, [proposal(14n)], 'error_during_execution'), files(0.25, [], 'error_max_turns'));
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
   });
 
   it('stops the Red Team even when the close fails before its first Advisor run', async () => {
@@ -455,6 +463,15 @@ describe('the revenue catch-up', () => {
     expect(runs).toHaveLength(2);
     expect(runs[1]!.prompt).toMatch(/^Revenue catch-up for 2026-09: .*Acme Analytics \(customerId 20\): 100000 minor units\. Delegate to revenue: propose one recognition journal entry for 2026-09 with recognizeScheduleYm 2026-09/);
     expect(steps).toContain('revenue catch-up for 1 customer(s)');
+  });
+
+  it('hands over to the scripted close when the Advisor fails during the catch-up', async () => {
+    rows.proposal = [approvedSchedule()];
+    rows.revenueScheduleLine!.push({ id: 91n, contractItemId: 80n, customerId: 20n, ym: '2026-09', amountMinor: 100000n, recognized: false });
+    scripts.push(plain(0), async function* () { throw new Error('SDK unavailable'); });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runs).toHaveLength(2);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
   });
 
   it('with CLOSE_NO_WAIT, leaves a schedule still waiting for the CFO to the next close', async () => {
@@ -524,6 +541,12 @@ describe('the revenue catch-up', () => {
 });
 
 describe('liveAnswer', () => {
+  it('fails an answer that ends in an error result instead of returning it as verified', async () => {
+    scripts.push(async function* () { yield result(0.5, 'error_max_budget_usd'); });
+    const read = async () => { for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume */ } };
+    await expect(read()).rejects.toThrow('the Advisor could not answer (error_max_budget_usd)');
+  });
+
   it('caps the default spend of one answer at fifty cents', async () => {
     for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
     expect(runs[0]!.options.maxBudgetUsd).toBe(0.5);

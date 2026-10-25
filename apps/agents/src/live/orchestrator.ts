@@ -87,8 +87,10 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const allowedTools = [...new Set([advisorCharter.harness, ...WORKERS.map(r => activeCharter(A, r).harness)].flatMap(h => h.tools))];
   let total = 0;
   let advisorUnavailable = false;
-  /** Set when the Advisor failed and the close still needs finishing; runs after the critic stops (below). */
-  let finishScripted = false;
+  /** Did the latest Advisor run fail (threw, or ended in an error result)? Then it did not finish the close (below). */
+  let lastRunFailed = false;
+  /** The close stopped on purpose to wait for the CFO's revenue-schedule decisions. */
+  let waitingOnCfo = false;
   /** The most the whole close may spend (CLOSE_BUDGET_USD, empty means the default); each run gets what is left. */
   const budget = Number(process.env.CLOSE_BUDGET_USD?.trim() || 15);
   /** One Advisor query over the same servers, subagents and gate. */
@@ -131,11 +133,14 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
         } else if (msg.type === 'result') {
           total += (msg as any).total_cost_usd ?? 0;
           onStep(`done (${(msg as any).subtype}), cost $${total.toFixed(2)}`);
+          lastRunFailed = (msg as any).subtype !== 'success' || (msg as any).is_error === true;
         }
       }
-      recordOk('agents');
+      if (lastRunFailed) recordFallback('agents', 'the Advisor run ended in an error result');
+      else recordOk('agents');
     } catch (error) {
       advisorUnavailable = true;
+      lastRunFailed = true;
       recordFallback('agents', error);
       const why = error instanceof Error ? error.message : String(error);
       onStep(`Advisor run failed: ${why}; applying standard rulings to remaining proposals`);
@@ -198,6 +203,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (pendingSchedules().length) {
       if (process.env.CLOSE_NO_WAIT === '1') {
         onStep('revenue schedules still wait for the CFO; their revenue catch-up rolls into the next close');
+        waitingOnCfo = true;
         return { costUsd: total };
       }
       onStep('waiting for the CFO to decide the revenue schedules before the revenue catch-up');
@@ -205,13 +211,11 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
       while (pendingSchedules().length && Date.now() < deadline) await sleep(Math.min(2000, deadline - Date.now()));
       if (pendingSchedules().length) {
         onStep('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+        waitingOnCfo = true;
         return { costUsd: total };
       }
     }
-    if (advisorUnavailable) {
-      finishScripted = true;
-      return { costUsd: total };
-    }
+    // An unavailable Advisor cannot run the catch-up; the scripted close below does it.
     const s = snapshot(A, periodYm);
     const due = catchUpAmounts(A, s);
     if (due.size) {
@@ -223,10 +227,11 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     }
   } finally {
     stopCritic();
-    // The failed Advisor run was the one asked to finish the close: mark tasks done, catch up revenue and request the
-    // lock. Nothing else would, so the scripted close resumes this one (it rules only what is still open and never
-    // proposes twice) once the live critic has stopped. A close that waits on the CFO stays waiting, as above.
-    if (finishScripted && [...A.db.period.iter()].find(p => p.ym === periodYm)?.status.tag === 'Open') {
+    // A failed last Advisor run (thrown, or an error result) was the one asked to finish the close: mark tasks done,
+    // catch up revenue and request the lock. Nothing else would, so the scripted close resumes this one (it rules only
+    // what is still open and never proposes twice) once the live critic has stopped, wherever the failure came. A close
+    // that waits on the CFO stays waiting.
+    if (lastRunFailed && !waitingOnCfo && [...A.db.period.iter()].find(p => p.ym === periodYm)?.status.tag === 'Open') {
       onStep('the Advisor is unavailable, so the scripted close finishes this one: close tasks, revenue catch-up and the lock request');
       const { runScriptedClose } = await import('../scripted/close');
       await runScriptedClose(cast, periodYm, { onStep });
@@ -270,6 +275,9 @@ async function* streamAnswer(question: string, books: ReturnType<typeof booksSer
     if (msg.type === 'stream_event') {
       const ev = (msg as any).event;
       if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta') yield ev.delta.text as string;
+    } else if (msg.type === 'result' && ((msg as any).subtype !== 'success' || (msg as any).is_error === true)) {
+      // A rejected key or a spent budget ends in an error result, not a throw: never report that answer as verified.
+      throw new Error(`the Advisor could not answer (${(msg as any).subtype})`);
     }
   }
 }

@@ -15,6 +15,9 @@ let client: Promise<any> | null = null;
 const ready = new Map<string, Promise<any | null>>();
 /** Why an index could not be set up, reported on every search that falls back because of it. */
 const down = new Map<string, string>();
+const downAt = new Map<string, number>();
+/** A failed setup is tried again after this long, so one transient error does not mean local search until restart. */
+const RETRY_MS = 5 * 60_000;
 
 function mossClient(): Promise<any> {
   client ??= (async () => {
@@ -25,6 +28,10 @@ function mossClient(): Promise<any> {
 }
 
 function mossIndex(name: string, docs: Doc[]): Promise<any | null> {
+  if (down.has(name) && Date.now() - (downAt.get(name) ?? 0) >= RETRY_MS) {
+    ready.delete(name);
+    down.delete(name);
+  }
   let p = ready.get(name);
   if (p) return p;
   p = (async () => {
@@ -38,6 +45,9 @@ function mossIndex(name: string, docs: Doc[]): Promise<any | null> {
     } catch (e) {
       console.warn(`moss index "${name}" unavailable, using local search:`, (e as Error).message);
       down.set(name, (e as Error).message);
+      downAt.set(name, Date.now());
+      // A client that failed to construct is rebuilt on the retry too.
+      client = null;
       return null;
     }
   })();
@@ -79,4 +89,5 @@ export function resetMoss(): void {
   client = null;
   ready.clear();
   down.clear();
+  downAt.clear();
 }

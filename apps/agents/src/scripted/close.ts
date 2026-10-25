@@ -23,7 +23,7 @@ import {
 import { tracked } from '../provider-calls';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
-import { customerSite, siteSignals, sitePlain } from '../apify';
+import { customerSites, siteSignals, sitePlain } from '../apify';
 import { STEP_MS } from '../env';
 import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
 import { monthLabel } from '../advisor-chat';
@@ -537,8 +537,9 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   // Then each exposed customer's own website: what the business says about itself, against what it owes us.
   const sites: string[] = [];
   let read = 0;
+  const crawled = await customerSites(exposed.map(c => c.domain));
   for (const cust of exposed) {
-    const site = await customerSite(cust.domain);
+    const site = cust.domain ? crawled.get(cust.domain.toLowerCase()) : undefined;
     if (!site) continue;
     read++;
     const signals = siteSignals(site);

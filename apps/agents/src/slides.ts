@@ -16,6 +16,8 @@ export type SlidesSetup = { config: SlidesConfig } | { missing: string[] };
 const SCOPES = 'https://www.googleapis.com/auth/presentations https://www.googleapis.com/auth/drive.file';
 const ROWS_PER_SLIDE = 12;
 const MAX_COLUMNS = 8;
+/** Rows per table on slides (10 slides); the rest stays in the CSV, and one batchUpdate stays well inside Google's limits. */
+const MAX_ROWS = 120;
 const EMAIL = /^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/;
 
 /** What is configured, or the settings still missing (named, never their values). */
@@ -82,14 +84,16 @@ export function deckRequests(title: string, subtitle: string, tables: Table[], d
   let n = 0;
   for (const t of tables) {
     const cols = Math.min(t.header.length, MAX_COLUMNS);
-    const chunks = t.rows.length ? Math.ceil(t.rows.length / ROWS_PER_SLIDE) : 1;
+    const shown = t.rows.slice(0, MAX_ROWS);
+    const chunks = shown.length ? Math.ceil(shown.length / ROWS_PER_SLIDE) : 1;
     for (let k = 0; k < chunks; k++) {
       n++;
       const slide = `cafoo_s${n}`;
       const table = `cafoo_t${n}`;
-      const body = t.rows.slice(k * ROWS_PER_SLIDE, (k + 1) * ROWS_PER_SLIDE);
+      const body = shown.slice(k * ROWS_PER_SLIDE, (k + 1) * ROWS_PER_SLIDE);
       const rows = [t.header.slice(0, cols), ...(body.length ? body : [['Nothing to show.']])].map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ''));
-      const heading = `${t.title}${chunks > 1 ? ` (${k + 1} of ${chunks})` : ''}${t.header.length > cols ? `; first ${cols} of ${t.header.length} columns, all in the CSV` : ''}`;
+      const left = [t.rows.length > shown.length ? `first ${shown.length} of ${t.rows.length} rows` : '', t.header.length > cols ? `first ${cols} of ${t.header.length} columns` : ''].filter(Boolean);
+      const heading = `${t.title}${chunks > 1 ? ` (${k + 1} of ${chunks})` : ''}${left.length ? `; ${left.join(', ')}, all in the CSV` : ''}`;
       reqs.push(
         { createSlide: { objectId: slide, slideLayoutReference: { predefinedLayout: 'TITLE_ONLY' }, placeholderIdMappings: [{ layoutPlaceholder: { type: 'TITLE' }, objectId: `${slide}_t` }] } },
         { insertText: { objectId: `${slide}_t`, text: heading } },
@@ -126,15 +130,16 @@ export async function exportToSlides(c: SlidesConfig, title: string, subtitle: s
     } else {
       id = (await google<{ presentationId: string }>(fetcher, 'Slides creation', 'https://slides.googleapis.com/v1/presentations', { method: 'POST', headers: auth, body: JSON.stringify({ title }) })).presentationId;
     }
-    const deck = await google<{ slides?: { objectId: string }[] }>(fetcher, 'Slides read', `https://slides.googleapis.com/v1/presentations/${encodeURIComponent(id)}?fields=slides.objectId`, { method: 'GET', headers: auth });
-    await google(fetcher, 'Slides update', `https://slides.googleapis.com/v1/presentations/${encodeURIComponent(id)}:batchUpdate`, {
-      method: 'POST', headers: auth, body: JSON.stringify({ requests: deckRequests(title, subtitle, tables, deck.slides?.[0]?.objectId) }),
-    });
+    // Share first: if filling fails, the person still has the deck rather than an orphan in the service account's Drive.
     for (const emailAddress of c.shareWith) {
       await google(fetcher, 'Drive sharing', `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
         method: 'POST', headers: auth, body: JSON.stringify({ type: 'user', role: 'writer', emailAddress }),
       });
     }
+    const deck = await google<{ slides?: { objectId: string }[] }>(fetcher, 'Slides read', `https://slides.googleapis.com/v1/presentations/${encodeURIComponent(id)}?fields=slides.objectId`, { method: 'GET', headers: auth });
+    await google(fetcher, 'Slides update', `https://slides.googleapis.com/v1/presentations/${encodeURIComponent(id)}:batchUpdate`, {
+      method: 'POST', headers: auth, body: JSON.stringify({ requests: deckRequests(title, subtitle, tables, deck.slides?.[0]?.objectId) }),
+    });
     recordOk('slides');
     return { presentationId: id, url: `https://docs.google.com/presentation/d/${id}/edit` };
   } catch (e) {

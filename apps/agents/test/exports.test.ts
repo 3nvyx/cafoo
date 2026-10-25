@@ -97,9 +97,13 @@ describe('Google Slides export', () => {
       'Ledger, 2026-09 (1 of 3); first 8 of 15 columns, all in the CSV', 'Ledger, 2026-09 (2 of 3); first 8 of 15 columns, all in the CSV', 'Ledger, 2026-09 (3 of 3); first 8 of 15 columns, all in the CSV',
     ]);
     expect(reqs.at(-1)).toEqual({ deleteObject: { objectId: 'p' } });
+    // Past 120 rows the deck stops and says the rest is in the CSV.
+    const long = deckRequests('Deck', 'sub', [{ ...wide, rows: Array.from({ length: 300 }, () => ['x']) }]) as Record<string, any>[];
+    expect(long.filter(r => r.createTable)).toHaveLength(10);
+    expect(long.find(r => r.insertText?.objectId === 'cafoo_s1_t').insertText.text).toBe('Ledger, 2026-09 (1 of 10); first 120 of 300 rows, first 8 of 15 columns, all in the CSV');
   });
 
-  it('signs in, creates the deck, fills it, shares it, and records the export', async () => {
+  it('signs in, creates the deck, shares it, fills it, and records the export', async () => {
     const calls: string[] = [];
     const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
       calls.push(`${init?.method} ${String(url)}`);
@@ -113,9 +117,10 @@ describe('Google Slides export', () => {
     expect(calls).toEqual([
       'POST https://oauth2.googleapis.com/token',
       'POST https://slides.googleapis.com/v1/presentations',
+      // Shared before it is filled, so a failed fill never leaves an orphan deck.
+      'POST https://www.googleapis.com/drive/v3/files/deck1/permissions?sendNotificationEmail=false&supportsAllDrives=true',
       'GET https://slides.googleapis.com/v1/presentations/deck1?fields=slides.objectId',
       'POST https://slides.googleapis.com/v1/presentations/deck1:batchUpdate',
-      'POST https://www.googleapis.com/drive/v3/files/deck1/permissions?sendNotificationEmail=false&supportsAllDrives=true',
     ]);
     expect(evidence('slides').okCount).toBe(1);
   });

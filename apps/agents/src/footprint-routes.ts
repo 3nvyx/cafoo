@@ -41,6 +41,8 @@ export function footprintRoutes(cast: Cast): Route[] {
       // A customer's website, read-only: what it says about closing, insolvency or a new owner. Crawls once per process.
       method: 'GET',
       pattern: /^\/customers\/(\d+)\/site$/,
+      // A first read starts a paid crawl, so it needs this machine or the gateway key like any state change.
+      changesState: true,
       handle: async ({ res, params }) => {
         const c = cast.advisor.db.customer.id.find(BigInt(params[0]!));
         if (!c) return json(res, 404, { error: `Unknown customer ${params[0]}` });

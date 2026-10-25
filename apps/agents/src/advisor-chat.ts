@@ -72,7 +72,8 @@ function policyExcerpt(text: string, question: string): string {
   const sentences = text.replace(/^#.*$/gm, '').split(/(?<=[.!?])\s+|\n+/).map(s => s.replace(/^[-*\d.\s]+/, '').trim()).filter(s => s.length > 20);
   const scored = sentences.map((s, i) => ({ s, i, n: [...terms].filter(t => s.toLowerCase().includes(t)).length }));
   const best = scored.filter(x => x.n > 0).sort((a, b) => b.n - a.n || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i);
-  return (best.length ? best : scored.slice(0, 2)).map(x => x.s).join(' ');
+  // Nothing shared with the question: a semantic hit, not a passage that answers it. Quote nothing rather than guess.
+  return best.map(x => x.s).join(' ');
 }
 
 /** "September 2026" for "2026-09". */
@@ -255,7 +256,12 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       yield 'No house policy covers that. The policies cover accruals, bank reconciliation, revenue recognition, credit and allowances, consolidation, and materiality.';
       return;
     }
-    for (const h of hits) yield `From the ${h.id.replace(/-/g, ' ')} policy: ${policyExcerpt(h.text, question)} `;
+    const quoted = hits.map(h => ({ name: h.id.replace(/-/g, ' '), excerpt: policyExcerpt(h.text, question) }));
+    if (!quoted.some(h => h.excerpt)) {
+      yield `No passage in the house policies answers that directly; the closest is the ${quoted[0]!.name} policy, on the Charters page. `;
+    } else {
+      for (const h of quoted) if (h.excerpt) yield `From the ${h.name} policy: ${h.excerpt} `;
+    }
     yield 'The Red Team checks every Proposal against these same policies before the Advisor rules.';
     return;
   }
