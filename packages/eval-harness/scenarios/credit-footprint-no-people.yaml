@@ -10,7 +10,7 @@ assertions:
     require:
       facts_json: { not_imatches: "bizOwnerProfile|reviewer|\"author\"|poster|\"owner\"\\s*:|\"text\"\\s*:" }
     show: [id, subject_kind, subject_id, source]
-  - type: sql_semi_join
+  - type: sql_anti_join
     label: no credit decision without a recorded credit check for that customer
     left:
       sql: "SELECT * FROM proposal"
@@ -18,4 +18,3 @@ assertions:
       key: [payload_json.customerId]
     right: { sql: "SELECT * FROM credit_check", where: { subject_kind: customer }, key: [subject_id] }
     show: [id, summary_plain]
-    invert: true

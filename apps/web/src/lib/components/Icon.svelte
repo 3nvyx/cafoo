@@ -18,6 +18,7 @@
 		chevronDown: 'M5 9l7 7 7-7',
 		lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
 		play: 'M7 5v14l12-7z',
+		pause: 'M8 5v14M16 5v14',
 		arrowRight: 'M5 12h14M13 6l6 6-6 6',
 		check: 'M5 12.5l4.5 4.5L19 7.5',
 		alert: 'M12 4 2.5 20h19zM12 10v4.5M12 17.5v.01',

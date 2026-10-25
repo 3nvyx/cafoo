@@ -5,7 +5,7 @@
 	import Icon, { type IconName } from './Icon.svelte';
 
 	const items: { href: string; label: string; icon: IconName }[] = [
-		{ href: '/', label: 'Launchpad', icon: 'home' },
+		{ href: '/dashboard', label: 'Launchpad', icon: 'home' },
 		{ href: '/proposals', label: 'Proposals', icon: 'inbox' },
 		{ href: '/agents', label: 'Agents', icon: 'chat' },
 		{ href: '/close', label: 'Close', icon: 'checklist' },
@@ -17,12 +17,12 @@
 	];
 
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
-	const isActive = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
+	const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
 	let { compact = false }: { compact?: boolean } = $props();
 </script>
 
 <nav aria-label="Main" class="flex h-full flex-col gap-1 p-3">
-	<a href="/" class="mb-4 flex min-h-[44px] items-center gap-2.5 px-2.5" aria-label="Cafoo home">
+	<a href="/dashboard" class="mb-4 flex min-h-[44px] items-center gap-2.5 px-2.5" aria-label="Cafoo home">
 		<span class="grid size-7 shrink-0 place-items-center rounded-btn bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
 		{#if !compact}<span class="font-display text-lg font-medium tracking-tight">Cafoo</span>{/if}
 	</a>

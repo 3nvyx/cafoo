@@ -26,7 +26,7 @@
 			phase = 'done';
 			history.replaceState(null, '', '/claim');
 			toasts.push('You are the CFO for this database.', 'success');
-			setTimeout(() => void goto('/'), 900);
+			setTimeout(() => void goto('/dashboard'), 900);
 		} catch (err) {
 			phase = 'error';
 			error = err instanceof Error ? err.message : String(err);
@@ -47,7 +47,7 @@
 	<h1 class="mt-1 text-3xl font-medium tracking-tight">Claim the CFO seat</h1>
 
 	{#if phase === 'demo'}
-		<p class="mt-4 text-ink-2">Demo mode has no seat to claim: this browser already acts as the CFO. <a class="text-accent-ink underline" href="/">Back to the Launchpad</a>.</p>
+		<p class="mt-4 text-ink-2">Demo mode has no seat to claim: this browser already acts as the CFO. <a class="text-accent-ink underline" href="/dashboard">Back to the Launchpad</a>.</p>
 	{:else if phase === 'claiming'}
 		<p class="mt-4 text-ink-2">Claiming…</p>
 	{:else if phase === 'done'}
