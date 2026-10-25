@@ -8,6 +8,8 @@
 	import FlowDiagram from './FlowDiagram.svelte';
 	import GateStack from './GateStack.svelte';
 	import ModeDemo from './ModeDemo.svelte';
+	import River from './River.svelte';
+	import Swirls from './Swirls.svelte';
 
 	const live = PUBLIC_DATA_SOURCE === 'spacetime';
 
@@ -50,7 +52,10 @@
 
 <a href="#main" class="sr-only z-50 rounded-full bg-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
-<div class="dots min-h-dvh bg-canvas">
+<div class="relative isolate min-h-dvh bg-canvas">
+	<!-- Rises out of the hero's brushwork and winds down behind the page as you scroll. -->
+	<River from="#hero" to="footer" />
+
 	<header class="sticky top-0 z-30 px-4 pt-3 sm:px-8">
 		<div class="mx-auto flex h-14 max-w-[1120px] items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center gap-2.5" aria-label="Cafoo home">
@@ -70,8 +75,10 @@
 	</header>
 
 	<main id="main">
+		<!-- The brushwork runs up behind the floating header (68px) and clears away under the headline. -->
+		<div id="hero" class="relative isolate -mt-[68px] overflow-hidden pt-[68px]">
+			<div class="sky absolute inset-0 -z-10"><Swirls seed={11} spacing={20} alpha={0.32} /></div>
 		<section class="mx-auto flex max-w-[1120px] flex-col items-center px-4 pt-20 pb-24 text-center sm:px-8 sm:pt-32 sm:pb-32">
-			<p class="mb-6 font-mono text-[13px] text-ink-3">The agentic finance ERP</p>
 			<h1 class="max-w-[15ch] text-[48px] leading-[0.95] font-medium sm:text-[84px]" style="letter-spacing:-0.035em">Agents close your books. You keep the last word.</h1>
 			<p class="mt-8 max-w-[54ch] text-lg text-ink-2">
 				Agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything at or above your threshold waits for your one click.
@@ -84,6 +91,7 @@
 				<p class="mt-5 text-sm text-ink-3">Runs in your browser on a sample SaaS group. No sign-up.</p>
 			{/if}
 		</section>
+		</div>
 
 		<section aria-label="By the numbers" class="mx-auto max-w-[1120px] px-4 sm:px-8">
 			<div class="relative">
@@ -160,19 +168,20 @@
 		</section>
 
 		<section class="mx-auto max-w-[1120px] px-4 pt-32 pb-8 sm:px-8" aria-labelledby="cta-h">
-			<div class="flex flex-col items-center rounded-3xl bg-ink px-6 py-20 text-center text-canvas sm:py-24">
+			<div class="relative isolate flex flex-col items-center overflow-hidden rounded-3xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
+				<div class="sky-panel absolute inset-0 -z-10"><Swirls seed={3} spacing={22} alpha={0.22} /></div>
 				<h2 id="cta-h" class="max-w-[16ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Close your next month with us</h2>
-				<p class="mt-5 max-w-[46ch] text-lg opacity-75">Close September on sample data, confirm what matters, and lock the month yourself.</p>
+				<p class="mt-5 max-w-[46ch] text-lg opacity-80">Close September on sample data, confirm what matters, and lock the month yourself.</p>
 				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
-					<a href="/dashboard" {...newTab} class="pill pill-primary pill-lg">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
-					<a href="/pitch" class="pill pill-lg border border-canvas/25 text-canvas hover:bg-canvas/10">Watch the pitch</a>
+					<a href="/dashboard" {...newTab} class="pill pill-lg bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
+					<a href="/pitch" class="pill pill-lg border border-on-accent/30 text-on-accent hover:bg-on-accent/10">Watch the pitch</a>
 				</div>
 			</div>
 		</section>
 	</main>
 
 	<footer class="mx-auto flex max-w-[1120px] flex-col gap-2 px-4 pb-10 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-		<span>Cafoo, the agentic finance ERP</span>
+		<span>Cafoo</span>
 		<nav aria-label="Footer" class="flex flex-wrap gap-x-1">
 			<a href="/dashboard" {...newTab} class="flex min-h-11 items-center px-2 hover:text-ink">Sign in{@render tabNote()}</a>
 			<a href="/pitch" class="flex min-h-11 items-center px-2 hover:text-ink">Pitch</a>
@@ -181,10 +190,15 @@
 </div>
 
 <style>
-	/* Dot-grid paper behind the whole page. */
-	.dots {
-		background-image: radial-gradient(color-mix(in srgb, var(--ink) 12%, transparent) 1px, transparent 1px);
-		background-size: 22px 22px;
+	/* A quiet frame: the brushwork shows only at the hero's edges and fades out toward the
+	   middle and the bottom, so the headline and buttons sit on plain paper. */
+	.sky {
+		mask-image: radial-gradient(ellipse 85% 70% at 50% 50%, transparent 0%, transparent 55%, rgb(0 0 0 / 0.35) 80%, black 100%),
+			linear-gradient(to bottom, black 70%, transparent);
+		mask-composite: intersect;
+	}
+	.sky-panel {
+		mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 0%, rgb(0 0 0 / 0.25) 50%, black 100%);
 	}
 
 	/* In the components layer so Tailwind utilities (hidden, border, text color) still win. */
@@ -220,7 +234,7 @@
 			color: var(--on-accent);
 		}
 		.pill-primary:hover {
-			background: color-mix(in srgb, var(--accent) 88%, black);
+			background: color-mix(in srgb, var(--accent) 85%, var(--canvas));
 		}
 		.pill-outline {
 			border: 1px solid var(--line);

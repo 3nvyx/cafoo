@@ -2,95 +2,101 @@
 
 /* Design tokens. Every color in the app comes from these variables. */
 :root {
-	--canvas: #ffffff;
-	--surface: #ffffff;
-	--subtle: #f6f6f7;
-	--ink: #18181b;
-	--ink-2: #52525b;
-	--ink-3: #6b6b74;
-	--line: #e5e7eb;
-	--line-strong: #d4d4d8;
-	--accent: #582efd;
-	--on-accent: #ffffff;
-	--accent-ink: #4a1fe6;
-	--accent-soft: #f0ebff;
-	--pos: #15803d;
-	--pos-soft: #e9f7ee;
+	/* Palette: tar black, milk, pearl and dust neutrals, one neon ocean blue. */
+	--canvas: #efebe4;
+	--surface: #f7f5f0;
+	--subtle: #e5e0d7;
+	--ink: #151413;
+	--ink-2: #45413c;
+	--ink-3: #625d56;
+	--line: #d9d3c8;
+	--line-strong: #c3bcb0;
+	/* Neon ocean blue always carries tar text (7.9:1). Text in the brand color uses accent-ink. */
+	--accent: #00b4ff;
+	--on-accent: #151413;
+	--accent-ink: #075c9e;
+	--accent-soft: #dcf0fb;
+	/* The deep ocean tone of the brushwork pattern. */
+	--accent-deep: #0a3d62;
+	--pos: #146c35;
+	--pos-soft: #e7f1e6;
 	--neg: #b91c1c;
-	--neg-soft: #fdeeee;
+	--neg-soft: #f8e9e4;
 	--warn: #92400e;
-	--warn-soft: #fdf4e3;
-	--focus: #582efd;
+	--warn-soft: #f6ecd9;
+	--focus: #151413;
 
-	--role-advisor: #582efd;
-	--role-bookkeeper: #0e7490;
-	--role-revenue: #15803d;
+	--role-advisor: #075c9e;
+	--role-bookkeeper: #57620f;
+	--role-revenue: #146c35;
 	--role-credit: #b45309;
 	--role-redteam: #be123c;
-	--role-cfo: #18181b;
-	--role-system: #6b6b74;
+	--role-cfo: #151413;
+	--role-system: #625d56;
 	color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
-		--canvas: #0b0b0e;
-		--surface: #16161d;
-		--subtle: #20202a;
-		--ink: #f4f4f5;
-		--ink-2: #b4b4bc;
-		--ink-3: #a1a1aa;
-		--line: #343442;
-		--line-strong: #4a4a5a;
-		--accent: #6b46ff;
-		--on-accent: #ffffff;
-		--accent-ink: #c4b5fd;
-		--accent-soft: #221a45;
+		--canvas: #0e0d0c;
+		--surface: #171614;
+		--subtle: #211f1c;
+		--ink: #ede9e2;
+		--ink-2: #b8b1a6;
+		--ink-3: #9a9389;
+		--line: #2d2a26;
+		--line-strong: #3e3a35;
+		--accent: #00b4ff;
+		--on-accent: #151413;
+		--accent-ink: #5cc9ff;
+		--accent-soft: #0a2433;
+		--accent-deep: #0b5c8c;
 		--pos: #4ade80;
 		--pos-soft: #10291a;
 		--neg: #fca5a5;
 		--neg-soft: #2e1414;
 		--warn: #fbbf24;
 		--warn-soft: #2b2110;
-		--focus: #c4b5fd;
-		--role-advisor: #a992ff;
-		--role-bookkeeper: #22b3d1;
+		--focus: #00b4ff;
+		--role-advisor: #00b4ff;
+		--role-bookkeeper: #b5c65a;
 		--role-revenue: #34c26b;
 		--role-credit: #e08a2c;
 		--role-redteam: #ff758f;
-		--role-cfo: #e4e4e7;
-		--role-system: #a1a1aa;
+		--role-cfo: #ede9e2;
+		--role-system: #9a9389;
 		color-scheme: dark;
 	}
 }
 
 :root[data-theme='dark'] {
-	--canvas: #0b0b0e;
-	--surface: #16161d;
-	--subtle: #20202a;
-	--ink: #f4f4f5;
-	--ink-2: #b4b4bc;
-	--ink-3: #a1a1aa;
-	--line: #343442;
-	--line-strong: #4a4a5a;
-	--accent: #6b46ff;
-	--on-accent: #ffffff;
-	--accent-ink: #c4b5fd;
-	--accent-soft: #221a45;
+	--canvas: #0e0d0c;
+	--surface: #171614;
+	--subtle: #211f1c;
+	--ink: #ede9e2;
+	--ink-2: #b8b1a6;
+	--ink-3: #9a9389;
+	--line: #2d2a26;
+	--line-strong: #3e3a35;
+	--accent: #00b4ff;
+	--on-accent: #151413;
+	--accent-ink: #5cc9ff;
+	--accent-soft: #0a2433;
+	--accent-deep: #0b5c8c;
 	--pos: #4ade80;
 	--pos-soft: #10291a;
 	--neg: #fca5a5;
 	--neg-soft: #2e1414;
 	--warn: #fbbf24;
 	--warn-soft: #2b2110;
-	--focus: #c4b5fd;
-	--role-advisor: #a992ff;
-	--role-bookkeeper: #22b3d1;
+	--focus: #00b4ff;
+	--role-advisor: #00b4ff;
+	--role-bookkeeper: #b5c65a;
 	--role-revenue: #34c26b;
 	--role-credit: #e08a2c;
 	--role-redteam: #ff758f;
-	--role-cfo: #e4e4e7;
-	--role-system: #a1a1aa;
+	--role-cfo: #ede9e2;
+	--role-system: #9a9389;
 	color-scheme: dark;
 }
 
@@ -107,6 +113,7 @@
 	--color-on-accent: var(--on-accent);
 	--color-accent-ink: var(--accent-ink);
 	--color-accent-soft: var(--accent-soft);
+	--color-accent-deep: var(--accent-deep);
 	--color-pos: var(--pos);
 	--color-pos-soft: var(--pos-soft);
 	--color-neg: var(--neg);
@@ -205,8 +212,9 @@
 		border-color: var(--accent);
 		color: var(--on-accent);
 	}
+	/* Mixing toward the page color lightens the primary in light mode and darkens it in dark mode. */
 	.btn-primary:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--accent) 88%, black);
+		background: color-mix(in srgb, var(--accent) 85%, var(--canvas));
 	}
 	.btn-lg {
 		min-height: 52px;
