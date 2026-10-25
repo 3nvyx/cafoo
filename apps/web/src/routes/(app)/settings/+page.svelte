@@ -5,6 +5,7 @@
 	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Pill from '#lib/components/Pill.svelte';
+	import { providerState } from '#lib/providers.js';
 	import { toasts } from '#lib/toast.svelte.js';
 
 	const current = $derived(toNumber(db.settings().materialityThresholdMinor));
@@ -161,18 +162,25 @@
 
 	<section aria-labelledby="prov-h" class="flex flex-col gap-3">
 		<h2 id="prov-h" class="text-2xl">Connections</h2>
-		<p class="text-ink-2">
-			{db.kind === 'mock' ? 'Demo mode: no API keys, every outside call replays recorded fixtures.' : 'Live: connected to the ledger database.'}
-		</p>
+		<div>
+			<p class="text-ink-2">
+				{db.kind === 'mock' ? 'Demo mode: no API keys, every outside call replays recorded fixtures.' : 'Live mode: each connection below says how much this session has confirmed.'}
+			</p>
+			<p class="mt-2 text-body-sm text-ink-3">
+				Connected means this browser has spoken to it in this session. Configured means a key is present and the live path is selected; it does not prove a call succeeded. Demo replays recorded fixtures.
+			</p>
+		</div>
 		<ul class="divide-y divide-line border-y border-line">
 			{#each db.providers() as p (p.id)}
+				{@const state = providerState(p, db.connection())}
 				<li class="flex items-start justify-between gap-4 py-3">
 					<div class="min-w-0">
 						<p class="font-medium">{p.name}</p>
-						<p class="text-sm text-ink-2">{p.purpose}</p>
-						<p class="truncate text-sm text-ink-3">{p.detail}</p>
+						<p class="text-body-sm text-ink-2">{p.purpose}</p>
+						<p class="text-body-sm break-words text-ink-3">{p.detail}</p>
+						{#if state.tone !== 'muted'}<p class="mt-0.5 text-caption text-ink-3">{state.hint}.</p>{/if}
 					</div>
-					<Pill tone={p.mode === 'live' ? 'pos' : 'neutral'}>{p.mode === 'live' ? 'Live' : 'Demo mode'}</Pill>
+					<Pill tone={state.tone}>{state.label}</Pill>
 				</li>
 			{/each}
 		</ul>

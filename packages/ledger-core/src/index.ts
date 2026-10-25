@@ -12,4 +12,5 @@ export * from './accruals.js';
 export * from './metrics.js';
 export * from './consolidation.js';
 export * from './proposals.js';
+export * from './bank-exceptions.js';
 export * from './plain.js';

@@ -1,0 +1,815 @@
+{
+	"$schema": "https://www.designtokens.org/schemas/2025.10/tokens.json",
+	"$description": "Semantic tokens: what each value is for. This tier is what screens and components read, through the CSS variables and Tailwind classes built from it. Values are references into primitives.tokens.json; light and dark live under $extensions.mode. Usage notes for agents live under $extensions[\"com.cafoo\"] as usage (kebab-case use cases) and rules (\"Never\" and \"Only\" sentences).",
+	"color": {
+		"$type": "color",
+		"$description": "Semantic colours: what a value is for. Every name here becomes a CSS variable and a Tailwind class (bg-*, text-*, border-*, fill-*, stroke-*).",
+		"canvas": {
+			"$value": "{palette.neutral.50}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.50}",
+					"dark": "{palette.neutral.1000}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"page-background",
+						"app-shell"
+					],
+					"rules": "Only for the page itself and full-bleed sections. Never as a card or control fill; that is surface."
+				}
+			},
+			"$description": "The page background."
+		},
+		"surface": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.900}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"card",
+						"panel",
+						"dialog",
+						"input",
+						"table-header"
+					],
+					"rules": "Only on canvas or subtle. Never stacked on another surface without a border between them."
+				}
+			},
+			"$description": "Cards, panels, dialogs, inputs: anything that sits on the canvas."
+		},
+		"on-surface": {
+			"$value": "{color.ink}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.ink}",
+					"dark": "{color.ink}"
+				}
+			},
+			"$description": "Text and icons on surface. Same as ink today; kept as a pair so the two can part later."
+		},
+		"subtle": {
+			"$value": "{palette.neutral.100}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.100}",
+					"dark": "{palette.neutral.850}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"row-hover",
+						"neutral-chip",
+						"segmented-track"
+					],
+					"rules": "Only as a fill. Never as text."
+				}
+			},
+			"$description": "A quieter fill: hovered rows, neutral chips, dividers made of fill."
+		},
+		"on-subtle": {
+			"$value": "{color.ink}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.ink}",
+					"dark": "{color.ink}"
+				}
+			},
+			"$description": "Text and icons on subtle."
+		},
+		"ink": {
+			"$value": "{palette.neutral.950}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.950}",
+					"dark": "{palette.neutral.75}"
+				}
+			},
+			"$description": "Primary text and icons."
+		},
+		"ink-2": {
+			"$value": "{palette.neutral.600}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.600}",
+					"dark": "{palette.neutral.300}"
+				}
+			},
+			"$description": "Secondary text: descriptions, table body cells that are not the key figure."
+		},
+		"ink-3": {
+			"$value": "{palette.neutral.500}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.500}",
+					"dark": "{palette.neutral.400}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"eyebrow",
+						"caption",
+						"placeholder",
+						"inactive-icon"
+					],
+					"rules": "Only for text at caption size or larger. Never for all-caps eyebrows; eyebrows are sentence case."
+				}
+			},
+			"$description": "Tertiary text: eyebrows, captions, placeholders, inactive icons."
+		},
+		"line": {
+			"$value": "{palette.neutral.150}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.150}",
+					"dark": "{palette.neutral.800}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"card-border",
+						"divider",
+						"table-rule"
+					],
+					"rules": "Only this colour for borders and dividers. Never a coloured border, not even for status; use a soft fill instead."
+				}
+			},
+			"$description": "The one border. Every box uses it; differences between boxes show through fill, never through border colour."
+		},
+		"line-strong": {
+			"$value": "{palette.neutral.200}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.200}",
+					"dark": "{palette.neutral.700}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"button-border",
+						"field-border",
+						"drill-underline"
+					],
+					"rules": "Only on interactive controls. Never on cards or dividers; those use line."
+				}
+			},
+			"$description": "Border for controls that need a firmer edge: buttons, fields, the drill underline."
+		},
+		"accent": {
+			"$value": "{palette.ocean.500}",
+			"$description": "Neon ocean blue. The one main action on a screen, selection, and the live cursor.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"primary-button",
+						"selected-state",
+						"live-indicator",
+						"link-hover"
+					],
+					"rules": "Never more than one primary action per view. Never for status, badges or informational text; status has its own colours and info is neutral. Only with on-accent for text placed on it."
+				}
+			}
+		},
+		"on-accent": {
+			"$value": "{palette.neutral.950}",
+			"$description": "Tar text on the accent. The accent is light, so its text is always dark, in both modes.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"primary-button-label"
+					],
+					"rules": "Only on accent fills. Never white text on the accent."
+				}
+			}
+		},
+		"accent-ink": {
+			"$value": "{palette.ocean.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ocean.700}",
+					"dark": "{palette.ocean.300}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"link",
+						"drill-hover",
+						"brand-text"
+					],
+					"rules": "Only for text and icons. Never as a fill; the fill is accent."
+				}
+			},
+			"$description": "The brand colour as text: links, drill targets, the Advisor's name."
+		},
+		"accent-soft": {
+			"$value": "{palette.ocean.50}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ocean.50}",
+					"dark": "{palette.ocean.950}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"selected-row",
+						"selection-highlight",
+						"accent-chip"
+					],
+					"rules": "Only as a fill paired with on-accent-soft for its text. Never for status."
+				}
+			},
+			"$description": "Accent container: selected rows, the chosen segment, highlights."
+		},
+		"on-accent-soft": {
+			"$value": "{color.accent-ink}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.accent-ink}",
+					"dark": "{color.accent-ink}"
+				}
+			},
+			"$description": "Text and icons on accent-soft."
+		},
+		"accent-deep": {
+			"$value": "{palette.ocean.600}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ocean.600}",
+					"dark": "{palette.ocean.800}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"painted-sky",
+						"river-glint",
+						"marketing-artwork"
+					],
+					"rules": "Only in the marketing artwork and decorative gradients. Never as a text or control colour; it fails contrast for text."
+				}
+			},
+			"$description": "The deep ocean of the painted brushwork. Artwork, not UI."
+		},
+		"pos": {
+			"$value": "{palette.moss.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.moss.700}",
+					"dark": "{palette.moss.300}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"positive-amount",
+						"approved-state",
+						"matched-indicator"
+					],
+					"rules": "Only for meaning, never for decoration. Only as text on canvas or surface, or as a fill with on-pos."
+				}
+			},
+			"$description": "Positive: money in, matched, reconciled, approved."
+		},
+		"pos-soft": {
+			"$value": "{palette.moss.50}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.moss.50}",
+					"dark": "{palette.moss.950}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"positive-badge",
+						"positive-row"
+					],
+					"rules": "Only as a fill paired with on-pos-soft."
+				}
+			},
+			"$description": "Positive container for badges and highlighted rows."
+		},
+		"on-pos-soft": {
+			"$value": "{color.pos}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.pos}",
+					"dark": "{color.pos}"
+				}
+			},
+			"$description": "Text and icons on pos-soft."
+		},
+		"on-pos": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text on a solid pos fill."
+		},
+		"neg": {
+			"$value": "{palette.ember.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ember.700}",
+					"dark": "{palette.ember.300}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"negative-amount",
+						"error-text",
+						"rejected-state",
+						"destructive-action"
+					],
+					"rules": "Only for meaning, never for decoration. Only as text on canvas or surface, or as a fill with on-neg. Never the accent for errors."
+				}
+			},
+			"$description": "Negative: money out, failed, rejected, over budget."
+		},
+		"neg-soft": {
+			"$value": "{palette.ember.50}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ember.50}",
+					"dark": "{palette.ember.950}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"negative-badge",
+						"error-banner",
+						"error-row"
+					],
+					"rules": "Only as a fill paired with on-neg-soft."
+				}
+			},
+			"$description": "Negative container for badges, error rows and inline error messages."
+		},
+		"on-neg-soft": {
+			"$value": "{color.neg}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.neg}",
+					"dark": "{color.neg}"
+				}
+			},
+			"$description": "Text and icons on neg-soft."
+		},
+		"on-neg": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text on a solid neg fill."
+		},
+		"warn": {
+			"$value": "{palette.amber.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.amber.700}",
+					"dark": "{palette.amber.300}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"warning-text",
+						"pending-state",
+						"due-soon"
+					],
+					"rules": "Only for meaning, never for decoration. Only as text on canvas or surface, or as a fill with on-warn."
+				}
+			},
+			"$description": "Warning: needs a look, not yet wrong."
+		},
+		"warn-soft": {
+			"$value": "{palette.amber.50}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.amber.50}",
+					"dark": "{palette.amber.950}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"warning-badge",
+						"warning-banner"
+					],
+					"rules": "Only as a fill paired with on-warn-soft."
+				}
+			},
+			"$description": "Warning container for badges and banners."
+		},
+		"on-warn-soft": {
+			"$value": "{color.warn}",
+			"$extensions": {
+				"mode": {
+					"light": "{color.warn}",
+					"dark": "{color.warn}"
+				}
+			},
+			"$description": "Text and icons on warn-soft."
+		},
+		"on-warn": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text on a solid warn fill."
+		},
+		"info": {
+			"$value": "{palette.neutral.500}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.500}",
+					"dark": "{palette.neutral.400}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"info-text",
+						"neutral-status",
+						"hint"
+					],
+					"rules": "Never blue; blue is the accent and means an action. Only as text on canvas or surface, or as a fill with on-info."
+				}
+			},
+			"$description": "Informational: a note, a hint, a neutral status. Deliberately grey, so a note never looks like an action."
+		},
+		"info-soft": {
+			"$value": "{palette.neutral.150}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.150}",
+					"dark": "{palette.neutral.800}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"info-badge",
+						"note-banner"
+					],
+					"rules": "Only as a fill paired with on-info-soft. Never as a hover fill; that is subtle."
+				}
+			},
+			"$description": "Info container for neutral badges and notes. One step firmer than subtle, so a badge stays visible on a hovered row."
+		},
+		"on-info-soft": {
+			"$value": "{palette.neutral.600}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.600}",
+					"dark": "{palette.neutral.300}"
+				}
+			},
+			"$description": "Text and icons on info-soft. One step darker than info so it stays readable on the firmer fill."
+		},
+		"on-info": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text on a solid info fill."
+		},
+		"scrim": {
+			"$value": "{palette.overlay.40}",
+			"$description": "The dimmer behind dialogs and sheets.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"dialog-backdrop",
+						"sheet-backdrop"
+					],
+					"rules": "Only behind a dialog, sheet or command palette. Never as a tint on content."
+				}
+			}
+		},
+		"inverse": {
+			"$value": "{palette.neutral.950}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.950}",
+					"dark": "{palette.neutral.75}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"toast",
+						"tooltip",
+						"inverse-panel"
+					],
+					"rules": "Only for small transient surfaces. Never for a whole page or card. Only with on-inverse for its text."
+				}
+			},
+			"$description": "A surface that flips the mode: toasts, tooltips, the command palette's footer."
+		},
+		"on-inverse": {
+			"$value": "{palette.neutral.0}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.0}",
+					"dark": "{palette.neutral.950}"
+				}
+			},
+			"$description": "Text and icons on inverse."
+		},
+		"focus": {
+			"$value": "{palette.neutral.950}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.950}",
+					"dark": "{palette.ocean.500}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"focus-ring"
+					],
+					"rules": "Only for :focus-visible outlines and rings. Never removed without a replacement that passes 3:1."
+				}
+			},
+			"$description": "The focus ring. Tar in light mode, ocean in dark mode, always 3:1 against the page."
+		}
+	},
+	"role": {
+		"$type": "color",
+		"$description": "One colour per agent role, for avatars, names and the debate thread. Classes: bg-role-*, text-role-*, fill-role-*.",
+		"advisor": {
+			"$value": "{palette.ocean.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.ocean.700}",
+					"dark": "{palette.ocean.500}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"advisor-avatar",
+						"advisor-name"
+					],
+					"rules": "Only for the Advisor's avatar, name and message rail. Never as a generic accent."
+				}
+			},
+			"$description": "The Advisor, who rules on proposals. Shares the brand hue because it speaks for the system."
+		},
+		"bookkeeper": {
+			"$value": "{palette.olive.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.olive.700}",
+					"dark": "{palette.olive.300}"
+				}
+			},
+			"$description": "The Bookkeeper agent."
+		},
+		"revenue": {
+			"$value": "{palette.moss.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.moss.700}",
+					"dark": "{palette.moss.400}"
+				}
+			},
+			"$description": "The Revenue agent."
+		},
+		"credit": {
+			"$value": "{palette.amber.800}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.amber.800}",
+					"dark": "{palette.amber.400}"
+				}
+			},
+			"$description": "The Credit agent."
+		},
+		"redteam": {
+			"$value": "{palette.rose.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.rose.700}",
+					"dark": "{palette.rose.300}"
+				}
+			},
+			"$description": "The Red-team agent."
+		},
+		"cfo": {
+			"$value": "{palette.neutral.950}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.950}",
+					"dark": "{palette.neutral.75}"
+				}
+			},
+			"$description": "The CFO, the human in the loop."
+		},
+		"system": {
+			"$value": "{palette.neutral.500}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.500}",
+					"dark": "{palette.neutral.400}"
+				}
+			},
+			"$description": "System and audit messages."
+		}
+	},
+	"type": {
+		"$type": "typography",
+		"$description": "The type scale, by role. Classes: text-micro … text-display set size, line height and tracking; weight is a separate utility (font-medium) and the fontWeight here is the recommended pairing. Headings add font-display.",
+		"micro": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 11,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 16,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": 0.01,
+					"unit": "em"
+				}
+			},
+			"$description": "Tiny labels: axis ticks, keyboard hints, badge text."
+		},
+		"caption": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 12,
+					"unit": "px"
+				},
+				"fontWeight": 400,
+				"lineHeight": {
+					"value": 18,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": 0,
+					"unit": "em"
+				}
+			},
+			"$description": "Captions, eyebrows, table meta, helper text.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"eyebrow",
+						"caption",
+						"helper-text",
+						"table-meta"
+					],
+					"rules": "Only in sentence case. Never all caps, even with letter spacing."
+				}
+			}
+		},
+		"body-sm": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 13,
+					"unit": "px"
+				},
+				"fontWeight": 400,
+				"lineHeight": {
+					"value": 20,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": 0,
+					"unit": "em"
+				}
+			},
+			"$description": "Dense body: table cells, lists, secondary copy."
+		},
+		"body": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 15,
+					"unit": "px"
+				},
+				"fontWeight": 400,
+				"lineHeight": {
+					"value": 22,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": 0,
+					"unit": "em"
+				}
+			},
+			"$description": "Default body text."
+		},
+		"subtitle": {
+			"$value": {
+				"fontFamily": "{font.sans}",
+				"fontSize": {
+					"value": 17,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 24,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": -0.005,
+					"unit": "em"
+				}
+			},
+			"$description": "Card headers, KPI labels, the line under a page title."
+		},
+		"title": {
+			"$value": {
+				"fontFamily": "{font.display}",
+				"fontSize": {
+					"value": 20,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 26,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": -0.01,
+					"unit": "em"
+				}
+			},
+			"$description": "Section and card titles."
+		},
+		"display-sm": {
+			"$value": {
+				"fontFamily": "{font.display}",
+				"fontSize": {
+					"value": 28,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 32,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": -0.02,
+					"unit": "em"
+				}
+			},
+			"$description": "Page titles and the key figure on a report."
+		},
+		"display": {
+			"$value": {
+				"fontFamily": "{font.display}",
+				"fontSize": {
+					"value": 44,
+					"unit": "px"
+				},
+				"fontWeight": 500,
+				"lineHeight": {
+					"value": 46,
+					"unit": "px"
+				},
+				"letterSpacing": {
+					"value": -0.03,
+					"unit": "em"
+				}
+			},
+			"$description": "The hero and the one number that matters on a screen.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"hero-heading",
+						"headline-figure"
+					],
+					"rules": "Only once per screen. Never for body copy or inside cards."
+				}
+			}
+		}
+	},
+	"shape": {
+		"$type": "dimension",
+		"$description": "Corner radii. Classes: rounded-sm, rounded-md, rounded-lg, rounded-xl; rounded-full stays Tailwind's pill.",
+		"sm": {
+			"$value": "{size.4}",
+			"$description": "Buttons, fields, chips."
+		},
+		"md": {
+			"$value": "{size.8}",
+			"$description": "Cards and panels.",
+			"$extensions": {
+				"com.cafoo": {
+					"usage": [
+						"card",
+						"panel",
+						"dialog"
+					],
+					"rules": "Only one radius per component. Never a different radius on a nested element unless it is a control."
+				}
+			}
+		},
+		"lg": {
+			"$value": "{size.16}",
+			"$description": "Large flat panels on the marketing page."
+		},
+		"xl": {
+			"$value": "{size.24}",
+			"$description": "Hero frames."
+		}
+	}
+}

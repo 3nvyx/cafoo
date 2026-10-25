@@ -1,0 +1,30 @@
+{
+  "name": "@cafoo/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cafoo's design decisions as data: DTCG token files, the CSS built from them, and the checks that keep the web app on them.",
+  "type": "module",
+  "files": [
+    "tokens",
+    "css"
+  ],
+  "exports": {
+    "./css": "./css/cafoo-tokens.css",
+    "./tokens/*": "./tokens/*"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "tz check",
+    "test": "vitest run",
+    "baseline": "node scripts/baseline.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/node": "^4.3.3",
+    "@terrazzo/cli": "2.10.0",
+    "@terrazzo/parser": "2.10.0",
+    "@terrazzo/plugin-css": "2.10.0",
+    "@terrazzo/token-tools": "2.10.0",
+    "tailwindcss": "^4.3.3",
+    "vitest": "^5.0.5"
+  }
+}

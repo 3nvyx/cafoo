@@ -42,8 +42,11 @@ export type ChangeKind = 'insert' | 'update' | 'delete';
 export interface ConnectionState {
 	ledger: 'demo' | 'connecting' | 'live' | 'offline';
 	agents: 'online' | 'offline' | 'unknown';
-	/** Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working. */
-	closes: { periodYm: string; status: 'running' | 'done' }[];
+	/**
+	 * Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working, 'error' when the run
+	 * stopped on a failure. `steps` is the gateway's live-close log (absent in the demo); `error` its failure reason.
+	 */
+	closes: { periodYm: string; status: 'running' | 'done' | 'error'; steps?: string[]; error?: string }[];
 	message?: string;
 	/** The live feed, as the agent gateway last reported it (undefined until it has). */
 	feed?: FeedStatus;
@@ -146,6 +149,8 @@ export interface DataSource {
 	/** CFO switches the live feed on or off. It books only into the open month after one the CFO locked. */
 	setFeedEnabled(enabled: boolean): Promise<void>;
 	setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void>;
+	/** CFO accepts the exact reviewed unmatched bank lines with a reason; lines remain unmatched. */
+	acceptBankExceptions(periodId: string, expectedSnapshot: string, reasonPlain: string): Promise<void>;
 	/** CFO locks the Period. The Board Pack becomes final. */
 	lockPeriod(periodId: string): Promise<void>;
 	/** CFO unlocks a locked Period so it can be posted to again. The reason goes to the audit log. */

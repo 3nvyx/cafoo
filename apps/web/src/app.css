@@ -26,6 +26,29 @@
 	--warn-soft: #f6ecd9;
 	--focus: #151413;
 
+	/* Semantic tokens that app.css did not define yet, aliased to the variables above so the token classes render.
+	   Values mirror packages/design-tokens/css/cafoo-tokens.css until this file imports it. */
+	--info: var(--ink-3);
+	--info-soft: var(--line);
+	--on-info: var(--surface);
+	--on-info-soft: var(--ink-2);
+	--on-pos: var(--surface);
+	--on-pos-soft: var(--pos);
+	--on-neg: var(--surface);
+	--on-neg-soft: var(--neg);
+	--on-warn: var(--surface);
+	--on-warn-soft: var(--warn);
+	--on-accent-soft: var(--accent-ink);
+	--on-subtle: var(--ink);
+	--on-surface: var(--ink);
+	--inverse: var(--ink);
+	--on-inverse: var(--surface);
+	--scrim: color-mix(in srgb, var(--on-accent) 40%, transparent);
+	--shape-sm: 4px;
+	--shape-md: 8px;
+	--shape-lg: 16px;
+	--shape-xl: 24px;
+
 	--role-advisor: #075c9e;
 	--role-bookkeeper: #57620f;
 	--role-revenue: #146c35;
@@ -58,6 +81,12 @@
 		--warn: #fbbf24;
 		--warn-soft: #2b2110;
 		--focus: #00b4ff;
+	/* Text on a solid status fill is tar in dark mode, as it is on the accent. */
+		--on-info: var(--on-accent);
+		--on-pos: var(--on-accent);
+		--on-neg: var(--on-accent);
+		--on-warn: var(--on-accent);
+		--on-inverse: var(--on-accent);
 		--role-advisor: #00b4ff;
 		--role-bookkeeper: #b5c65a;
 		--role-revenue: #34c26b;
@@ -90,6 +119,12 @@
 	--warn: #fbbf24;
 	--warn-soft: #2b2110;
 	--focus: #00b4ff;
+	/* Text on a solid status fill is tar in dark mode, as it is on the accent. */
+	--on-info: var(--on-accent);
+	--on-pos: var(--on-accent);
+	--on-neg: var(--on-accent);
+	--on-warn: var(--on-accent);
+	--on-inverse: var(--on-accent);
 	--role-advisor: #00b4ff;
 	--role-bookkeeper: #b5c65a;
 	--role-revenue: #34c26b;
@@ -121,6 +156,22 @@
 	--color-warn: var(--warn);
 	--color-warn-soft: var(--warn-soft);
 	--color-focus: var(--focus);
+	--color-info: var(--info);
+	--color-info-soft: var(--info-soft);
+	--color-on-info: var(--on-info);
+	--color-on-info-soft: var(--on-info-soft);
+	--color-on-pos: var(--on-pos);
+	--color-on-pos-soft: var(--on-pos-soft);
+	--color-on-neg: var(--on-neg);
+	--color-on-neg-soft: var(--on-neg-soft);
+	--color-on-warn: var(--on-warn);
+	--color-on-warn-soft: var(--on-warn-soft);
+	--color-on-accent-soft: var(--on-accent-soft);
+	--color-on-subtle: var(--on-subtle);
+	--color-on-surface: var(--on-surface);
+	--color-inverse: var(--inverse);
+	--color-on-inverse: var(--on-inverse);
+	--color-scrim: var(--scrim);
 
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-display: 'Space Grotesk', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
@@ -128,6 +179,37 @@
 
 	--radius-card: 8px;
 	--radius-btn: 4px;
+	--radius-sm: var(--shape-sm);
+	--radius-md: var(--shape-md);
+	--radius-lg: var(--shape-lg);
+	--radius-xl: var(--shape-xl);
+
+	/* The type scale, mirrored value for value from the @theme block of packages/design-tokens/css/cafoo-tokens.css
+	   until this file imports @cafoo/design-tokens/css (which also retires text-sm and friends). */
+	--text-micro: 11px;
+	--text-micro--line-height: 16px;
+	--text-micro--letter-spacing: 0.01em;
+	--text-caption: 12px;
+	--text-caption--line-height: 18px;
+	--text-caption--letter-spacing: 0em;
+	--text-body-sm: 13px;
+	--text-body-sm--line-height: 20px;
+	--text-body-sm--letter-spacing: 0em;
+	--text-body: 15px;
+	--text-body--line-height: 22px;
+	--text-body--letter-spacing: 0em;
+	--text-subtitle: 17px;
+	--text-subtitle--line-height: 24px;
+	--text-subtitle--letter-spacing: -0.005em;
+	--text-title: 20px;
+	--text-title--line-height: 26px;
+	--text-title--letter-spacing: -0.01em;
+	--text-display-sm: 28px;
+	--text-display-sm--line-height: 32px;
+	--text-display-sm--letter-spacing: -0.02em;
+	--text-display: 44px;
+	--text-display--line-height: 46px;
+	--text-display--letter-spacing: -0.03em;
 }
 
 @layer base {
@@ -170,7 +252,7 @@
 		cursor: not-allowed;
 	}
 	dialog::backdrop {
-		background: rgb(0 0 0 / 0.4);
+		background: var(--scrim);
 	}
 }
 
@@ -216,6 +298,15 @@
 	.btn-primary:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--accent) 85%, var(--canvas));
 	}
+	/* The one destructive action in a dialog (unlock, reverse). Never the default button. */
+	.btn-danger {
+		background: var(--neg);
+		border-color: var(--line);
+		color: var(--on-neg);
+	}
+	.btn-danger:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--neg) 85%, var(--canvas));
+	}
 	.btn-lg {
 		min-height: 52px;
 		padding: 0 1.5rem;
@@ -224,6 +315,34 @@
 	.btn-quiet {
 		border-color: transparent;
 		background: transparent;
+	}
+	/* A segmented filter (company, thread filter). Selection is the accent pair; the border is the one border. */
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-height: 36px;
+		padding: 0 0.75rem;
+		border-radius: 999px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		color: var(--ink-2);
+		font-size: var(--text-body-sm);
+		line-height: var(--text-body-sm--line-height);
+		font-weight: 500;
+		white-space: nowrap;
+		transition:
+			background-color 120ms ease-out,
+			color 120ms ease-out;
+	}
+	.chip:hover {
+		background: var(--subtle);
+		color: var(--ink);
+	}
+	.chip[aria-pressed='true'],
+	.chip[aria-current] {
+		background: var(--accent-soft);
+		color: var(--on-accent-soft);
 	}
 	.num {
 		font-family: var(--font-mono);

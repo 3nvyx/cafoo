@@ -26,7 +26,8 @@ import type {
 	TableName
 } from '../types';
 import { editorProblems } from '../../charter';
-import { eliminations, formatMinor, revaluation, translate, ymFromString, type JournalEntryInput } from '@cafoo/ledger-core';
+import { eliminations, formatMinor, isBankReconciliationTask, revaluation, translate, ymFromString, type JournalEntryInput } from '@cafoo/ledger-core';
+import { bankExceptionState } from '../../close';
 import { toCore } from '../group';
 import { roleName } from '../../labels';
 import catalogJson from './seed/charters.json';
@@ -43,9 +44,10 @@ const PROVIDERS: ProviderStatus[] = [
 	{ id: 'advisor-model', name: 'Advisor and worker models', purpose: 'Proposals, rulings and Plain summaries', mode: 'demo', detail: 'Recorded transcript replayed on Close' },
 	{ id: 'redteam-model', name: 'Red Team model', purpose: 'Critiques on a second model', mode: 'demo', detail: 'Recorded critiques' },
 	{ id: 'gemini', name: 'Google Gemini', purpose: "The Red Team's second critic: adds what the first critique missed", mode: 'demo', detail: 'Scripted critiques' },
-	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '30 September transactions from fixtures' },
+	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '30 September transactions from fixtures; a Capital One Nessie account when one is connected' },
 	{ id: 'credit-cascade', name: 'Credit check cascade', purpose: 'Identity, fraud, credit report, public records', mode: 'demo', detail: 'Sandbox personas, stored request ids' },
 	{ id: 'public-web', name: 'Public web data', purpose: 'What a logged-out visitor sees about a customer or vendor', mode: 'demo', detail: 'Recorded Yelp, job board and LinkedIn pages' },
+	{ id: 'site-crawl', name: 'Site crawl', purpose: 'Bulk crawl of customer sites into policy search', mode: 'demo', detail: 'Not implemented yet; a token alone does not enable it' },
 	{ id: 'email', name: 'Email delivery', purpose: 'Board Pack and dunning emails', mode: 'demo', detail: 'Emails are written to the audit log, not sent' }
 ];
 
@@ -226,9 +228,26 @@ export class MockDataSource implements DataSource {
 	async setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void> {
 		const task = this.#t.close_task.find((t) => t.id === taskId);
 		if (!task) throw new Error(`Unknown close task ${taskId}`);
-		task.status = status;
+		task.status = status === 'done' && isBankReconciliationTask({ ownerRole: task.ownerRole, sortOrder: task.order, title: task.title }) && bankExceptionState(this, task.periodId).rows.length ? 'in_progress' : status;
 		this.#emit('close_task', 'update', task);
-		this.#audit('cfo', 'close_task.status', 'close_task', taskId, { status });
+		this.#audit('cfo', 'close_task.status', 'close_task', taskId, { status: task.status });
+	}
+
+	async acceptBankExceptions(periodId: string, expectedSnapshot: string, reasonPlain: string): Promise<void> {
+		const period = this.#t.period.find((p) => p.id === periodId);
+		if (!period) throw new Error(`Unknown period ${periodId}`);
+		if (period.status === 'closed') throw new Error('Unlock this Period before reviewing bank exceptions.');
+		const reason = reasonPlain.trim();
+		if (!reason) throw new Error('Give a reason for accepting the unresolved bank exceptions.');
+		const state = bankExceptionState(this, periodId);
+		if (!state.rows.length) throw new Error('No unmatched bank exceptions remain through this Period.');
+		if (expectedSnapshot !== state.snapshot) throw new Error('The bank exceptions changed since you reviewed them. Refresh and review the current lines before accepting.');
+		this.#audit('cfo', 'accept_bank_exceptions', 'period', periodId, { periodYm: periodId, snapshot: state.snapshot, reasonPlain: reason });
+		for (const task of this.#t.close_task.filter((t) => t.periodId === periodId && t.status === 'done' && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title }))) {
+			task.status = 'in_progress';
+			this.#emit('close_task', 'update', task);
+		}
+		this.#settle(periodId);
 	}
 
 	async lockPeriod(periodId: string): Promise<void> {
@@ -244,12 +263,17 @@ export class MockDataSource implements DataSource {
 					: `${unresolved.length} item${unresolved.length === 1 ? ' is' : 's are'} not resolved yet.`
 			);
 		}
+		const blocked = this.#t.close_task.filter((t) => t.periodId === periodId && t.status === 'blocked');
+		if (blocked.length) throw new Error(`${blocked.length} Close Task${blocked.length === 1 ? ' is' : 's are'} blocked.`);
+		const bank = bankExceptionState(this, periodId);
+		if (bank.rows.length && !bank.acceptance.accepted) throw new Error('Unmatched bank lines need your explicit acceptance before locking.');
 		const pending = this.#t.close_task.filter((t) => t.periodId === periodId && t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done');
 		if (period.status !== 'closing' && pending.length) throw new Error('Finish every close task before locking.');
 		period.status = 'closed';
 		period.lockedAt = this.#now();
 		this.#emit('period', 'update', period);
 		for (const t of this.#t.close_task.filter((t) => t.periodId === periodId && t.status !== 'done')) {
+			if (bank.rows.length && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })) continue;
 			t.status = 'done';
 			this.#emit('close_task', 'update', t);
 		}
@@ -266,7 +290,7 @@ export class MockDataSource implements DataSource {
 		period.lockedAt = undefined;
 		this.#emit('period', 'update', period);
 		this.#message({ role: 'cfo', kind: 'statement', body: `UNLOCK ${periodId}: ${reason}`, summary: `You unlocked the period: ${reason}`, threadId: closeThread(periodId) });
-		this.#audit('cfo', 'period.unlock', 'period', periodId, { reason });
+		this.#audit('cfo', 'unlock_period', 'period', periodId, { reason });
 	}
 
 	// Charters. Demo mode has no eval runner: an eval checks the line mapping the way the editor does (every line mapped,
@@ -683,16 +707,21 @@ export class MockDataSource implements DataSource {
 			t.status = next;
 			this.#emit('close_task', 'update', t);
 		};
+		const bank = bankExceptionState(this, periodId);
 		for (const t of tasks) {
 			if (t.ownerRole === 'cfo' || t.ownerRole === 'advisor' || !t.proposalIds.length) continue;
 			const ps = t.proposalIds.map((id) => byId.get(id)).filter((p): p is Proposal => !!p);
+			if (bank.rows.length && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })) {
+				set(t, ps.some((p) => p.status === 'awaiting_cfo') ? 'blocked' : 'in_progress');
+				continue;
+			}
 			set(t, ps.every((p) => RESOLVED.includes(p.status)) ? 'done' : ps.some((p) => p.status === 'awaiting_cfo') ? 'blocked' : 'in_progress');
 		}
 		const unresolved = forPeriod.filter((p) => UNRESOLVED.includes(p.status));
 		for (const t of tasks.filter((t) => t.ownerRole === 'advisor')) {
 			set(t, close.status === 'running' ? 'in_progress' : unresolved.some((p) => p.status === 'awaiting_cfo') ? 'blocked' : unresolved.length ? 'in_progress' : 'done');
 		}
-		if (close.status === 'done' && !unresolved.length && period.status === 'open') {
+		if (close.status === 'done' && !unresolved.length && period.status === 'open' && (!bank.rows.length || bank.acceptance.accepted)) {
 			period.status = 'closing';
 			this.#emit('period', 'update', period);
 			const month = new Date(Date.UTC(period.year, period.month - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
@@ -700,8 +729,8 @@ export class MockDataSource implements DataSource {
 				role: 'advisor',
 				kind: 'ruling',
 				threadId: closeThread(periodId),
-				body: `REQUEST LOCK ${periodId}. All proposals resolved; trial balance ties; no open items.`,
-				summary: `Every item for ${month} is resolved and the books balance. The Advisor asks you to lock ${month}.`
+				body: `REQUEST LOCK ${periodId}. All proposals resolved; trial balance ties. ${bank.rows.length ? `${bank.rows.length} bank exception(s) accepted by the CFO remain unmatched.` : 'No bank exceptions remain.'}`,
+				summary: `The proposals for ${month} are resolved and the books balance. ${bank.rows.length ? `${bank.rows.length} accepted bank exception(s) remain unmatched. ` : ''}The Advisor asks you to lock ${month}.`
 			});
 			this.#audit('advisor', 'period.request_lock', 'period', periodId, {});
 		}

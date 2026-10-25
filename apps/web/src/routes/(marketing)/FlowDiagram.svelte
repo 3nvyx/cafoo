@@ -18,7 +18,20 @@
 		initials: string;
 	}
 
-	const STAGES = ['Sources', 'Propose', 'Critique', 'Rule', 'Confirm', 'Post'];
+	// The six steps, each with the sentence that sits under its heading. The heading is the
+	// caption step in sentence case; the number is part of the diagram, not an eyebrow.
+	interface Step {
+		name: string;
+		blurb: string;
+	}
+	const STEPS: Step[] = [
+		{ name: 'Sources', blurb: 'Bank lines, invoices and owner records from bureaus and filings come in.' },
+		{ name: 'Propose', blurb: 'The Bookkeeper, Revenue and Credit & Risk agents each draft a proposal.' },
+		{ name: 'Critique', blurb: 'A second model, the Red Team, challenges every proposal.' },
+		{ name: 'Rule', blurb: 'The Advisor applies the rules and explains the decision.' },
+		{ name: 'Confirm', blurb: 'Anything of $10,000 or more waits for the CFO\'s one-click confirmation.' },
+		{ name: 'Post', blurb: 'Under $10,000 posts straight to the ledger, behind the gate.' }
+	];
 	const nodes: Node[] = [
 		{ id: 'bank', c: 0, r: 0, title: 'Bank feed', short: 'Bank', sub: 'bank lines', tone: 'system', initials: 'BF' },
 		{ id: 'billing', c: 0, r: 1, title: 'Billing', sub: 'invoices', tone: 'system', initials: 'BL' },
@@ -53,18 +66,23 @@
 		nh: number;
 		nodeW: (n: Node) => number;
 		pos: (n: Node) => { x: number; y: number };
+		/** Where a step's heading and sentence go. */
+		band: (c: number) => { x: number; y: number; w: number; h: number };
 		edge: (a: Node, b: Node, bend: Bend) => { d: string; lx: number; ly: number; anchor: 'start' | 'middle' | 'end' };
 	}
 
 	// Wide screens run left to right; phones run top to bottom with the same lanes.
 	// Stage x positions leave room between stages for a chip to be seen in transit.
+	// Each step's text sits in a band above its column; the lanes start below the band.
 	const XS = [16, 196, 412, 628, 764, 916];
+	const WIDE_BAND = 112; // five caption lines of text, with one line to spare
 	const wide: Layout = {
 		w: 1070,
-		h: 304,
+		h: WIDE_BAND + 12 + 2 * 92 + 60 + 8,
 		nh: 60,
 		nodeW: (n) => (n.c === 0 ? 112 : 140),
-		pos: (n) => ({ x: XS[n.c], y: 44 + n.r * 92 }),
+		pos: (n) => ({ x: XS[n.c], y: WIDE_BAND + 12 + n.r * 92 }),
+		band: (c) => ({ x: XS[c], y: 0, w: (XS[c + 1] ?? 1070) - XS[c] - 16, h: WIDE_BAND }),
 		edge(a, b, bend) {
 			const p = this.pos(a), q = this.pos(b), aw = this.nodeW(a), bw = this.nodeW(b), mid = this.nh / 2;
 			if (bend === 'down') {
@@ -79,18 +97,27 @@
 			return { d: `M${x1} ${y1} C${x1 + k} ${y1} ${x2 - k} ${y2} ${x2} ${y2}`, lx: (x1 + x2) / 2, ly: (y1 + y2) / 2 - 8, anchor: 'middle' };
 		}
 	};
+	// Each step's text sits in a band above its row of nodes; the wires pass behind the text.
+	// The drawing is scaled down on a phone, so the text here is a step larger (body-sm).
+	const TALL_PITCH = 140;
+	const TALL_TOP = 70;
 	const tall: Layout = {
 		w: 360,
-		h: 600,
+		h: TALL_TOP + 5 * TALL_PITCH + 52 + 8,
 		nh: 52,
 		nodeW: () => 108,
-		pos: (n) => ({ x: 8 + n.r * 118, y: 40 + n.c * 96 }),
+		pos: (n) => ({ x: 8 + n.r * 118, y: TALL_TOP + n.c * TALL_PITCH }),
+		band: (c) => ({ x: 8, y: TALL_TOP + c * TALL_PITCH - 70, w: 344, h: 64 }),
 		edge(a, b) {
 			const p = this.pos(a), q = this.pos(b);
 			const x1 = p.x + 54, y1 = p.y + this.nh, x2 = q.x + 54, y2 = q.y, k = (y2 - y1) / 2;
-			// A straight wire's label goes on its left, clear of the CFO node in the right lane.
-			const straight = x1 === x2;
-			return { d: `M${x1} ${y1} C${x1} ${y1 + k} ${x2} ${y2 - k} ${x2} ${y2}`, lx: straight ? x1 - 6 : (x1 + x2) / 2 + 6, ly: (y1 + y2) / 2 + 4, anchor: straight ? 'end' : 'start' };
+			// A label must stay clear of the next step's text. A wire that skips a step has its
+			// midpoint in that step's empty lane, so the label goes there, on the wire's left; a
+			// wire to the next step gets its label just under its source node, on the right.
+			const skips = b.c - a.c > 1;
+			return skips
+				? { d: `M${x1} ${y1} C${x1} ${y1 + k} ${x2} ${y2 - k} ${x2} ${y2}`, lx: x1 - 6, ly: (y1 + y2) / 2 + 4, anchor: 'end' }
+				: { d: `M${x1} ${y1} C${x1} ${y1 + k} ${x2} ${y2 - k} ${x2} ${y2}`, lx: x1 + 6, ly: y1 + 14, anchor: 'start' };
 		}
 	};
 
@@ -103,17 +130,7 @@
 {#snippet diagram(L: Layout, vertical: boolean)}
 	<svg viewBox="0 0 {L.w} {L.h}" class="h-auto w-full" use:smil={paused} role="img" aria-labelledby="flow-title-{vertical ? 1 : 0} flow-desc-{vertical ? 1 : 0}">
 		<title id="flow-title-{vertical ? 1 : 0}">How a Proposal reaches the ledger</title>
-		<desc id="flow-desc-{vertical ? 1 : 0}">
-			Bank lines, billing and owner records feed the Bookkeeper, Revenue and Credit and Risk agents. Every Proposal goes to the Red Team, then the Advisor. Items under $10,000 post to the ledger; items of $10,000 or more go to the CFO first.
-		</desc>
-
-		{#each STAGES as s, c (s)}
-			{#if vertical}
-				<text x="8" y={L.pos({ c, r: 0 } as Node).y - 10} class="fill-ink-3 font-mono text-[11px]" style="paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round">0{c + 1} {s.toUpperCase()}</text>
-			{:else}
-				<text x={L.pos({ c, r: 0 } as Node).x} y="22" class="fill-ink-3 font-mono text-[12px]" style="paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round">0{c + 1} {s.toUpperCase()}</text>
-			{/if}
-		{/each}
+		<desc id="flow-desc-{vertical ? 1 : 0}">{STEPS.map((s, i) => `${i + 1}. ${s.name}: ${s.blurb}`).join(' ')}</desc>
 
 		{#each edges as [from, to, label, , bend = 'side'] (from + to)}
 			{@const e = L.edge(byId[from], byId[to], bend)}
@@ -144,6 +161,19 @@
 				{/if}
 			{/each}
 		{/if}
+
+		<!-- Step headings and sentences, as HTML so the sentence wraps to its column. Each line
+		     carries its own background, the same halo the wire labels have, so a wire passing
+		     behind the text on phones disappears only where there are words. -->
+		{#each STEPS as s, c (s.name)}
+			{@const b = L.band(c)}
+			<foreignObject x={b.x} y={b.y} width={b.w} height={b.h}>
+				<div class={vertical ? 'font-sans text-body-sm' : 'font-sans text-caption'}>
+					<p class="font-medium text-ink"><span class="box-decoration-clone bg-surface py-px"><span class="text-ink-3">0{c + 1}</span> {s.name}</span></p>
+					<p class="text-ink-3"><span class="box-decoration-clone bg-surface py-px">{s.blurb}</span></p>
+				</div>
+			</foreignObject>
+		{/each}
 
 		{#each nodes as n (n.id)}
 			{@const p = L.pos(n)}
