@@ -58,7 +58,7 @@
 
 <svelte:head>
 	<title>Cafoo · The agentic finance ERP</title>
-	<meta name="description" content="Agents close your books. A Red Team critiques, an Advisor rules, and the CFO confirms anything material. Every number drills down." />
+	<meta name="description" content="AI agents do your month-end close: matching, accruals and revenue schedules. They only suggest changes; a second AI challenges each one, a reviewing agent rules, and you confirm anything material." />
 </svelte:head>
 
 <svelte:window onscroll={onScroll} />
@@ -94,10 +94,10 @@
 			<div class="sky absolute inset-0 -z-10"><PaintedSky seed={11} /></div>
 		<!-- A split hero: the heading on the left, the pitch and one action on the right, set to its baseline. -->
 		<section class="mx-auto grid max-w-[1120px] grid-cols-2 gap-x-[14px] px-4 pt-32 pb-28 sm:px-8 sm:pt-56 sm:pb-44 md:grid-cols-6 md:gap-x-4 lg:grid-cols-12 lg:gap-x-[18px]">
-			<h1 class="col-span-full text-[52px] leading-[0.95] font-medium text-balance sm:text-[88px] md:col-span-4 lg:col-span-7" style="letter-spacing:-0.035em">Agents close your books</h1>
+			<h1 class="col-span-full text-[52px] leading-[0.95] font-medium text-balance sm:text-[88px] md:col-span-4 lg:col-span-7" style="letter-spacing:-0.035em">Agents do your <span class="whitespace-nowrap">month-end</span> close</h1>
 			<div class="col-span-full mt-8 flex flex-col gap-6 md:col-span-2 md:col-start-5 md:mt-0 md:mb-2 md:self-end lg:col-span-4 lg:col-start-9">
 				<p class="max-w-[46ch] text-lg text-pretty text-ink-2 md:max-w-none">
-					Agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything at or above your threshold waits for your one click.
+					Cafoo is an agentic ERP for finance teams. Its agents match bank deposits to invoices, book accruals, schedule revenue, check new customers' credit and consolidate every subsidiary into one set of books. A second AI challenges each change before it posts, and anything over your limit waits for your click.
 				</p>
 				<a href="/dashboard" {...newTab} class="cta">{live ? 'Get started' : 'Try the live demo'}{@render tabNote()}</a>
 			</div>
