@@ -1,6 +1,6 @@
 <script lang="ts">
-	// The dashboard sidebar: brand, Search and the collapse toggle on top, then the month every page shows and the
-	// ledger connection, grouped destinations that can fold away, and the CFO profile pinned to the bottom.
+	// The dashboard sidebar: brand, Search and the collapse toggle on top, then the month every page shows,
+	// grouped destinations that can fold away, and the CFO profile pinned to the bottom.
 	// Collapsed to icons, the top holds one button, so Search becomes a row and the month picker a button that expands.
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
@@ -63,22 +63,9 @@
 
 	const periods = $derived(db.periods());
 	const current = $derived(periods.find((p) => p.id === ui.periodId));
-	const conn = $derived(db.connection());
-	const seat = $derived(db.cfoSeat());
 	const statusWord = { open: 'Open', closing: 'Closing', closed: 'Locked' } as const;
-	const ledgerWord = { live: 'Live', connecting: 'Connecting', offline: 'Offline' } as const;
-	const seatNeedsYou = $derived(conn.ledger !== 'demo' && (seat.status === 'other' || seat.status === 'unclaimed'));
-	const seatWord = $derived(seat.status === 'other' ? 'CFO seat held elsewhere' : 'Claim the CFO seat');
 	// The collapsed button's whole story, since it has no room for words.
-	const compactLabel = $derived(
-		[
-			current ? `Month: ${periodShort(current)}, ${statusWord[current.status]}` : 'Month: none',
-			conn.ledger === 'demo' ? 'Demo data' : `Ledger: ${ledgerWord[conn.ledger]}`,
-			seatNeedsYou ? seatWord : ''
-		]
-			.filter(Boolean)
-			.join('. ')
-	);
+	const compactLabel = $derived(current ? `Month: ${periodShort(current)}, ${statusWord[current.status]}` : 'Month: none');
 
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
 	const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
@@ -163,9 +150,6 @@
 				onclick={() => ui.toggleNav()}
 			>
 				<Icon name="calendar" size={18} />
-				{#if conn.ledger !== 'demo'}
-					<span class="absolute top-1.5 right-1.5 size-2 rounded-full {seatNeedsYou || conn.ledger === 'connecting' ? 'bg-warn' : conn.ledger === 'live' ? 'bg-pos' : 'bg-neg'}" aria-hidden="true"></span>
-				{/if}
 			</button>
 		{:else}
 			<div class="flex flex-col gap-2">
@@ -178,19 +162,6 @@
 					</select>
 					<Icon name="chevronDown" size={16} class="pointer-events-none absolute right-2.5 text-ink-3" />
 				</label>
-				<p class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-caption text-ink-3">
-					{#if conn.ledger === 'demo'}
-						Demo data
-					{:else}
-						<span class="inline-flex items-center gap-1.5" title={conn.message ?? ''}>
-							<span class="size-2 rounded-full {conn.ledger === 'live' ? 'bg-pos' : conn.ledger === 'connecting' ? 'bg-warn' : 'bg-neg'}" aria-hidden="true"></span>
-							{ledgerWord[conn.ledger]}
-						</span>
-						{#if seatNeedsYou}
-							<a href="/claim" class="rounded-sm bg-warn-soft px-2 py-0.5 text-on-warn-soft">{seatWord}</a>
-						{/if}
-					{/if}
-				</p>
 			</div>
 		{/if}
 
