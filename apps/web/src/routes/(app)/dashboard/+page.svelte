@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
-	import { periodLabel, periodShort, ymShort } from '#lib/data/derive.js';
+	import { periodLabel, ymShort } from '#lib/data/derive.js';
 	import { isWholeMonths, monthRange, monthly, monthsIn, postings, previousRange, rangeDays, summarize, type DateRange, type Summary } from '#lib/data/dashboard.js';
 	import { rootOf } from '#lib/data/group.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
@@ -130,7 +130,8 @@
 			/>
 		</section>
 
-		<div class="flex min-w-0 flex-col gap-8">
+		<!-- With nothing waiting, the close's next step (start it, lock it) leads on narrow screens. -->
+		<div class="flex min-w-0 flex-col gap-8 {queue.length ? '' : 'order-first lg:order-none'}">
 			<CloseCard {period} />
 
 			<section aria-labelledby="feed-h">
@@ -160,16 +161,7 @@
 					<button class="chip" aria-pressed={mode === 'month'} onclick={() => (mode = 'month')}>Month</button>
 					<button class="chip" aria-pressed={mode === 'range'} onclick={pickRange}>Date range</button>
 				</div>
-				{#if mode === 'month'}
-					<label class="flex flex-col gap-1 text-caption text-ink-2">
-						Month
-						<select class="field num text-body-sm" bind:value={ui.periodId}>
-							{#each db.periods() as p (p.id)}
-								<option value={p.id}>{periodShort(p)}</option>
-							{/each}
-						</select>
-					</label>
-				{:else}
+				{#if mode === 'range'}
 					<label class="flex flex-col gap-1 text-caption text-ink-2">
 						From
 						<input type="date" class="field num text-body-sm" bind:value={from} min={bounds?.from} max={bounds?.to} />

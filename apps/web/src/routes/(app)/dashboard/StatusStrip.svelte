@@ -20,10 +20,14 @@
 
 	const conn = $derived(db.connection());
 	const run = $derived(conn.closes.find((c) => c.periodYm === period.id));
+	// What an agent is doing is app-wide; it counts for this month only when it is about one of this month's Proposals.
+	const act = $derived(db.liveActivity());
+	const activeHere = $derived(!!act && (!act.proposalId || proposals.find((p) => p.id === act.proposalId)?.periodId === period.id));
 	const agents = $derived.by(() => {
 		if (run?.status === 'error') return { value: 'Stopped', note: 'The close run hit an error', tone: 'neg' as const };
 		if (conn.agents === 'offline') return { value: 'Offline', note: 'The agent gateway is unreachable', tone: 'neg' as const };
-		if (db.liveActivity() || run?.status === 'running') return { value: 'Working', note: `Closing ${periodShort(period)}`, tone: null };
+		if (run?.status === 'running' || activeHere) return { value: 'Working', note: `Closing ${periodShort(period)}`, tone: null };
+		if (act) return { value: 'Working', note: 'On another month', tone: null };
 		return { value: 'Idle', note: run?.status === 'done' ? 'The close run finished' : 'Waiting for a close to start', tone: null };
 	});
 
@@ -33,8 +37,8 @@
 	const items = $derived<{ label: string; value: string; note: string; href: string; tone: Tone; num?: boolean }[]>([
 		{ label: 'Needs your OK', value: `${needs}`, note: needs ? 'Above your threshold' : 'Nothing waiting', href: '/proposals?status=awaiting_cfo', tone: needs ? 'warn' : null, num: true },
 		{ label: 'In debate', value: `${debating}`, note: 'Red Team and Advisor', href: '/proposals?status=open', tone: null, num: true },
-		{ label: 'Unmatched bank lines', value: `${bank}`, note: !bank ? 'All matched' : bankDecision ? 'Decide before the lock' : gate.started || period.status === 'closed' ? 'Accepted as open' : 'The close matches what it can', href: '/close#bank-exceptions', tone: bankDecision ? 'warn' : null, num: true },
-		{ label: 'Close checklist', value: tasks.length ? `${done} of ${tasks.length}` : '–', note: period.status === 'closed' ? 'Locked' : done === tasks.length && tasks.length ? 'Ready to lock' : 'Tasks done', href: '/close', tone: null, num: true },
+		{ label: 'Unmatched bank lines', value: `${bank}`, note: !bank ? 'All matched' : bankDecision ? 'Decide before the lock' : period.status === 'closed' ? 'Locked unmatched' : gate.started ? 'Accepted as open' : 'The close matches what it can', href: '/close#bank-exceptions', tone: bankDecision ? 'warn' : null, num: true },
+		{ label: 'Close checklist', value: tasks.length ? `${done} of ${tasks.length}` : '–', note: period.status === 'closed' ? 'Locked' : gate.canLock ? 'Ready to lock' : 'Tasks done', href: '/close', tone: gate.canLock && period.status !== 'closed' ? 'warn' : null, num: true },
 		{ label: 'Agents', value: agents.value, note: agents.note, href: '/agents', tone: agents.tone }
 	]);
 </script>
@@ -42,8 +46,8 @@
 <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Status">
 	{#each items as it (it.label)}
 		<li class={it.label === 'Agents' ? 'col-span-2 sm:col-span-1' : ''}>
-			<a href={it.href} class="card flex h-full flex-col gap-1 p-4 transition-colors {it.tone ? FILL[it.tone] : 'hover:bg-subtle'}">
-				<span class="text-body-sm {it.tone ? '' : 'text-ink-2'}">{it.label}</span>
+			<a href={it.href} class="group card flex h-full flex-col gap-1 p-4 transition-colors {it.tone ? FILL[it.tone] : 'hover:bg-subtle'}">
+				<span class="text-body-sm {it.tone ? 'group-hover:underline' : 'text-ink-2'}">{it.label}</span>
 				<span class="text-title font-medium {it.num ? 'num' : ''} {it.tone ? '' : 'text-ink'}">{it.value}</span>
 				<span class="text-caption {it.tone ? '' : 'text-ink-3'}">{it.note}</span>
 			</a>
