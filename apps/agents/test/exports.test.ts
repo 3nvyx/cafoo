@@ -100,7 +100,7 @@ describe('Google Slides export', () => {
     // Past 120 rows the deck stops and says the rest is in the CSV.
     const long = deckRequests('Deck', 'sub', [{ ...wide, rows: Array.from({ length: 300 }, () => ['x']) }]) as Record<string, any>[];
     expect(long.filter(r => r.createTable)).toHaveLength(10);
-    expect(long.find(r => r.insertText?.objectId === 'cafoo_s1_t').insertText.text).toBe('Ledger, 2026-09 (1 of 10); first 120 of 300 rows, first 8 of 15 columns, all in the CSV');
+    expect(long.find(r => r.insertText?.objectId === 'cafoo_s1_t')?.insertText.text).toBe('Ledger, 2026-09 (1 of 10); first 120 of 300 rows, first 8 of 15 columns, all in the CSV');
   });
 
   it('signs in, creates the deck, shares it, fills it, and records the export', async () => {
