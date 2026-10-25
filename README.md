@@ -91,6 +91,25 @@ The three `ENABLE_*_GENERATION` flags stop Open WebUI from sending its own backg
 Open WebUI in Docker connects from the Docker network, not from loopback, so it needs the key both to chat and to start a close; with the key it can do both.
 Once `GATEWAY_HOST` is `0.0.0.0`, other machines on your network can reach the port too; the key is what keeps them out of `/v1/*` and anything that changes state.
 
+## The Advisor on Agentverse and ASI:One
+
+![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
+![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
+
+| Agent | Address |
+|---|---|
+| Cafoo Advisor (orchestrator, on Agentverse) | `agent1q0umtvqa3es9hwpd04uhu4fman6epdmy4thrqkp50nqk5ra7al8mvqy8rde` |
+| Cafoo Bookkeeper | `agent1q268mjp7znyh33pylwdy23y6tmscxf7h2akfqrkcunumq0fdvt2nsn6cjl4` |
+| Cafoo Revenue | `agent1qd0j6p9yg2uklfjgumrx59fc0fqvr6c6smftht356kkg39lza5tt6n5ppvt` |
+| Cafoo Credit & Risk | `agent1q25a3cnevsjrgmrx9ddy2wqq6ujw0ms6yynpzsqexy2tjmc26gdpz3qjsp6` |
+| Cafoo Consolidation | `agent1q2elptd3ff4sh5htr22h6dc0egmzejqjm07e2wwmmhfvr60z49ekcfgegfw` |
+| Cafoo Red Team | `agent1qwn005l9dqmmnhk703v3r60c2dckj0kmx2s97sh38gfhvdgzpqw0wjklap2` |
+
+The Advisor is also a uAgent with the Agent Chat Protocol and ASI:One interactive cards, so anyone can chat with it from ASI:One.
+It orchestrates five specialist uAgents, each with its own request and response models: a financial health check asks them in parallel and returns one card with advice.
+It also lists what waits for the CFO, explains any Proposal with its Red Team critiques and ruling, starts the close, and answers questions from the live books; it never confirms or posts.
+It runs next to this stack as a mailbox agent; see [apps/asi-advisor/README.md](apps/asi-advisor/README.md).
+
 ## The group close, the feed, and charters
 
 **A group of three companies.** The demo books hold Cafoo Inc (USD, the parent), Cafoo Ltd (GBP) and the Elimination subsidiary, which holds only eliminations. One Period per month covers the whole group, and the CFO locks it once. Account codes line up across companies by Group code (`2950-UK` is the UK's 2950).
