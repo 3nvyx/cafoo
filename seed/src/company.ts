@@ -78,7 +78,14 @@ type Seat = { title: string; department: string; country: 'US' | 'UK'; salary: n
 const FIRST = ['Maya', 'Theo', 'Priya', 'Jonah', 'Amara', 'Lucas', 'Sofia', 'Ravi', 'Hana', 'Owen', 'Leila', 'Mateo', 'Ines', 'Kofi', 'Elena', 'Daniel', 'Yuki', 'Nadia', 'Samuel', 'Grace', 'Arjun', 'Zara', 'Felix', 'Imani', 'Noah', 'Chloe', 'Tariq', 'Ruth', 'Emil', 'Ana', 'Ben', 'Clara', 'Dev', 'Esther', 'Farid', 'Gemma', 'Hugo', 'Ivy', 'Jamal', 'Kira', 'Liam', 'Mira', 'Nico', 'Olga', 'Pablo', 'Quinn', 'Rosa', 'Sven', 'Tara', 'Uma', 'Victor', 'Wren', 'Xavi', 'Yara', 'Zane', 'Aiden', 'Bea', 'Cyrus', 'Dina', 'Eli', 'Fiona', 'Gus'];
 const LAST = ['Okonkwo', 'Lindgren', 'Raman', 'Castillo', 'Haddad', 'Moreau', 'Nakamura', 'Fitzgerald', 'Abara', 'Petrov', 'Delgado', 'Brennan', 'Sato', 'Mensah', 'Kowalski', 'Ferreira', 'Iqbal', 'Larsen', 'Osei', 'Varga', 'Quinlan', 'Whitaker', 'Ashby', 'Rinaldi', 'Takahashi', 'Ndiaye', 'Holm', 'Kapoor', 'Silva', 'Marsh', 'Novak', 'Ahmed'];
 
-function seats(): Seat[] {
+const monthsFrom = (from: string, to: string) => {
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm] = to.split('-').map(Number);
+  return (ty - fy) * 12 + (tm - fm);
+};
+
+/** Every seat, with its start month. Each role is hired evenly from its first start to the close, so everyone has started by then. */
+function seats(closeYm: string): Seat[] {
   const s: Seat[] = [
     { title: 'Chief executive officer and co-founder', department: 'leadership', country: 'US', salary: 210_000, start: '2024-02' },
     { title: 'Chief technology officer and co-founder', department: 'leadership', country: 'US', salary: 205_000, start: '2024-02' },
@@ -90,7 +97,8 @@ function seats(): Seat[] {
     { title: 'Managing director, UK', department: 'leadership', country: 'UK', salary: 140_000, start: '2025-10' },
   ];
   const add = (n: number, title: string, department: string, country: 'US' | 'UK', lo: number, hi: number, firstStart: string, type?: string) => {
-    for (let i = 0; i < n; i++) s.push({ title, department, country, salary: lo + Math.round(((hi - lo) * i) / Math.max(1, n - 1)), start: ymAdd(firstStart, Math.floor((i * 17) / Math.max(1, n))), type });
+    const span = Math.max(1, monthsFrom(firstStart, closeYm) + 1);
+    for (let i = 0; i < n; i++) s.push({ title, department, country, salary: lo + Math.round(((hi - lo) * i) / Math.max(1, n - 1)), start: ymAdd(firstStart, Math.floor((i * span) / Math.max(1, n))), type });
   };
   add(15, 'Software engineer', 'engineering', 'US', 150_000, 205_000, '2024-04');
   add(4, 'Software engineer', 'engineering', 'UK', 85_000, 110_000, '2025-11');
@@ -108,11 +116,16 @@ function seats(): Seat[] {
   return s;
 }
 
+/** US employees (not contractors) on the payroll in month `ym`: the ledger's monthly payroll counts these people. */
+export function usStaffAt(closeYm: string, ym: string): number {
+  return seats(closeYm).filter((s) => s.country === 'US' && s.type !== 'contractor' && s.start <= ym).length;
+}
+
 function buildPeople(input: CompanyInput, rand: () => number) {
   const us = input.subsidiaryIds.get('US') ?? '1';
   const uk = input.subsidiaryIds.get('UK') ?? us;
   const employees: Record<string, unknown>[] = [];
-  const all = seats();
+  const all = seats(input.closeYm);
   all.forEach((seat, i) => {
     const id = `qm-emp-${String(i + 1).padStart(2, '0')}`;
     const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 7) % LAST.length]}`;
