@@ -24,7 +24,7 @@
 </script>
 
 <div class="cascade flex flex-col gap-2" class:run={active}>
-	<div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+	<div class="grid gap-2 sm:grid-cols-2">
 		{#each steps as s, i (s.title)}
 			<div class="step flex flex-col gap-2 rounded-lg border border-line bg-canvas p-4" style="--i:{i}">
 				<div class="flex items-center gap-2">
@@ -37,7 +37,7 @@
 		{/each}
 	</div>
 	<!-- The tier the books derive, under the four checks, with the payment terms each tier allows. -->
-	<div class="step flex flex-col gap-4 rounded-lg border border-line bg-canvas p-4 md:flex-row md:items-center md:justify-between" style="--i:4">
+	<div class="step flex flex-col gap-4 rounded-lg border border-line bg-canvas p-4" style="--i:4">
 		<div class="flex flex-col gap-1">
 			<div class="flex items-center gap-2">
 				<Icon name="lock" size={16} />
@@ -45,7 +45,7 @@
 			</div>
 			<p class="text-body-sm text-ink-2">The database derives it from the recorded facts, so the agent cannot claim a friendlier one.</p>
 		</div>
-		<ul class="grid shrink-0 grid-cols-5 gap-1">
+		<ul class="grid grid-cols-5 gap-1">
 			{#each tiers as t (t.tier)}
 				<li class="flex flex-col items-center gap-0.5 rounded-md bg-surface px-2 py-1.5 text-center">
 					<span class="num text-body-sm font-medium">{t.tier}</span>

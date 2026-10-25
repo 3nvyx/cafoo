@@ -3,8 +3,10 @@
 	// sponsor's API does inside Cafoo. It moves only when the visitor asks (the tabs, the arrows, or
 	// arrow keys on the tabs); nothing advances on its own, so there is nothing to pause.
 	// From lg up every slide shares one grid cell, so the card keeps the tallest slide's height and
-	// does not jump; below lg only the open slide is laid out. Each slide's visual is told whether it
-	// is open, so a closed one stops animating.
+	// does not jump; below lg only the open slide is laid out. From xl up a slide splits in two, the
+	// visual on the left and the words on the right. Each slide's visual is told whether it is open,
+	// so a closed one stops animating.
+	import { MediaQuery } from 'svelte/reactivity';
 	import Icon from '#lib/components/Icon.svelte';
 	import GateStack from './GateStack.svelte';
 	import CreditCascade from './CreditCascade.svelte';
@@ -52,6 +54,8 @@
 	];
 
 	let current = $state(0);
+	// The xl split, where the security drawing goes compact to fit its half of the card.
+	const split = new MediaQuery('min-width: 1280px', false);
 
 	function go(i: number, focus = false) {
 		current = (i + slides.length) % slides.length;
@@ -106,18 +110,18 @@
 				role="tabpanel"
 				id="slide-{s.id}"
 				aria-labelledby="tab-{s.id}"
-				class="slide flex flex-col"
+				class="slide"
 				class:on={i === current}
 				inert={i !== current}
 				tabindex="0"
 			>
-				<div class="flex flex-col items-center text-center">
+				<div class="copy flex flex-col items-center text-center">
 					<h3 class="max-w-[24ch] text-display-sm font-medium text-balance sm:text-display">{s.title}</h3>
 					<p class="mt-4 max-w-[64ch] text-ink-2">{s.body}</p>
 				</div>
-				<div class="mt-10 flex flex-1 flex-col justify-center">
+				<div class="visual mt-10 flex flex-1 flex-col justify-center">
 					{#if s.id === 'security'}
-						<GateStack active={i === current} />
+						<GateStack active={i === current} compact={split.current} />
 					{:else if s.id === 'credit'}
 						<CreditCascade active={i === current} />
 					{:else if s.id === 'advisor'}
@@ -162,6 +166,10 @@
 	}
 
 	/* Below lg only the open slide is laid out. */
+	.slide {
+		display: flex;
+		flex-direction: column;
+	}
 	.slide:not(.on) {
 		display: none;
 	}
@@ -182,6 +190,25 @@
 		}
 		.slide.on {
 			transition-delay: 0s;
+		}
+	}
+	/* From xl up: the visual on the left, the heading and text on the right, read from the left. */
+	@media (min-width: 1280px) {
+		.slide,
+		.slide:not(.on) {
+			display: grid;
+			grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+			align-items: center;
+			gap: 48px;
+		}
+		.slide .copy {
+			order: 2;
+			align-items: flex-start;
+			text-align: left;
+		}
+		.slide .visual {
+			order: 1;
+			margin-top: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

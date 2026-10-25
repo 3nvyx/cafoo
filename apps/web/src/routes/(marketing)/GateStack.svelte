@@ -11,7 +11,9 @@
 	import { smil } from './smil';
 
 	// Closed when another carousel slide is open: the drawing is still laid out, so it stops itself.
-	let { active = true }: { active?: boolean } = $props();
+	// Compact, it sits in half a card: the parts list on the right is left out (the text beside the
+	// drawing covers the layers) and the drawing is cropped to the feeds, plates and gate log.
+	let { active = true, compact = false }: { active?: boolean; compact?: boolean } = $props();
 
 	interface Layer {
 		name: string;
@@ -184,7 +186,7 @@
 
 <div use:scrub use:watch>
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
-	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
+	<svg viewBox={compact ? '0 0 700 640' : '0 0 1040 640'} class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
 		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
@@ -254,7 +256,7 @@
 			{/each}
 		</g>
 
-		<g style="opacity:{Math.max(0, (p - 0.55) / 0.45)}">
+		<g style="opacity:{Math.max(0, (p - 0.55) / 0.45)}" display={compact ? 'none' : undefined}>
 			{#each layers as L, i (L.name)}
 				<path d={leader(i)} fill="none" class="stroke-ink-3" stroke-width="0.75" />
 				<text x={LABEL_X} y={labelY(i) - 6} class="fill-ink-3 font-mono text-[12px]">0{i + 1}</text>
