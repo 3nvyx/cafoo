@@ -165,7 +165,7 @@ describe('runLiveClose', () => {
     });
     await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 1.25 });
 
-    const opening = fx.calls[0]!;
+    const opening = fx.calls.find(c => c.reducer === 'postAgentMessage')!;
     expect(opening).toMatchObject({ role: 'advisor', reducer: 'postAgentMessage', args: { threadId: 'close:2026-09', kind: 'ruling', summaryPlain: 'The Advisor started the 2026-09 close.' } });
     expect(opening.args.body).toMatch(/^Opening the 2026-09 close for Cafoo Inc\. /);
     expect(runs).toHaveLength(1);
@@ -216,6 +216,20 @@ describe('runLiveClose', () => {
     expect(runs[0]!.options.model).toBe('claude-test-advisor');
     expect(runs[0]!.options.agents.credit.model).toBe('claude-test-worker');
   });
+  it('opens a soft close: the month\'s close tasks leave todo before the Advisor announces it, so the feed has stopped', async () => {
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(fx.calls.slice(0, 2).map(c => c.reducer)).toEqual(['updateCloseTask', 'postAgentMessage']);
+    expect(fx.callsTo('updateCloseTask')).toEqual([{ role: 'advisor', reducer: 'updateCloseTask', args: { taskId: 5n, status: 'in_progress', note: 'Close started' } }]);
+  });
+
+  it('refuses to start while an earlier month is not locked, before anything runs or is said', async () => {
+    rows.period!.find(p => p.ym === '2026-08')!.status = { tag: 'Open' };
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('The September 2026 close cannot start while August 2026 is not locked: months close in order. Lock August 2026 first.');
+    expect(runs).toEqual([]);
+    expect(fx.calls).toEqual([]);
+    expect(startCritic).not.toHaveBeenCalled();
+  });
+
 });
 
 describe('the PreToolUse role gate in the live close', () => {

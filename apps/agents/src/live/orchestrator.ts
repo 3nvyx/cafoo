@@ -6,7 +6,7 @@
  */
 import { query, type AgentDefinition, type HookCallback, type PostToolUseHookInput } from '@anthropic-ai/claude-agent-sdk';
 import { say, sleep, type Cast } from '../stdb';
-import { closeHasWork, openingMarker } from '../close-state';
+import { closeHasWork, closeStartRefusal, openingMarker } from '../close-state';
 import { advisorServer, booksServer, consolidationServer, crsServer, workerServer } from './tools';
 import { startCritic } from '../redteam';
 import { HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from '../harness';
@@ -38,6 +38,9 @@ function subagent(conn: RoleConn, role: WorkerRole): AgentDefinition {
 export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: string) => void) {
   const cfoWaitMs = Number(process.env.CLOSE_CFO_WAIT_MS?.trim() || 45 * 60_000);
   if (!Number.isSafeInteger(cfoWaitMs) || cfoWaitMs < 0) throw new Error('CLOSE_CFO_WAIT_MS must be a non-negative safe integer');
+  // A locked month, or an earlier month not locked yet (months close in order), is refused before anything runs.
+  const refusal = closeStartRefusal(cast.advisor, periodYm);
+  if (refusal) throw new Error(refusal);
   // Resume only a close that has work of its own (src/close-state.ts): not the live feed's Proposals of an open month,
   // and not a close that failed right after opening, before it filed anything.
   if (closeHasWork(cast.advisor, periodYm)) {
@@ -192,6 +195,12 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // Started only now, so a close that fails while setting up (a charter that does not build) leaves no critic running.
   const stopCritic = startCritic(cast);
   try {
+    // Opening the close is a soft close (docs/adr/0014): with a task out of todo the books stop the feed booking into
+    // the month, as the scripted close does. The tasks move before the opening message, so the feed has stopped by the
+    // time the close is announced; a rerun after a failure here finds no todo task left and goes on.
+    for (const t of A.db.closeTask.iter()) {
+      if (t.periodId === periodId && t.status.tag === 'Todo') await A.reducers.updateCloseTask({ taskId: t.id, status: 'in_progress', note: 'Close started' });
+    }
     // The opening message marks the close as started, so a second run resumes instead of proposing twice.
     await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     await run(

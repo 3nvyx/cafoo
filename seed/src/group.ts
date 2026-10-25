@@ -14,9 +14,12 @@
  * - Activity elimination $15,000 (4900 against 5900-UK). Cafoo Ltd's side is £11,811.03, which translates at the
  *   1.27 average rate to $15,000.01, so this pair shows a one-cent rounding difference (under the $1 tolerance).
  * The two closed months were consolidated when they closed: their service-fee activity eliminations ($15,000 each,
- * exact at 1.25) are seeded in ELIM, so the year-to-date group results carry only September's cent. Their balance
- * eliminations would have reversed by now, so none are seeded; September's checks (activity in the month, ELIM balances
- * through the month) still see nothing eliminated. Rates are seeded through the month after next (the seeded periods).
+ * exact at 1.25) are seeded in ELIM, so the year-to-date group results carry only September's cent. So are their
+ * balance eliminations, each with its reversal in the next month, so a closed month reopened and locked again still
+ * shows as consolidated (the module refuses to lock a group month that is not). Their rates book and close at 0.80, so
+ * they need no revaluation. Through September the balance eliminations and their reversals net to zero, so September's
+ * checks (activity in the month, ELIM balances through the month) still see nothing eliminated. Rates are seeded
+ * through the month after next (the seeded periods).
  */
 import { ELIM_ACCOUNTS, UK_ACCOUNTS, type SeedAccount } from './accounts';
 import { DAY_MICROS, microsAt, mulberry32, ymAdd, ymStr, type Ym } from './calendar';
@@ -190,6 +193,25 @@ export function buildGroup(close: Ym): GroupSeed {
         memo: `Remove ${period} service fees between Cafoo Inc and Cafoo Ltd`,
         lines: [usd('4900-ELIM', SERVICE_FEE_USD, 0, 'Service fees charged to Cafoo Ltd'), usd('5900-ELIM', 0, SERVICE_FEE_USD, 'Service fees paid to Cafoo Inc')],
       });
+      // And its balances: what Cafoo Inc's 1900 and 1950 show through the month, removed and reversed the next month.
+      const through = (code: string) =>
+        g.journalEntries
+          .filter(je => je.subsidiaryCode === 'US' && je.periodYm <= period)
+          .flatMap(je => je.lines)
+          .filter(l => l.accountCode === code)
+          .reduce((a, l) => a + Number(l.debitMinor) - Number(l.creditMinor), 0);
+      const due = through('1900');
+      const loan = through('1950');
+      const removal = [usd('2900-ELIM', due, 0, 'Due to Cafoo Inc'), usd('1900-ELIM', 0, due, 'Due from Cafoo Ltd'), usd('2950-ELIM', loan, 0, 'Loan from Cafoo Inc'), usd('1950-ELIM', 0, loan, 'Loan to Cafoo Ltd')];
+      g.journalEntries.push(
+        { subsidiaryCode: ELIM.code, periodYm: period, memo: `Remove balances Cafoo Inc and Cafoo Ltd owe each other at the end of ${period}`, lines: removal },
+        {
+          subsidiaryCode: ELIM.code,
+          periodYm: ymStr(ymAdd(ym, 1)),
+          memo: `Reversal of the ${period} balance elimination`,
+          lines: removal.map(l => ({ ...l, debitMinor: l.creditMinor, creditMinor: l.debitMinor, memo: `Reverse elimination: ${l.memo}` })),
+        }
+      );
     }
 
     tx(ym, 1, -RENT_GBP, 'STANDING ORDER SHOREDITCH WORKSPACE', 'Shoreditch Workspace');

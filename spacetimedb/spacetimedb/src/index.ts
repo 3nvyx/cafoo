@@ -5,6 +5,15 @@ import { sha256HexOfString, utf8 } from './sha256';
 // The Risk Tier rules, shared with the Credit & Risk agent's cascade: one pure file with no imports, I/O or clock.
 import { deriveTier, POLICY as CREDIT_POLICY, TIERS as CREDIT_TIERS, type Tier } from '../../../packages/crs-mcp/src/tiers';
 import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions, isBankReconciliationTask } from '../../../packages/ledger-core/src/bank-exceptions';
+// The close order (months in order, a group month locks only once consolidated), shared with the agents and Demo mode: one
+// pure file with no imports. docs/adr/0014-close-order-and-soft-close.md.
+import {
+  closeOrderRefusal,
+  consolidationDueRefusal,
+  isGroup,
+  type EliminationDue,
+  type RevaluationDue,
+} from '../../../packages/ledger-core/src/close-order';
 
 export { default } from './tables';
 
@@ -74,6 +83,12 @@ function periodByYm(ctx: Ctx, ym: string) {
   const p = ctx.db.period.ym.find(ym);
   if (!p) throw new SenderError(`Unknown period ${ym}`);
   return p;
+}
+
+/** Refuse when a month before `ym` is not locked yet: months start their close, ask for the lock and lock in order. */
+function assertCloseOrder(ctx: Ctx, ym: string, action: 'start' | 'request_lock' | 'lock') {
+  const why = closeOrderRefusal([...ctx.db.period.iter()].map(p => ({ ym: p.ym, status: p.status.tag })), ym, action);
+  if (why) throw new SenderError(why);
 }
 
 function assertPeriodOpen(ctx: Ctx, periodId: bigint, why?: string) {
@@ -893,6 +908,29 @@ function accountLines(ctx: Ctx, accountId: bigint, ym: string, mode: 'through' |
   return out;
 }
 
+/**
+ * One account's position through ym in its company's own currency: the booked functional balance of all its lines,
+ * and per foreign currency (any but `functional`) the debit-positive balance in that currency. The revaluation check
+ * and the lock's consolidation check both read it.
+ */
+function accountPosition(ctx: Ctx, accountId: bigint, ym: string, functional: string): { booked: bigint; foreign: Map<string, bigint> } {
+  let booked = 0n;
+  const foreign = new Map<string, bigint>();
+  for (const l of accountLines(ctx, accountId, ym, 'through')) {
+    booked += functionalOf(l);
+    const c = ccyKey(l.ccy);
+    if (c !== functional) foreign.set(c, (foreign.get(c) ?? 0n) + l.debitMinor - l.creditMinor);
+  }
+  return { booked, foreign };
+}
+
+/** An intercompany account's functional amount on an elimination basis: balance through ym, or activity in ym. */
+function icAmount(ctx: Ctx, accountId: bigint, ym: string, basis: 'balance' | 'activity'): bigint {
+  let n = 0n;
+  for (const l of accountLines(ctx, accountId, ym, basis === 'balance' ? 'through' : 'in')) n += functionalOf(l);
+  return n;
+}
+
 /** Net (debit − credit) per account code of some proposed lines. */
 function netByAccount(lines: LineIn[]): Map<string, bigint> {
   const net = new Map<string, bigint>();
@@ -997,12 +1035,9 @@ function checkFxRevaluation(ctx: Ctx, payloadJson: string, selfId: bigint | unde
     if (ccy === functional) throw new SenderError(`Item ${acct.code} is in ${ccy}, ${sub.code}'s own currency; only foreign-currency balances are revalued.`);
     const rate = closingRate(ctx, ccy, functional, ym);
     if (rate === undefined) throw new SenderError(`No ${ccy}/${functional} closing rate is recorded for ${ym}; record it before revaluing ${acct.code}.`);
-    let txn = 0n;
-    let booked = 0n;
-    for (const l of accountLines(ctx, acct.id, ym, 'through')) {
-      if (ccyKey(l.ccy) === ccy) txn += l.debitMinor - l.creditMinor;
-      booked += functionalOf(l);
-    }
+    const pos = accountPosition(ctx, acct.id, ym, functional);
+    const txn = pos.foreign.get(ccy) ?? 0n;
+    const booked = pos.booked;
     const target = applyFx(txn, rate);
     const delta = target - booked;
     const figures: [keyof FxRevaluationItem, bigint, string][] = [
@@ -1046,11 +1081,11 @@ type IcPair = {
 };
 type IcEliminationPayload = { subsidiaryId: string; periodYm: string; memo?: string; basis: string; reversesInYm?: string; pairs: IcPair[]; lines: JsonLine[] };
 
-/** The group's intercompany pairs by source group code (the same pairs as ledger-core's IC_PAIRS). */
-const IC_GROUP_PAIRS: Record<string, { counter: string; basis: 'balance' | 'activity' }> = {
-  '1900': { counter: '2900', basis: 'balance' },
-  '1950': { counter: '2950', basis: 'balance' },
-  '4900': { counter: '5900', basis: 'activity' },
+/** The group's intercompany pairs by source group code (the same pairs and labels as ledger-core's IC_PAIRS). */
+const IC_GROUP_PAIRS: Record<string, { counter: string; basis: 'balance' | 'activity'; label: string }> = {
+  '1900': { counter: '2900', basis: 'balance', label: 'Intercompany balance' },
+  '1950': { counter: '2950', basis: 'balance', label: 'Loan' },
+  '4900': { counter: '5900', basis: 'activity', label: 'Service fees' },
 };
 /** The account type the other company books the mirror of a balance or charge in. */
 const MIRROR_TYPE: Record<string, string> = { asset: 'liability', liability: 'asset', revenue: 'expense', expense: 'revenue' };
@@ -1133,8 +1168,7 @@ function checkIcElimination(ctx: Ctx, payloadJson: string, selfId: bigint | unde
     const pnl = (t: string) => t === 'revenue' || t === 'expense';
     if (basis === 'balance' && pnl(srcAcct.accountType.tag)) throw new SenderError(`Pair "${label}": ${srcAcct.code} is ${srcAcct.accountType.tag}; a balance elimination pairs asset and liability balances (use basis "activity").`);
     if (basis === 'activity' && !pnl(srcAcct.accountType.tag)) throw new SenderError(`Pair "${label}": ${srcAcct.code} is ${srcAcct.accountType.tag}; an activity elimination pairs income and expense (use basis "balance").`);
-    let signed = 0n;
-    for (const l of accountLines(ctx, srcAcct.id, ym, basis === 'balance' ? 'through' : 'in')) signed += functionalOf(l);
+    const signed = icAmount(ctx, srcAcct.id, ym, basis);
     const stated = minorOf(pair.amountMinor, `Pair "${label}" amountMinor`);
     if (stated !== abs(signed)) throw new SenderError(`Pair "${label}": amountMinor is ${stated}, but ${srcAcct.code} in ${src.code} shows ${abs(signed)} (${where}).`);
     for (const f of ['counterTranslatedMinor', 'differenceMinor'] as const) {
@@ -1160,11 +1194,95 @@ function checkIcElimination(ctx: Ctx, payloadJson: string, selfId: bigint | unde
   for (const code of expected.keys()) {
     const acct = ctx.db.account.code.find(code);
     if (!acct) continue;
-    let carried = 0n;
-    for (const l of accountLines(ctx, acct.id, ym, basis === 'balance' ? 'through' : 'in')) carried += functionalOf(l);
+    const carried = icAmount(ctx, acct.id, ym, basis);
     if (carried !== 0n) throw new SenderError(`${code} already carries ${carried} (${where}): ${ym} is already eliminated on the ${basis} basis. Reverse that elimination first.`);
   }
   return { payload, sub, period, next, lines };
+}
+
+/** A revaluation's own entry, or a reversal of one: the own-currency adjustments a foreign-currency account takes. */
+function isRevaluationEntry(ctx: Ctx, jeId: bigint): boolean {
+  const je = ctx.db.journalEntry.id.find(jeId);
+  const of = je?.reversalOf != null ? ctx.db.journalEntry.id.find(je.reversalOf) : je;
+  return of?.proposalId != null && ctx.db.proposal.id.find(of.proposalId)?.kind.tag === 'fx_revaluation';
+}
+
+/**
+ * Refuse a group month's lock request or lock until its consolidation matches the books, recomputed from the posted
+ * ledger with the revaluation and elimination checks' own arithmetic (accountPosition, icAmount) over the companies
+ * and pairs the Consolidation agent consolidates (ledger-core revaluation() and eliminations()): every trading
+ * company with an FX gain or loss account has its foreign-currency balances at the month's closing rate, and the
+ * elimination company carries exactly what the reporting-currency source companies show on each intercompany pair.
+ * A correction posted after the consolidation (a CFO reversal on an intercompany account, say) is caught here too.
+ * A month that is not a group month, or has nothing to consolidate, passes. An account that also holds the company's
+ * own currency, other than revaluation adjustments (a euro receipt into a dollar bank account), is left out: the
+ * revaluation restates a whole account, so it cannot restate the foreign part of a mixed one.
+ */
+function assertConsolidated(ctx: Ctx, period: { id: bigint; ym: string }, action: 'request_lock' | 'lock') {
+  const subs = [...ctx.db.subsidiary.iter()];
+  if (!isGroup(subs)) return;
+  const ym = period.ym;
+  const trading = subs.filter(s => !s.isElimination).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const elim = subs.find(s => s.isElimination)!;
+  const accountsOf = new Map(trading.map(s => [s.id, [...ctx.db.account.subsidiaryId.filter(s.id)].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))]));
+  const revalued = new Set<bigint>();
+  for (const p of ctx.db.proposal.iter()) {
+    if (p.periodId !== period.id || p.kind.tag !== 'fx_revaluation' || (p.status.tag !== 'approved' && p.status.tag !== 'amended')) continue;
+    try {
+      revalued.add(idOf((JSON.parse(p.payloadJson) as { subsidiaryId?: unknown }).subsidiaryId, 'subsidiaryId'));
+    } catch {
+      continue;
+    }
+  }
+  const revaluations: RevaluationDue[] = [];
+  for (const sub of trading) {
+    const accounts = accountsOf.get(sub.id)!;
+    if (!accounts.some(a => groupCode(a.code) === '7100')) continue;
+    const functional = ccyKey(sub.functionalCcy);
+    for (const acct of accounts) {
+      if (acct.accountType.tag !== 'asset' && acct.accountType.tag !== 'liability') continue;
+      const pos = accountPosition(ctx, acct.id, ym, functional);
+      if (pos.foreign.size === 0) continue;
+      if (accountLines(ctx, acct.id, ym, 'through').some(l => ccyKey(l.ccy) === functional && !isRevaluationEntry(ctx, l.jeId))) continue;
+      const base = { company: sub.name, accountCode: acct.code, functionalCcy: functional, revalued: revalued.has(sub.id) };
+      if (pos.foreign.size > 1) {
+        revaluations.push({ ...base, ccy: [...pos.foreign.keys()].sort().join(' and '), problem: 'several_currencies' });
+        continue;
+      }
+      const [first] = [...pos.foreign.entries()];
+      if (!first) continue;
+      const [ccy, txn] = first;
+      if (txn === 0n && pos.booked === 0n) continue;
+      const rate = closingRate(ctx, ccy, functional, ym);
+      if (rate === undefined) revaluations.push({ ...base, ccy, problem: 'no_closing_rate' });
+      else if (applyFx(txn, rate) !== pos.booked) revaluations.push({ ...base, ccy, deltaMinor: applyFx(txn, rate) - pos.booked });
+    }
+  }
+  const reporting = reportingCcy(ctx);
+  const eliminations: EliminationDue[] = [];
+  for (const [sourceGc, def] of Object.entries(IC_GROUP_PAIRS)) {
+    let sourceMinor = 0n;
+    for (const src of trading) {
+      if (ccyKey(src.functionalCcy) !== reporting) continue;
+      const sa = accountsOf.get(src.id)!.find(a => groupCode(a.code) === sourceGc);
+      if (!sa) continue;
+      if (!trading.some(c => c.id !== src.id && accountsOf.get(c.id)!.some(a => groupCode(a.code) === def.counter))) continue;
+      sourceMinor += icAmount(ctx, sa.id, ym, def.basis);
+    }
+    const elimAcct = ctx.db.account.code.find(codeFor(ctx, elim.id, sourceGc));
+    const eliminatedMinor = elimAcct ? icAmount(ctx, elimAcct.id, ym, def.basis) : 0n;
+    if (sourceMinor + eliminatedMinor === 0n) continue;
+    const due: EliminationDue = { label: def.label, basis: def.basis, sourceMinor, eliminatedMinor, reportingCcy: reporting };
+    if (def.basis === 'balance') {
+      // checkIcElimination posts a balance elimination only while the month it reverses in exists and is open.
+      const next = ctx.db.period.ym.find(ymAdd(ym, 1));
+      if (!next) due.reversal = { ym: ymAdd(ym, 1), problem: 'missing' };
+      else if (periodLocked(ctx, next.id)) due.reversal = { ym: next.ym, problem: 'locked' };
+    }
+    eliminations.push(due);
+  }
+  const why = consolidationDueRefusal(subs, { revaluations, eliminations }, ym, action);
+  if (why) throw new SenderError(why);
 }
 
 /**
@@ -1689,6 +1807,8 @@ export const propose = spacetimedb.reducer(
     postMessage(ctx, role, threadId, 'statement', rationale, summaryPlain, p.id);
     if (closeTaskId !== undefined) {
       const task = ctx.db.closeTask.id.find(closeTaskId);
+      // Filing against a task still in todo opens that month's close, so it follows the close order as updateCloseTask does.
+      if (task?.status.tag === 'todo') assertCloseOrder(ctx, periodById(ctx, task.periodId).ym, 'start');
       if (task) {
         const ids = task.evidenceProposalIds ? task.evidenceProposalIds.split(',') : [];
         ids.push(String(p.id));
@@ -1966,6 +2086,8 @@ export const updateCloseTask = spacetimedb.reducer(
       const bank = assertBankExceptionsAccepted(ctx, period.ym);
       if (bank.rows.length) s = 'in_progress';
     }
+    // A task leaving todo opens the month's close (the feed stops booking into it), so months open in order too.
+    if (task.status.tag === 'todo' && s !== 'todo') assertCloseOrder(ctx, periodById(ctx, task.periodId).ym, 'start');
     ctx.db.closeTask.id.update({ ...task, status: { tag: s } });
     audit(ctx, role, 'update_close_task', 'close_task', taskId, `${s} ${note}`);
   }
@@ -2058,12 +2180,14 @@ export const requestPeriodLock = spacetimedb.reducer(
     requireRole(ctx, ['advisor'], 'request a period lock');
     const p = periodByYm(ctx, periodYm);
     if (p.status.tag === 'closed') throw new SenderError(`Period ${periodYm} is already closed.`);
+    assertCloseOrder(ctx, periodYm, 'request_lock');
     const open = [...ctx.db.proposal.iter()].filter(
       x => x.periodId === p.id && (x.status.tag === 'open' || x.status.tag === 'awaiting_cfo' || x.status.tag === 'sent_back')
     );
     if (open.length > 0) throw new SenderError(`${open.length} proposals for ${periodYm} still need a ruling or the CFO's confirmation.`);
     assertNoBlockedTasks(ctx, p.id, periodYm, `${periodYm} cannot be locked yet`);
     assertRevenueRecognizedThrough(ctx, periodYm, `${periodYm} cannot be locked yet`);
+    assertConsolidated(ctx, p, 'request_lock');
     const bank = assertBankExceptionsAccepted(ctx, periodYm);
     ctx.db.period.id.update({ ...p, status: { tag: 'closing' } });
     if (bank.rows.length) keepBankTaskIncomplete(ctx, p.id);
@@ -2227,12 +2351,14 @@ export const lockPeriod = spacetimedb.reducer(
     requireRole(ctx, ['cfo'], 'lock periods');
     const p = periodByYm(ctx, periodYm);
     if (ctx.db.periodLock.periodId.find(p.id)) throw new SenderError(`Period ${periodYm} is already locked.`);
+    assertCloseOrder(ctx, periodYm, 'lock');
     const pending = [...ctx.db.proposal.iter()].filter(
       x => x.periodId === p.id && (x.status.tag === 'open' || x.status.tag === 'awaiting_cfo' || x.status.tag === 'sent_back')
     );
     if (pending.length > 0) throw new SenderError(`${pending.length} proposal(s) for ${periodYm} still need a decision before the month can lock.`);
     assertNoBlockedTasks(ctx, p.id, periodYm, `${periodYm} cannot be locked yet`);
     assertRevenueRecognizedThrough(ctx, periodYm, `${periodYm} cannot be locked yet`);
+    assertConsolidated(ctx, p, 'lock');
     const bank = assertBankExceptionsAccepted(ctx, periodYm);
     ctx.db.periodLock.insert({
       id: 0n,
