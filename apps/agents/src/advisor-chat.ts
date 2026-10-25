@@ -4,14 +4,15 @@
  * A close starts only on an explicit command ("start the close") at the start of the CFO's latest message, never
  * because a question or a chat client's background prompt happens to mention the close.
  */
-import { applyFx, dateLabel, formatMinor, LedgerError, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
+import { applyFx, dateLabel, formatMinor, LedgerError, targetAllowanceMinor, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
 import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
-import { bankExceptionsOf, closeHasWork } from './close-state';
+import { bankExceptionsOf, closeHasWork, closeOpened } from './close-state';
 import type { Cast } from './stdb';
 import { advisorReport } from './advisor-report';
 import { searchPolicies } from './redteam';
+import { matchesTerm, queryTerms, stems } from './moss';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 /** Whole minor units as the module's parseLines reads them: a string or number of digits; absent or "" is the default. */
@@ -50,9 +51,9 @@ function pendingRevenue(payloadJson: string, isRevenue: (code: string) => boolea
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_WORD = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
-/** Month words that are also everyday words or names ("may", "march", "Jan from audit"): a month only next to a year or after a preposition. */
+/** Month words that are also everyday words or names ("may", "march", "Jan from audit"): a month only next to a year or after a preposition (or "lock", as in "can we lock August"). */
 const AMBIGUOUS = new Set(['jan', 'mar', 'march', 'apr', 'april', 'may', 'jun', 'june', 'aug', 'august']);
-const MONTH_RE = new RegExp(`(\\b(?:in|for|of|during|since|through|until|from|to|by)\\s+)?\\b(${MONTH_WORD})\\b\\.?(?:\\s+(?:of\\s+)?(\\d{4}))?`, 'gi');
+const MONTH_RE = new RegExp(`(\\b(?:in|for|of|during|since|through|until|from|to|by|lock)\\s+)?\\b(${MONTH_WORD})\\b\\.?(?:\\s+(?:of\\s+)?(\\d{4}))?`, 'gi');
 /** A month slot inside a close command: YYYY-MM, or a month name with an optional year. */
 const MONTH_SLOT = `(?:\\d{4}-\\d{2}|${MONTH_WORD}\\.?(?:\\s+\\d{4})?)`;
 /**
@@ -67,10 +68,17 @@ const CLOSE_COMMAND = new RegExp(
 );
 
 /** The policy's sentences that share the most words with the question, in their original order (at most three). */
-function policyExcerpt(text: string, question: string): string {
-  const terms = new Set(question.toLowerCase().split(/\W+/).filter(t => t.length > 3 && !['what', 'policy', 'does', 'should', 'cafoo', 'account', 'about'].includes(t)));
+/** Words every policy question uses, which say nothing about which passage answers it. */
+const POLICY_QUESTION_WORDS = new Set(stems('policy policies cafoo account house rule'));
+
+export function policyExcerpt(text: string, question: string): string {
+  // Stems, so "reserves" finds "reserve" and "accrued" finds "accrual"; synonyms, so "bad debt" finds the allowance.
+  const terms = queryTerms(question).filter(t => !POLICY_QUESTION_WORDS.has(t));
   const sentences = text.replace(/^#.*$/gm, '').split(/(?<=[.!?])\s+|\n+/).map(s => s.replace(/^[-*\d.\s]+/, '').trim()).filter(s => s.length > 20);
-  const scored = sentences.map((s, i) => ({ s, i, n: [...terms].filter(t => s.toLowerCase().includes(t)).length }));
+  const scored = sentences.map((s, i) => {
+    const words = stems(s);
+    return { s, i, n: terms.filter(t => matchesTerm(words, t)).length };
+  });
   const best = scored.filter(x => x.n > 0).sort((a, b) => b.n - a.n || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i);
   // Nothing shared with the question: a semantic hit, not a passage that answers it. Quote nothing rather than guess.
   return best.map(x => x.s).join(' ');
@@ -176,6 +184,18 @@ async function startCloseOverHttp(periodYm: string): Promise<CloseStart> {
  * tasks, and subscription revenue through the month that is not recognized yet.
  */
 function lockOutlook(A: Cast['advisor'], ym: string, periodId: bigint): string {
+  const { left, bankNote } = lockState(A, ym, periodId);
+  const note = bankNote ? ` ${bankNote}` : '';
+  if (!left.length) return `everything is decided, so I will ask to lock it.${note}`;
+  return `${left.join('; ')}. I will ask to lock only once ${left.length === 1 ? 'that is' : 'those are'} resolved.${note}`;
+}
+
+/**
+ * The lock gate's checks for `ym`, as the module's lockPeriod runs them: undecided proposals, blocked close tasks,
+ * subscription revenue through the month not recognized yet, and unmatched bank lines the CFO has not accepted.
+ * `bankNote` says when the CFO's current acceptance covers the unmatched lines, so they do not block.
+ */
+function lockState(A: Cast['advisor'], ym: string, periodId: bigint): { left: string[]; bankNote: string } {
   const undecided = [...A.db.proposal.iter()].filter(p => p.periodId === periodId && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag)).length;
   const blocked = [...A.db.closeTask.iter()].filter(t => t.periodId === periodId && t.status.tag === 'Blocked');
   const subscription = new Set([...A.db.contractItem.iter()].filter(i => i.kind.tag === 'Subscription').map(i => i.id));
@@ -187,8 +207,105 @@ function lockOutlook(A: Cast['advisor'], ym: string, periodId: bigint): string {
     unrecognized > 0n ? `${money(unrecognized)} of subscription revenue through ${monthLabel(ym)} is not recognized yet` : '',
     bank.rows.length && !bank.accepted ? `${bank.rows.length} unmatched bank line${bank.rows.length === 1 ? '' : 's'} through ${monthLabel(ym)} need${bank.rows.length === 1 ? 's' : ''} reconciling or your explicit acceptance` : '',
   ].filter(Boolean);
-  if (!left.length) return 'everything is decided, so I will ask to lock it.';
-  return `${left.join('; ')}. I will ask to lock only once ${left.length === 1 ? 'that is' : 'those are'} resolved.`;
+  let bankNote = '';
+  if (bank.rows.length && bank.accepted) {
+    const n = bank.rows.length;
+    const acceptance = latestAcceptance(A, ym);
+    bankNote = `${n} unmatched bank line${n === 1 ? '' : 's'} through ${monthLabel(ym)} ${n === 1 ? 'was' : 'were'} accepted by the CFO as exceptions${acceptance ? ` on ${dateLabel(acceptance.at)}${acceptance.reason ? ` ("${acceptance.reason}")` : ''}` : ''}, so ${n === 1 ? 'it does' : 'they do'} not block the lock; ${n === 1 ? 'it is' : 'they are'} still unreconciled.`;
+  }
+  return { left, bankNote };
+}
+
+/** The CFO's latest acceptance of bank exceptions for `ym` (when and why), from the audit trail. */
+function latestAcceptance(A: Cast['advisor'], ym: string): { at: bigint; reason: string } | undefined {
+  let best: { at: bigint; reason: string } | undefined;
+  for (const e of A.db.auditEvent.iter()) {
+    if (e.action !== 'accept_bank_exceptions' || e.actorRole !== 'cfo') continue;
+    let detail: { periodYm?: unknown; reasonPlain?: unknown };
+    try {
+      detail = JSON.parse(e.detail) as typeof detail;
+    } catch {
+      continue;
+    }
+    if (detail?.periodYm !== ym) continue;
+    const at = e.at.microsSinceUnixEpoch;
+    if (!best || at > best.at) best = { at, reason: typeof detail.reasonPlain === 'string' ? detail.reasonPlain.trim() : '' };
+  }
+  return best;
+}
+
+/** "Can we lock September?", "is September ready to lock", "what blocks the lock". */
+const LOCK_QUESTION = /\b(?:can|could|may|should|shall)\s+(?:we|i|you)\s+(?:now\s+)?lock\b|\bready\s+(?:to|for)\s+(?:be\s+)?(?:the\s+)?lock|\b(?:block|stop|prevent|hold)(?:s|ing)?\s+(?:up\s+)?(?:us\s+from\s+locking|(?:the\s+)?(?:period\s+|month\s+)?lock)\b|\bin\s+the\s+way\s+of\s+(?:the\s+)?lock|\block\s+(?:gate|status|outlook)\b/;
+export const isLockQuestion = (q: string) => LOCK_QUESTION.test(q.toLowerCase().slice(0, 1000));
+
+/** Risk tiers, worst first. */
+const TIER_ORDER = ['BLOCK', 'D', 'C', 'B', 'A'] as const;
+type Tier = (typeof TIER_ORDER)[number];
+const TIER_RATE: Record<Tier, string> = { A: '1%', B: '5%', C: '10%', D: '50%', BLOCK: '100%' };
+/** "Which customers are high risk?", "risky customers", "risk tiers", "credit risk by customer". */
+const RISK_QUESTION = /\b(?:high|higher|highest|elevated)[\s-]+risk\b|\brisk(?:y|iest|ier)\b|\brisk\s+tiers?\b|\bcredit\s+(?:risk|tiers?|checks?)\b|\btier\s+(?:d|block)\b|\bat[\s-]+risk\b/;
+export const isRiskQuestion = (q: string) => RISK_QUESTION.test(q.toLowerCase().slice(0, 1000));
+
+/**
+ * The customers' Risk Tiers from the recorded credit checks (the latest check per customer sets its tier, as on the
+ * dashboard; a customer never checked keeps the tier on its record), and for the highest-risk ones the open balance
+ * (unpaid invoices) and the reserve posted against them (allowance lines on account 1150), with the policy rate.
+ */
+function* riskAnswer(A: Cast['advisor']): Generator<string> {
+  const subs = new Map([...A.db.subsidiary.iter()].map(s => [s.id, s]));
+  const customers = [...A.db.customer.iter()].filter(c => !subs.get(c.subsidiaryId)?.isElimination);
+  const latest = new Map<bigint, { tier: string; requestId: string; at: bigint; id: bigint }>();
+  for (const r of A.db.creditCheck.iter()) {
+    if (r.subjectKind.tag.toLowerCase() !== 'customer') continue;
+    const at = r.createdAt.microsSinceUnixEpoch;
+    const prev = latest.get(r.subjectId);
+    if (!prev || at > prev.at || (at === prev.at && r.id > prev.id)) latest.set(r.subjectId, { tier: r.tier, requestId: r.requestId, at, id: r.id });
+  }
+  const isTier = (t: string | undefined): t is Tier => (TIER_ORDER as readonly string[]).includes(t ?? '');
+  const open = new Map<bigint, { minor: bigint; count: number }>();
+  for (const i of A.db.invoice.iter()) {
+    if (i.status.tag.toLowerCase() === 'paid') continue;
+    const o = open.get(i.customerId) ?? { minor: 0n, count: 0 };
+    open.set(i.customerId, { minor: o.minor + i.amountMinor, count: o.count + 1 });
+  }
+  const allowanceAccounts = new Set([...A.db.account.iter()].filter(a => a.code === '1150' || a.code.startsWith('1150-')).map(a => a.id));
+  const reserve = new Map<bigint, bigint>();
+  for (const l of A.db.journalLine.iter()) {
+    if (l.customerId === undefined || !allowanceAccounts.has(l.accountId)) continue;
+    reserve.set(l.customerId, (reserve.get(l.customerId) ?? 0n) + l.creditMinor - l.debitMinor);
+  }
+  const rated = customers.map(c => {
+    const check = latest.get(c.id);
+    const tier = check && isTier(check.tier) ? check.tier : isTier(c.creditTier) ? c.creditTier : undefined;
+    return { c, tier, check: check && isTier(check.tier) ? check : undefined };
+  });
+  const counts = TIER_ORDER.slice().reverse().map(t => `${t} ${rated.filter(r => r.tier === t).length}`).join(', ');
+  const unrated = rated.filter(r => !r.tier).length;
+  const checked = rated.filter(r => r.check).length;
+  if (!rated.some(r => r.tier)) {
+    yield 'No customer has a Risk Tier yet: no credit check is recorded. The Credit & Risk agent runs the checks during the close.';
+    return;
+  }
+  yield `Risk Tiers: ${counts}${unrated ? ` (${unrated} customer${unrated === 1 ? '' : 's'} not rated)` : ''}. Source: the latest recorded credit check per customer${checked < rated.filter(r => r.tier).length ? ', or the tier on the customer record where none is recorded' : ''}.\n`;
+  const worst = rated.filter(r => r.tier === 'BLOCK' || r.tier === 'D');
+  if (!worst.length) {
+    yield 'No customer is in Risk Tier D or BLOCK. Open Customers for each tier and its evidence.';
+    return;
+  }
+  const ccy = (c: (typeof customers)[number]) => subs.get(c.subsidiaryId)?.functionalCcy ?? 'USD';
+  const fmt = (n: bigint, code: string) => formatMinor(n, code, { trimZeroCents: true });
+  worst.sort((a, b) => TIER_ORDER.indexOf(a.tier!) - TIER_ORDER.indexOf(b.tier!) || Number((open.get(b.c.id)?.minor ?? 0n) - (open.get(a.c.id)?.minor ?? 0n)) || Number(a.c.id - b.c.id));
+  const SHOWN = 6;
+  yield `Highest risk (${worst.length} in D or BLOCK):\n`;
+  for (const { c, tier, check } of worst.slice(0, SHOWN)) {
+    const o = open.get(c.id) ?? { minor: 0n, count: 0 };
+    const r = reserve.get(c.id) ?? 0n;
+    const source = check ? `credit check ${check.requestId ? `${check.requestId} ` : ''}on ${dateLabel(check.at)}` : 'customer record';
+    const target = targetAllowanceMinor(o.minor, tier!);
+    yield `- ${c.name}: ${tier} (${source}); open balance ${fmt(o.minor, ccy(c))} (${o.count} unpaid invoice${o.count === 1 ? '' : 's'}); reserve ${fmt(r, ccy(c))} posted to account 1150 (policy target ${fmt(target, ccy(c))} at ${TIER_RATE[tier!]}).\n`;
+  }
+  if (worst.length > SHOWN) yield `- and ${worst.length - SHOWN} more on the Customers page.\n`;
+  yield 'Tier rates come from the credit and allowance policy. Open Customers for the evidence behind each tier.';
 }
 
 export async function* answerQuestion(cast: Cast, question: string, _history: { role: string; content: string }[], opts: AnswerOptions = {}): AsyncGenerator<string> {
@@ -263,6 +380,36 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       for (const h of quoted) if (h.excerpt) yield `From the ${h.name} policy: ${h.excerpt} `;
     }
     yield 'The Red Team checks every Proposal against these same policies before the Advisor rules.';
+    return;
+  }
+
+  // "Can we lock September?": the lock gate's own checks for that month (the open month by default).
+  if (isLockQuestion(question)) {
+    const label = monthLabel(closeYm);
+    if (period.status.tag === 'Closed') {
+      yield `${label} is already locked.`;
+      return;
+    }
+    if (period.status.tag === 'Closing') {
+      yield `The ${label} close is done and the lock has been requested; confirm the lock on the Close page when you are ready.`;
+      return;
+    }
+    if (closeYm >= ymOf(now)) {
+      yield `Not yet: ${label} has not ended, so it cannot be locked.`;
+      return;
+    }
+    if (!closeOpened(A, closeYm) && !closeHasWork(A, closeYm)) {
+      yield `Not yet: the ${label} close has not run. Say "start the close" to run it; I will tell you what is left before the lock.`;
+      return;
+    }
+    const { left, bankNote } = lockState(A, closeYm, period.id);
+    if (left.length) yield `Not yet. ${left.join('; ')}.${bankNote ? ` ${bankNote}` : ''} These are the checks the lock runs.`;
+    else yield `Yes. Every item for ${label} is decided, no close task is blocked, and subscription revenue through ${label} is recognized. ${bankNote || 'Every bank line through the month is matched.'} The lock is yours to confirm on the Close page.`;
+    return;
+  }
+
+  if (isRiskQuestion(question)) {
+    yield* riskAnswer(A);
     return;
   }
 
