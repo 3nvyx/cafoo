@@ -41,6 +41,11 @@ describe('crawlLive', () => {
     const site = await crawlLive('example-co.com', { APIFY_TOKEN: 't' }, f as unknown as typeof fetch);
     expect(site.pages).toEqual([{ url: 'https://example-co.com/', title: 'Example Co', text: 'We build furniture.' }]);
   });
+
+  it('treats a crawl with no readable page text as a failure', async () => {
+    const empty = vi.fn(async () => new Response(JSON.stringify([{ url: 'https://example-co.com/', text: null, markdown: null }]), { status: 201 }));
+    await expect(crawlLive('example-co.com', { APIFY_TOKEN: 't' }, empty as unknown as typeof fetch)).rejects.toThrow('no page text');
+  });
 });
 
 describe('customerSite', () => {

@@ -68,6 +68,8 @@ export async function crawlLive(domain: string, env: NodeJS.ProcessEnv = process
     .slice(0, MAX_PAGES)
     .map(i => ({ url: i.url, title: i.metadata?.title ?? '', text: (i.text ?? i.markdown ?? '').slice(0, MAX_PAGE_CHARS) }))
     .filter(p => p.text.trim());
+  // A crawl with no readable page is a failure (the caller falls back and says so), never "crawled 0 pages".
+  if (!pages.length) throw new Error('Apify crawl returned no page text.');
   return { domain, source: 'apify', crawledAt: new Date().toISOString(), pages };
 }
 
