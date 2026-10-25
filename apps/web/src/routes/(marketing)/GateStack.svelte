@@ -11,8 +11,9 @@
 	import { smil } from './smil';
 
 	// Closed when another carousel slide is open: the drawing is still laid out, so it stops itself.
-	// Compact, it sits in half a card: the parts list on the right is left out (the text beside the
-	// drawing covers the layers) and the drawing is cropped to the feeds, plates and gate log.
+	// Compact, it sits in a feature card: the parts list on the right is left out (the card's text
+	// covers the layers) and the drawing is cropped to the feeds, plates and gate log. On phones the
+	// card shows the stack alone; the gate log and the parts list stay for screen readers only.
 	let { active = true, compact = false }: { active?: boolean; compact?: boolean } = $props();
 
 	interface Layer {
@@ -272,7 +273,7 @@
 		{@render plates(false)}
 	</svg>
 	<!-- Phones and tablets: the gate log under the stack. -->
-	<section class="mt-6 lg:hidden" aria-label="Gate log">
+	<section class="mt-6 lg:hidden" class:hidden={compact} aria-label="Gate log">
 		<p class="font-mono text-caption text-ink-3">Gate log</p>
 		<ul class="mt-2 flex flex-col divide-y divide-line border-y border-line">
 			{#each log as row (row.n)}
@@ -292,7 +293,7 @@
 			The gate checks who is calling. A worker agent that tries to post to the ledger is refused, whatever its prompt says;
 			only the Advisor, below your threshold, and you, above it, get a Proposal posted.
 		</p>
-		<ol class="mt-6 flex flex-col divide-y divide-line border-y border-line lg:sr-only">
+		<ol class="mt-6 flex flex-col divide-y divide-line border-y border-line lg:sr-only" class:sr-only={compact}>
 			{#each layers as L, i (L.name)}
 				<li class="grid grid-cols-[32px_minmax(0,1fr)] gap-x-2 py-4">
 					<span class="num text-sm text-ink-3">0{i + 1}</span>

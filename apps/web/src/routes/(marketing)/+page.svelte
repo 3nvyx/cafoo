@@ -4,12 +4,11 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import AgentWorkflows from './AgentWorkflows.svelte';
-	import FeatureCarousel from './FeatureCarousel.svelte';
+	import FeatureCards from './FeatureCards.svelte';
 	import LogoWall from './LogoWall.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
 
-	let carousel = $state<FeatureCarousel>();
 
 	const anchors = [
 		{ href: '#how', label: 'Agents' },
@@ -177,21 +176,10 @@
 			</div>
 		</section>
 
-		<!-- One card for the gate and the sponsors' APIs behind it, as a carousel; the first slide is the gate. -->
-		<!-- Laid out like the hero: the paint fills the whole frame and the card sits on the content columns inside it,
-		     with the carousel's arrows in the painted gutters at the card's middle. -->
-		<section id="gate" class="wide scroll-mt-24 pt-32" aria-labelledby="gate-h">
+		<!-- The gate and the sponsors' APIs behind Cafoo, as two rows of two cards that widen on hover. -->
+		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
 			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
-			<PaintedFrame seed={37} class="py-[7%]">
-				<div class="wide-content px-3 sm:px-6 lg:px-0">
-					<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
-						{@render marks()}
-						<FeatureCarousel bind:this={carousel} />
-					</div>
-				</div>
-				<button class="gutter-arrow prev" aria-label="Previous feature" onclick={() => carousel?.prev()}><Icon name="chevronLeft" /></button>
-				<button class="gutter-arrow next" aria-label="Next feature" onclick={() => carousel?.next()}><Icon name="chevronRight" /></button>
-			</PaintedFrame>
+			<FeatureCards />
 		</section>
 
 		<section id="growth" class="content scroll-mt-24 pt-32" aria-labelledby="growth-h">
@@ -319,37 +307,6 @@
 		}
 		.wide-content {
 			width: calc(100% * 10 / 12 - var(--gap) / 6);
-		}
-	}
-
-	/* The security carousel's arrows, from lg up: one in each painted gutter beside the card, at its middle. A gutter is
-	   a 24th of the frame (the card takes 10 of 12 columns), so each 40px arrow is centred on 1/48 of the frame. */
-	.gutter-arrow {
-		position: absolute;
-		top: 50%;
-		translate: 0 -50%;
-		display: none;
-		place-items: center;
-		width: 40px;
-		height: 40px;
-		border-radius: 999px;
-		border: 1px solid var(--line);
-		background: var(--surface);
-		color: var(--ink);
-		transition: background-color 120ms ease-out;
-	}
-	.gutter-arrow:hover {
-		background: var(--subtle);
-	}
-	.gutter-arrow.prev {
-		left: calc(100% / 48 - 20px);
-	}
-	.gutter-arrow.next {
-		right: calc(100% / 48 - 20px);
-	}
-	@media (min-width: 1024px) {
-		.gutter-arrow {
-			display: grid;
 		}
 	}
 

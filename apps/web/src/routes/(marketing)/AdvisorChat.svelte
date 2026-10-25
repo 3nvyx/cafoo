@@ -59,7 +59,7 @@
 		</div>
 	{/key}
 </div>
-<p class="mt-4 text-center text-body-sm text-ink-3">It reads the books and explains them. It never confirms or posts anything: the CFO does that in the Cafoo app.</p>
+<p class="mt-4 text-body-sm text-ink-3">It reads the books and explains them. It never confirms or posts anything: the CFO does that in the Cafoo app.</p>
 
 <style>
 	/* Each part rises in after the one before it. */

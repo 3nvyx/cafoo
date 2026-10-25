@@ -51,7 +51,7 @@
 		</ul>
 	{/key}
 </div>
-<p class="mt-4 text-center text-body-sm text-ink-3">Every run is stored, so you see what changed. Credit & Risk cites these in its reasons, never in a tier by themselves, and no owner, reviewer or poster names are kept.</p>
+<p class="mt-4 text-body-sm text-ink-3">Every run is stored, so you see what changed. Credit & Risk cites these in its reasons, never in a tier by themselves, and no owner, reviewer or poster names are kept.</p>
 
 <style>
 	@media (prefers-reduced-motion: no-preference) {

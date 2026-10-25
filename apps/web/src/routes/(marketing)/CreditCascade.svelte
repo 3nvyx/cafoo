@@ -55,7 +55,7 @@
 		</ul>
 	</div>
 </div>
-<p class="mt-4 text-center text-body-sm text-ink-3">The result becomes a Proposal, so the Advisor rules on it and the CFO confirms it before credit is extended, reserved or blocked.</p>
+<p class="mt-4 text-body-sm text-ink-3">The result becomes a Proposal, so the Advisor rules on it and the CFO confirms it before credit is extended, reserved or blocked.</p>
 
 <style>
 	/* One step lights at a time, in order, then the tier; the loop rests briefly before it starts again.
