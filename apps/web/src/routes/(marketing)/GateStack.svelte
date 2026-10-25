@@ -1,8 +1,10 @@
 <script lang="ts">
-	// Six layers pull apart as the section scrolls into view.
-	// Feeds enter at the worker layer; reducers check each write before the ledger changes.
-	// Two calls replay on the plates, and a gate log lists each call with its verdict.
-	// With reduced motion, the layers stay apart and the log stays still.
+	// Cafoo as an exploded stack: six layers pull apart as the section scrolls into view, each
+	// with a numbered part label. Feeds enter at the worker layer; only the gate writes to the
+	// ledger. What the agent-workflows section above cannot show is the gate at work, so two
+	// calls replay on the plates (a worker's write bounces off the gate; a confirmed Proposal
+	// passes it and posts) and a gate log lists every call with its verdict. Under reduced
+	// motion it renders fully exploded, the calls stay still and the log does not scroll.
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { prefersReducedMotion } from 'svelte/motion';
