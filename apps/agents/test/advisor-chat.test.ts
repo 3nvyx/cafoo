@@ -106,6 +106,10 @@ describe('month in a question', () => {
     expect(monthIn('cash in march')).toEqual({ month: 3 });
     expect(monthIn('June 2026 revenue')).toEqual({ month: 6, year: 2026 });
     expect(monthIn('September revenue')).toEqual({ month: 9 });
+    // Next to the lock, an ambiguous month is a month; "may lock" stays the verb.
+    expect(monthIn('is June ready to lock?')).toEqual({ month: 6 });
+    expect(monthIn('what blocks the August lock')).toEqual({ month: 8 });
+    expect(monthIn('we may lock it today')).toBeUndefined();
   });
   it('reads "last month" and "this month" from today', () => {
     expect(monthIn('revenue last month', NOW)).toEqual({ year: 2026, month: 9 });
@@ -500,9 +504,16 @@ describe('lock questions', () => {
 
   it('tells a locked, requested, unended or not-yet-run month apart', async () => {
     expect(await ask(books(), 'Can we lock August?')).toBe('August 2026 is already locked.');
-    expect(await ask(books({ period: [{ id: 2n, ym: '2026-09', status: { tag: 'Closing' } }] }), 'can we lock september?')).toMatch(/lock has been requested/);
+    // An ambiguous month name right before "lock" is still that month.
+    expect(await ask(books(), 'Is August ready to lock?')).toBe('August 2026 is already locked.');
+    const closing = [{ id: 1n, ym: '2026-08', status: { tag: 'Closed' } }, { id: 2n, ym: '2026-09', status: { tag: 'Closing' } }];
+    expect(await ask(decided({ period: closing }), 'can we lock september?')).toMatch(/^Yes\. .*The lock has been requested; confirm it on the Close page/);
+    // A requested lock is checked again: a Proposal filed since still blocks it.
+    expect(await ask(books({ period: closing }), 'can we lock september?')).toMatch(/^Not yet\. 1 item still needs a decision/);
     expect(await ask(fresh(), 'Can we lock September?', { now: new Date('2026-09-20T00:00:00Z') })).toMatch(/has not ended/);
     expect(await ask(fresh(), 'Can we lock September?')).toMatch(/^Not yet: the September 2026 close has not run\. Say "start the close"/);
+    // Opened, then failed before filing anything: still not run, never a yes.
+    expect(await ask(books({ agentMessage: opened, proposal: [] }), 'What is stopping us from locking September?')).toMatch(/^Not yet: the September 2026 close has not run/);
     // Months lock in order, as the gate refuses.
     const unlockedAugust = decided({ period: [{ id: 1n, ym: '2026-08', status: { tag: 'Open' } }, { id: 2n, ym: '2026-09', status: { tag: 'Open' } }] });
     expect(await ask(unlockedAugust, 'Can we lock September?')).toBe('Not yet: September 2026 cannot be locked while August 2026 is not locked: months close in order. Lock August 2026 first.');
@@ -514,7 +525,9 @@ describe('lock questions', () => {
       { id: 2n, code: 'UK', name: 'Cafoo Ltd', functionalCcy: 'GBP', parentId: 1n, isElimination: false },
       { id: 3n, code: 'ELIM', name: 'Eliminations', functionalCcy: 'USD', parentId: 1n, isElimination: true },
     ] });
-    expect(await ask(group, 'Can we lock September?')).toMatch(/^Yes\..*As a group month, the lock also checks that the consolidation .* still matches the books\. The lock is yours to confirm/);
+    const text = await ask(group, 'Can we lock September?');
+    expect(text).toMatch(/^Nothing in these checks blocks the September 2026 lock\..*As a group month, the lock also checks that the consolidation .* still matches the books; I do not recompute that here/);
+    expect(text).not.toMatch(/^Yes/);
     expect(await ask(decided(), 'Can we lock September?')).not.toMatch(/group month/);
   });
 });

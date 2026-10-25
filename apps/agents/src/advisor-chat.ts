@@ -8,7 +8,7 @@ import { applyFx, closeOrderRefusal, dateLabel, formatMinor, isGroup, LedgerErro
 import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
-import { bankExceptionsOf, closeHasWork, closeOpened } from './close-state';
+import { bankExceptionsOf, closeHasWork } from './close-state';
 import type { Cast } from './stdb';
 import { advisorReport } from './advisor-report';
 import { searchPolicies } from './redteam';
@@ -139,7 +139,9 @@ export function monthIn(full: string, now: Date = new Date()): MonthRef | undefi
   }
   for (const m of text.matchAll(MONTH_RE)) {
     const word = m[2]!.toLowerCase();
-    if (AMBIGUOUS.has(word) && !m[1] && !m[3]) continue;
+    // "is August ready to lock", "the June lock": a month right before the lock ("we may lock" stays the verb).
+    const beforeLock = word !== 'may' && /^\s+(?:is\s+)?(?:ready\s+(?:to|for)\s+(?:be\s+)?)?lock/i.test(text.slice(m.index! + m[0].length));
+    if (AMBIGUOUS.has(word) && !m[1] && !m[3] && !beforeLock) continue;
     return { month: monthNumber(word), ...(m[3] ? { year: Number(m[3]) } : {}) };
   }
   return undefined;
@@ -235,7 +237,7 @@ function latestAcceptance(A: Cast['advisor'], ym: string): { at: bigint; reason:
 }
 
 /** "Can we lock September?", "is September ready to lock", "what blocks the lock". */
-const LOCK_QUESTION = /\b(?:can|could|may|should|shall)\s+(?:we|i|you)\s+(?:now\s+)?lock\b|\bready\s+(?:to|for)\s+(?:be\s+)?(?:the\s+)?lock|\b(?:block|stop|prevent|hold)(?:s|ing)?\s+(?:up\s+)?(?:us\s+from\s+locking|(?:the\s+)?(?:period\s+|month\s+)?lock)\b|\bin\s+the\s+way\s+of\s+(?:the\s+)?lock|\block\s+(?:gate|status|outlook)\b/;
+const LOCK_QUESTION = /\b(?:can|could|may|should|shall)\s+(?:we|i|you)\s+(?:now\s+)?lock\b|\bready\s+(?:to|for)\s+(?:be\s+)?(?:the\s+)?lock|\b(?:block|stopp?|prevent|hold)(?:s|ing|ed)?\s+(?:up\s+)?(?:us\s+from\s+locking|(?:the\s+)?(?:period\s+|month\s+)?lock)\b|\bin\s+the\s+way\s+of\s+(?:the\s+)?lock|\block\s+(?:gate|status|outlook)\b/;
 export const isLockQuestion = (q: string) => LOCK_QUESTION.test(q.toLowerCase().slice(0, 1000));
 
 /** Risk tiers, worst first. */
@@ -390,16 +392,9 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       yield `${label} is already locked.`;
       return;
     }
-    if (period.status.tag === 'Closing') {
-      yield `The ${label} close is done and the lock has been requested; confirm the lock on the Close page when you are ready.`;
-      return;
-    }
-    if (closeYm >= ymOf(now)) {
+    const requested = period.status.tag === 'Closing';
+    if (!requested && closeYm >= ymOf(now)) {
       yield `Not yet: ${label} has not ended, so it cannot be locked.`;
-      return;
-    }
-    if (!closeOpened(A, closeYm) && !closeHasWork(A, closeYm)) {
-      yield `Not yet: the ${label} close has not run. Say "start the close" to run it; I will tell you what is left before the lock.`;
       return;
     }
     const order = closeOrderRefusal(periods.map(p => ({ ym: p.ym, status: p.status })), closeYm, 'lock');
@@ -407,12 +402,23 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
       yield `Not yet: ${order}`;
       return;
     }
+    // The gate rechecks everything at the lock, so a requested lock is checked again too: something may have changed since.
     const { left, bankNote } = lockState(A, closeYm, period.id);
-    if (left.length) yield `Not yet. ${left.join('; ')}.${bankNote ? ` ${bankNote}` : ''} These are the checks the lock runs.`;
-    else {
-      yield `Yes. Every item for ${label} is decided, no close task is blocked, and subscription revenue through ${label} is recognized. ${bankNote || 'Every bank line through the month is matched.'} `;
-      if (isGroup([...A.db.subsidiary.iter()].map(s => ({ isElimination: s.isElimination === true })))) yield 'As a group month, the lock also checks that the consolidation (revaluation at closing rates and intercompany eliminations) still matches the books. ';
-      yield 'The lock is yours to confirm on the Close page.';
+    if (left.length) {
+      yield `Not yet. ${left.join('; ')}.${bankNote ? ` ${bankNote}` : ''} These are the checks the lock runs.`;
+      return;
+    }
+    if (!requested && !closeHasWork(A, closeYm)) {
+      yield `Not yet: the ${label} close has not run. Say "start the close" to run it; I will tell you what is left before the lock.`;
+      return;
+    }
+    const passed = `Every item for ${label} is decided, no close task is blocked, and subscription revenue through ${label} is recognized. ${bankNote || 'Every bank line through the month is matched.'}`;
+    const confirm = requested ? 'The lock has been requested; confirm it on the Close page when you are ready.' : 'The lock is yours to confirm on the Close page.';
+    if (isGroup([...A.db.subsidiary.iter()].map(s => ({ isElimination: s.isElimination === true })))) {
+      // The consolidation check is the module's own; this answer does not recompute it, so it does not say a plain yes.
+      yield `Nothing in these checks blocks the ${label} lock. ${passed} As a group month, the lock also checks that the consolidation (revaluation at closing rates and intercompany eliminations) still matches the books; I do not recompute that here, and the lock will refuse with the reason if it does not. ${confirm}`;
+    } else {
+      yield `Yes. ${passed} ${confirm}`;
     }
     return;
   }
