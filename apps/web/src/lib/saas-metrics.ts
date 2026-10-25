@@ -1,7 +1,7 @@
 // SaaS metrics the way finance tools lay them out (ARR movement, retention, efficiency, payback), over a chosen window
 // ending at a month. Pure maths over the source's rows, building on derive.ts (ARR), dashboard.ts (the books' summary),
 // costs.ts (cost of service) and kpis.ts (burn, FTE). Money stays bigint minor units; ratios are basis points.
-import { addDays, monthRange, type Posting } from './data/dashboard';
+import { addDays, monthRange, summarize, type Posting } from './data/dashboard';
 import { arrWaterfall, type ArrWaterfall } from './data/derive';
 import { toBig } from './data/money';
 import type { Contract } from './data/types';
@@ -106,6 +106,60 @@ export function revenuePerEmployee(revenue: bigint, months: number, fte: number)
 }
 
 export const revenuePerEmployeeHealth = (v: bigint | null): Health => (v === null ? null : v >= 20_000_000n ? 'good' : v >= 10_000_000n ? 'watch' : 'poor');
+
+/** Months of operating cash flow that burn and runway average over, on every page. */
+export const BURN_MONTHS = 3;
+
+/** Burn and runway as one reading, so the Dashboard and the Metrics page can never disagree. */
+export interface BurnReading {
+	/** The months averaged ("yyyy-mm"), oldest first. */
+	yms: string[];
+	/** Net operating cash used over those months, a positive amount; 0 when operations added cash. */
+	totalBurn: bigint;
+	/** totalBurn over the number of months: the monthly burn runway divides by. */
+	monthlyBurn: bigint;
+	/** Book cash at the end of the last month. */
+	cash: bigint;
+	/** Months the cash lasts at the monthly burn; null when operations did not use cash or there is no cash. */
+	runwayMonths: number | null;
+}
+
+/**
+ * Burn and runway at the end of `endYm`: net operating cash burn (cash change without money raised, the Summary's
+ * operatingCashChange) averaged over the BURN_MONTHS whole months ending with `endYm` (fewer when the books start
+ * later), and runway as cash over that monthly burn. One month alone swings with annual prepayments: a month that
+ * collects a year of contracts upfront shows no burn, and the month after it shows only spend.
+ */
+export function burnReading(ps: Posting[], endYm: string, firstYm: string): BurnReading {
+	const win = windowRange(endYm, BURN_MONTHS, firstYm);
+	// A month before the books begin has nothing to average.
+	if (win.months === 0) return { yms: [], totalBurn: 0n, monthlyBurn: 0n, cash: 0n, runwayMonths: null };
+	const s = summarize(ps, [], { from: win.from, to: win.to });
+	const change = toBig(s.operatingCashChange);
+	const totalBurn = change < 0n ? -change : 0n;
+	const monthlyBurn = totalBurn / BigInt(win.months);
+	const cash = toBig(s.cash);
+	return { yms: win.yms, totalBurn, monthlyBurn, cash, runwayMonths: monthlyBurn > 0n && cash > 0n ? Number(cash) / Number(monthlyBurn) : null };
+}
+
+/** Runway in words, the same on every page. */
+export function runwayLabel(r: Pick<BurnReading, 'runwayMonths' | 'cash'>): string {
+	if (r.runwayMonths === null) return r.cash > 0n ? 'Cash not falling' : 'No cash';
+	if (r.runwayMonths > 36) return 'Over 3 years';
+	if (r.runwayMonths < 1) return 'Under a month';
+	return `${Math.round(r.runwayMonths)} months`;
+}
+
+/** "over Jul to Sep 2026" style words for the months a burn reading averages. */
+export function burnWindowLabel(yms: string[]): string {
+	const name = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+	if (yms.length === 0) return '';
+	if (yms.length === 1) return `over ${name(yms[0])}`;
+	return `over ${name(yms[0])} to ${name(yms.at(-1)!)}`;
+}
+
+/** A burn multiple with enough digits to read: a very efficient quarter is 0.03×, not 0.0×. */
+export const burnMultipleLabel = (m: number) => `${m > 0 && m < 0.1 ? m.toFixed(2) : m.toFixed(1)}×`;
 
 /** An SVG path through the values, scaled to fill a w x h box (top is the highest value). Null values break the line. */
 export function sparkPath(values: (number | null)[], w: number, h: number): string {

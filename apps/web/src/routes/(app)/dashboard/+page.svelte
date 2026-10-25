@@ -16,7 +16,8 @@
 	import MonthlyChart from './MonthlyChart.svelte';
 	import StatusStrip from './StatusStrip.svelte';
 	import Workflows from './Workflows.svelte';
-	import { aiTiles, dsoHealth, efficiencyTiles, netBurn, quarterStart, reserveHealth, usdRate } from '#lib/kpis.js';
+	import { aiTiles, dsoHealth, efficiencyTiles, reserveHealth, usdRate } from '#lib/kpis.js';
+	import { burnReading } from '#lib/saas-metrics.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
@@ -61,13 +62,14 @@
 	const money = (m: Minor | bigint) => formatMoney(m.toString(), { whole: true });
 
 	// The KPIs card reads the month the strip shows, with the Metrics page's own readings where it has one.
+	// Burn is the Metrics page's too: net operating cash burn averaged over the quarter ending with the month.
 	const firstMonth = $derived(db.periods()[0]?.id);
 	const kpis = $derived.by<KpiRow[]>(() => {
 		if (!period || !monthSummary || !firstMonth) return [];
 		const m = monthSummary;
-		const r = monthRange(period.id);
+		const burn = burnReading(ps, period.id, firstMonth);
 		const all = [
-			...efficiencyTiles({ month: monthSummary, from: r.from, to: r.to, quarterFrom: quarterStart(r.from, monthRange(firstMonth).from), contracts, employees: db.employees() }),
+			...efficiencyTiles({ ps, endYm: period.id, firstYm: firstMonth, contracts, employees: db.employees() }),
 			...aiTiles({
 				ym: period.id,
 				revenueMinor: monthSummary.revenue,
@@ -88,7 +90,7 @@
 		const reserveBp = receivables > 0n ? Number((toBig(m.allowance) * 10000n) / receivables) : null;
 		return [
 			{ label: 'Cash', value: money(m.cash), health: null, href: drill({ account: '1000' }, { to: period.id }) },
-			{ label: 'Monthly net burn', value: money(netBurn(m)), health: null, href: '/metrics' },
+			{ label: 'Monthly net burn', value: money(burn.monthlyBurn), health: null, href: '/metrics' },
 			...tile('runway', 'Runway'),
 			{ label: 'ARR', value: money(m.arr), health: null, href: '/reports' },
 			...tile('ndr', 'Net dollar retention'),

@@ -1,6 +1,7 @@
 // The numbers an AI startup's board and investors ask about, each with the yardstick it is usually read against.
 // Pure maths over DataSource rows and the Dashboard's Summary; the Metrics page renders them.
-import type { Summary } from './data/dashboard';
+import { summarize, type Posting, type Summary } from './data/dashboard';
+import { BURN_MONTHS, burnMultipleLabel, burnReading, burnWindowLabel, runwayLabel, windowRange } from './saas-metrics';
 import { arrAt, arrWaterfall, nrrBp } from './data/derive';
 import { formatMoney, toBig } from './data/money';
 import type { Batch, CloudCost, Contract, Deal, Employee, FxRate, Invoice, Minor, SupportTicket } from './data/types';
@@ -127,39 +128,41 @@ export function quarterStart(rangeFrom: string, firstMonthFrom: string): string 
 	return back.toISOString().slice(0, 10);
 }
 
-export function efficiencyTiles(input: { month: Summary; from: string; to: string; quarterFrom: string; contracts: Contract[]; employees: Employee[] }): Tile[] {
-	const { month: s, from, to, quarterFrom, contracts, employees } = input;
+/**
+ * The efficiency readings for the month ending `endYm`, over the trailing quarter (BURN_MONTHS) that the Metrics page's
+ * quarter view reads too: burn and runway from burnReading, burn multiple, Rule of 40 and retention over the same
+ * months. One month alone swings too much with annual prepayments and early growth.
+ */
+export function efficiencyTiles(input: { ps: Posting[]; endYm: string; firstYm: string; contracts: Contract[]; employees: Employee[] }): Tile[] {
+	const { ps, endYm, firstYm, contracts, employees } = input;
 	const money = (m: bigint | string) => formatMoney(m.toString(), { whole: true });
-	const before = (() => {
-		const d = new Date(`${from}T00:00:00Z`);
-		d.setUTCDate(d.getUTCDate() - 1);
-		return d.toISOString().slice(0, 10);
-	})();
-	const burn = netBurn(s);
-	const added = netNewArr(contracts, before, to);
+	const win = windowRange(endYm, BURN_MONTHS, firstYm);
+	const q = summarize(ps, contracts, { from: win.from, to: win.to });
+	const b = burnReading(ps, endYm, firstYm);
+	const burn = b.totalBurn;
+	const added = netNewArr(contracts, win.before, win.to);
 	const multiple = burnMultiple(burn, added);
+	const to = win.to;
 	const perFte = arrPerFte(contracts, employees, to);
 	const heads = fte(employees, to);
-	// Growth over the same window as retention, annualized; one month alone swings too much early on.
-	const months = Math.max(1, Math.round((Date.parse(to) - Date.parse(quarterFrom)) / (30.44 * 86_400_000)));
-	const r40 = ruleOf40(contracts, quarterFrom, to, months, s.netMarginBp);
-	const ndr = ndrBp(contracts, quarterFrom, to);
-	const runway = s.runwayMonths;
+	const r40 = ruleOf40(contracts, win.before, to, win.months, q.netMarginBp);
+	const ndr = ndrBp(contracts, win.before, to);
+	const over = burnWindowLabel(b.yms);
 	return [
 		{
 			key: 'burn-multiple',
 			label: 'Burn multiple',
-			value: multiple === null ? (burn > 0n ? 'No ARR added' : '–') : `${multiple.toFixed(1)}×`,
+			value: multiple === null ? (burn > 0n ? 'No ARR added' : '–') : burnMultipleLabel(multiple),
 			health: burnMultipleHealth(multiple, burn),
-			inputs: `${money(burn)} burned · ${money(added)} net new ARR`,
+			inputs: `${money(burn)} burned · ${money(added)} net new ARR, ${over}`,
 			yardstick: 'Dollars of cash burned to add $1 of recurring revenue. Under 1× is great; over 2× means growth costs too much.'
 		},
 		{
 			key: 'runway',
 			label: 'Runway',
-			value: runway === null ? 'Cash not falling' : runway > 36 ? 'Over 3 years' : `${Math.round(runway)} months`,
-			health: runwayHealth(runway),
-			inputs: `${money(burn)} a month of operating burn · ${money(s.cash)} cash`,
+			value: runwayLabel(b),
+			health: runwayHealth(b.runwayMonths),
+			inputs: `${money(b.monthlyBurn)} a month of operating burn, averaged ${over} · ${money(b.cash)} cash`,
 			yardstick: 'Months your cash lasts at this rate of burn. 18 or more is comfortable; under 9 means start raising now.'
 		},
 		{
@@ -167,7 +170,7 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			label: 'ARR per employee',
 			value: perFte === null ? '–' : money(perFte),
 			health: arrPerFteHealth(perFte),
-			inputs: `${money(s.arr)} ARR · ${heads} full-time equivalents`,
+			inputs: `${money(q.arr)} ARR · ${heads} full-time equivalents`,
 			yardstick: 'Recurring revenue per full-time person; higher is better. Early AI startups aim for $150k to $250k.',
 			href: '/people'
 		},

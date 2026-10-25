@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { eliminations, revaluation, ymFromString } from '@cafoo/ledger-core';
 import { ACCOUNTS as US_ACCOUNTS } from '../../../../../seed/src/accounts';
 import { buildGroup } from '../../../../../seed/src/group';
-import { boardPack, functionalNet, rateText, toCore, type GroupBooks } from './group';
+import { boardPack, eliminationStatus, functionalNet, rateText, toCore, type GroupBooks } from './group';
 import type { Account, AccountType, JournalEntry, JournalLine, Subsidiary } from './types';
 
 const SEP = { year: 2026, month: 9 };
@@ -126,6 +126,50 @@ describe('boardPack, one company in its own currency', () => {
 	it('throws a plain sentence when a rate the translation needs is missing', () => {
 		const books = afterClose(seedBooks());
 		expect(() => boardPack({ ...books, rates: books.rates.filter((r) => !(r.ym === '2026-09' && r.kind === 'closing')) }, 'group', '2026-09')).toThrow(/no closing rate from GBP to USD for 2026-09/);
+	});
+});
+
+describe('eliminationStatus', () => {
+	/** One more Cafoo Inc entry in September: a $1,000 service fee charged to Cafoo Ltd after the close ran. */
+	function lateFee(books: GroupBooks): GroupBooks {
+		const id = 'je-late-fee';
+		return {
+			...books,
+			entries: [...books.entries, { id, periodId: '2026-09', postedAt: '2026-10-03T00:00:00Z', memo: 'Late service fee', source: 'manual', postedByRole: 'cfo' }],
+			lines: [
+				...books.lines,
+				{ id: `${id}-0`, jeId: id, accountId: 'a-1900', debitMinor: '100000', creditMinor: '0', ccy: 'USD', fxRateE6: '1000000' },
+				{ id: `${id}-1`, jeId: id, accountId: 'a-4900', debitMinor: '0', creditMinor: '100000', ccy: 'USD', fxRateE6: '1000000' }
+			]
+		};
+	}
+
+	it('is pending while the month has intercompany balances and no Elimination has posted', () => {
+		expect(eliminationStatus(seedBooks(), '2026-09')).toBe('pending');
+	});
+
+	it('is current once the balance and activity Eliminations post, before the lock', () => {
+		expect(eliminationStatus(afterClose(seedBooks()), '2026-09')).toBe('current');
+	});
+
+	it('is pending when only one basis has posted', () => {
+		const books = afterClose(seedBooks());
+		const activityJe = 'je-close-2';
+		expect(eliminationStatus({ ...books, entries: books.entries.filter((e) => e.id !== activityJe), lines: books.lines.filter((l) => l.jeId !== activityJe) }, '2026-09')).toBe('pending');
+	});
+
+	it('is stale when intercompany activity posts after the Eliminations', () => {
+		expect(eliminationStatus(lateFee(afterClose(seedBooks())), '2026-09')).toBe('stale');
+	});
+
+	it('is none for a single company', () => {
+		const books = seedBooks();
+		expect(eliminationStatus({ ...books, subsidiaries: SUBS.filter((s) => s.code === 'US') }, '2026-09')).toBe('none');
+	});
+
+	it('is unknown when a rate the eliminations need is missing', () => {
+		const books = afterClose(seedBooks());
+		expect(eliminationStatus({ ...books, rates: books.rates.filter((r) => !(r.ym === '2026-09' && r.kind === 'closing')) }, '2026-09')).toBe('unknown');
 	});
 });
 

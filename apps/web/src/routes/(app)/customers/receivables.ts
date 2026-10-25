@@ -23,9 +23,13 @@ export const SEGMENT_LABEL: Record<Segment, string> = {
 	enterprise: 'Enterprise',
 	no_contract: 'No active contract'
 };
-/** ARR thresholds in minor units: under $25k is self-serve, under $250k mid-market, the rest enterprise. */
-const MID_MARKET_FROM = 2_500_000n;
-const ENTERPRISE_FROM = 25_000_000n;
+/**
+ * ARR thresholds in minor units: under $15k is self-serve, under $75k mid-market, the rest enterprise. They sit in the
+ * gaps between the price bands a Series A SaaS company sells at: team plans from about $18k a year, enterprise
+ * contracts from about $90k.
+ */
+export const MID_MARKET_FROM = 1_500_000n;
+export const ENTERPRISE_FROM = 7_500_000n;
 
 export function segmentOf(arrMinor: Minor): Segment {
 	const arr = toBig(arrMinor);

@@ -40,6 +40,20 @@ describe('cell', () => {
 		expect(cell({ tag: 'Blocked', value: 'missing W-9' })).toMatchObject({ kind: 'enum', text: 'Blocked · missing W-9' });
 	});
 
+	it('shows a unit variant, which SpacetimeDB sends with an empty value, by its tag alone', () => {
+		expect(cell({ tag: 'Asset', value: {} })).toMatchObject({ kind: 'enum', text: 'Asset' });
+		expect(cell({ tag: 'BankMatch', value: {} })).toMatchObject({ kind: 'enum', text: 'Bank match' });
+		expect(cell({ tag: 'Blocked', value: null })).toMatchObject({ kind: 'enum', text: 'Blocked' });
+	});
+
+	it('shows the identity that acted as the role recorded beside it, keeping the hash in full', () => {
+		const id = { toHexString: () => 'c2009f3a5b1e77d0aa11' };
+		expect(cell(id, 'proposedBy', { proposedBy: id, proposerRole: 'consolidation' })).toMatchObject({ kind: 'text', text: 'Consolidation', full: 'c2009f3a5b1e77d0aa11' });
+		expect(cell(id, 'postedBy', { postedByRole: 'advisor' })).toMatchObject({ text: 'Advisor' });
+		expect(cell(id, 'cfoConfirmedBy', {})).toMatchObject({ text: 'CFO' });
+		expect(cell(id, 'decidedBy', {})).toMatchObject({ kind: 'id', text: 'c2009f3a…aa11' });
+	});
+
 	it('pretty-prints JSON columns and nested values, bigint included', () => {
 		expect(cell('{"a":1}', 'detailJson')).toMatchObject({ kind: 'json', full: '{\n  "a": 1\n}' });
 		expect(cell('not json', 'detailJson')).toMatchObject({ kind: 'text' });

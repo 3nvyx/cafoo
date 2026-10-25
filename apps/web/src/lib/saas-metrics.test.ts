@@ -2,7 +2,76 @@ import { describe, expect, it } from 'vitest';
 import type { CostOfService } from './costs';
 import type { Posting } from './data/dashboard';
 import type { Account, Contract } from './data/types';
-import { arrMovement, cacPaybackMonths, grrBp, revenuePerEmployee, salesAndMarketing, shiftYm, sparkPath, windowGmAfterInferenceBp, windowRange } from './saas-metrics';
+import { efficiencyTiles } from './kpis';
+import {
+	arrMovement,
+	burnMultipleLabel,
+	burnReading,
+	burnWindowLabel,
+	cacPaybackMonths,
+	grrBp,
+	revenuePerEmployee,
+	runwayLabel,
+	salesAndMarketing,
+	shiftYm,
+	sparkPath,
+	windowGmAfterInferenceBp,
+	windowRange
+} from './saas-metrics';
+
+describe('burn and runway', () => {
+	const acct = (code: string, type: Account['type']): Account => ({ id: code, subsidiaryId: 's', code, name: code, type });
+	const cash = acct('1000', 'asset');
+	const equity = acct('3000', 'equity');
+	const p = (date: string, account: Account, amount: bigint, jeId: string): Posting => ({ date, account, amount, jeId });
+	// 1.2M raised in June; 100k a month of spend; a year of annual contracts (240k) collected upfront in August.
+	const ps: Posting[] = [
+		p('2026-06-01', cash, 120_000_000n, 'raise'),
+		p('2026-06-01', equity, 120_000_000n, 'raise'),
+		p('2026-07-15', cash, -10_000_000n, 'jul'),
+		p('2026-08-10', cash, 24_000_000n, 'prepay'),
+		p('2026-08-15', cash, -10_000_000n, 'aug'),
+		p('2026-09-15', cash, -10_000_000n, 'sep')
+	];
+
+	it('averages net operating cash burn over the last three months, leaving money raised out', () => {
+		const b = burnReading(ps, '2026-09', '2026-06');
+		expect(b.yms).toEqual(['2026-07', '2026-08', '2026-09']);
+		// 300k spent less 240k collected over the quarter: 60k, 20k a month. September alone would read 100k.
+		expect(b.totalBurn).toBe(6_000_000n);
+		expect(b.monthlyBurn).toBe(2_000_000n);
+		expect(b.cash).toBe(114_000_000n);
+		expect(b.runwayMonths).toBe(57);
+		expect(runwayLabel(b)).toBe('Over 3 years');
+	});
+
+	it('uses fewer months when the books start later, and has no runway when operations add cash', () => {
+		const b = burnReading(ps, '2026-08', '2026-08');
+		expect(b.yms).toEqual(['2026-08']);
+		expect(b.totalBurn).toBe(0n);
+		expect(b.runwayMonths).toBeNull();
+		expect(runwayLabel(b)).toBe('Cash not falling');
+		expect(runwayLabel({ runwayMonths: 12.4, cash: 1n })).toBe('12 months');
+		expect(runwayLabel({ runwayMonths: 0.5, cash: 1n })).toBe('Under a month');
+		// A month before the books begin reads nothing rather than dividing by zero months.
+		expect(burnReading(ps, '2026-05', '2026-06')).toMatchObject({ yms: [], monthlyBurn: 0n, runwayMonths: null });
+	});
+
+	it("gives the Dashboard's health tiles the same burn and runway", () => {
+		const tiles = efficiencyTiles({ ps, endYm: '2026-09', firstYm: '2026-06', contracts: [], employees: [] });
+		const runway = tiles.find((t) => t.key === 'runway')!;
+		expect(runway.value).toBe(runwayLabel(burnReading(ps, '2026-09', '2026-06')));
+		expect(runway.inputs).toBe('$20,000 a month of operating burn, averaged over Jul 2026 to Sep 2026 · $1,140,000 cash');
+		expect(tiles.find((t) => t.key === 'burn-multiple')!.inputs).toBe('$60,000 burned · $0 net new ARR, over Jul 2026 to Sep 2026');
+	});
+
+	it('labels the months and a small burn multiple readably', () => {
+		expect(burnWindowLabel(['2026-07', '2026-08', '2026-09'])).toBe('over Jul 2026 to Sep 2026');
+		expect(burnMultipleLabel(0.03)).toBe('0.03×');
+		expect(burnMultipleLabel(1.54)).toBe('1.5×');
+		expect(burnMultipleLabel(0)).toBe('0.0×');
+	});
+});
 
 const c = (id: string, arr: number, startAt: string, extra: Partial<Contract> = {}): Contract => ({ id, customerId: id, arrMinor: String(arr), startAt, ...extra }) as Contract;
 
