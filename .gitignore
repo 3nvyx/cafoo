@@ -13,3 +13,4 @@ spacetimedb/.spacetime/
 .claude/settings.local.json
 .preview/
 .codex/config.toml
+build-pages/
