@@ -116,6 +116,18 @@ export function arrWaterfall(contracts: Contract[], from: string, to: string): A
 	};
 }
 
+/**
+ * Net revenue retention over a waterfall's window, in basis points: what the customers who had ARR at the start are
+ * worth at the end (expansion in, contraction and churn out, new customers left out), over what they were worth.
+ * Floored like @cafoo/ledger-core's nrr() (floor(ending * 10000 / starting)); null when nobody had ARR at the start.
+ */
+export function nrrBp(w: ArrWaterfall): number | null {
+	const start = toBig(w.start);
+	if (start <= 0n) return null;
+	const ending = start + toBig(w.expansion) - toBig(w.contraction) - toBig(w.churned);
+	return Number((ending * 10000n) / start);
+}
+
 // Aging
 export type AgingBucket = 'current' | '1-30' | '31-60' | '61-90' | '90+';
 export const AGING_BUCKETS: AgingBucket[] = ['current', '1-30', '31-60', '61-90', '90+'];

@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
-	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, periodEnd, periodLabel } from '#lib/data/derive.js';
+	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, nrrBp, periodEnd, periodLabel } from '#lib/data/derive.js';
 	import { atClosingRate, boardPack, rateText, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
@@ -78,6 +78,7 @@
 		return new Date(Date.UTC(period.year, qm, 0)).toISOString().slice(0, 10);
 	});
 	const arr = $derived(period ? arrWaterfall(contracts, quarterStart, asOf) : null);
+	const nrr = $derived(arr ? nrrBp(arr) : null);
 	const ag = $derived(aging(invoices, asOf));
 	const customers = $derived(new Map(db.customers().map((c) => [c.id, c])));
 	const agingRows = $derived(
@@ -343,6 +344,11 @@
 					From {quarterStart} to {asOf}, from the active contracts{consolidated ? ` of every company, at the month's closing rate` : ''}. ARR is not a ledger figure, so it has no journal lines.
 				</p>
 				<div class="mt-4"><ArrWaterfall w={arr} currency={ccy} /></div>
+				<p class="mt-3 text-sm text-ink-2">
+					Net revenue retention:
+					<span class="num font-medium text-ink">{nrr === null ? 'n/a (no customer had ARR at the start).' : `${(nrr / 100).toFixed(1)}%.`}</span>
+					<span class="text-ink-3">The customers we had on {quarterStart}, at what they are worth now; new customers are left out.</span>
+				</p>
 			</section>
 
 			<section aria-labelledby="aging-h" class="min-w-0">
