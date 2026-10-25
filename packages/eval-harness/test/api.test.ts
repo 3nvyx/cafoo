@@ -88,6 +88,6 @@ describe('read-only SQL', () => {
       expect(() => assertReadOnly(sql), sql).toThrow(/only a single SELECT statement/);
     }
     // The CLI wrapper refuses too, without spawning the binary.
-    expect(() => new SpacetimeCli({ db: 'cafoo-eval', server: 'local', bin: '/nonexistent/spacetime' }).query('DELETE FROM period')).toThrow(/only a single SELECT statement/);
+    expect(() => new SpacetimeCli({ db: 'luyten-eval', server: 'local', bin: '/nonexistent/spacetime' }).query('DELETE FROM period')).toThrow(/only a single SELECT statement/);
   });
 });

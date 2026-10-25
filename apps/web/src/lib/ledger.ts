@@ -2,7 +2,7 @@
 // running balances. Pure functions over the source's rows; every amount is a bigint of minor units in the account's
 // company's own (Functional) currency, lines in another currency converted at their recorded rate (ledger-core's
 // rounding, via functionalNet), so the figures match the Board Pack's.
-import { groupCode } from '@cafoo/ledger-core';
+import { groupCode } from '@luyten/ledger-core';
 import { isDebitNormal } from './data/derive';
 import { functionalNet } from './data/group';
 import type { Account, AccountType, JournalEntry, JournalLine, Subsidiary } from './data/types';

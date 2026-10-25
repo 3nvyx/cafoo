@@ -27,7 +27,7 @@
 	--focus: #151413;
 
 	/* Semantic tokens that app.css did not define yet, aliased to the variables above so the token classes render.
-	   Values mirror packages/design-tokens/css/cafoo-tokens.css until this file imports it. */
+	   Values mirror packages/design-tokens/css/luyten-tokens.css until this file imports it. */
 	--info: var(--ink-3);
 	--info-soft: var(--line);
 	--on-info: var(--surface);
@@ -214,8 +214,8 @@
 	--radius-lg: var(--shape-lg);
 	--radius-xl: var(--shape-xl);
 
-	/* The type scale, mirrored value for value from the @theme block of packages/design-tokens/css/cafoo-tokens.css
-	   until this file imports @cafoo/design-tokens/css (which also retires text-sm and friends). */
+	/* The type scale, mirrored value for value from the @theme block of packages/design-tokens/css/luyten-tokens.css
+	   until this file imports @luyten/design-tokens/css (which also retires text-sm and friends). */
 	--text-micro: 11px;
 	--text-micro--line-height: 16px;
 	--text-micro--letter-spacing: 0.01em;

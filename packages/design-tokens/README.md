@@ -1,6 +1,6 @@
-# @cafoo/design-tokens
+# @luyten/design-tokens
 
-Cafoo's design decisions as data, and the checks that keep the web app on them.
+Luyten's design decisions as data, and the checks that keep the web app on them.
 
 ```
 tokens/primitives.tokens.json   palette ramps, sizes, font stacks (W3C DTCG 2025.10)
@@ -11,7 +11,7 @@ scripts/build.mjs               runs Terrazzo, re-indents, adds color-scheme, ap
 scripts/tokens.mjs              a small token reader used by the checks
 scripts/raw-values.mjs          the scanner behind the raw-values check and its allowlist
 scripts/raw-values-baseline.json  per-file counts of raw values in apps/web/src that may only go down
-css/cafoo-tokens.css            the committed build output that apps/web imports
+css/luyten-tokens.css            the committed build output that apps/web imports
 tests/                          the checks (build, contrast, usage notes, raw values, Tailwind compile)
 NAMING.md                       tiers, grammar, how to add a token
 ```
@@ -20,10 +20,10 @@ NAMING.md                       tiers, grammar, how to add a token
 
 | Command | Does |
 |---|---|
-| `pnpm -F @cafoo/design-tokens build` | Regenerates `css/cafoo-tokens.css`. Commit the result. |
-| `pnpm -F @cafoo/design-tokens check` | `tz check`: validates the token files (types, references, names). Part of `pnpm check`. |
-| `pnpm -F @cafoo/design-tokens test` | Runs the checks below. Part of `pnpm test` and CI. |
-| `pnpm -F @cafoo/design-tokens baseline` | Rewrites the raw-values baseline with the current counts; refuses to raise the total unless `RATCHET_ALLOW_RAISE=1`. |
+| `pnpm -F @luyten/design-tokens build` | Regenerates `css/luyten-tokens.css`. Commit the result. |
+| `pnpm -F @luyten/design-tokens check` | `tz check`: validates the token files (types, references, names). Part of `pnpm check`. |
+| `pnpm -F @luyten/design-tokens test` | Runs the checks below. Part of `pnpm test` and CI. |
+| `pnpm -F @luyten/design-tokens baseline` | Rewrites the raw-values baseline with the current counts; refuses to raise the total unless `RATCHET_ALLOW_RAISE=1`. |
 
 ## Checks
 
@@ -40,13 +40,13 @@ A check is a script with a fixed answer. Nobody judges whether something passes.
 ## How a value change flows
 
 1. Edit a value in `tokens/primitives.tokens.json`, or repoint a semantic token.
-2. `pnpm -F @cafoo/design-tokens build`.
-3. `pnpm -F @cafoo/design-tokens test`. If white text on the new red fails contrast, the test names the pair and the mode.
+2. `pnpm -F @luyten/design-tokens build`.
+3. `pnpm -F @luyten/design-tokens test`. If white text on the new red fails contrast, the test names the pair and the mode.
 4. Open a pull request with the token file and the regenerated CSS. The diff is values only.
 5. Every screen that uses the semantic names picks up the change. No component changes.
 
 ## Using the tokens in apps/web
 
-`app.css` imports `@cafoo/design-tokens/css` after `tailwindcss` (the migration that does this, and moves the components onto the token classes, is tracked by the raw-values baseline; until it lands, `app.css` still defines its own variables and only those classes render). The `@theme` block at the end of the generated file is the complete list of design classes; a class that is not there does not exist. Rules of the road are in the root `AGENTS.md` under "Design tokens"; the grammar is in `NAMING.md`.
+`app.css` imports `@luyten/design-tokens/css` after `tailwindcss` (the migration that does this, and moves the components onto the token classes, is tracked by the raw-values baseline; until it lands, `app.css` still defines its own variables and only those classes render). The `@theme` block at the end of the generated file is the complete list of design classes; a class that is not there does not exist. Rules of the road are in the root `AGENTS.md` under "Design tokens"; the grammar is in `NAMING.md`.
 
 Sources this follows: the [W3C Design Tokens Community Group format](https://www.designtokens.org/), Nathan Curtis's writing on design-system structure and naming, and GitHub Primer's `usage`/`rules` fields for agent-readable notes.

@@ -10,6 +10,6 @@ export const variables = defineEnvVars({
 		schema: (v: string | undefined) => (v === 'spacetime' ? 'spacetime' : 'mock')
 	},
 	PUBLIC_STDB_URI: { public: true, static: true, description: 'Ledger database websocket URI.', schema: orDefault('ws://localhost:3000') },
-	PUBLIC_STDB_DATABASE: { public: true, static: true, description: 'Ledger database name.', schema: orDefault('cafoo') },
+	PUBLIC_STDB_DATABASE: { public: true, static: true, description: 'Ledger database name.', schema: orDefault('luyten') },
 	PUBLIC_AGENT_GATEWAY: { public: true, static: true, description: 'Agent gateway base URL (POST /close starts a close).', schema: orDefault('http://localhost:8787') }
 });

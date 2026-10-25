@@ -1,5 +1,5 @@
 /**
- * Domain types for the Cafoo ledger engine.
+ * Domain types for the Luyten ledger engine.
  * Ids are bigint, money is bigint minor units, FX rates are bigint scaled by 1e6.
  */
 

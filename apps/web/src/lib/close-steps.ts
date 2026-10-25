@@ -1,7 +1,7 @@
 // The close status bar: the month-end close as six steps in the order the agents work them, Bookkeeper, Revenue,
 // Credit & Risk, Consolidation, CFO review, Lock, each with a state and its Proposal counts. Pure: derived from the
 // Period, its close tasks and Proposals, and the lock gate (#lib/close.js), so the Close page and its tests agree.
-import { isBankReconciliationTask } from '@cafoo/ledger-core';
+import { isBankReconciliationTask } from '@luyten/ledger-core';
 import type { AgentRole, CloseTask, Period, Proposal } from './data/types';
 
 export type StepState = 'done' | 'running' | 'waiting' | 'not_started';

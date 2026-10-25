@@ -1,6 +1,6 @@
 <script lang="ts">
 	// The security card as a carousel: the first slide is the gate itself, the others show what a
-	// sponsor's API does inside Cafoo. It moves only when the visitor asks (the tabs, the arrows, or
+	// sponsor's API does inside Luyten. It moves only when the visitor asks (the tabs, the arrows, or
 	// arrow keys on the tabs); nothing advances on its own, so there is nothing to pause.
 	// From lg up every slide shares one grid cell, so the card keeps the tallest slide's height and
 	// does not jump; below lg only the open slide is laid out. From xl up a slide splits in two, the
@@ -42,7 +42,7 @@
 			topic: 'Advisor chat',
 			brand: { kind: 'logo', name: 'Fetch.ai', file: 'fetch-ai', ratio: 6.1 },
 			title: 'Ask your Advisor how the business is doing',
-			body: 'The Cafoo Advisor lives on Fetch.ai’s Agentverse, so you can chat with it in ASI:One. It asks four specialist agents at once and answers with one interactive card, built from the live books.'
+			body: 'Luyten lives on Fetch.ai’s Agentverse, so you can chat with it in ASI:One. It asks four specialist agents at once and answers with one interactive card, built from the live books.'
 		},
 		{
 			id: 'footprint',

@@ -9,7 +9,7 @@
  * never from the files directly, so a published charter changes all three at once. Whatever the source, every shipped
  * rule runs (src/charter/build.ts): a custom charter can only make the gate stricter.
  */
-import { loadScenarios, scenariosDir, type Scenario } from '@cafoo/eval-harness';
+import { loadScenarios, scenariosDir, type Scenario } from '@luyten/eval-harness';
 import { STDB_DB } from '../env';
 import { agentPrompt, charterPrompt, harnessFor, HARNESSES, type Harness, type Role } from '../harness';
 import type { RoleConn } from '../stdb';

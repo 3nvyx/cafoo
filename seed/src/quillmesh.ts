@@ -66,7 +66,7 @@ export function scaleToQuillmesh(seed: Seed, close: Ym): void {
 
   // 0. The group's entries, bank lines and close tasks name Quillmesh Inc and Quillmesh Ltd, not the fixture's companies
   // (the loader renames the subsidiaries and the intercompany accounts the same way).
-  seed.group = JSON.parse(JSON.stringify(seed.group).replace(/\bCafoo (Inc|Ltd)\b/g, 'Quillmesh $1').replace(/\bCAFOO (INC|LTD)\b/g, 'QUILLMESH $1'));
+  seed.group = JSON.parse(JSON.stringify(seed.group).replace(/\bLuyten (Inc|Ltd)\b/g, 'Quillmesh $1').replace(/\bCAFOO (INC|LTD)\b/g, 'QUILLMESH $1'));
 
   // 1. Periods: 15 more closed months before the fixture's first.
   const earlier: string[] = [];

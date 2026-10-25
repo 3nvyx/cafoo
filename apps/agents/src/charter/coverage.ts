@@ -5,7 +5,7 @@
  * about this role, and only reads. On top of that a custom charter can only make the gate stricter (see
  * charterCoverage). Problems are plain sentences for the CFO's editor and the eval report.
  */
-import { customScenario, DEFAULT_VARS, templateVars, VAR_LIMITS, type Scenario } from '@cafoo/eval-harness';
+import { customScenario, DEFAULT_VARS, templateVars, VAR_LIMITS, type Scenario } from '@luyten/eval-harness';
 import { HARNESSES, type Role } from '../harness';
 import { keepsShippedRule, shippedLines } from './build';
 import { PARAM_TEMPLATES, templateById } from './library';

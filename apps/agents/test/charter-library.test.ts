@@ -2,7 +2,7 @@
 // gate (every probe gets its expected verdict), the scenario variables, the scripted close's params, and the
 // generated scenarios, which must run on the recorded close.
 import { describe, expect, it } from 'vitest';
-import { parseScenarioYaml, runScenarios, snapshotDb } from '@cafoo/eval-harness';
+import { parseScenarioYaml, runScenarios, snapshotDb } from '@luyten/eval-harness';
 import { HARNESSES, WORKERS, type Role } from '../src/harness';
 import { allTemplates, builtinTemplates, PARAM_TEMPLATES, runProbe, templateById, templatesFor, type TemplateUse } from '../src/charter/library';
 

@@ -74,12 +74,12 @@ async function google<T>(fetcher: typeof fetch, what: string, url: string, init:
 /** The deck's slides as Slides API batchUpdate requests: a title slide, then each table in chunks of ROWS_PER_SLIDE. */
 export function deckRequests(title: string, subtitle: string, tables: Table[], deleteSlideId?: string): unknown[] {
   const reqs: unknown[] = [
-    { createSlide: { objectId: 'cafoo_title', slideLayoutReference: { predefinedLayout: 'TITLE' }, placeholderIdMappings: [
-      { layoutPlaceholder: { type: 'CENTERED_TITLE' }, objectId: 'cafoo_title_t' },
-      { layoutPlaceholder: { type: 'SUBTITLE' }, objectId: 'cafoo_title_s' },
+    { createSlide: { objectId: 'luyten_title', slideLayoutReference: { predefinedLayout: 'TITLE' }, placeholderIdMappings: [
+      { layoutPlaceholder: { type: 'CENTERED_TITLE' }, objectId: 'luyten_title_t' },
+      { layoutPlaceholder: { type: 'SUBTITLE' }, objectId: 'luyten_title_s' },
     ] } },
-    { insertText: { objectId: 'cafoo_title_t', text: title } },
-    { insertText: { objectId: 'cafoo_title_s', text: subtitle } },
+    { insertText: { objectId: 'luyten_title_t', text: title } },
+    { insertText: { objectId: 'luyten_title_s', text: subtitle } },
   ];
   let n = 0;
   for (const t of tables) {
@@ -88,8 +88,8 @@ export function deckRequests(title: string, subtitle: string, tables: Table[], d
     const chunks = shown.length ? Math.ceil(shown.length / ROWS_PER_SLIDE) : 1;
     for (let k = 0; k < chunks; k++) {
       n++;
-      const slide = `cafoo_s${n}`;
-      const table = `cafoo_t${n}`;
+      const slide = `luyten_s${n}`;
+      const table = `luyten_t${n}`;
       const body = shown.slice(k * ROWS_PER_SLIDE, (k + 1) * ROWS_PER_SLIDE);
       const rows = [t.header.slice(0, cols), ...(body.length ? body : [['Nothing to show.']])].map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ''));
       const left = [t.rows.length > shown.length ? `first ${shown.length} of ${t.rows.length} rows` : '', t.header.length > cols ? `first ${cols} of ${t.header.length} columns` : ''].filter(Boolean);

@@ -117,7 +117,7 @@
 </section>
 
 {#if projection && 'error' in projection}
-	<div class="mt-10"><Notice tone="warn" title="After the {projection.next.name}">Cafoo can't project this round: {projection.error}</Notice></div>
+	<div class="mt-10"><Notice tone="warn" title="After the {projection.next.name}">Luyten can't project this round: {projection.error}</Notice></div>
 {:else if projection}
 	{@const p = projection}
 	<section aria-labelledby="after-h" class="mt-10 flex flex-col gap-3">

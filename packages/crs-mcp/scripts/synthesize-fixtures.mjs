@@ -1,6 +1,6 @@
 // Synthesizes fixtures/crs/<product>/<name>.json for every persona row of crs-sandbox-dataset.csv,
 // from the documented sandbox outcomes (expected_outcome column + CRS product guides).
-// Run: pnpm -F @cafoo/crs-mcp fixtures:synth   (builds dist first)
+// Run: pnpm -F @luyten/crs-mcp fixtures:synth   (builds dist first)
 // Live recordings (CrsClient { record }) overwrite these files with synthesized:false.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -487,7 +487,7 @@ writeFileSync(
       note:
         'These responses are synthesized from the documented sandbox outcomes (expected_outcome in crs-sandbox-dataset.csv and the CRS product guides), ' +
         'using the documented response shapes. Request ids are fake (fx-<persona>-<product>[-<bureau>]). They are not recordings. ' +
-        'Once CRS credentials exist, refresh them with `pnpm -F @cafoo/crs-mcp fixtures:record`, which overwrites each file with the live body and RequestID (synthesized:false). ' +
+        'Once CRS credentials exist, refresh them with `pnpm -F @luyten/crs-mcp fixtures:record`, which overwrites each file with the live body and RequestID (synthesized:false). ' +
         'Unconfirmed shapes: PitchPoint /pp/fcrablj/data keys (free-form XML-derived JSON), the deceased errorMessages code, TU identity SubjectRecord fields beyond addOnProducts[0].idManagerVerification.messages, score modelName strings.',
       generator: 'packages/crs-mcp/scripts/synthesize-fixtures.mjs',
     },

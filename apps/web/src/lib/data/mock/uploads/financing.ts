@@ -159,7 +159,7 @@ function trackerState(ctx: MockContext) {
 
 const closingTracker: UploadHandler = {
 	kind: 'closing_tracker',
-	fileName: 'Cafoo Seed 2026 closing tracker, first close.xlsx',
+	fileName: 'Luyten Seed 2026 closing tracker, first close.xlsx',
 	sizeBytes: 48_212,
 	readByRole: 'funding',
 	read(ctx) {
@@ -333,7 +333,7 @@ const safe: UploadHandler = {
 		return {
 			extracted: { form: 'Post-money valuation cap SAFE (standard form)', company: 'Cafoo Inc', investor: 'Fenwick Row Ventures Ltd', purchaseAmount: '200,000.00 USD', paymentTerms: 'Payable in GBP at the spot rate on the payment date, to an account the Company names', valuationCap: '24,000,000.00 USD post-money', discount: 'None', mfn: 'No', proRata: 'Yes (side letter)', signedAt: '2026-10-01', governingLaw: 'Delaware', counselFees: '8,400.00 USD (company counsel, SAFE paperwork for the round)' },
 			summaryPlain: "Fenwick Row's $200,000 post-money SAFE at a $24M cap. The Capital accountant records it as a liability, because a SAFE can pay out cash if the company is sold first, and the lawyers' bill for the SAFEs as an expense.",
-			flagsPlain: ["The SAFE is in dollars but lets Fenwick Row pay in pounds into an account Cafoo names. They paid into Cafoo Ltd's account, so the two companies owe each other $200,000 until it is moved. A person should decide when to move it."]
+			flagsPlain: ["The SAFE is in dollars but lets Fenwick Row pay in pounds into an account Luyten names. They paid into Cafoo Ltd's account, so the two companies owe each other $200,000 until it is moved. A person should decide when to move it."]
 		};
 	},
 	apply(ctx, doc) {
@@ -400,7 +400,7 @@ const convertibleNote: UploadHandler = {
 				: isFunded
 				? "Orrin's $1M note at 6% a year for 24 months. It stays a liability until it converts; October's interest is an expense, not a reduction of what was raised."
 				: "Orrin's $1M note at 6% a year for 24 months. Interest starts when the money arrives; upload the closing tracker to record it.",
-			flagsPlain: ['On a sale of the company before conversion, Orrin can take twice its principal in cash. That premium may need to be valued on its own; Cafoo will not invent a number. Upload the valuation report, and a person decides.']
+			flagsPlain: ['On a sale of the company before conversion, Orrin can take twice its principal in cash. That premium may need to be valued on its own; Luyten will not invent a number. Upload the valuation report, and a person decides.']
 		};
 	},
 	apply(ctx, doc) {
@@ -543,7 +543,7 @@ const valuationReport: UploadHandler = {
 				proposerRole: 'capital',
 				amountMinor: delta.toString(),
 				summaryPlain: `Restate ${fresh.length === 1 ? 'a SAFE' : `${fresh.length} SAFEs`} worth ${money(principal)} at the valuer's fair value, ${money(principal + delta)}. The ${money(delta)} increase is a non-cash loss on the P&L; no money moves.`,
-				rationale: `Fair value from ${doc.fileName} (Ashgrove, 106.2% of purchase amount). SAFEs are liabilities at fair value through earnings; the change goes to 7300. Cafoo does not estimate fair values itself.`,
+				rationale: `Fair value from ${doc.fileName} (Ashgrove, 106.2% of purchase amount). SAFEs are liabilities at fair value through earnings; the change goes to 7300. Luyten does not estimate fair values itself.`,
 				payload: { key, documentId: doc.id, instrumentIds: fresh.map((i) => i.id), adjustments, memo: 'SAFEs restated to fair value per the valuation report', lines: [L('7300', delta, '0'), L('2600', '0', delta)] },
 				body: `${fresh.map((i) => `${i.id} ${money(i.principalMinor).slice(1)} x 1.062`).join('; ')}. Dr 7300 Change in fair value of SAFEs / Cr 2600 ${money(delta).slice(1)}.`
 			})
@@ -567,7 +567,7 @@ const capTable: UploadHandler = {
 			summaryPlain: has
 				? 'The export matches the register: same holders, classes and share counts.'
 				: 'The export matches the register except one option grant: 25,000 options to Grace Liu, approved by the board on 30 September. The Capital accountant adds it out of the unallocated pool, so the fully diluted total does not change.',
-			flagsPlain: has ? [] : ["Grace Liu's grant was approved by the board but never reached Cafoo. A person should check the board consent is on file before her offer letter goes out."]
+			flagsPlain: has ? [] : ["Grace Liu's grant was approved by the board but never reached Luyten. A person should check the board consent is on file before her offer letter goes out."]
 		};
 	},
 	apply(ctx) {
@@ -622,8 +622,8 @@ const termSheet: UploadHandler = {
 			extracted: { lead: 'Saltmarsh Partners', security: 'Series A preferred', investment: '12,000,000.00 USD', preMoney: '60,000,000.00 USD, including converting SAFEs and notes and the unallocated pool', liquidationPreference: '1x, non-participating', optionPool: 'Top up to 10% of post-money, inside the pre-money', board: 'One seat for Saltmarsh', legalFees: 'Company pays investor counsel up to 40,000.00 USD', expectedClose: '2026-12-15', pricePerShare: formatPriceE4(plan.roundPriceE4) },
 			summaryPlain: `Saltmarsh Partners offers $12M at a $60M pre-money, about ${formatPriceE4(plan.roundPriceE4)} a share. The Seed SAFEs and note convert into Series A preferred at their $24M cap at the ${day(SERIES_A_CLOSE)} close. ${conversionFor(ctx) ? 'The conversion is already proposed; SAFEs funded since then convert at the close.' : 'The Capital accountant worked out the shares and proposes the conversion.'}`,
 			flagsPlain: [
-				'The term sheet tops the option pool up to 10% of the company after the round, counted inside the pre-money. That dilutes today’s holders, not Saltmarsh. Cafoo has not modelled the top-up; a person should agree its size.',
-				'Before the close the SAFEs must be valued again at the closing date. Cafoo will not invent that fair value; upload the valuer’s update.',
+				'The term sheet tops the option pool up to 10% of the company after the round, counted inside the pre-money. That dilutes today’s holders, not Saltmarsh. Luyten has not modelled the top-up; a person should agree its size.',
+				'Before the close the SAFEs must be valued again at the closing date. Luyten will not invent that fair value; upload the valuer’s update.',
 				'Brightwater’s most-favoured-nation election on the note’s 20% discount is still open. The conversion assumes no discount for them.',
 				'The company pays Saltmarsh’s legal fees up to $40,000. That is a cost of issuing the shares, set against paid-in capital, but nothing is booked until a bill arrives; a person should watch for it.'
 			]

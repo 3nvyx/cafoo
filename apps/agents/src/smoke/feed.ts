@@ -1,6 +1,6 @@
 /**
  * End-to-end smoke test of the live feed, against a local SpacetimeDB (destructive: it republishes its database).
- *   pnpm -F @cafoo/agents smoke:feed            database cafoo-c1 (SPACETIMEDB_DB_NAME to choose another; never cafoo)
+ *   pnpm -F @luyten/agents smoke:feed            database luyten-c1 (SPACETIMEDB_DB_NAME to choose another; never luyten)
  * Steps: publish the module fresh, generate and load the demo group with a CFO bootstrap secret, run the September close
  * without waiting, claim the CFO seat with the secret, confirm what waits for the CFO, explicitly accept the remaining
  * bank exceptions as the fixture CFO, and resume until the lock is requested. Lock September, then switch the feed on
@@ -13,15 +13,15 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '@luyten/ledger-core';
 import { closePeriod } from '../close-period';
 
-process.env.SPACETIMEDB_DB_NAME ||= 'cafoo-c1';
+process.env.SPACETIMEDB_DB_NAME ||= 'luyten-c1';
 process.env.DEMO_STEP_MS = '0';
 process.env.CLOSE_NO_WAIT = '1';
 const DB = process.env.SPACETIMEDB_DB_NAME;
-if (DB === 'cafoo') {
-  console.error('smoke:feed republishes its database; pick another one than cafoo with SPACETIMEDB_DB_NAME.');
+if (DB === 'luyten') {
+  console.error('smoke:feed republishes its database; pick another one than luyten with SPACETIMEDB_DB_NAME.');
   process.exit(2);
 }
 const repoRoot = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..', '..');
@@ -44,8 +44,8 @@ const check = (name: string, ok: boolean, detail = '') => {
 
 step(`publish the module fresh to ${DB} and load the demo group (close month ${CLOSE})`);
 run(CLI, ['publish', DB, '--server', SERVER, '--delete-data=always', '--yes'], join(repoRoot, 'spacetimedb'));
-run('pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot, { CLOSE_PERIOD: CLOSE });
-run('pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { SEED_NO_BOOTSTRAP: '' });
+run('pnpm', ['-F', '@luyten/seed', 'generate'], repoRoot, { CLOSE_PERIOD: CLOSE });
+run('pnpm', ['-F', '@luyten/seed', 'load'], repoRoot, { SEED_NO_BOOTSTRAP: '' });
 
 // Imported after the environment is set: env.ts reads the database name and step time once.
 const { Cast, RoleConn, sleep, waitFor } = await import('../stdb');

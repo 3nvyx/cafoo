@@ -55,12 +55,12 @@
 			: e.type === 'contractor' || e.type === 'intern'
 				? 'No benefits.'
 				: e.ccy === 'GBP'
-					? `Pension: Cafoo pays ${e.retirementBp / 100}% of salary, ${e.name.split(' ')[0]} pays 5%. Private medical ${money(e.benefitsMonthlyMinor, e.ccy, false)} a month.`
-					: `${e.retirementBp ? `401(k): Cafoo matches up to ${e.retirementBp / 100}% of pay.` : 'Not in the 401(k).'} Health: Cafoo pays ${money(e.benefitsMonthlyMinor, e.ccy, false)} a month of the premium.`
+					? `Pension: Luyten pays ${e.retirementBp / 100}% of salary, ${e.name.split(' ')[0]} pays 5%. Private medical ${money(e.benefitsMonthlyMinor, e.ccy, false)} a month.`
+					: `${e.retirementBp ? `401(k): Luyten matches up to ${e.retirementBp / 100}% of pay.` : 'Not in the 401(k).'} Health: Luyten pays ${money(e.benefitsMonthlyMinor, e.ccy, false)} a month of the premium.`
 	);
 </script>
 
-<svelte:head><title>{e?.name ?? 'Person'} · Cafoo</title></svelte:head>
+<svelte:head><title>{e?.name ?? 'Person'} · Luyten</title></svelte:head>
 
 <a href="/people" class="drill inline-flex min-h-11 items-center gap-1 text-body-sm text-ink-2"><Icon name="chevronLeft" size={16} />People</a>
 
@@ -81,7 +81,7 @@
 
 	{#if leave}
 		<Notice class="mt-4" tone="warn" title="On {leave.kind === 'parental' ? 'parental' : 'unpaid'} leave until {fmtDate(leave.endAt)}">
-			State disability and paid family leave pay {e.name.split(' ')[0]} while away; Cafoo keeps paying the health premium. Payroll resumes on return.
+			State disability and paid family leave pay {e.name.split(' ')[0]} while away; Luyten keeps paying the health premium. Payroll resumes on return.
 		</Notice>
 	{/if}
 

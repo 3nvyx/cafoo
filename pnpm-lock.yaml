@@ -22,19 +22,19 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.309
         version: 0.3.309(@anthropic-ai/sdk@1.1.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.7))(zod@4.6.7)
-      '@cafoo/crs-mcp':
+      '@luyten/crs-mcp':
         specifier: workspace:*
         version: link:../../packages/crs-mcp
-      '@cafoo/eval-harness':
+      '@luyten/eval-harness':
         specifier: workspace:*
         version: link:../../packages/eval-harness
-      '@cafoo/ledger-core':
+      '@luyten/ledger-core':
         specifier: workspace:*
         version: link:../../packages/ledger-core
-      '@cafoo/seed':
+      '@luyten/seed':
         specifier: workspace:*
         version: link:../../seed
-      '@cafoo/stdb-bindings':
+      '@luyten/stdb-bindings':
         specifier: workspace:*
         version: link:../../packages/stdb-bindings
       '@moss-js/moss':
@@ -65,9 +65,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@cafoo/ledger-core':
-        specifier: workspace:*
-        version: link:../../packages/ledger-core
       '@fontsource-variable/instrument-sans':
         specifier: 5.3.0
         version: 5.3.0
@@ -77,6 +74,9 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: 5.3.0
         version: 5.3.0
+      '@luyten/ledger-core':
+        specifier: workspace:*
+        version: link:../../packages/ledger-core
       spacetimedb:
         specifier: ^2.13.0
         version: 2.13.0(svelte@5.57.2)
@@ -166,7 +166,7 @@ importers:
 
   packages/eval-harness:
     dependencies:
-      '@cafoo/crs-mcp':
+      '@luyten/crs-mcp':
         specifier: workspace:*
         version: link:../crs-mcp
       yaml:
@@ -210,7 +210,7 @@ importers:
 
   seed:
     dependencies:
-      '@cafoo/stdb-bindings':
+      '@luyten/stdb-bindings':
         specifier: workspace:*
         version: link:../packages/stdb-bindings
       spacetimedb:

@@ -189,7 +189,7 @@
 	] as const;
 </script>
 
-<svelte:head><title>Charters · Cafoo</title></svelte:head>
+<svelte:head><title>Charters · Luyten</title></svelte:head>
 
 <div class="flex flex-col gap-2">
 	<h1 class="text-[34px] sm:text-[42px]">Charters</h1>

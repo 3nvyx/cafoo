@@ -1,6 +1,8 @@
-# Cafoo
+# Luyten
 
-Cafoo is an agentic finance ERP for SaaS companies. Worker agents propose changes to the books, a Chief Finance Advisor agent rules on them, and the human CFO confirms anything material. Every number drills down to the journal lines behind it.
+Luyten is automated finance for 10x growth startups.
+Worker agents propose changes to the books, a Chief Finance Advisor agent rules on them, and the human CFO confirms anything material.
+Every number drills down to the journal lines behind it.
 
 ## Language
 

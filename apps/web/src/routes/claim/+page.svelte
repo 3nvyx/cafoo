@@ -89,7 +89,7 @@
 	const done = $derived(phase === 'claimed' || phase === 'already' || phase === 'demo' || (phase === 'no-secret' && seat.status === 'you'));
 </script>
 
-<svelte:head><title>Claim the CFO seat · Cafoo</title></svelte:head>
+<svelte:head><title>Claim the CFO seat · Luyten</title></svelte:head>
 
 <div class="flex min-h-dvh flex-col bg-canvas">
 	<header class="mx-auto flex h-16 w-full max-w-[1120px] items-center px-4 sm:px-8">

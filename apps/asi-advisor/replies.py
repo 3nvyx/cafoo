@@ -1,4 +1,4 @@
-"""The Cafoo Advisor's orchestration: what to answer, and which specialist agents to ask for it.
+"""Luyten's orchestration: what to answer, and which specialist agents to ask for it.
 
 `call(desk, request, response_type)` sends one request to a specialist agent and returns its response, or None when it
 did not answer in time; agent.py passes ctx.send_and_receive, and tests pass a stub. Independent specialists are
@@ -96,6 +96,6 @@ async def reply_to(text: str, call: Call) -> ChatMessage:
             return cards.text_message(await ledger.ask_advisor(choice.get("question", "")))
         return cards.text_message(await ledger.ask_advisor(text))
     except ledger.LedgerError as e:
-        return cards.text_message(f"I can't reach the Cafoo books right now: {e}. Try again in a moment.")
+        return cards.text_message(f"I can't reach the Luyten books right now: {e}. Try again in a moment.")
     except (KeyError, ValueError) as e:
         return cards.menu_message(f"I didn't understand that selection ({e.__class__.__name__}). Here is the menu.")

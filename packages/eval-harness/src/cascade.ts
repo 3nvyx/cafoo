@@ -1,4 +1,4 @@
-import { CrsClient, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
+import { CrsClient, runCascade, type CascadeResult } from '@luyten/crs-mcp';
 
 const cache = new Map<string, Promise<CascadeResult>>();
 let client: CrsClient | undefined;

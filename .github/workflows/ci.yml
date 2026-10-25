@@ -27,7 +27,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
-      - run: pnpm -F @cafoo/agents test:module
+      - run: pnpm -F @luyten/agents test:module
 
   ledger:
     name: Ledger smoke and eval (SpacetimeDB)
@@ -57,13 +57,13 @@ jobs:
           for i in $(seq 1 60); do spacetime server ping local && exit 0; sleep 1; done
           cat "$RUNNER_TEMP/spacetime.log"; exit 1
       - name: Module smoke (every gate and refusal, plus an in-place upgrade)
-        run: pnpm -F @cafoo/stdb-bindings smoke
+        run: pnpm -F @luyten/stdb-bindings smoke
       - name: Feed smoke (September close, CFO lock, then the October feed)
-        run: pnpm -F @cafoo/agents smoke:feed
+        run: pnpm -F @luyten/agents smoke:feed
       - name: Eval (rerun the scripted close, check every charter and persona scenario)
         run: |
-          (cd spacetimedb && spacetime publish cafoo-ci-eval --server local --delete-data=always --yes)
-          pnpm eval --rerun --db cafoo-ci-eval
+          (cd spacetimedb && spacetime publish luyten-ci-eval --server local --delete-data=always --yes)
+          pnpm eval --rerun --db luyten-ci-eval
       - name: SpacetimeDB log on failure
         if: failure()
         run: tail -n 200 "$RUNNER_TEMP/spacetime.log"
@@ -86,4 +86,4 @@ jobs:
       # Card, decoding, report and selection tests; the live tests skip without a running ledger.
       - run: python -m unittest -v test_agent
         env:
-          CAFOO_ADVISOR_SEED: ci-only-seed-not-a-secret
+          LUYTEN_ADVISOR_SEED: ci-only-seed-not-a-secret

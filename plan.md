@@ -6,7 +6,7 @@ If you are an agent picking this up, read this file, then `AGENTS.md`, then `CON
 
 ## Working rules
 
-- Commit and push to `main` often. Run `pnpm check` and `pnpm -F @cafoo/web test` before every push. CI must stay green.
+- Commit and push to `main` often. Run `pnpm check` and `pnpm -F @luyten/web test` before every push. CI must stay green.
 - Never use the em dash. Use a plain dash.
 - No co-author lines naming an agent in commits.
 - Do not edit `CHANGELOG.md`, lockfiles, or generated files (`apps/web/src/lib/module_bindings/`, `packages/stdb-bindings/src/`) by hand; regenerate with `pnpm gen:bindings`.
@@ -36,9 +36,9 @@ Quillmesh is a second seed profile: `pnpm demo:quillmesh` (that is `SEED_PROFILE
 It adds 15 earlier closed months, the 80 contract customers (every term invoiced and paid by the close), monthly billing-sync revenue and operating costs, and the seed and Series A cash, on top of the fixture's close. The September close then runs exactly as on the fixture (51 Proposals when nobody confirms).
 Company records outside the ledger (people, payroll, funding, cap table, costs, credit packs, CRM) live in the `company_record` table, built by `seed/src/company.ts`.
 
-## How Cafoo grows with a startup ($10M to $1B valuation)
+## How Luyten grows with a startup ($10M to $1B valuation)
 
-| Stage | What changes for finance | What Cafoo does | Today or roadmap |
+| Stage | What changes for finance | What Luyten does | Today or roadmap |
 |---|---|---|---|
 | $10M to $50M (seed to A) | One or two entities, a few hundred customers, the founder still approves spend | Agents propose, the Advisor rules, the CFO confirms anything material. Close in days, not weeks. Cap table and round modeling | Today |
 | $50M to $250M (A to B) | A second country and currency, usage pricing, enterprise contracts, a first controller | Multi-currency consolidation, revaluation and eliminations as Proposals. Revenue schedules rebuilt automatically. Credit checks on customers and vendors. Custom Charters that only tighten the gate | Today |

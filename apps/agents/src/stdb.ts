@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Identity } from 'spacetimedb';
-import { DbConnection } from '@cafoo/stdb-bindings';
+import { DbConnection } from '@luyten/stdb-bindings';
 import { STDB_DB, STDB_URI } from './env';
 
 /** Agent roles. `feed` is the live bank feed's identity: it may only ingest raw bank lines and invoices. */
@@ -45,7 +45,7 @@ function tokenPath(role: ConnRole) {
 }
 /** Before tokens were kept per database they lived in .secrets/<role>.token; the default database still reads those. */
 function legacyTokenPath(role: ConnRole) {
-  return STDB_DB === 'cafoo' ? join(repoRoot, '.secrets', `${role}.token`) : undefined;
+  return STDB_DB === 'luyten' ? join(repoRoot, '.secrets', `${role}.token`) : undefined;
 }
 function loadToken(role: ConnRole) {
   try {

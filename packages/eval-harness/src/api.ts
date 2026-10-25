@@ -3,7 +3,7 @@
 // The CLI (run.ts) and the gateway's charter eval runner (apps/agents/src/charter/evaluate.ts) both go through here.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { personas } from '@cafoo/crs-mcp';
+import { personas } from '@luyten/crs-mcp';
 import type { Scalar } from './conditions.js';
 import type { Db } from './db.js';
 import { runScenario, scoreOf, type EngineContext, type ScenarioResult } from './engine.js';

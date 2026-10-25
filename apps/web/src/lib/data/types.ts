@@ -520,7 +520,7 @@ export interface LiveActivity {
 
 // Uploaded documents. Demo mode loads a bundled sample per kind and replays a recorded parse; nothing leaves the browser.
 
-/** Every kind of file the CFO can hand Cafoo, grouped by where it is uploaded. */
+/** Every kind of file the CFO can hand Luyten, grouped by where it is uploaded. */
 export type DocumentKind =
 	// Books
 	| 'bank_statement'
@@ -848,7 +848,7 @@ export interface Batch {
 	status: 'active' | 'expiring' | 'expired' | 'depleted';
 }
 
-// Integrations: the tools Cafoo reads from instead of rebuilding them (CRM, support, billing, payroll, cloud, cap table).
+// Integrations: the tools Luyten reads from instead of rebuilding them (CRM, support, billing, payroll, cloud, cap table).
 
 export type IntegrationCategory = 'crm' | 'support' | 'billing' | 'payroll' | 'cloud' | 'model_usage' | 'cap_table';
 
@@ -862,12 +862,12 @@ export interface Integration {
 	/** The last time a record arrived from it; drives "Updated 12s ago". */
 	lastSyncAt?: Iso;
 	recordsSynced: number;
-	/** What Cafoo reads from it, in plain words. */
+	/** What Luyten reads from it, in plain words. */
 	readsPlain: string;
 	notePlain?: string;
 }
 
-// CRM, kept small: Cafoo reads these from the connected CRM, support and billing tools; it does not edit them.
+// CRM, kept small: Luyten reads these from the connected CRM, support and billing tools; it does not edit them.
 
 export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 

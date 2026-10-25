@@ -70,13 +70,13 @@ describe('CSV', () => {
 
 describe('Google Slides export', () => {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
-  const config: SlidesConfig = { clientEmail: 'cafoo@proj.iam.gserviceaccount.com', privateKey, tokenUri: 'https://oauth2.googleapis.com/token', shareWith: ['cfo@example.com'] };
+  const config: SlidesConfig = { clientEmail: 'luyten@proj.iam.gserviceaccount.com', privateKey, tokenUri: 'https://oauth2.googleapis.com/token', shareWith: ['cfo@example.com'] };
   beforeEach(() => resetProviderCalls());
 
   it('names what is missing, never the values', () => {
     expect(slidesSetup({})).toEqual({ missing: [expect.stringMatching(/^GOOGLE_SERVICE_ACCOUNT_FILE/), expect.stringMatching(/^SLIDES_SHARE_WITH/)] });
     expect(slidesSetup({ GOOGLE_SERVICE_ACCOUNT_FILE: '/nope.json', SLIDES_SHARE_WITH: 'not-an-email' })).toEqual({ missing: ['SLIDES_SHARE_WITH must be comma-separated email addresses'] });
-    const dir = mkdtempSync(join(tmpdir(), 'cafoo-sa-'));
+    const dir = mkdtempSync(join(tmpdir(), 'luyten-sa-'));
     writeFileSync(join(dir, 'sa.json'), JSON.stringify({ client_email: config.clientEmail, private_key: privateKey }));
     expect(slidesSetup({ GOOGLE_SERVICE_ACCOUNT_FILE: join(dir, 'sa.json'), SLIDES_SHARE_WITH: 'a@b.co, c@d.co' })).toMatchObject({ config: { clientEmail: config.clientEmail, shareWith: ['a@b.co', 'c@d.co'] } });
   });
@@ -93,14 +93,14 @@ describe('Google Slides export', () => {
     const reqs = deckRequests('Deck', 'sub', [wide], 'p') as Record<string, any>[];
     const tables = reqs.filter(r => r.createTable).map(r => r.createTable);
     expect(tables.map(t => [t.rows, t.columns])).toEqual([[13, 8], [13, 8], [2, 8]]);
-    expect(reqs.filter(r => r.insertText?.objectId?.endsWith('_t') && r.insertText.objectId.startsWith('cafoo_s')).map(r => r.insertText.text)).toEqual([
+    expect(reqs.filter(r => r.insertText?.objectId?.endsWith('_t') && r.insertText.objectId.startsWith('luyten_s')).map(r => r.insertText.text)).toEqual([
       'Ledger, 2026-09 (1 of 3); first 8 of 15 columns, all in the CSV', 'Ledger, 2026-09 (2 of 3); first 8 of 15 columns, all in the CSV', 'Ledger, 2026-09 (3 of 3); first 8 of 15 columns, all in the CSV',
     ]);
     expect(reqs.at(-1)).toEqual({ deleteObject: { objectId: 'p' } });
     // Past 120 rows the deck stops and says the rest is in the CSV.
     const long = deckRequests('Deck', 'sub', [{ ...wide, rows: Array.from({ length: 300 }, () => ['x']) }]) as Record<string, any>[];
     expect(long.filter(r => r.createTable)).toHaveLength(10);
-    expect(long.find(r => r.insertText?.objectId === 'cafoo_s1_t')?.insertText.text).toBe('Ledger, 2026-09 (1 of 10); first 120 of 300 rows, first 8 of 15 columns, all in the CSV');
+    expect(long.find(r => r.insertText?.objectId === 'luyten_s1_t')?.insertText.text).toBe('Ledger, 2026-09 (1 of 10); first 120 of 300 rows, first 8 of 15 columns, all in the CSV');
   });
 
   it('signs in, creates the deck, shares it, fills it, and records the export', async () => {
@@ -112,7 +112,7 @@ describe('Google Slides export', () => {
       if (init?.method === 'GET') return new Response(JSON.stringify({ slides: [{ objectId: 'p' }] }));
       return new Response('{}');
     });
-    const out = await exportToSlides(config, 'Cafoo Board Pack, 2026-09', 'sub', [{ title: 'T', header: ['a'], rows: [['1']] }], fetcher as unknown as typeof fetch);
+    const out = await exportToSlides(config, 'Luyten Board Pack, 2026-09', 'sub', [{ title: 'T', header: ['a'], rows: [['1']] }], fetcher as unknown as typeof fetch);
     expect(out).toEqual({ presentationId: 'deck1', url: 'https://docs.google.com/presentation/d/deck1/edit' });
     expect(calls).toEqual([
       'POST https://oauth2.googleapis.com/token',
@@ -145,7 +145,7 @@ describe('export routes', () => {
     const r = await fetch(`${await start()}/export/csv?dataset=cfo-queue&period=2026-09`);
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toBe('text/csv; charset=utf-8');
-    expect(r.headers.get('content-disposition')).toBe('attachment; filename="cafoo-cfo-queue-2026-09.csv"');
+    expect(r.headers.get('content-disposition')).toBe('attachment; filename="luyten-cfo-queue-2026-09.csv"');
     expect(await r.text()).toMatch(/^Proposal,Period,Kind,Proposed by,Summary,Amount,Proposed\r\n7,2026-09,JournalEntry,revenue,"Record \$1,234.56 of usage revenue.",1234.56,2026-10-01\r\n$/);
   });
 

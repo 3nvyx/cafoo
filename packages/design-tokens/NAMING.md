@@ -39,7 +39,7 @@ Light is the default `$value`; a token that changes in dark mode carries both un
 
 ## Usage notes
 
-Tokens that are easy to misuse carry, under `$extensions["com.cafoo"]`, `usage` (a short list of kebab-case use cases) and `rules` (one string of sentences, each starting with "Never" or "Only"). These are written for the agents and people who read the token files directly. `tests/usage-notes.test.ts` keeps the format honest and fails if a listed token loses its notes.
+Tokens that are easy to misuse carry, under `$extensions["com.luyten"]`, `usage` (a short list of kebab-case use cases) and `rules` (one string of sentences, each starting with "Never" or "Only"). These are written for the agents and people who read the token files directly. `tests/usage-notes.test.ts` keeps the format honest and fails if a listed token loses its notes.
 
 ## Type scale
 
@@ -50,6 +50,6 @@ Eight steps by role: `micro` 11/16, `caption` 12/18, `body-sm` 13/20, `body` 15/
 1. If the value does not exist yet, add it to a ramp in `primitives.tokens.json` as `{ "colorSpace": "srgb", "components": [r, g, b], "hex": "#rrggbb" }` (components are 0–1; the test checks they agree with the hex). Dimensions are `{ "value": 8, "unit": "px" }`.
 2. Add the semantic token with a one-sentence `$description`, both modes if they differ, and usage notes if it could be misused. Status fills come as a pair with their `on-` partner.
 3. If it is text on a fill, add the pair to `contrast.json`.
-4. `pnpm -F @cafoo/design-tokens build`, then `test`. Commit the token files and the regenerated CSS together.
+4. `pnpm -F @luyten/design-tokens build`, then `test`. Commit the token files and the regenerated CSS together.
 
 Three uses make a token. One screen's special case is not a token; it is a component style on that screen.

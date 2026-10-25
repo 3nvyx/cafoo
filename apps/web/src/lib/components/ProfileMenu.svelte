@@ -18,7 +18,7 @@
 	const items: { href: string; label: string; icon: IconName; newTab?: boolean }[] = [
 		{ href: '/settings', label: 'Settings', icon: 'sliders' },
 		{ href: '/pitch', label: 'Pitch deck', icon: 'slides' },
-		{ href: '/', label: 'Cafoo website', icon: 'globe', newTab: true }
+		{ href: '/', label: 'Luyten website', icon: 'globe', newTab: true }
 	];
 
 	function close(refocus = false) {

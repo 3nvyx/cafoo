@@ -4,7 +4,7 @@ import { askAdvisor, completionText, errorText } from './advisor-chat';
 const ok = (body: unknown, status = 200) => async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 describe('askAdvisor', () => {
-	it('posts the conversation to the gateway as cafoo-advisor and returns the answer', async () => {
+	it('posts the conversation to the gateway as luyten and returns the answer', async () => {
 		let seen: { url: string; init?: RequestInit } | null = null;
 		const f = (async (url: string, init?: RequestInit) => {
 			seen = { url, init };
@@ -13,7 +13,7 @@ describe('askAdvisor', () => {
 		const answer = await askAdvisor([{ role: 'user', content: 'Cash?' }], { gateway: 'http://localhost:8787/', fetch: f });
 		expect(answer).toBe('Cash is $11M.');
 		expect(seen!.url).toBe('http://localhost:8787/v1/chat/completions');
-		expect(JSON.parse(String(seen!.init?.body))).toEqual({ model: 'cafoo-advisor', messages: [{ role: 'user', content: 'Cash?' }] });
+		expect(JSON.parse(String(seen!.init?.body))).toEqual({ model: 'luyten', messages: [{ role: 'user', content: 'Cash?' }] });
 	});
 
 	it('turns a refusal into a plain sentence', async () => {

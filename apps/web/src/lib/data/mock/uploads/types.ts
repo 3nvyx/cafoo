@@ -65,7 +65,7 @@ export interface Reading {
 	flagsPlain?: string[];
 }
 
-/** One kind of sample file and what Cafoo does with it. */
+/** One kind of sample file and what Luyten does with it. */
 export interface UploadHandler {
 	kind: DocumentKind;
 	fileName: string;

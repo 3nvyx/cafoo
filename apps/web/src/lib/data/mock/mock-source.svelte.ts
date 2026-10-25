@@ -41,7 +41,7 @@ import {
 	translate,
 	ymFromString,
 	type JournalEntryInput
-} from '@cafoo/ledger-core';
+} from '@luyten/ledger-core';
 import { bankExceptionState } from '../../close';
 import { toCore } from '../group';
 import { DOCUMENT, KIND, roleName } from '../../labels';
@@ -591,7 +591,7 @@ export class MockDataSource implements DataSource {
 			} catch (err) {
 				console.error(err);
 				doc.status = 'rejected';
-				doc.summaryPlain = `Cafoo could not use ${handler.fileName}: ${err instanceof Error ? err.message : String(err)}`;
+				doc.summaryPlain = `Luyten could not use ${handler.fileName}: ${err instanceof Error ? err.message : String(err)}`;
 				ctx.update('document', doc);
 			} finally {
 				this.#clearActivity(reading);

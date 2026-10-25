@@ -1,5 +1,5 @@
 {
-	"_note": "Read-only copies of records in the connected CRM (HubSpot deals), support desk (Zendesk tickets) and billing tool (Stripe promotions). Cafoo reads them; it never edits them. Names are fictitious. SLA is time to first response: urgent 1h, high 4h, normal 8h, low 24h.",
+	"_note": "Read-only copies of records in the connected CRM (HubSpot deals), support desk (Zendesk tickets) and billing tool (Stripe promotions). Luyten reads them; it never edits them. Names are fictitious. SLA is time to first response: urgent 1h, high 4h, normal 8h, low 24h.",
 	"deal": [
 		{
 			"id": "dl-01",

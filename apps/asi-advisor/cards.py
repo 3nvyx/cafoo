@@ -1,4 +1,4 @@
-"""ASI:One interactive cards for the Cafoo Advisor.
+"""ASI:One interactive cards for Luyten.
 
 Each reply is a text bubble plus one `custom` card (element tree), sent as MetadataContent on the chat protocol. A
 button's `action.selection` comes back as a follow-up ChatMessage: a JSON object when the user @mentions the agent,
@@ -17,7 +17,7 @@ from uagents_core.contrib.protocols.chat import ChatMessage, MetadataContent, Te
 
 from ledger import Proposal, money
 
-SOURCE = "cafoo_advisor"
+SOURCE = "luyten_advisor"
 KIND_LABEL = {
     "journalentry": "Journal entry",
     "bankmatch": "Bank match",
@@ -63,8 +63,8 @@ def text_message(text: str) -> ChatMessage:
 def menu_root() -> dict[str, Any]:
     return {
         "type": "section",
-        "title": "Cafoo Advisor",
-        "subtitle": "The Chief Finance Advisor for an agentic month-end close",
+        "title": "Luyten",
+        "subtitle": "Automated finance for growth startups",
         "children": [
             {
                 "type": "text",
@@ -129,7 +129,7 @@ def needs_ok_message(items: list[Proposal]) -> ChatMessage:
     root = {
         "type": "section",
         "title": f"Needs the CFO's OK: {len(items)}",
-        "subtitle": f"{money(total)} in total. The CFO confirms these in the Cafoo app.",
+        "subtitle": f"{money(total)} in total. The CFO confirms these in the Luyten app.",
         "children": [{"type": "list", "items": rows}],
     }
     more = f" Showing the 12 largest of {len(items)}." if len(items) > 12 else ""
@@ -254,7 +254,7 @@ def advice(cash, rev, credit, waiting: list[Proposal]) -> list[str]:
     """Plain next steps from what the specialists reported."""
     tips: list[str] = []
     if waiting:
-        tips.append(f"Confirm or send back the {len(waiting)} items waiting for you ({money(sum(p.amount_minor for p in waiting))}) in the Cafoo app, largest first.")
+        tips.append(f"Confirm or send back the {len(waiting)} items waiting for you ({money(sum(p.amount_minor for p in waiting))}) in the Luyten app, largest first.")
     if rev is not None and rev.ok and rev.overdue_invoices:
         tips.append(f"Chase {rev.overdue_invoices} overdue invoices worth {amounts(rev.overdue_receivables)}.")
     if cash is not None and cash.ok and cash.unmatched_bank_lines:

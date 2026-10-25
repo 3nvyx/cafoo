@@ -1,4 +1,4 @@
-# @cafoo/crs-mcp
+# @luyten/crs-mcp
 
 Updated 2026-10-24. Agent-facing: keep one rule per line, imperative, no filler. Change the tier rules here and in `src/tiers.ts` (`POLICY`, `classify`) together.
 
@@ -22,8 +22,8 @@ Replay is the default: `CRS_USERNAME` empty or `CRS_REPLAY="1"` answers every ca
 Live: set `CRS_USERNAME`, `CRS_PASSWORD`, `CRS_REPLAY="0"`; `CRS_BASE_URL` defaults to `https://api-sandbox.stitchcredit.com/api`.
 The package reads `process.env` only; the caller loads `.env`.
 Record: `new CrsClient({ record: dir })` writes each live persona response to `dir` in fixture layout with the real `RequestID` and `synthesized: false`.
-Refresh all fixtures once credentials exist: `pnpm -F @cafoo/crs-mcp fixtures:record` (optional persona filter: `... fixtures:record P05`). It loads `../../.env` via `node --env-file-if-exists`.
-Regenerate synthesized fixtures: `pnpm -F @cafoo/crs-mcp fixtures:synth` (overwrites recordings; check `fixtures/crs/_meta.json` first).
+Refresh all fixtures once credentials exist: `pnpm -F @luyten/crs-mcp fixtures:record` (optional persona filter: `... fixtures:record P05`). It loads `../../.env` via `node --env-file-if-exists`.
+Regenerate synthesized fixtures: `pnpm -F @luyten/crs-mcp fixtures:synth` (overwrites recordings; check `fixtures/crs/_meta.json` first).
 429 waits `Retry-After` seconds (capped at 120), up to 3 retries per call.
 Every response keeps `headers.requestId` (the `RequestID` header; fixtures use `fx-<persona>-<product>[-<bureau>]`). Store it with the Credit Check.
 
@@ -110,10 +110,10 @@ Asserted by `test/cascade.test.ts`; all 20 match the dataset's `expected_decisio
 
 `fixtures/crs/` is synthesized from the documented outcomes until recorded live; `_meta.json` says which.
 Unconfirmed shapes the interpreters tolerate rather than assume: PitchPoint `/pp/fcrablj/data` keys (free-form XML-derived JSON, read by case-insensitive key search for `Bankruptcy`, `Judgment`, `Lien`, `*Found`), the deceased `errorMessages` code (matched on text containing "deceas"), the login `expires` format, and score `modelName` strings.
-After a live recording, run `pnpm -F @cafoo/crs-mcp test`; if a persona's decision changes, fix the interpreter, not the expected decision.
+After a live recording, run `pnpm -F @luyten/crs-mcp test`; if a persona's decision changes, fix the interpreter, not the expected decision.
 
 ## Commands
 
-`pnpm -F @cafoo/crs-mcp test` runs vitest (replay only, no network).
-`pnpm -F @cafoo/crs-mcp check` type-checks.
-`pnpm -F @cafoo/crs-mcp build` emits `dist/`.
+`pnpm -F @luyten/crs-mcp test` runs vitest (replay only, no network).
+`pnpm -F @luyten/crs-mcp check` type-checks.
+`pnpm -F @luyten/crs-mcp build` emits `dist/`.

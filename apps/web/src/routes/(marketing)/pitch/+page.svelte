@@ -15,7 +15,7 @@
 	}
 
 	const slides: Slide[] = [
-		{ kind: 'title', kicker: 'Cafoo', title: 'Cafoo, the agentic finance ERP', body: 'Agents propose. An Advisor rules. The CFO confirms. Every number drills down.' },
+		{ kind: 'title', kicker: 'Luyten', title: 'Automated finance for 10x growth startups', body: 'Agents propose. An Advisor rules. The CFO confirms. Every number drills down.' },
 		{ kind: 'stat', kicker: 'The problem', title: 'The close still takes 10 days', stat: '10 days', body: 'Most of it is matching deposits, accruing bills and chasing receipts by hand, every single month.' },
 		{ kicker: 'The insight', title: 'Everyone has agents. Nobody trusts them to post.', body: 'Finance cannot accept a model writing straight to the books. So we built the approval gate first and the agents second.' },
 		{
@@ -31,7 +31,7 @@
 		},
 		{ kind: 'demo', kicker: 'Live demo', title: 'Close September in front of you', body: 'Worker agents propose, a Red Team pushes back on the weak ones, and the Advisor posts the small items. The CFO confirms the material ones, locks the month, and the Board Pack re-renders.' },
 		{ kind: 'drill', kicker: 'Trust', title: 'Every number drills down', body: 'Click any figure in the Board Pack and land on the Journal Lines behind it, with the Proposal and the debate that produced them.' },
-		{ kicker: 'Built in', title: 'Credit and risk, built in', body: 'Most SaaS customers are small businesses. Cafoo checks the owner behind each one, sets payment terms from the Risk Tier and proposes the Allowance.' },
+		{ kicker: 'Built in', title: 'Credit and risk, built in', body: 'Most SaaS customers are small businesses. Luyten checks the owner behind each one, sets payment terms from the Risk Tier and proposes the Allowance.' },
 		{
 			kind: 'cols',
 			kicker: 'Why now',
@@ -47,8 +47,8 @@
 			kicker: 'Roadmap',
 			title: 'Where this goes',
 			items: [
-				{ head: 'Now', text: 'The single-company close: bank matching, accruals, revenue schedules, owner credit checks, Board Pack.' },
-				{ head: 'Next 90 days', text: 'Multi-entity and FX with consolidation, live bank and billing feeds, customer-site enrichment, Charters the finance team writes, hosted deployment, SOC 2 readiness.' },
+				{ head: 'Now', text: 'The group close in two currencies with consolidation, a live feed, Charters that only tighten, and Credit & Risk collecting its own evidence over MCP: bureaus, identity, fraud and the web.' },
+				{ head: 'Next 90 days', text: 'An Intake agent that collects the payables inbox, Stripe, bank accounts and rates over MCP, and can only add raw data, never post. Per-company locks, hosted deployment, SOC 2 readiness.' },
 				{ head: '2027', text: 'An agentic credit exchange that negotiates working-capital terms from live, audited books, plus a marketplace of audited agent Charters.' }
 			]
 		},
@@ -73,11 +73,11 @@
 </script>
 
 <svelte:window onkeydown={onkey} />
-<svelte:head><title>Pitch · Cafoo</title></svelte:head>
+<svelte:head><title>Pitch · Luyten</title></svelte:head>
 
 <div class="flex min-h-dvh flex-col bg-canvas">
 	<header class="flex h-16 items-center justify-between px-4 sm:px-8">
-		<a href="/" class="flex min-h-[44px] items-center" aria-label="Back to Cafoo"><Wordmark size={22} /></a>
+		<a href="/" class="flex min-h-[44px] items-center" aria-label="Back to Luyten"><Wordmark size={22} /></a>
 		<span class="num text-sm text-ink-3" aria-live="polite">{i + 1} / {slides.length}</span>
 	</header>
 

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 export const PACKAGE_ROOT = resolve(here, '..');
 export const WEB_SRC = resolve(PACKAGE_ROOT, '../../apps/web/src');
-export const CSS_FILE = resolve(PACKAGE_ROOT, 'css/cafoo-tokens.css');
+export const CSS_FILE = resolve(PACKAGE_ROOT, 'css/luyten-tokens.css');
 export const BASELINE_FILE = resolve(here, 'raw-values-baseline.json');
 
 /** Brand artwork: colour math that is the design, not UI. One reason per entry. */
@@ -192,7 +192,7 @@ export function scan(source, tokenNames, kind = 'markup') {
 /** Token names the scan accepts: colour names, "text:<step>" for the type scale and "rounded:<name>" for radii. */
 export function acceptedNames(css = readFileSync(CSS_FILE, 'utf8')) {
 	const at = css.indexOf('@theme inline {');
-	if (at === -1) throw new Error(`${CSS_FILE} has no @theme block; run: pnpm -F @cafoo/design-tokens build`);
+	if (at === -1) throw new Error(`${CSS_FILE} has no @theme block; run: pnpm -F @luyten/design-tokens build`);
 	const theme = css.slice(at);
 	const names = tokenColourNames(theme);
 	for (const m of theme.matchAll(/--text-([a-z0-9-]+?)(?:--[a-z-]+)?\s*:/g)) names.add(`text:${m[1]}`);

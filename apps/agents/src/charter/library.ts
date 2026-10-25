@@ -6,8 +6,8 @@
  * A custom charter can only make the gate stricter: every shipped rule always runs, a template mapped onto a shipped
  * rule's line runs on top of it (`tightens`), and template params can only raise a bar, never lower it.
  */
-import { CAPPED_KINDS as SHARED_CAPPED_KINDS, TEMPLATE_SCENARIOS, templateVars } from '@cafoo/eval-harness';
-import { formatMinor } from '@cafoo/ledger-core';
+import { CAPPED_KINDS as SHARED_CAPPED_KINDS, TEMPLATE_SCENARIOS, templateVars } from '@luyten/eval-harness';
+import { formatMinor } from '@luyten/ledger-core';
 import { charterPrompt, HARNESSES, type CharterLine, type Harness, type ProposalKind, type Role, type Rule, type RuleContext, type ToolCall } from '../harness';
 import { BATCH_MIN_SCORE_BP } from '../harness/bookkeeper';
 import { IC_DIFFERENCE_TOLERANCE_MINOR } from '../harness/consolidation';

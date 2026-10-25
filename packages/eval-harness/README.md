@@ -1,4 +1,4 @@
-# @cafoo/eval-harness
+# @luyten/eval-harness
 
 Updated 2026-10-24. Agent-facing: one rule per line, imperative, no filler.
 
@@ -9,12 +9,12 @@ Two eval layers, both with zero API keys:
 ## Commands
 
 Run from the repo root.
-`pnpm -F @cafoo/eval-harness run run` evaluates the current database (all suites). `pnpm -F @cafoo/eval-harness run` alone only lists scripts (pnpm built-in), so the `eval` script is an alias: `pnpm -F @cafoo/eval-harness eval`.
-Flags: `--suite charters|personas|all` (default all), `--rerun`, `--db <name>` (default `cafoo`), `--server <name>` (default `local`), `--ym YYYY-MM` (close month; default: month of the newest proposal), `--as-of YYYY-MM-DD` (persona cascade date; default 2026-10-24), `--only <id substring>`.
+`pnpm -F @luyten/eval-harness run run` evaluates the current database (all suites). `pnpm -F @luyten/eval-harness run` alone only lists scripts (pnpm built-in), so the `eval` script is an alias: `pnpm -F @luyten/eval-harness eval`.
+Flags: `--suite charters|personas|all` (default all), `--rerun`, `--db <name>` (default `luyten`), `--server <name>` (default `local`), `--ym YYYY-MM` (close month; default: month of the newest proposal), `--as-of YYYY-MM-DD` (persona cascade date; default 2026-10-24), `--only <id substring>`.
 `--rerun` is destructive: it runs seed generate, `SEED_RESET=1 SEED_NO_BOOTSTRAP=1` seed load (no CFO claim is armed) and the scripted close for `--ym` (default 2026-09) against `--db`, about 30 s. Never use it on a database someone else is demoing from.
 `--suite personas` needs no database.
-`pnpm -F @cafoo/eval-harness test` runs the harness's own tests offline (vitest, no database).
-`pnpm -F @cafoo/eval-harness check` type-checks.
+`pnpm -F @luyten/eval-harness test` runs the harness's own tests offline (vitest, no database).
+`pnpm -F @luyten/eval-harness check` type-checks.
 The `spacetime` CLI is found via `SPACETIME_BIN`, then `~/.local/bin/spacetime`, then `PATH`.
 Published charters: when `--db` has `charter_version` rows with status live, the run judges each such agent by its published text and mapping (verbatim check against that text, the scenarios its mapping binds, the variables it sets) and prints `published charters: bookkeeper v2`; a scenario whose line the published charter rewords or drops, with nothing binding it, is listed as skipped. Every other agent is judged by its shipped file.
 
@@ -77,7 +77,7 @@ Escape backslashes in double-quoted YAML regexes (`"^done\\b"`).
 
 Flags summaries shorter than 10 characters, more than one sentence, any account code from the `account` table, bookkeeping jargon (debit, accrual, Dr, Cr, GL, JE, AR, AP, ECL, ASC 606), bureau jargon (tradeline, FICO, KBA, BLJ, PitchPoint), machine reason codes (`thin_file_tu`), and raw minor-unit numbers of five or more digits.
 
-## Library (`@cafoo/eval-harness`, entry `src/api.ts`)
+## Library (`@luyten/eval-harness`, entry `src/api.ts`)
 
 Import only from the package root; deep imports do not resolve.
 `runScenarios({scenarios, db, vars?, chartersDir?, charterText?, bound?, asOf?})` runs scenarios in order and returns `{results, score, vars}`; vars merge over `DEFAULT_VARS` and, for keys still missing, `materiality` and `close_ym` read from `db`.

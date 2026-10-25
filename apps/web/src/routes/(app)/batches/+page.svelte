@@ -58,7 +58,7 @@
 	const qty = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 </script>
 
-<svelte:head><title>Batches · Cafoo</title></svelte:head>
+<svelte:head><title>Batches · Luyten</title></svelte:head>
 
 {#snippet row(b: Batch, who: string, from?: string)}
 	{@const st = batchStatus(b, now)}

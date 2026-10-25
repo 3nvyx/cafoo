@@ -71,8 +71,8 @@ if (live.length) {
   process.exit(2);
 }
 try {
-  run('pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot);
-  run('pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { SEED_RESET: '1' });
+  run('pnpm', ['-F', '@luyten/seed', 'generate'], repoRoot);
+  run('pnpm', ['-F', '@luyten/seed', 'load'], repoRoot, { SEED_RESET: '1' });
   cfo = spawn('node', ['--import', 'tsx', 'src/demo-cfo.ts', ym, '--timeout-s', '900'], { cwd: agentsDir, env, stdio: 'inherit' });
   run('node', ['--import', 'tsx', 'src/cli-close.ts', ym], agentsDir);
   const db = new SpacetimeCli({ db: dbName, server: 'local' });

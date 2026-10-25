@@ -4,7 +4,7 @@
  * note is answered honestly with a rejection, so nothing posts that the CFO questioned. The live Advisor, with keys, can
  * revise other kinds of proposal from a note.
  */
-import { applyBp, formatMinor } from '@cafoo/ledger-core';
+import { applyBp, formatMinor } from '@luyten/ledger-core';
 import { line, type ModuleLine } from '../snapshot';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });

@@ -80,7 +80,7 @@ export function textOf(content: unknown): string {
 export function taskReply(text: string): string | undefined {
   if (!/^\s*###\s*Task:/i.test(text)) return undefined;
   const task = text.replace(/^\s*###\s*Task:\s*/i, '').split(/\n/)[0]!.toLowerCase();
-  if (/title/.test(task)) return JSON.stringify({ title: 'Cafoo Advisor' });
+  if (/title/.test(task)) return JSON.stringify({ title: 'Luyten' });
   if (/tags?\b/.test(task)) return JSON.stringify({ tags: ['Finance'] });
   if (/follow.?ups?|messages this user might|next/.test(task)) return JSON.stringify({ follow_ups: [] });
   if (/quer(y|ies)|search/.test(task)) return JSON.stringify({ queries: [] });
@@ -196,7 +196,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         if (!apiKey && !isLocal(req.socket.remoteAddress)) return json(403, { error: { message: chatNotFromHere, type: 'invalid_request_error' } });
       }
       if (req.method === 'GET' && url.pathname === '/v1/models') {
-        return json(200, { object: 'list', data: [{ id: 'cafoo-advisor', object: 'model', owned_by: 'cafoo' }] });
+        return json(200, { object: 'list', data: [{ id: 'luyten', object: 'model', owned_by: 'luyten' }] });
       }
       if (req.method === 'POST' && url.pathname === '/v1/chat/completions') {
         const body = await readJson(req);
@@ -214,7 +214,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         if (body.stream) {
           res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', ...cors });
           const send = (delta: Record<string, unknown>, finish: string | null = null) =>
-            res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created, model: 'cafoo-advisor', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
+            res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created, model: 'luyten', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
           send({ role: 'assistant' });
           try {
             for await (const chunk of chunks()) send({ content: chunk });
@@ -228,7 +228,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         }
         let text = '';
         for await (const chunk of chunks()) text += chunk;
-        return json(200, { id, object: 'chat.completion', created, model: 'cafoo-advisor', choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+        return json(200, { id, object: 'chat.completion', created, model: 'luyten', choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
       }
       const hit = matchRoute(routes, req.method, url.pathname);
       if (hit) {

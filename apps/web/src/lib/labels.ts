@@ -47,7 +47,7 @@ export const KIND: Record<ProposalKind, string> = {
 	inventory_writeoff: 'Stock write-off'
 };
 
-/** Each uploadable file: its name, the format the sample comes in, and what Cafoo reads from it. */
+/** Each uploadable file: its name, the format the sample comes in, and what Luyten reads from it. */
 export const DOCUMENT: Record<DocumentKind, { label: string; format: string; readsPlain: string }> = {
 	bank_statement: { label: 'Bank statement', format: 'CSV', readsPlain: 'Every line, matched to invoices and bills' },
 	invoices: { label: 'Invoices', format: 'CSV', readsPlain: 'Customer invoices with due dates' },

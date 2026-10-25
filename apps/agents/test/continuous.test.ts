@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BankTransaction, Bill, Invoice } from '@cafoo/ledger-core';
+import type { BankTransaction, Bill, Invoice } from '@luyten/ledger-core';
 import { citedBankTxIds, planFeedProposals, waitingFeedLines, type FeedPlanParams } from '../src/continuous/bookkeeper';
 import { checkCall, HARNESSES } from '../src/harness';
 import { plainSummaryProblems } from '../src/harness/rules';

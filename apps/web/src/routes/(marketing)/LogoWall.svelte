@@ -1,5 +1,5 @@
 <script lang="ts">
-	// What Cafoo runs on and who it is for, as a monochrome logo wall. Logos are masks filled
+	// What Luyten runs on and who it is for, as a monochrome logo wall. Logos are masks filled
 	// with the text color, so every brand reads as one quiet tone in both themes.
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 
@@ -31,7 +31,7 @@
 		{
 			id: 'clients',
 			label: 'Company types',
-			note: 'The finance teams Cafoo is built for',
+			note: 'The finance teams Luyten is built for',
 			items: [
 				tile('SaaS companies', 'monitor'),
 				tile('Selling to small businesses', 'home'),
@@ -119,7 +119,7 @@
 	{/each}
 </div>
 
-<p class="mt-10 text-center text-caption text-ink-3">Logos are trademarks of their owners and show the data and tools Cafoo uses, not endorsements.</p>
+<p class="mt-10 text-center text-caption text-ink-3">Logos are trademarks of their owners and show the data and tools Luyten uses, not endorsements.</p>
 
 <style>
 	/* The page's section headings, matched size for size. */

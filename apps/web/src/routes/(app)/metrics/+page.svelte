@@ -306,7 +306,7 @@
 	}
 </script>
 
-<svelte:head><title>Metrics · Cafoo</title></svelte:head>
+<svelte:head><title>Metrics · Luyten</title></svelte:head>
 
 {#if period && r}
 	<header class="flex flex-col gap-4 pb-6 md:flex-row md:items-end md:justify-between">

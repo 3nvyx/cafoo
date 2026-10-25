@@ -1,4 +1,4 @@
-"""Read-only access to the Cafoo ledger and the Advisor.
+"""Read-only access to the Luyten ledger and the Advisor.
 
 The ledger is the SpacetimeDB database the CFO app reads. Its public tables answer SQL over HTTP without a token, and
 this agent only ever reads them. Questions in plain English go to the Advisor through the agent gateway's
@@ -13,10 +13,10 @@ from typing import Any
 
 import aiohttp
 
-LEDGER_URL = os.getenv("CAFOO_LEDGER_URL", "http://localhost:3000").rstrip("/")
-LEDGER_DB = os.getenv("CAFOO_LEDGER_DB", "cafoo")
-GATEWAY_URL = os.getenv("CAFOO_GATEWAY_URL", "http://127.0.0.1:8787").rstrip("/")
-GATEWAY_API_KEY = os.getenv("CAFOO_GATEWAY_API_KEY", "")
+LEDGER_URL = os.getenv("LUYTEN_LEDGER_URL", "http://localhost:3000").rstrip("/")
+LEDGER_DB = os.getenv("LUYTEN_LEDGER_DB", "luyten")
+GATEWAY_URL = os.getenv("LUYTEN_GATEWAY_URL", "http://127.0.0.1:8787").rstrip("/")
+GATEWAY_API_KEY = os.getenv("LUYTEN_GATEWAY_API_KEY", "")
 TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
@@ -128,7 +128,7 @@ async def ask_advisor(question: str) -> str:
     headers = {"content-type": "application/json"}
     if GATEWAY_API_KEY:
         headers["authorization"] = f"Bearer {GATEWAY_API_KEY}"
-    body = {"model": "cafoo-advisor", "stream": False, "messages": [{"role": "user", "content": question}]}
+    body = {"model": "luyten", "stream": False, "messages": [{"role": "user", "content": question}]}
     try:
         async with aiohttp.ClientSession(timeout=TIMEOUT) as s:
             async with s.post(f"{GATEWAY_URL}/v1/chat/completions", json=body, headers=headers) as r:
@@ -137,7 +137,7 @@ async def ask_advisor(question: str) -> str:
                     message = (data.get("error") or {}).get("message") if isinstance(data, dict) else None
                     raise LedgerError(f"the Advisor refused ({r.status}): {message or 'no detail'}")
     except aiohttp.ClientError as e:
-        raise LedgerError(f"the Cafoo agent gateway at {GATEWAY_URL} is not reachable ({e.__class__.__name__})") from e
+        raise LedgerError(f"the Luyten agent gateway at {GATEWAY_URL} is not reachable ({e.__class__.__name__})") from e
     return str(data["choices"][0]["message"]["content"])
 
 

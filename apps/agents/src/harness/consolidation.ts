@@ -3,7 +3,7 @@
  * ruling. A revaluation's arithmetic is checked in the call (closing rate times the foreign balance, the delta, and the
  * lines that book it); whether the rate and balances are the recorded ones is a ledger join, checked by the eval.
  */
-import { applyFx } from '@cafoo/ledger-core';
+import { applyFx } from '@luyten/ledger-core';
 import { PLAIN_RULE, BOOKS_TOOLS, allow, arr, baseName, deny, kindAllowed, mcp, noPosting, noRulings, obj, plainSummaryRule, rule, str } from './rules';
 import type { Harness, ToolCall } from './types';
 

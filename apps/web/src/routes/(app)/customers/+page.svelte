@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Customers, and the small CRM around them: deals from the CRM, support tickets from the help desk, promotion codes
-	// from billing. Cafoo reads those tools and never edits them; repeat customers are computed from the books.
+	// from billing. Luyten reads those tools and never edits them; repeat customers are computed from the books.
 	import { db } from '#lib/data/index.js';
 	import { periodEnd } from '#lib/data/derive.js';
 	import { formatMoney } from '#lib/data/money.js';
@@ -113,13 +113,13 @@
 	const PROMO_TONE: Record<string, Tone> = { active: 'pos', scheduled: 'neutral', ended: 'muted' };
 </script>
 
-<svelte:head><title>Customers · Cafoo</title></svelte:head>
+<svelte:head><title>Customers · Luyten</title></svelte:head>
 
 <div class="flex flex-col gap-6">
 	<header class="flex flex-col gap-2">
 		<h1 class="text-display-sm sm:text-display">Customers</h1>
 		<p class="max-w-prose text-body text-ink-2">
-			Each customer is a small business with an owner who guarantees the account. Deals, tickets and promotion codes are read from your CRM, help desk and billing tool; Cafoo never edits them.
+			Each customer is a small business with an owner who guarantees the account. Deals, tickets and promotion codes are read from your CRM, help desk and billing tool; Luyten never edits them.
 		</p>
 	</header>
 

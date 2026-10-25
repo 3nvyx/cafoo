@@ -8,7 +8,7 @@ import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../sourc
 import type * as U from '../types';
 import * as M from './map';
 
-const TOKEN_KEY = 'cafoo.stdb.token';
+const TOKEN_KEY = 'luyten.stdb.token';
 
 export interface SpacetimeConfig {
 	uri: string;

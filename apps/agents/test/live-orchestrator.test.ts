@@ -29,7 +29,7 @@ vi.mock('@anthropic-ai/claude-agent-sdk', async importOriginal => ({
 vi.mock('../src/redteam', () => ({ startCritic: vi.fn() }));
 vi.mock('../src/scripted/close', () => ({ runScriptedClose: vi.fn(async () => ({ scripted: true })) }));
 vi.mock('../src/scripted/rulings', async importOriginal => ({ ...(await importOriginal<typeof import('../src/scripted/rulings')>()), ruleOpen: vi.fn(async () => 0) }));
-vi.mock('../src/live/openai-bridge', () => ({ claudeProcessEnv: vi.fn(async () => ({ CAFOO_TEST_ENV: '1' })) }));
+vi.mock('../src/live/openai-bridge', () => ({ claudeProcessEnv: vi.fn(async () => ({ LUYTEN_TEST_ENV: '1' })) }));
 // The orchestrator's waits (quiescing, the CFO) advance the fake clock instead of sleeping.
 vi.mock('../src/stdb', async importOriginal => ({
   ...(await importOriginal<typeof import('../src/stdb')>()),
@@ -186,7 +186,7 @@ describe('runLiveClose', () => {
     expect(o).not.toHaveProperty('maxTurns');
     expect(o.permissionMode).toBe('dontAsk');
     expect(o.settingSources).toEqual([]);
-    expect(o.env).toEqual({ CAFOO_TEST_ENV: '1' });
+    expect(o.env).toEqual({ LUYTEN_TEST_ENV: '1' });
     expect(o.maxBudgetUsd).toBe(15);
     expect(new Set(o.allowedTools).size).toBe(o.allowedTools.length);
     for (const role of ['advisor', ...WORKERS] as const) for (const t of HARNESSES[role].tools) expect(o.allowedTools, `${role}: ${t}`).toContain(t);
@@ -603,6 +603,6 @@ describe('liveAnswer', () => {
     expect(o.tools).toEqual([]);
     expect(o.allowedTools).toEqual(mcp('books', BOOKS_TOOLS));
     expect(Object.keys(o.mcpServers)).toEqual(['books']);
-    expect(o).toMatchObject({ permissionMode: 'dontAsk', maxTurns: 6, includePartialMessages: true, settingSources: [], env: { CAFOO_TEST_ENV: '1' } });
+    expect(o).toMatchObject({ permissionMode: 'dontAsk', maxTurns: 6, includePartialMessages: true, settingSources: [], env: { LUYTEN_TEST_ENV: '1' } });
   });
 });

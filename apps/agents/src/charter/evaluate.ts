@@ -9,13 +9,13 @@
  *      whose charter line the draft still quotes verbatim, and, in a dry run, every other agent's scenarios too (by its
  *      published charter where the CFO published one, else its shipped file).
  * Two modes: `snapshot` judges the recorded close (eval-harness test/fixtures/ledger-snapshot.json: seconds, no server,
- * a quick check that cannot publish), `dry_run` reseeds a scratch database (CHARTER_EVAL_DB, default cafoo-eval), runs
+ * a quick check that cannot publish), `dry_run` reseeds a scratch database (CHARTER_EVAL_DB, default luyten-eval), runs
  * the scripted close there with CHARTER_OVERRIDE_JSON forcing the draft and the other roles' published charters, and
  * judges that ledger (about a minute; the gateway runs one at a time).
  */
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { charterPlan, combinePlans, findSpacetimeBin, loadScenarios, runScenarios, scenariosDir, snapshotDb, SpacetimeCli, type CharterPlan, type Db, type Scenario, type ScenarioResult } from '@cafoo/eval-harness';
+import { charterPlan, combinePlans, findSpacetimeBin, loadScenarios, runScenarios, scenariosDir, snapshotDb, SpacetimeCli, type CharterPlan, type Db, type Scenario, type ScenarioResult } from '@luyten/eval-harness';
 import { STDB_DB } from '../env';
 import { closePeriod } from '../close-period';
 import { HARNESSES, type Role, type Rule } from '../harness';
@@ -56,7 +56,7 @@ export interface PublishedCharter {
   mapping: CharterMappingEntry[];
 }
 
-export const DEFAULT_EVAL_DB = 'cafoo-eval';
+export const DEFAULT_EVAL_DB = 'luyten-eval';
 export const evalDbName = (env: NodeJS.ProcessEnv = process.env) => env.CHARTER_EVAL_DB?.trim() || DEFAULT_EVAL_DB;
 
 /** The server every dry-run step talks to: SPACETIMEDB_URI (default the local server), as a CLI URL and an SDK URL. */
@@ -156,8 +156,8 @@ export async function prepareDryRun(o: DryRunOptions): Promise<void> {
   o.onStep(`Publishing a fresh ledger to ${o.db}`);
   await runCommand(findSpacetimeBin(), ['publish', o.db, '--server', o.server, '--delete-data=always', '--yes'], join(repoRoot, 'spacetimedb'), base);
   o.onStep('Loading the demo company');
-  await runCommand('pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot, base);
-  await runCommand('pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { ...base, SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' });
+  await runCommand('pnpm', ['-F', '@luyten/seed', 'generate'], repoRoot, base);
+  await runCommand('pnpm', ['-F', '@luyten/seed', 'load'], repoRoot, { ...base, SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' });
   const others = o.published ?? [];
   o.onStep(`Running the ${o.ym} close with the draft ${o.role} charter${others.length ? ` and the published ${others.map(p => `${p.role} v${p.version}`).join(', ')}` : ''}`);
   const charters: CharterOverride[] = [{ role: o.role, bodyMd: o.bodyMd, mapping: o.mapping, version: o.version }, ...others.map(p => ({ role: p.role, bodyMd: p.bodyMd, mapping: p.mapping, version: p.version }))];
@@ -174,7 +174,7 @@ export interface CharterUnderEval {
 
 export interface EvaluateOptions {
   mode?: EvalMode;
-  /** Scratch database for a dry run; never the gateway's own. Default CHARTER_EVAL_DB or cafoo-eval. */
+  /** Scratch database for a dry run; never the gateway's own. Default CHARTER_EVAL_DB or luyten-eval. */
   evalDb?: string;
   /** Server URL for a dry run. Default evalServer().http (SPACETIMEDB_URI, else the local server). */
   server?: string;

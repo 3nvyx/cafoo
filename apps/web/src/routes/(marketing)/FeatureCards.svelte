@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The gate and the sponsors' APIs behind Cafoo, as two rows of two cards. Each card has its words
+	// The gate and the sponsors' APIs behind Luyten, as two rows of two cards. Each card has its words
 	// on top and its diagram in a panel set into the bottom-right corner. From lg up, where a pointer
 	// can hover, hovering a card widens it and dims the card beside it. Both the words and the diagram
 	// then have widths set from the row, not the card, so nothing re-wraps and the row's height never
@@ -42,7 +42,7 @@
 			topic: 'Advisor chat',
 			brand: { kind: 'logo', name: 'Fetch.ai', file: 'fetch-ai', ratio: 6.1 },
 			title: 'Ask your Advisor how the business is doing',
-			body: 'The Cafoo Advisor lives on Fetch.ai’s Agentverse, so you can chat with it in ASI:One. It asks four specialist agents at once and answers with one interactive card, built from the live books.'
+			body: 'Luyten lives on Fetch.ai’s Agentverse, so you can chat with it in ASI:One. It asks four specialist agents at once and answers with one interactive card, built from the live books.'
 		},
 		{
 			id: 'footprint',

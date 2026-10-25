@@ -1,7 +1,7 @@
 /**
  * The live feed, run by the gateway: once the CFO switches it on, bank lines and invoices for the first open month
  * after a locked month (October once September is locked) arrive one by one, as a bank and a billing system would send
- * them. Without Nessie configuration, events come from the deterministic plan in @cafoo/seed/feed. With Nessie,
+ * them. Without Nessie configuration, events come from the deterministic plan in @luyten/seed/feed. With Nessie,
  * bank lines come from its account transaction IDs while invoices remain on the separate deterministic billing plan.
  * Every event enters the books only through the module's
  * two ingest reducers under the `feed` identity, which may never propose or commit. The continuous Bookkeeper
@@ -10,7 +10,7 @@
  * The feed stops for a month once that month's close has started; the module refuses ingest when the feed is off, the
  * month is not open, or the month before it is not locked.
  */
-import { feedPlan, type FeedContext, type FeedEvent } from '@cafoo/seed/feed';
+import { feedPlan, type FeedContext, type FeedEvent } from '@luyten/seed/feed';
 import { closeOpened, lockedByCfo, previousYm } from '../close-state';
 import { json, type Route } from '../http';
 import { rootSubsidiary } from '../snapshot';

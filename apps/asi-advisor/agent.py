@@ -1,9 +1,9 @@
-"""Cafoo Advisor on Agentverse: the orchestrator ASI:One users talk to, and the five specialist agents it calls.
+"""Luyten on Agentverse: the orchestrator ASI:One users talk to, and the five specialist agents it calls.
 
 All six run in one Bureau, so the orchestrator reaches the specialists locally. Only the orchestrator has a mailbox:
 Agentverse relays ASI:One messages to it, it asks the Bookkeeper, Revenue, Credit & Risk, Consolidation and Red Team
 agents for their part (each with its own request and response models), and answers with interactive cards. Nothing
-here confirms or posts anything: the human CFO does that in the Cafoo app.
+here confirms or posts anything: the human CFO does that in the Luyten app.
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ from replies import reply_to  # noqa: E402
 DESK_TIMEOUT_SECONDS = int(os.getenv("DESK_TIMEOUT_SECONDS", "20"))
 
 advisor = Agent(
-    name=os.getenv("AGENT_NAME", "Cafoo Advisor"),
-    seed=os.environ["CAFOO_ADVISOR_SEED"],
+    name=os.getenv("AGENT_NAME", "Luyten"),
+    seed=os.environ["LUYTEN_ADVISOR_SEED"],
     mailbox=True,
     publish_agent_details=True,
 )
@@ -70,7 +70,7 @@ advisor.include(chat, publish_manifest=True)
 
 @advisor.on_event("startup")
 async def startup(ctx: Context):
-    ctx.logger.info(f"Cafoo Advisor address: {advisor.address}")
+    ctx.logger.info(f"Luyten address: {advisor.address}")
     for name, desk in DESKS.items():
         ctx.logger.info(f"  specialist {name}: {desk.address}")
     ctx.logger.info(f"Ledger: {ledger.LEDGER_URL}/{ledger.LEDGER_DB}  Gateway: {ledger.GATEWAY_URL}")

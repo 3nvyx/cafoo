@@ -23,7 +23,7 @@ describe('raw values in apps/web/src', () => {
 		expect(worse, 'new raw values; use tokens instead (see packages/design-tokens/NAMING.md)').toEqual([]);
 		expect(
 			stale,
-			'fewer raw values than the baseline allows (or a file moved); tighten it with: pnpm -F @cafoo/design-tokens baseline',
+			'fewer raw values than the baseline allows (or a file moved); tighten it with: pnpm -F @luyten/design-tokens baseline',
 		).toEqual([]);
 	});
 

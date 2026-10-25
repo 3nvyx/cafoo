@@ -5,7 +5,7 @@
  * https://github.com/nessieisreal/nessie-javascript-sdk/blob/master/lib/withdrawal.js
  */
 import { z } from 'zod';
-import type { FeedBankTxEvent } from '@cafoo/seed/feed';
+import type { FeedBankTxEvent } from '@luyten/seed/feed';
 
 export interface NessieConfig {
   apiKey: string;

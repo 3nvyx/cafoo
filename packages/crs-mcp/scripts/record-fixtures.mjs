@@ -1,6 +1,6 @@
 // Re-records fixtures/crs from the live CRS sandbox: one call per persona row of the dataset,
 // sequential, persona bodies only. Logs in once; aborts on the first login error.
-// Run: pnpm -F @cafoo/crs-mcp fixtures:record   (needs CRS_USERNAME/CRS_PASSWORD and CRS_REPLAY="0")
+// Run: pnpm -F @luyten/crs-mcp fixtures:record   (needs CRS_USERNAME/CRS_PASSWORD and CRS_REPLAY="0")
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CrsClient, CrsLoginError, resolveMode } from '../dist/client.js';

@@ -1,5 +1,5 @@
 {
-  "name": "@cafoo/seed",
+  "name": "@luyten/seed",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cafoo/stdb-bindings": "workspace:*",
+    "@luyten/stdb-bindings": "workspace:*",
     "spacetimedb": "2.13.*"
   },
   "devDependencies": {

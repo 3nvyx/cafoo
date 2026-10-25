@@ -1,4 +1,4 @@
-"""The five specialist agents the Cafoo Advisor orchestrates, each behind its own request and response models.
+"""The five specialist agents the Luyten orchestrates, each behind its own request and response models.
 
 Each one reads its part of the live ledger and answers in its response model; none of them writes. The answers are
 pure functions of the ledger rows (reports.py), so they are tested without a running ledger.
@@ -26,18 +26,18 @@ from models import (
 from reports import cash_report, credit_report, group_report, review_report, revenue_report
 
 def _seed(role: str) -> str:
-    return f"{os.environ['CAFOO_ADVISOR_SEED']}/{role}"
+    return f"{os.environ['LUYTEN_ADVISOR_SEED']}/{role}"
 
 
 def _desk(name: str, role: str) -> tuple[Agent, Protocol]:
-    return Agent(name=name, seed=_seed(role)), Protocol(name=f"cafoo-{role}", version="0.1.0")
+    return Agent(name=name, seed=_seed(role)), Protocol(name=f"luyten-{role}", version="0.1.0")
 
 
-bookkeeper, _bk = _desk("Cafoo Bookkeeper", "bookkeeper")
-revenue, _rev = _desk("Cafoo Revenue", "revenue")
-credit, _cr = _desk("Cafoo Credit & Risk", "credit")
-consolidation, _cons = _desk("Cafoo Consolidation", "consolidation")
-redteam, _rt = _desk("Cafoo Red Team", "redteam")
+bookkeeper, _bk = _desk("Luyten Bookkeeper", "bookkeeper")
+revenue, _rev = _desk("Luyten Revenue", "revenue")
+credit, _cr = _desk("Luyten Credit & Risk", "credit")
+consolidation, _cons = _desk("Luyten Consolidation", "consolidation")
+redteam, _rt = _desk("Luyten Red Team", "redteam")
 
 
 async def _answer(ctx: Context, sender: str, response_type, build):

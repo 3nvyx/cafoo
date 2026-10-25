@@ -35,7 +35,7 @@ export function exportRoutes(cast: Cast, env: NodeJS.ProcessEnv = process.env, f
         } catch (e) {
           return json(ctx.res, 404, { error: (e as Error).message });
         }
-        ctx.res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="cafoo-${dataset}-${period}.csv"` });
+        ctx.res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="luyten-${dataset}-${period}.csv"` });
         ctx.res.end(toCsv(tables));
       },
     },
@@ -54,7 +54,7 @@ export function exportRoutes(cast: Cast, env: NodeJS.ProcessEnv = process.env, f
           return json(ctx.res, 404, { error: (e as Error).message });
         }
         try {
-          const deck = await exportToSlides(setup.config, `Cafoo ${LABEL[dataset]}, ${period}`, `Exported ${new Date().toISOString().slice(0, 10)} from the Cafoo ledger. Every figure drills down to its journal lines in the app.`, tables, fetcher);
+          const deck = await exportToSlides(setup.config, `Luyten ${LABEL[dataset]}, ${period}`, `Exported ${new Date().toISOString().slice(0, 10)} from the Luyten ledger. Every figure drills down to its journal lines in the app.`, tables, fetcher);
           return json(ctx.res, 200, { ...deck, sharedWith: setup.config.shareWith });
         } catch (e) {
           return json(ctx.res, 502, { error: (e as Error).message });

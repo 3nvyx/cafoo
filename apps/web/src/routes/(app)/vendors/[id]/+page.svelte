@@ -66,7 +66,7 @@
 	const liveLookups = $derived(lookups.filter((f) => f.live).length);
 </script>
 
-<svelte:head><title>{v?.name ?? 'Vendor'} · Cafoo</title></svelte:head>
+<svelte:head><title>{v?.name ?? 'Vendor'} · Luyten</title></svelte:head>
 
 <a href="/vendors" class="drill inline-flex min-h-11 items-center gap-1 text-body-sm text-ink-2"><Icon name="chevronLeft" size={16} />Vendors</a>
 

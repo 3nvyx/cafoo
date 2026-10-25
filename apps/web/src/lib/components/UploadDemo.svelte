@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Hand Cafoo a file. Demo mode loads a bundled sample of the chosen kind, shows what was read from it, and the agent
+	// Hand Luyten a file. Demo mode loads a bundled sample of the chosen kind, shows what was read from it, and the agent
 	// that owns it proposes what follows. Lists this page's recent uploads with their status.
 	import { db } from '#lib/data/index.js';
 	import type { DocumentKind, DocumentStatus } from '#lib/data/types.js';

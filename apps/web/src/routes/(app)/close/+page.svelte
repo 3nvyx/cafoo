@@ -16,7 +16,7 @@
 	import { closeRunNotes } from '#lib/close-run.js';
 	import BankExceptions from '#lib/components/BankExceptions.svelte';
 	import Notice from '#lib/components/Notice.svelte';
-	import { isBankReconciliationTask } from '@cafoo/ledger-core';
+	import { isBankReconciliationTask } from '@luyten/ledger-core';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
 	const tasks = $derived(db.closeTasks().filter((t) => t.periodId === ui.periodId).sort((a, b) => a.order - b.order));
@@ -63,7 +63,7 @@
 	const SHOW = 4;
 </script>
 
-<svelte:head><title>Close · Cafoo</title></svelte:head>
+<svelte:head><title>Close · Luyten</title></svelte:head>
 
 {#if period}
 	<div class="mb-6"><CloseStatusBar periodId={period.id} /></div>

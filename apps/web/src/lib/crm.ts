@@ -1,5 +1,5 @@
-// The small CRM Cafoo keeps, as pure maths over rows read from the connected tools (deals, support tickets,
-// promotions) and the books (invoices, contracts, credit packs). Cafoo reads these; it never edits them.
+// The small CRM Luyten keeps, as pure maths over rows read from the connected tools (deals, support tickets,
+// promotions) and the books (invoices, contracts, credit packs). Luyten reads these; it never edits them.
 import type { Batch, Contract, Deal, DealStage, Invoice, Minor, Promotion, SupportTicket } from './data/types';
 import { toBig } from './data/money';
 

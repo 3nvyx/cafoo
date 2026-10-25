@@ -1,6 +1,6 @@
 /**
  * Charter smoke test, end to end through the module, on two scratch databases that it resets: CHARTER_SMOKE_DB
- * (default cafoo-charter-smoke) holds the books and the charter versions, CHARTER_EVAL_DB (default cafoo-eval) takes
+ * (default luyten-charter-smoke) holds the books and the charter versions, CHARTER_EVAL_DB (default luyten-eval) takes
  * the dry run. Needs the local SpacetimeDB server and the spacetime CLI (the CLI publishes, so it owns the database and
  * can arm the CFO bootstrap). With zero API keys:
  *   1. a draft with a line nobody mapped fails coverage, and publishCharter refuses it;
@@ -12,16 +12,16 @@
  *      are each proposed on their own;
  *   6. the eval of that ledger (pnpm eval's view: published charters) passes the batch line at ninety percent;
  *   7. retiring the version restores the built-in charter.
- * Usage: pnpm -F @cafoo/agents smoke:charter   (CHARTER_SMOKE_DB=..., CHARTER_EVAL_DB=..., CLOSE_PERIOD=2026-09)
+ * Usage: pnpm -F @luyten/agents smoke:charter   (CHARTER_SMOKE_DB=..., CHARTER_EVAL_DB=..., CLOSE_PERIOD=2026-09)
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { closePeriod } from '../close-period';
 
-const smokeDb = process.env.CHARTER_SMOKE_DB?.trim() || 'cafoo-charter-smoke';
-const evalDb = process.env.CHARTER_EVAL_DB?.trim() || 'cafoo-eval';
+const smokeDb = process.env.CHARTER_SMOKE_DB?.trim() || 'luyten-charter-smoke';
+const evalDb = process.env.CHARTER_EVAL_DB?.trim() || 'luyten-eval';
 const ym = closePeriod();
-if (smokeDb === evalDb || smokeDb === 'cafoo' || evalDb === 'cafoo') {
-  console.error(`[smoke:charter] refusing to reset ${smokeDb === evalDb ? `one database for both roles (${smokeDb})` : 'the default database cafoo'}; set CHARTER_SMOKE_DB and CHARTER_EVAL_DB to two scratch databases`);
+if (smokeDb === evalDb || smokeDb === 'luyten' || evalDb === 'luyten') {
+  console.error(`[smoke:charter] refusing to reset ${smokeDb === evalDb ? `one database for both roles (${smokeDb})` : 'the default database luyten'}; set CHARTER_SMOKE_DB and CHARTER_EVAL_DB to two scratch databases`);
   process.exit(2);
 }
 // Before anything reads the environment: the smoke database is this process's database, fixtures only, no pauses.
@@ -31,7 +31,7 @@ process.env.DEMO_STEP_MS = '0';
 delete process.env.CHARTER_OVERRIDE_JSON;
 
 const { dirname, join } = await import('node:path');
-const { findSpacetimeBin, liveCharters, loadScenarios, runScenarios, scenariosDir, chartersDir, SpacetimeCli } = await import('@cafoo/eval-harness');
+const { findSpacetimeBin, liveCharters, loadScenarios, runScenarios, scenariosDir, chartersDir, SpacetimeCli } = await import('@luyten/eval-harness');
 const { Cast, RoleConn, repoRoot, waitFor } = await import('../stdb');
 const { activeCharter } = await import('./active');
 const { evaluateCharterVersion, runCommand } = await import('./evaluate');
@@ -57,8 +57,8 @@ async function refused(p: Promise<unknown>, pattern: RegExp, what: string) {
 
 log(`books on ${smokeDb}, dry runs on ${evalDb}, close month ${ym}`);
 await runCommand(bin, ['publish', smokeDb, '--server', 'local', '--delete-data=always', '--yes'], join(repoRoot, 'spacetimedb'), env);
-await runCommand('pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot, env);
-await runCommand('pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { ...env, SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' });
+await runCommand('pnpm', ['-F', '@luyten/seed', 'generate'], repoRoot, env);
+await runCommand('pnpm', ['-F', '@luyten/seed', 'load'], repoRoot, { ...env, SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' });
 log('seeded; arming a one-time CFO claim through the CLI (the publisher owns the database)');
 const secret = randomBytes(18).toString('base64url');
 await runCommand(bin, ['call', smokeDb, 'arm_cfo_bootstrap', JSON.stringify(createHash('sha256').update(secret).digest('hex')), '30', '--server', 'local', '--no-config', '--yes'], repoRoot, env);

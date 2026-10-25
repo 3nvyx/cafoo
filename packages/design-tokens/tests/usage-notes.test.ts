@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadTokens } from '../scripts/tokens.mjs';
 
-const NAMESPACE = 'com.cafoo';
+const NAMESPACE = 'com.luyten';
 const tokens = loadTokens();
 
 /** Tokens that are easy to misuse must explain themselves. Removing their notes is a failure. */
@@ -12,7 +12,7 @@ const MUST_HAVE_NOTES = [
 	'color.focus', 'shape.md', 'type.display', 'type.caption', 'role.advisor',
 ];
 
-describe('usage notes ($extensions["com.cafoo"])', () => {
+describe('usage notes ($extensions["com.luyten"])', () => {
 	const noted = [...tokens.values()].filter((t) => t.$extensions && NAMESPACE in t.$extensions);
 
 	it('exist on every token that is easy to misuse', () => {

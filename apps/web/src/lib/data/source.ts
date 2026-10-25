@@ -163,7 +163,7 @@ export interface DataSource {
 	/** Cloud and model-usage bill lines, by month. */
 	cloudCosts(): CloudCost[];
 	batches(): Batch[];
-	/** The tools Cafoo reads from, connected or available. */
+	/** The tools Luyten reads from, connected or available. */
 	integrations(): Integration[];
 	deals(): Deal[];
 	promotions(): Promotion[];

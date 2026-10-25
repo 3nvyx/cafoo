@@ -1,5 +1,5 @@
 // The browser side of "Ask the Advisor": one OpenAI-compatible chat call to the agent gateway
-// (POST {gateway}/v1/chat/completions, model "cafoo-advisor"). The gateway answers only this machine unless it has an
+// (POST {gateway}/v1/chat/completions, model "luyten"). The gateway answers only this machine unless it has an
 // API key, so a refusal comes back as a plain sentence for the chat to show. The caller passes the gateway URL
 // (PUBLIC_AGENT_GATEWAY, the same one the live data source uses), which keeps this module free of SvelteKit and testable.
 
@@ -31,7 +31,7 @@ export async function askAdvisor(history: ChatTurn[], opts: { gateway: string; f
 		res = await f(`${opts.gateway.replace(/\/+$/, '')}/v1/chat/completions`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ model: 'cafoo-advisor', messages: history }),
+			body: JSON.stringify({ model: 'luyten', messages: history }),
 			signal: opts.signal
 		});
 	} catch (e) {

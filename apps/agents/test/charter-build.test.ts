@@ -4,7 +4,7 @@
 // their default mapping rebuild exactly the shipped harnesses, so a version that only rewords lines changes nothing.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { loadScenarios, scenariosDir } from '@cafoo/eval-harness';
+import { loadScenarios, scenariosDir } from '@luyten/eval-harness';
 import { agentPrompt, checkCall, chartersDir, HARNESSES, type Role } from '../src/harness';
 import { CharterError, customScenarioId, defaultMapping, harnessFromCharter, promptFor, tightenedRules } from '../src/charter/build';
 import { charterCoverage, customScenario, readMapping } from '../src/charter/coverage';

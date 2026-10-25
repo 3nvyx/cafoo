@@ -32,7 +32,7 @@ const judge = (A: RoleConn, proposalId: bigint, c: Critique, ctx: RuleContext): 
 const policiesDir = join(repoRoot, 'fixtures', 'moss');
 
 /** Moss in live mode; local keyword search over the same policy documents otherwise (moss.ts). */
-const POLICY_INDEX = 'cafoo-policies';
+const POLICY_INDEX = 'luyten-policies';
 
 export async function searchPolicies(queryText: string, topK = 3): Promise<{ id: string; text: string; score: number }[]> {
   const docs = loadPolicyDocs();

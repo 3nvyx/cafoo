@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { charterCoverage } from '../src/charter/coverage';
 import type { EvalReport } from '../src/charter/evaluate';
 import { charterCatalog, charterEvalStatus, charterRoutes, resetCharterEvalStatus, type CharterRouteOptions } from '../src/charter/routes';
-import { loadScenarios, scenariosDir } from '@cafoo/eval-harness';
+import { loadScenarios, scenariosDir } from '@luyten/eval-harness';
 import { createGateway, type GatewayOptions } from '../src/gateway';
 import { HARNESSES, type Role } from '../src/harness';
 import type { Cast } from '../src/stdb';

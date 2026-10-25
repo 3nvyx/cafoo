@@ -1,10 +1,11 @@
-# Cafoo roadmap
+# Luyten roadmap
 
 Updated 2026-10-24. "Now" is what runs in this repo today. Everything after it is roadmap.
 
 ## Now
 
-Cafoo closes the month for a group of companies in two currencies, and keeps the books current between closes.
+Luyten is automated finance for 10x growth startups.
+It closes the month for a group of companies in two currencies, and keeps the books current between closes.
 
 Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) propose. A Red Team on two other model vendors critiques: Grok first, then Gemini adds what Grok missed. The Advisor rules with a written rationale. Rulings at or above the Materiality threshold (default $10,000, measured in the Reporting currency) wait in the CFO's "Needs your OK" queue. The CFO confirms or sends back, can reverse any entry, and always confirms the period lock. SpacetimeDB reducers enforce all of this by checking the caller's identity.
 
@@ -37,18 +38,25 @@ Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind th
 
 ## Next 90 days (roadmap)
 
-**Real bank and billing feeds.** Today's feed is simulated, or reads bank lines from the Capital One Nessie sandbox. Next it connects to production bank and billing providers through the same ingest-only role, so nothing about the gate changes.
+**Agents that collect their own data.** Today only the Credit & Risk agent collects data itself, over MCP: the CRS Credit API, Bright Data and Apify.
+Bank lines and invoices come from a simulated feed or the Capital One Nessie sandbox, and bills, the UK company's books and exchange rates come from the seed.
+Next, a new Intake agent reads every source through read-only MCP connectors: the accounts-payable inbox (email), billing (Stripe first), bank accounts (a US bank-data provider and UK open banking) and a closing-rate source for the group books.
+It writes only through the ingest-only feed role, so the database lets it add raw bank lines, invoices and bills and refuses everything else.
+A hijacked Intake agent can add evidence but never propose, rule or post.
+The Bookkeeper, Revenue and Consolidation agents react to what lands, as the continuous Bookkeeper does today.
+Email is untrusted input: a message asking to change a vendor's bank details never changes the vendor; it starts a Vendor check and waits for the CFO.
+This needs one new ingest reducer, for vendor bills; bank lines and invoices already have theirs.
 
 **Per-subsidiary locks.** Today the CFO locks the group's month in one step. Each company will get its own lock, with the consolidated Board Pack final only when every company's month is.
 
 **A dedicated evaluator identity.** Charter eval results are recorded under the Advisor's identity today. A separate evaluator identity will record them, so the agent being judged never shares an identity with its judge.
 
-**Hosted deployment.** A managed Cafoo per customer, so a finance team can start without running a database or a gateway. The CFO seat already needs a one-time Bootstrap secret, so a hosted database never hands the role to whoever connects first.
+**Hosted deployment.** A managed Luyten per customer, so a finance team can start without running a database or a gateway. The CFO seat already needs a one-time Bootstrap secret, so a hosted database never hands the role to whoever connects first.
 
 **SOC 2 readiness.** Controls, evidence collection, and access reviews, built on the audit trail the reducers already write.
 
 ## 2027 vision (roadmap)
 
-**An agentic credit exchange.** Cafoo's books are live, audited, and explained line by line. That is what a lender wants and rarely gets. Cafoo will use them to negotiate working-capital terms for its customers directly with lenders, with the CFO confirming every offer through the same approval gate.
+**An agentic credit exchange.** Luyten's books are live, audited, and explained line by line. That is what a lender wants and rarely gets. Luyten will use them to negotiate working-capital terms for its customers directly with lenders, with the CFO confirming every offer through the same approval gate.
 
 **A marketplace of audited agent charters.** Finance teams publish the Charters that work for them, each with its eval results attached. Other teams adopt a Charter knowing exactly what the agent may and may not do.

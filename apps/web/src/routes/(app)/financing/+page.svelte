@@ -74,7 +74,7 @@
 
 	const instruments = $derived(db.instruments().filter((i) => i.roundId === round?.id));
 
-	// The latest valuation report's fair values. Cafoo never estimates them itself.
+	// The latest valuation report's fair values. Luyten never estimates them itself.
 	const valuation = $derived.by(() => {
 		const d = db.documents().findLast((x) => x.kind === 'valuation_report' && x.status !== 'rejected' && x.status !== 'parsing');
 		if (!d) return null;
@@ -158,7 +158,7 @@
 	);
 </script>
 
-<svelte:head><title>Financing · Cafoo</title></svelte:head>
+<svelte:head><title>Financing · Luyten</title></svelte:head>
 
 <header class="flex flex-col gap-1 pb-6">
 	<p class="text-body-sm text-ink-2">{company} · Funding desk and Capital accountant</p>
@@ -272,7 +272,7 @@
 				{#if valuation}
 					Fair values come from {valuation.preparer ?? 'the valuation report'}{valuation.asOf ? ` as of ${shortDate(valuation.asOf)}` : ''}: SAFEs at {pctBp(valuation.safeFairValueBp ?? 0)} of what was paid{valuation.commonFairValuePerShareE4 ? `, common stock at ${formatPriceE4(valuation.commonFairValuePerShareE4)} a share` : ''}.
 				{:else}
-					Cafoo never estimates fair values; they come from an uploaded valuation report.
+					Luyten never estimates fair values; they come from an uploaded valuation report.
 				{/if}
 			</p>
 		</div>

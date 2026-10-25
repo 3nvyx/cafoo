@@ -85,7 +85,7 @@ const payrollRegister: UploadHandler = {
 	readByRole: 'bookkeeper',
 	read(ctx) {
 		const run = ctx.t.pay_run.find((r) => r.id === REGISTER_RUN_ID);
-		if (!run) return { extracted: {}, summaryPlain: 'This register is for a pay run Cafoo does not have, so nothing was booked.' };
+		if (!run) return { extracted: {}, summaryPlain: 'This register is for a pay run Luyten does not have, so nothing was booked.' };
 		const e = payrollEntry(run);
 		const extracted = {
 			provider: 'Gusto',

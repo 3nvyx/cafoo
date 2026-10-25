@@ -4,7 +4,7 @@
  * feed during an open month, before anyone starts that month's close. Opening pauses the feed and the continuous
  * Bookkeeper for that month; a close only resumes when it has work of its own to resume.
  */
-import { bankExceptionAcceptance, closeMonthLabel, closeOrderRefusal, currentBankExceptions } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, closeMonthLabel, closeOrderRefusal, currentBankExceptions } from '@luyten/ledger-core';
 import type { RoleConn } from './stdb';
 
 /** The start of the Advisor's first message in close:<ym>; its presence marks that month's close as opened. */

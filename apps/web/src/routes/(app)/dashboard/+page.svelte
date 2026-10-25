@@ -101,7 +101,7 @@
 	});
 </script>
 
-<svelte:head><title>Dashboard · Cafoo</title></svelte:head>
+<svelte:head><title>Dashboard · Luyten</title></svelte:head>
 
 {#if period && root}
 	<header class="flex flex-col gap-1 pb-6">

@@ -1,15 +1,15 @@
 {
-  "name": "@cafoo/design-tokens",
+  "name": "@luyten/design-tokens",
   "version": "0.1.0",
   "private": true,
-  "description": "Cafoo's design decisions as data: DTCG token files, the CSS built from them, and the checks that keep the web app on them.",
+  "description": "Luyten's design decisions as data: DTCG token files, the CSS built from them, and the checks that keep the web app on them.",
   "type": "module",
   "files": [
     "tokens",
     "css"
   ],
   "exports": {
-    "./css": "./css/cafoo-tokens.css",
+    "./css": "./css/luyten-tokens.css",
     "./tokens/*": "./tokens/*"
   },
   "scripts": {

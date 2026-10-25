@@ -7,8 +7,8 @@ const prefersDark = new MediaQuery('prefers-color-scheme: dark', false);
 /** 'system' follows the device; 'light' and 'dark' pin one. app.html applies a pinned theme before first paint. */
 export type Theme = 'system' | 'light' | 'dark';
 
-const KEY_NAV = 'cafoo.navCollapsed';
-const KEY_THEME = 'cafoo.theme';
+const KEY_NAV = 'luyten.navCollapsed';
+const KEY_THEME = 'luyten.theme';
 
 function read(key: string): string | null {
 	try {

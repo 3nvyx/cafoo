@@ -6,7 +6,7 @@
  * bank_match.paymentJeId (seeded with that commit's own loader and bindings, extracted with git archive).
  * Exits non-zero on any failed assertion.
  *
- *   pnpm -F @cafoo/stdb-bindings smoke
+ *   pnpm -F @luyten/stdb-bindings smoke
  *
  * Needs a local SpacetimeDB on :3000 and the spacetime CLI (SPACETIME_BIN, ~/.local/bin/spacetime, or PATH).
  * SMOKE_DB names the database (must end in "smoke"); LEGACY_REF is the git commit of the pre-paymentJeId module
@@ -24,7 +24,7 @@ import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions }
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..', '..');
 const moduleDir = join(repo, 'spacetimedb', 'spacetimedb');
-const DB = process.env.SMOKE_DB ?? 'cafoo-smoke';
+const DB = process.env.SMOKE_DB ?? 'luyten-smoke';
 const LEGACY_DB = `${DB}-legacy`;
 const LEGACY_REF = process.env.LEGACY_REF ?? '57884e2';
 const URI = 'ws://localhost:3000';
@@ -89,8 +89,8 @@ const publish = (db: string, dir: string, fresh: boolean) =>
 const dropDb = (db: string) => spawnSync(BIN, ['delete', db, '-s', 'local', '--yes'], { encoding: 'utf8' });
 // The smoke arms its own CFO claim (below), so the loader must not arm one.
 const seedDb = (db: string) => {
-  run('pnpm', ['-F', '@cafoo/seed', 'generate']);
-  run('pnpm', ['-F', '@cafoo/seed', 'load'], { SPACETIMEDB_DB_NAME: db, SEED_NO_BOOTSTRAP: '1' });
+  run('pnpm', ['-F', '@luyten/seed', 'generate']);
+  run('pnpm', ['-F', '@luyten/seed', 'load'], { SPACETIMEDB_DB_NAME: db, SEED_NO_BOOTSTRAP: '1' });
 };
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 /** Arm a one-time CFO claim as the database owner: the CLI identity that published the smoke database. */
@@ -1193,7 +1193,7 @@ async function legacy() {
     console.log(`\nSKIPPED the in-place upgrade check: commit ${LEGACY_REF} is not in this clone (shallow clone or rewritten history). Set LEGACY_REF to a commit from before bank_match.paymentJeId existed to run it.`);
     return;
   }
-  const dir = mkdtempSync(join(tmpdir(), 'cafoo-legacy-'));
+  const dir = mkdtempSync(join(tmpdir(), 'luyten-legacy-'));
   try {
     // That commit's module, generated bindings and seed loader, extracted with git archive (the work tree is untouched),
     // so the old database is seeded exactly as it was then, whatever today's loader and bindings expect.
@@ -1205,10 +1205,10 @@ async function legacy() {
     const oldModule = join(dir, 'spacetimedb', 'spacetimedb');
     symlinkSync(join(moduleDir, 'node_modules'), join(oldModule, 'node_modules'));
     symlinkSync(join(repo, 'packages', 'stdb-bindings', 'node_modules'), join(dir, 'packages', 'stdb-bindings', 'node_modules'));
-    mkdirSync(join(dir, 'seed', 'node_modules', '@cafoo'), { recursive: true });
-    symlinkSync(join(dir, 'packages', 'stdb-bindings'), join(dir, 'seed', 'node_modules', '@cafoo', 'stdb-bindings'));
+    mkdirSync(join(dir, 'seed', 'node_modules', '@luyten'), { recursive: true });
+    symlinkSync(join(dir, 'packages', 'stdb-bindings'), join(dir, 'seed', 'node_modules', '@luyten', 'stdb-bindings'));
     symlinkSync(realpathSync(join(repo, 'seed', 'node_modules', 'spacetimedb')), join(dir, 'seed', 'node_modules', 'spacetimedb'));
-    if (!existsSync(join(repo, 'seed', 'out', 'seed.json'))) run('pnpm', ['-F', '@cafoo/seed', 'generate']);
+    if (!existsSync(join(repo, 'seed', 'out', 'seed.json'))) run('pnpm', ['-F', '@luyten/seed', 'generate']);
     mkdirSync(join(dir, 'seed', 'out'), { recursive: true });
     copyFileSync(join(repo, 'seed', 'out', 'seed.json'), join(dir, 'seed', 'out', 'seed.json'));
     console.log(`\npublishing the ${LEGACY_REF} module to ${LEGACY_DB} and seeding it with that commit's loader`);

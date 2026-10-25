@@ -5,7 +5,7 @@
  * and rulings are scripted per kind; the approval reducer still decides post-now or wait-for-the-CFO, and a ruling the
  * books refuse is recorded as a refusal (the Proposal is rejected so the close can continue).
  */
-import { formatMinor } from '@cafoo/ledger-core';
+import { formatMinor } from '@luyten/ledger-core';
 import { scriptedGeminiCritique } from '../gemini';
 import { IC_DIFFERENCE_TOLERANCE_MINOR } from '../harness/consolidation';
 import type { Snapshot } from '../snapshot';

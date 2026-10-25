@@ -3,6 +3,6 @@
   "asOf": "2026-10-20",
   "count": 180,
   "layout": "fixtures/crs/<product>/<personaId>.json; credit_report uses <personaId>.<bureau>.json",
-  "note": "These responses are synthesized from the documented sandbox outcomes (expected_outcome in crs-sandbox-dataset.csv and the CRS product guides), using the documented response shapes. Request ids are fake (fx-<persona>-<product>[-<bureau>]). They are not recordings. Once CRS credentials exist, refresh them with `pnpm -F @cafoo/crs-mcp fixtures:record`, which overwrites each file with the live body and RequestID (synthesized:false). Unconfirmed shapes: PitchPoint /pp/fcrablj/data keys (free-form XML-derived JSON), the deceased errorMessages code, TU identity SubjectRecord fields beyond addOnProducts[0].idManagerVerification.messages, score modelName strings.",
+  "note": "These responses are synthesized from the documented sandbox outcomes (expected_outcome in crs-sandbox-dataset.csv and the CRS product guides), using the documented response shapes. Request ids are fake (fx-<persona>-<product>[-<bureau>]). They are not recordings. Once CRS credentials exist, refresh them with `pnpm -F @luyten/crs-mcp fixtures:record`, which overwrites each file with the live body and RequestID (synthesized:false). Unconfirmed shapes: PitchPoint /pp/fcrablj/data keys (free-form XML-derived JSON), the deceased errorMessages code, TU identity SubjectRecord fields beyond addOnProducts[0].idManagerVerification.messages, score modelName strings.",
   "generator": "packages/crs-mcp/scripts/synthesize-fixtures.mjs"
 }

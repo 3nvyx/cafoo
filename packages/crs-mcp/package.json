@@ -1,5 +1,5 @@
 {
-  "name": "@cafoo/crs-mcp",
+  "name": "@luyten/crs-mcp",
   "version": "0.1.0",
   "private": true,
   "description": "CRS Credit API sandbox client, response interpreters, credit cascade and an in-process MCP server for the Credit & Risk agent.",

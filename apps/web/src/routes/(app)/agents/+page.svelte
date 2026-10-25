@@ -74,7 +74,7 @@
 	const SHOWN = 8;
 </script>
 
-<svelte:head><title>Agent activity · Cafoo</title></svelte:head>
+<svelte:head><title>Agent activity · Luyten</title></svelte:head>
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 	<div>

@@ -4,14 +4,14 @@
     {
       "name": "web-live",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-F", "@cafoo/web", "dev", "--port", "5173"],
+      "runtimeArgs": ["-F", "@luyten/web", "dev", "--port", "5173"],
       "port": 5173,
       "env": { "PUBLIC_DATA_SOURCE": "spacetime" }
     },
     {
       "name": "web-mock",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-F", "@cafoo/web", "dev", "--port", "5174"],
+      "runtimeArgs": ["-F", "@luyten/web", "dev", "--port", "5174"],
       "port": 5174
     }
   ]

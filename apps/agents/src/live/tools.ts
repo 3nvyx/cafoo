@@ -14,9 +14,9 @@ import {
   targetAllowanceMinor,
   ymToString,
   type RiskTier,
-} from '@cafoo/ledger-core';
+} from '@luyten/ledger-core';
 import { tracked } from '../provider-calls';
-import { CrsClient, createCrsMcpServer, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
+import { CrsClient, createCrsMcpServer, creditCheckSummaryJson, runCascade, type CascadeResult } from '@luyten/crs-mcp';
 import { activeCharter } from '../charter/active';
 import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';

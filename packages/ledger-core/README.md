@@ -1,4 +1,4 @@
-# @cafoo/ledger-core
+# @luyten/ledger-core
 
 Updated 2026-10-24. Agent-facing doc: keep it terse, one rule per line, guarantees not tutorials.
 
@@ -15,9 +15,9 @@ Never name the reference product anywhere; `bash scripts/lint-refs.sh` from the 
 
 ## Commands
 
-Run `pnpm -F @cafoo/ledger-core test`, `pnpm -F @cafoo/ledger-core check`, `pnpm -F @cafoo/ledger-core build` from the repo root.
-Update plain-summary snapshots only after reading the diff: `pnpm -F @cafoo/ledger-core exec vitest run -u`.
-Package `exports` point at `src/index.ts` (bundlers, vitest, tsx); `@cafoo/ledger-core/dist` is the built JS for plain Node after `build`.
+Run `pnpm -F @luyten/ledger-core test`, `pnpm -F @luyten/ledger-core check`, `pnpm -F @luyten/ledger-core build` from the repo root.
+Update plain-summary snapshots only after reading the diff: `pnpm -F @luyten/ledger-core exec vitest run -u`.
+Package `exports` point at `src/index.ts` (bundlers, vitest, tsx); `@luyten/ledger-core/dist` is the built JS for plain Node after `build`.
 
 ## Errors
 

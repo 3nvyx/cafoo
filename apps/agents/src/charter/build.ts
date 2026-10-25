@@ -9,7 +9,7 @@
  *   - the shipped evalOnly scenarios stay; params can only raise a bar (they are clamped to the shipped values).
  * Tools, model and turn cap stay the role's own: a charter changes what the gate checks, never what the agent can reach.
  */
-import { customScenarioId } from '@cafoo/eval-harness';
+import { customScenarioId } from '@luyten/eval-harness';
 import { charterPrompt, gateFormats, HARNESSES, type EvalOnly, type Harness, type Role, type Rule } from '../harness';
 import { templateById, type TemplateUse } from './library';
 import { charterLines, ruleIdFor } from './parse';
