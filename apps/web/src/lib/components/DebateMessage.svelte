@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { db } from '#lib/data/index.js';
-	import { reportingText } from '#lib/currency-text.js';
 	import type { AgentMessage } from '#lib/data/types.js';
 	import { MESSAGE_KIND, criticOf, roleName, timeOnly } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
@@ -8,9 +6,6 @@
 
 	let { m, pinned = false }: { m: AgentMessage; pinned?: boolean } = $props();
 
-	/** Amounts in another currency read reporting currency first, the original in brackets. */
-	const ym = $derived(db.proposals().find((p) => p.id === m.proposalId)?.periodId ?? (m.threadId.startsWith('close:') ? m.threadId.slice(6) : ui.periodId));
-	const say = (text: string) => reportingText(db, text, ym);
 	const critic = $derived(m.kind === 'critique' ? criticOf(m.body) : undefined);
 
 	const style = $derived(
@@ -40,10 +35,10 @@
 			<time class="num text-xs text-ink-3" datetime={m.createdAt}>{timeOnly(m.createdAt)}</time>
 		</div>
 		{#if ui.expert}
-			<p class="mt-1 font-mono text-[13px] leading-5 break-words whitespace-pre-wrap text-ink">{say(m.body)}</p>
-			<p class="mt-1 text-sm text-ink-3">{say(m.summaryPlain)}</p>
+			<p class="mt-1 font-mono text-[13px] leading-5 break-words whitespace-pre-wrap text-ink">{m.body}</p>
+			<p class="mt-1 text-sm text-ink-3">{m.summaryPlain}</p>
 		{:else}
-			<p class="mt-0.5 text-[15px] text-ink">{say(m.summaryPlain)}</p>
+			<p class="mt-0.5 text-[15px] text-ink">{m.summaryPlain}</p>
 		{/if}
 	</div>
 </div>

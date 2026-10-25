@@ -121,10 +121,10 @@
 				<a href="/agents" class="drill text-sm text-ink-2">Full Debate</a>
 			</div>
 			<ul class="flex flex-col gap-4" aria-live="polite">
-				{#each gate.started ? feed : [] as m (m.id)}
+				{#each feed as m (m.id)}
 					<li in:arrive><DebateMessage {m} /></li>
 				{:else}
-					<li class="text-ink-3">{gate.started ? 'Quiet for now. Messages appear here the moment an agent posts.' : `Nothing has happened yet. Once you start the ${month} close, the agents' messages appear here.`}</li>
+					<li class="text-ink-3">Quiet for now. Messages appear here the moment an agent posts.</li>
 				{/each}
 			</ul>
 		</aside>

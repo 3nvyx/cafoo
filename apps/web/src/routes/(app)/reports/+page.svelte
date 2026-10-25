@@ -8,8 +8,6 @@
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
-	import ExportButtons from '#lib/components/ExportButtons.svelte';
-	import { decimal, type CsvTable } from '#lib/csv.js';
 	import Pill from '#lib/components/Pill.svelte';
 	import { dateTime, drill } from '#lib/labels.js';
 	import type { DrillPeriod } from '#lib/drill.js';
@@ -102,49 +100,8 @@
 		return db.now();
 	});
 
-	/**
-	 * Whole units in Simple mode; Expert mode shows the cents. An amount under 1.00 keeps its cents in both, so a small
-	 * difference (the 0.01 left by intercompany rounding) is not rounded away to $0.
-	 */
-	const fmt = (m: string | undefined, currency = ccy) => {
-		const n = toBig(m);
-		return formatMoney(m ?? '0', { whole: !ui.expert && !(n !== 0n && n > -100n && n < 100n), currency });
-	};
-
-	/** Whether any figure in the pack is under 1.00 but not zero, to explain it once below. */
-	const hasSubDollar = $derived.by(() => {
-		if (!pack) return false;
-		const small = (c: Cells) => Object.values(c).some((v) => { const n = toBig(v); return n !== 0n && n > -100n && n < 100n; });
-		const rows = [...pack.pnl.revenue, ...pack.pnl.expenses].flatMap((r) => [r.month, r.ytd]);
-		const totals = [pack.pnl.totalRevenue, pack.pnl.totalExpenses, pack.pnl.netIncome].flatMap((t) => [t.month, t.ytd]);
-		const bs = [...pack.bs.assets, ...pack.bs.liabilities, ...pack.bs.equity].map((r) => r.amount);
-		return [...rows, ...totals, ...bs, pack.bs.totalAssets, pack.bs.totalLiabilities, pack.bs.totalEquity].some(small);
-	});
-
-	// Whether the group's elimination entries are still to post: an elimination Proposal for the month that is not yet
-	// approved (or none yet). Until then the consolidated draft can include intercompany charges.
-	const eliminationsPending = $derived.by(() => {
-		if (!period) return false;
-		const mine = db.proposals().filter((p) => p.kind === 'ic_elimination' && p.periodId === period.id && p.status !== 'rejected' && p.status !== 'superseded');
-		return mine.length === 0 || mine.some((p) => p.status !== 'approved' && p.status !== 'amended');
-	});
-
-	/** The CSV the Demo-mode button saves: the same figures as the tables below, one column per company in the consolidated view. */
-	const csvTables = (): CsvTable[] => {
-		if (!pack) return [];
-		const cols = consolidated ? pack.columns : pack.columns.filter((c) => c.key === tk);
-		const header = ['Account', ...cols.map((c) => c.label)];
-		const line = (label: string, cells: Cells) => [label, ...cols.map((c) => decimal(cells[c.key]))];
-		const pnl = [...pack.pnl.revenue, ...pack.pnl.expenses].map((r) => line(r.label, r.month));
-		pnl.splice(pack.pnl.revenue.length, 0, line('Total revenue', pack.pnl.totalRevenue.month));
-		pnl.push(line('Total expenses', pack.pnl.totalExpenses.month), line('Net income', pack.pnl.netIncome.month));
-		const bs = [...pack.bs.assets, ...pack.bs.liabilities, ...pack.bs.equity].map((r) => line(r.label, r.amount));
-		bs.push(line('Total assets', pack.bs.totalAssets), line('Total liabilities', pack.bs.totalLiabilities), line('Total equity', pack.bs.totalEquity));
-		return [
-			{ title: `Profit and loss, ${period?.id} (${ccy})`, header, rows: pnl },
-			{ title: `Balance sheet at the end of ${period?.id} (${ccy})`, header, rows: bs }
-		];
-	};
+	/** Whole units in Simple mode; Expert mode shows the cents. */
+	const fmt = (m: string | undefined, currency = ccy) => formatMoney(m ?? '0', { whole: !ui.expert, currency });
 	const pid = $derived(period?.id ?? '');
 
 	// Every ledger figure drills to exactly the lines it sums, in the company it belongs to: the month, the year to date,
@@ -191,7 +148,6 @@
 			<p class="eyebrow">Board Pack · {scopeName} · {ccy}</p>
 			<h1 class="text-[34px] sm:text-[42px]">{periodLabel(period)}</h1>
 			<p class="mt-1 text-sm text-ink-3">Rendered {dateTime(renderedAt)} from {db.journalEntries().length} Journal Entries</p>
-			<div class="mt-3"><ExportButtons dataset="board-pack" period={period.id} tables={csvTables} slides disabled={!pack} /></div>
 		</div>
 		{#if period.status === 'closed'}
 			<Pill tone={bankExceptions?.rows.length ? 'warn' : 'pos'}>Final{bankExceptions?.rows.length ? ' · bank exceptions' : ''} · locked {period.lockedAt ? dateTime(period.lockedAt) : ''}</Pill>
@@ -203,7 +159,7 @@
 		<div class="mt-5 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">
 			<p class="font-medium">{bankExceptions.rows.length} bank line{bankExceptions.rows.length === 1 ? ' remains' : 's remain'} unmatched.</p>
 			{#if bankExceptions.acceptance.accepted}
-				<p class="mt-1">The CFO accepted this exact exception set on {dateTime(bankExceptions.acceptance.at)}. Reason: <span class="break-words whitespace-pre-line">{bankExceptions.acceptance.reasonPlain}</span>. Acceptance does not reconcile the bank.</p>
+				<p class="mt-1">The CFO accepted this exact exception set on {dateTime(bankExceptions.acceptance.at)}. Reason: {bankExceptions.acceptance.reasonPlain}. Acceptance does not reconcile the bank.</p>
 			{:else}
 				<p class="mt-1">No current CFO exception acceptance is recorded. Review the lines on the <a class="drill" href="/close#bank-exceptions">close checklist</a> before treating this pack as reconciled.</p>
 			{/if}
@@ -219,7 +175,7 @@
 		</div>
 		<p class="mt-2 text-sm text-ink-3">
 			{#if consolidated}
-				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. The Eliminations column shows entries posted so far.{#if period.status !== 'closed' && eliminationsPending}{' '}Draft totals may still include intercompany activity.{/if}
+				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. The Eliminations column shows entries posted so far. Draft totals may still include intercompany activity.
 			{:else if selected?.isElimination}
 				The bookkeeping-only company that holds every Elimination, in {selected.baseCurrency}.
 			{:else}
@@ -227,7 +183,7 @@
 			{/if}
 		</p>
 	{/if}
-	{#if consolidated && period.status !== 'closed' && eliminationsPending}
+	{#if consolidated && period.status !== 'closed'}
 		<p class="mt-4 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">Draft group totals may include intercompany charges until the elimination entries post. Review the Eliminations column before using these figures.</p>
 	{/if}
 
@@ -262,12 +218,6 @@
 				<span class="text-sm text-ink-3">from the active contracts</span>
 			</div>
 		</section>
-
-		{#if hasSubDollar}
-			<p class="mt-4 text-sm text-ink-2" role="note">
-				A few figures are under 1.00 and show their cents (for example 0.01). That is a rounding difference between the companies' intercompany balances. The books accept differences under 1.00 by design, so it is not an error.
-			</p>
-		{/if}
 
 		<div class="mt-10 grid gap-12 {consolidated ? '' : 'xl:grid-cols-2'}">
 			<section aria-labelledby="pnl-h" class="min-w-0">

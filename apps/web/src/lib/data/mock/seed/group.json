@@ -1,5 +1,5 @@
 {
-	"_format": "Generated once from seed/src/group.ts (buildGroup for September 2026): Cafoo Ltd, the Elimination subsidiary, their FX rates and the intercompany entries on both sides. Lines are [accountCode, debitMinor, creditMinor, {ccy, fxRateE6}?]; a line without a currency is in its company's own currency at 1:1. Edited by hand after generation: Larkspur Bakery's September payment of UK-2009 (je-g034) is left out, so Cafoo Ltd has £4,100 of open receivables for the Customers and Board Pack views.",
+	"_format": "Generated once from seed/src/group.ts (buildGroup for September 2026): Cafoo Ltd, the Elimination subsidiary, their FX rates and the intercompany entries on both sides. Lines are [accountCode, debitMinor, creditMinor, {ccy, fxRateE6}?]; a line without a currency is in its company's own currency at 1:1.",
 	"reportingCcy": "USD",
 	"subsidiaries": [
 		{"code": "UK", "name": "Cafoo Ltd", "baseCurrency": "GBP", "isElimination": false},
@@ -86,6 +86,7 @@
 		{"id": "je-g031", "periodId": "2026-09", "postedAt": "2026-09-06T12:00:00Z", "memo": "Invoice Pembroke Dental Care UK-2008", "source": "seed", "postedByRole": "system", "lines": [["1100-UK", "610000", "0"], ["4000-UK", "0", "610000"]]},
 		{"id": "je-g032", "periodId": "2026-09", "postedAt": "2026-09-07T12:00:00Z", "memo": "Payment received Pembroke Dental Care UK-2008", "source": "seed", "postedByRole": "system", "lines": [["1000-UK", "610000", "0"], ["1100-UK", "0", "610000"]]},
 		{"id": "je-g033", "periodId": "2026-09", "postedAt": "2026-09-08T12:00:00Z", "memo": "Invoice Larkspur Bakery UK-2009", "source": "seed", "postedByRole": "system", "lines": [["1100-UK", "410000", "0"], ["4000-UK", "0", "410000"]]},
+		{"id": "je-g034", "periodId": "2026-09", "postedAt": "2026-09-09T12:00:00Z", "memo": "Payment received Larkspur Bakery UK-2009", "source": "seed", "postedByRole": "system", "lines": [["1000-UK", "410000", "0"], ["1100-UK", "0", "410000"]]},
 		{"id": "je-g035", "periodId": "2026-09", "postedAt": "2026-09-10T12:00:00Z", "memo": "Payroll 2026-09", "source": "seed", "postedByRole": "system", "lines": [["5300-UK", "1660000", "0"], ["1000-UK", "0", "1660000"]]}
 	]
 }
