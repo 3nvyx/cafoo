@@ -2,6 +2,7 @@
 	import { db } from '#lib/data/index.js';
 	import { monthName, periodLabel } from '#lib/data/derive.js';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
+	import CloseStatusBar from '#lib/components/CloseStatusBar.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import LiveActivity from '#lib/components/LiveActivity.svelte';
@@ -65,6 +66,8 @@
 <svelte:head><title>Close · Cafoo</title></svelte:head>
 
 {#if period}
+	<div class="mb-6"><CloseStatusBar periodId={period.id} /></div>
+
 	<div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
 		<div>
 			<p class="eyebrow">Month-end close</p>
