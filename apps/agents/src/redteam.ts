@@ -80,9 +80,9 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   return null;
 }
 
-/** Per-critique model deadline, shared by both critics; a timed-out critic falls back like any other failure. */
+/** Per-critique model deadline, shared by both critics; a timed-out critic falls back like any other failure. 90 s: Grok takes up to six tool steps, and at 30 s most live critiques timed out. */
 function redTeamTimeoutMs(): number {
-  const timeoutMs = Number(process.env.REDTEAM_TIMEOUT_MS?.trim() || 30_000);
+  const timeoutMs = Number(process.env.REDTEAM_TIMEOUT_MS?.trim() || 90_000);
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
     throw new Error('REDTEAM_TIMEOUT_MS must be a positive integer no greater than 2147483647');
   }
