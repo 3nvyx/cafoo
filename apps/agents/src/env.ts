@@ -85,6 +85,7 @@ export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[
     { id: 'nessie', name: 'Capital One Nessie', mode: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'live' : 'demo', detail: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'bank source configured; status does not verify fetched transactions' : 'simulated bank feed' },
     { id: 'apify', name: 'Apify (customer websites)', mode: !demo && has(env, 'APIFY_TOKEN') ? 'live' : 'demo', detail: !demo && has(env, 'APIFY_TOKEN') ? `configured for ${env.APIFY_ACTOR?.trim() || 'apify/website-content-crawler'} crawls into Moss; status does not verify a crawl` : 'demo website snapshots' },
     { id: 'moss', name: 'Moss', mode: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'hosted policy search configured; local fallback on failure' : 'local keyword search' },
+    { id: 'slides', name: 'Google Slides (exports)', mode: !demo && has(env, 'GOOGLE_SERVICE_ACCOUNT_FILE') && has(env, 'SLIDES_SHARE_WITH') ? 'live' : 'demo', detail: !demo && has(env, 'GOOGLE_SERVICE_ACCOUNT_FILE') && has(env, 'SLIDES_SHARE_WITH') ? 'service account configured; status does not verify an export' : 'CSV export only; Slides needs a service account' },
     { id: 'spacetimedb', name: 'SpacetimeDB', mode: 'live', detail: `configured URI ${env.SPACETIMEDB_URI ?? 'ws://localhost:3000'}; gateway status does not verify a connection` },
   ];
 }

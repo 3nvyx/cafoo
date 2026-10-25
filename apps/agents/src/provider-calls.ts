@@ -7,7 +7,7 @@
  */
 import type { ProviderStatus } from './env';
 
-export type ProviderId = 'agents' | 'grok' | 'gemini' | 'crs' | 'brightdata' | 'nessie' | 'apify' | 'moss' | 'spacetimedb';
+export type ProviderId = 'agents' | 'grok' | 'gemini' | 'crs' | 'brightdata' | 'nessie' | 'apify' | 'moss' | 'slides' | 'spacetimedb';
 
 export type ProviderEvidence = {
   okCount: number;
