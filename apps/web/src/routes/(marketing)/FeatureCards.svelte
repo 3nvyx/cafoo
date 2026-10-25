@@ -1,10 +1,11 @@
 <script lang="ts">
 	// The gate and the sponsors' APIs behind Cafoo, as two rows of two cards. Each card has its words
-	// on top and its diagram in a panel set into the bottom-right corner. From lg up, hovering a card
-	// widens it and dims the card beside it. A diagram's width is a share of the row, not of the card,
-	// so widening a card reveals more of its diagram without changing the row's height (the page never
-	// moves under the pointer). Below lg the cards stack and each diagram takes the card's full width.
-	// A diagram animates only while its card is on screen.
+	// on top and its diagram in a panel set into the bottom-right corner. From lg up, where a pointer
+	// can hover, hovering a card widens it and dims the card beside it. Both the words and the diagram
+	// then have widths set from the row, not the card, so nothing re-wraps and the row's height never
+	// changes (the page does not move under the pointer); widening a card only reveals the rest of its
+	// diagram, which fades out at the card's edge until then. Without hover (touch screens) and below lg,
+	// every diagram fits its card. A diagram animates only while its card is on screen.
 	import GateStack from './GateStack.svelte';
 	import CreditCascade from './CreditCascade.svelte';
 	import AdvisorChat from './AdvisorChat.svelte';
@@ -55,7 +56,8 @@
 	// when their card comes back into view).
 	let seen = $state<Record<string, boolean>>({});
 	function inView(node: HTMLElement, id: string) {
-		const io = new IntersectionObserver(([e]) => (seen[id] = e.isIntersecting), { threshold: 0.25 });
+		// The newest entry wins when a quick scroll batches several.
+		const io = new IntersectionObserver((entries) => (seen[id] = entries[entries.length - 1].isIntersecting), { threshold: 0.25 });
 		io.observe(node);
 		return { destroy: () => io.disconnect() };
 	}
@@ -77,9 +79,10 @@
 		<div class="row flex flex-col gap-2">
 			{#each row as f (f.id)}
 				<article class="card flex flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="feature-{f.id}" use:inView={f.id}>
-					<div class="flex flex-col gap-3 p-6 sm:p-8">
-						<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-ink-3">
-							<span class="text-body-sm">{f.topic}</span>
+					<div class="copy flex flex-col gap-3 p-6 sm:p-8">
+						<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-ink-3">
+							<span class="text-body-sm font-medium text-ink-2">{f.topic}</span>
+							<span aria-hidden="true">·</span>
 							{@render brand(f.brand)}
 						</div>
 						<h3 id="feature-{f.id}" class="max-w-[22ch] text-display-sm font-medium text-balance">{f.title}</h3>
@@ -119,8 +122,7 @@
 		flex: none;
 	}
 
-	/* From lg up: two cards side by side. The row is the size container, so a diagram's width
-	   (a share of the row) stays put while its card grows or shrinks; the panel clips what does not fit. */
+	/* From lg up: two cards side by side. The row is the size container for the widths below. */
 	@media (min-width: 1024px) {
 		.row {
 			flex-direction: row;
@@ -130,21 +132,34 @@
 			flex: 1 1 0;
 			min-width: 0;
 		}
-		.panel {
-			overflow: hidden;
+	}
+	/* Where a pointer can hover, the card under it widens (flex-grow 1.4 against 1, so 7/12 of the row)
+	   and the other dims. Widths come from the row (cqw), so they hold while the cards change size:
+	   - the words take the narrowest a card gets (5/12 of the row, less half the 8px gap and the 2px
+	     border; the padding is inside the width), so they never re-wrap;
+	   - the diagram takes what the widest card leaves inside its panel (7/12 of the row, less half the
+	     gap, the card's border, and the panel's 32px margin, 1px border and 48px padding), so a widened
+	     card shows all of it. The panel clips the rest and fades it out at the edge until then. */
+	@media (min-width: 1024px) and (hover: hover) {
+		.copy {
+			width: calc(100cqw * 5 / 12 - 6px);
 		}
 		.visual {
-			width: calc(58cqw - 80px);
+			width: calc(100cqw * 7 / 12 - 88px);
+		}
+		.panel {
+			overflow: hidden;
+			mask-image: linear-gradient(to right, black calc(100% - 48px), transparent);
+		}
+		.card:hover .panel {
+			mask-image: none;
 		}
 		.card {
 			transition:
 				flex-grow 400ms cubic-bezier(0.65, 0, 0.35, 1),
 				opacity 400ms cubic-bezier(0.65, 0, 0.35, 1);
 		}
-	}
-	/* The hover only where a pointer can hover: the card under it widens, the other dims. */
-	@media (min-width: 1024px) and (hover: hover) {
-		.row:hover .card {
+		.row:has(.card:hover) .card {
 			opacity: 0.4;
 		}
 		.row .card:hover {

@@ -13,7 +13,8 @@
 	// Closed when another carousel slide is open: the drawing is still laid out, so it stops itself.
 	// Compact, it sits in a feature card: the parts list on the right is left out (the card's text
 	// covers the layers) and the drawing is cropped to the feeds, plates and gate log. On phones the
-	// card shows the stack alone; the gate log and the parts list stay for screen readers only.
+	// card shows the stack alone. The parts list stays for screen readers; the gate log is left out
+	// for them, since it changes every few seconds and the card's text already says what it shows.
 	let { active = true, compact = false }: { active?: boolean; compact?: boolean } = $props();
 
 	interface Layer {
@@ -187,7 +188,7 @@
 
 <div use:scrub use:watch>
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
-	<svg viewBox={compact ? '0 0 700 640' : '0 0 1040 640'} class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
+	<svg viewBox={compact ? '0 30 700 600' : '0 0 1040 640'} class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
 		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
@@ -225,7 +226,7 @@
 					<animateMotion path={refusedPath} keyPoints="0;1;0.72;0.72" keyTimes="0;0.22;0.27;1" calcMode="linear" dur={LOOP} repeatCount="indefinite" />
 					<animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.04;0.33;0.38;1" dur={LOOP} repeatCount="indefinite" />
 				</g>
-				<g transform="translate({CX + 46} {gateY - 8})" opacity="0">
+				<g transform="translate({CX} {gateY - 8})" opacity="0">
 					{@render verdict('refused · agents propose, never post', 'refused')}
 					<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.22;0.25;0.44;0.48;1" dur={LOOP} repeatCount="indefinite" />
 				</g>

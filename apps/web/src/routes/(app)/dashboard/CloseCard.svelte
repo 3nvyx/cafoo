@@ -41,7 +41,8 @@
 	});
 </script>
 
-<section aria-labelledby="close-h" class="card flex flex-col gap-5 p-5">
+<!-- Full width on the Dashboard: the next step sits beside the headline once there is room. -->
+<section aria-labelledby="close-h" class="card flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
 	<div class="flex min-w-0 flex-col gap-2">
 		<p class="text-body-sm text-ink-2">Month-end close</p>
 		<h2 id="close-h" class="text-subtitle">{headline}</h2>
@@ -50,7 +51,7 @@
 		{/if}
 		<LiveActivity periodId={period.id} />
 	</div>
-	<div class="flex flex-col gap-4">
+	<div class="flex flex-col gap-4 lg:w-80 lg:shrink-0">
 		{#if period.status === 'closed'}
 			<a href="/reports" class="btn w-full">Open the Board Pack <Icon name="arrowRight" size={18} /></a>
 		{:else if gate.canLock}

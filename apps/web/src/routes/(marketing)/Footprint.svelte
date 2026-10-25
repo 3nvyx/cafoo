@@ -26,7 +26,7 @@
 	];
 </script>
 
-<div class="mx-auto w-full max-w-2xl rounded-xl border border-line bg-canvas">
+<div class="w-full max-w-2xl rounded-xl border border-line bg-canvas">
 	<div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
 		<div class="flex items-center gap-2">
 			<Icon name="globe" size={16} />

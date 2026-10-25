@@ -21,7 +21,7 @@
 	];
 </script>
 
-<div class="mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-line bg-canvas">
+<div class="w-full max-w-2xl overflow-hidden rounded-xl border border-line bg-canvas">
 	<div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
 		<div class="flex items-center gap-2">
 			<Icon name="chat" size={16} />
