@@ -188,7 +188,7 @@
 	</main>
 
 	<footer class="mx-auto flex max-w-[1120px] flex-col gap-2 px-4 pb-10 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-		<Wordmark size={18} />
+		<Wordmark size={18} class="self-start sm:self-auto" />
 		<nav aria-label="Footer" class="flex flex-wrap gap-x-1">
 			<a href="/dashboard" {...newTab} class="flex min-h-11 items-center px-2 hover:text-ink">Sign in{@render tabNote()}</a>
 			<a href="/pitch" class="flex min-h-11 items-center px-2 hover:text-ink">Pitch</a>

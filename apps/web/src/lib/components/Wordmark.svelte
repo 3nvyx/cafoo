@@ -1,121 +1,162 @@
 <script lang="ts">
-	// The Cafoo wordmark: the word itself, set tight in Space Grotesk 600 and finished as polished
-	// blue chrome. A sky-to-horizon gradient gives the chrome its hard dark line across the letters,
-	// specular lighting over a blurred copy of the letter shapes bevels their edges, and a faint
-	// ocean-blue glow sits underneath. On hover a sheen crosses it once (not under reduced motion).
-	// `size` is the font size in px; the mark is as tall as the word's capitals plus a little air.
+	// The Cafoo wordmark: the word set tight in Space Grotesk 600, finished as quiet chrome. The base
+	// layer is a tar (or milk) gradient with a thin ocean-blue horizon, bevelled by an SVG filter that
+	// runs specular lighting over a blurred copy of the letter shapes. An aria-hidden copy sits on top,
+	// clipped to the letters and filled with a narrow diagonal band of light; the band crosses once on
+	// load and again on hover. Under reduced motion the band never shows. Screen readers get the base
+	// text only. `size` is the font size in px.
 	let { size = 20, class: cls = '' }: { size?: number; class?: string } = $props();
 	const id = $props.id();
 </script>
 
-<svg class="wordmark {cls}" viewBox="0 -80 268 90" style="height: {size * 0.9}px" role="img" aria-label="Cafoo">
-	<defs>
-		<linearGradient id="{id}-chrome" gradientUnits="userSpaceOnUse" x1="0" y1="-74" x2="0" y2="2">
-			<stop offset="0" class="s0" />
-			<stop offset="0.3" class="s1" />
-			<stop offset="0.52" class="s2" />
-			<stop offset="0.555" class="s3" />
-			<stop offset="0.63" class="s4" />
-			<stop offset="0.82" class="s5" />
-			<stop offset="1" class="s6" />
-		</linearGradient>
-		<linearGradient id="{id}-sheen" x1="0" y1="0" x2="1" y2="0">
-			<stop offset="0" stop-color="#fff" stop-opacity="0" />
-			<stop offset="0.5" stop-color="#fff" stop-opacity="0.75" />
-			<stop offset="1" stop-color="#fff" stop-opacity="0" />
-		</linearGradient>
-		<filter id="{id}-metal" x="-8%" y="-20%" width="116%" height="145%" color-interpolation-filters="sRGB">
-			<feGaussianBlur in="SourceAlpha" stdDeviation="1.6" result="bump" />
-			<feSpecularLighting in="bump" surfaceScale="4" specularConstant="0.85" specularExponent="24" lighting-color="#eaf8ff" result="spec">
-				<feDistantLight azimuth="225" elevation="52" />
+<span class="wordmark {cls}" style="font-size: {size}px">
+	<!-- The filter sits on a wrapper, not on the background-clip:text node, which WebKit can drop. -->
+	<span class="base" style="filter: url(#{id}-bevel)"><span class="fill">Cafoo</span></span>
+	<span class="fill light" aria-hidden="true">Cafoo</span>
+	<svg aria-hidden="true" width="0" height="0" focusable="false">
+		<filter id="{id}-bevel" x="-10%" y="-30%" width="120%" height="160%" color-interpolation-filters="sRGB">
+			<feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="blur" />
+			<feSpecularLighting in="blur" surfaceScale="2.5" specularConstant="0.45" specularExponent="30" class="spec" result="spec">
+				<fePointLight x="-120" y="-220" z="260" />
 			</feSpecularLighting>
-			<feComposite in="spec" in2="SourceAlpha" operator="in" result="bevel" />
-			<feComposite in="SourceGraphic" in2="bevel" operator="arithmetic" k2="1" k3="0.7" result="lit" />
-			<feGaussianBlur in="SourceAlpha" stdDeviation="5" result="soft" />
-			<feFlood class="glow" />
-			<feComposite in2="soft" operator="in" result="glow" />
-			<feOffset in="SourceAlpha" dy="1.4" result="drop" />
-			<feFlood class="edge" />
-			<feComposite in2="drop" operator="in" result="edge" />
-			<feMerge>
-				<feMergeNode in="glow" />
-				<feMergeNode in="edge" />
-				<feMergeNode in="lit" />
-			</feMerge>
+			<feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn" />
+			<feComposite in="SourceGraphic" in2="specIn" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="lit" />
+			<feDropShadow dx="0" dy="0.6" stdDeviation="0.4" class="drop" />
 		</filter>
-		<clipPath id="{id}-letters">
-			<text x="-1" y="0">Cafoo</text>
-		</clipPath>
-	</defs>
-	<text x="-1" y="0" fill="url(#{id}-chrome)" filter="url(#{id}-metal)">Cafoo</text>
-	<g clip-path="url(#{id}-letters)">
-		<rect class="sheen" x="-120" y="-80" width="110" height="90" fill="url(#{id}-sheen)" />
-	</g>
-</svg>
+	</svg>
+</span>
 
 <style>
 	.wordmark {
-		--s0: #f6fcff;
-		--s1: #bfeaff;
-		--s2: #5cc4fa;
-		--s3: #06345a;
-		--s4: #0a5f9c;
-		--s5: #3cb4f2;
-		--s6: #d9f3ff;
-		--glow: rgb(0 180 255 / 0.22);
-		--edge: rgb(0 0 0 / 0.65);
-		display: block;
-		width: auto;
-		overflow: visible;
+		--wm-top: #57524b;
+		--wm-mid: var(--ink);
+		--wm-horizon: var(--accent-ink);
+		--wm-bottom: #2e2b28;
+		--wm-band: rgb(255 255 255 / 0.85);
+		--wm-spec: #ffffff;
+		--wm-drop: rgb(0 0 0 / 0.18);
+		position: relative;
+		display: inline-block;
+		/* Cancels the fill's end padding so the mark keeps its natural width in layout. */
+		margin-inline-end: -0.06em;
+		font-family: var(--font-display);
+		font-weight: 600;
+		line-height: 1;
+		letter-spacing: -0.045em;
+		white-space: nowrap;
 	}
-	/* Light theme: deeper steel, with a pale engraved edge in place of the shadow. */
-	@media (prefers-color-scheme: light) {
-		:global(:root:not([data-theme='dark'])) .wordmark {
-			--s0: #5aa0d2;
-			--s1: #14659f;
-			--s2: #0a4778;
-			--s3: #021f3a;
-			--s4: #0089cf;
-			--s5: #0a6cae;
-			--s6: #04294a;
-			--glow: rgb(0 120 200 / 0.12);
-			--edge: rgb(255 255 255 / 0.9);
+	/* Dark theme: milk chrome, a pale-blue horizon and a neon glint, with a deeper shadow. */
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .wordmark {
+			--wm-top: #ffffff;
+			--wm-horizon: #9cc6e0;
+			--wm-bottom: #f2eee7;
+			--wm-band: rgb(110 208 255 / 0.95);
+			--wm-drop: rgb(0 0 0 / 0.55);
 		}
 	}
-	:global(:root[data-theme='light']) .wordmark {
-		--s0: #5aa0d2;
-		--s1: #14659f;
-		--s2: #0a4778;
-		--s3: #021f3a;
-		--s4: #0089cf;
-		--s5: #0a6cae;
-		--s6: #04294a;
-		--glow: rgb(0 120 200 / 0.12);
-		--edge: rgb(255 255 255 / 0.9);
+	:global(:root[data-theme='dark']) .wordmark {
+		--wm-top: #ffffff;
+		--wm-horizon: #9cc6e0;
+		--wm-bottom: #f2eee7;
+		--wm-band: rgb(110 208 255 / 0.95);
+		--wm-drop: rgb(0 0 0 / 0.55);
 	}
-	text {
-		font-family: var(--font-display);
-		font-size: 100px;
-		font-weight: 600;
-		letter-spacing: -4.5px;
+	.base {
+		display: block;
 	}
-	.s0 { stop-color: var(--s0); }
-	.s1 { stop-color: var(--s1); }
-	.s2 { stop-color: var(--s2); }
-	.s3 { stop-color: var(--s3); }
-	.s4 { stop-color: var(--s4); }
-	.s5 { stop-color: var(--s5); }
-	.s6 { stop-color: var(--s6); }
-	.glow { flood-color: var(--glow); }
-	.edge { flood-color: var(--edge); }
-	.sheen {
-		transform: translateX(0);
+	/* background-clip:text paints only inside the box, and the negative tracking leaves the last
+	   "o" wider than it; the end padding keeps that glyph whole. */
+	.fill {
+		display: block;
+		padding-inline-end: 0.06em;
+		color: transparent;
+		-webkit-background-clip: text;
+		background-clip: text;
+		background-image: linear-gradient(
+			180deg,
+			var(--wm-top) 0%,
+			var(--wm-mid) 46%,
+			var(--wm-horizon) 53%,
+			var(--wm-mid) 64%,
+			var(--wm-bottom) 100%
+		);
+	}
+	/* The band lives in the middle third of a background three times the word's width, so at either
+	   end of the sweep it sits fully outside the letters and the overlay shows nothing. */
+	.light {
+		position: absolute;
+		inset: 0;
+		display: none;
+		pointer-events: none;
+		user-select: none;
+		background-image: linear-gradient(112deg, transparent 47.5%, var(--wm-band) 50%, transparent 52.5%);
+		background-size: 300% 100%;
+		background-repeat: no-repeat;
+		background-position: 100% 0;
+	}
+	svg {
+		position: absolute;
+		width: 0;
+		height: 0;
+		overflow: hidden;
+	}
+	.spec {
+		lighting-color: var(--wm-spec);
+	}
+	.drop {
+		flood-color: var(--wm-drop);
 	}
 	@media (prefers-reduced-motion: no-preference) {
-		:global(a:hover) > .wordmark .sheen,
-		.wordmark:hover .sheen {
-			transform: translateX(400px);
-			transition: transform 1100ms cubic-bezier(0.23, 1, 0.32, 1);
+		/* At rest the band is invisible; leaving a hover fades it out, then parks it off the letters. */
+		.light {
+			display: block;
+			opacity: 0;
+			transition:
+				opacity 150ms ease-out,
+				background-position 0s 150ms;
+			animation: wordmark-sweep 1100ms cubic-bezier(0.45, 0, 0.2, 1) 400ms backwards;
+		}
+		:global(a:focus-visible) > .wordmark .light {
+			opacity: 1;
+			background-position: 0 0;
+			transition: background-position 900ms cubic-bezier(0.45, 0, 0.2, 1);
+		}
+	}
+	/* Hover replays the sweep, only where hover is real, so a tap never leaves it stuck. */
+	@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+		:global(a:hover) > .wordmark .light,
+		.wordmark:hover .light {
+			opacity: 1;
+			background-position: 0 0;
+			transition: background-position 900ms cubic-bezier(0.45, 0, 0.2, 1);
+		}
+	}
+	@keyframes wordmark-sweep {
+		0% {
+			background-position: 100% 0;
+			opacity: 0;
+		}
+		15%,
+		85% {
+			opacity: 1;
+		}
+		100% {
+			background-position: 0 0;
+			opacity: 0;
+		}
+	}
+	/* Without backgrounds (forced colors, print) the clipped fill would vanish; fall back to text. */
+	@media (forced-colors: active), print {
+		.base {
+			filter: none !important;
+		}
+		.fill {
+			color: CanvasText;
+			background: none;
+		}
+		.light {
+			display: none;
 		}
 	}
 </style>
