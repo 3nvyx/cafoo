@@ -37,9 +37,13 @@ export function recordFallback(id: ProviderId, reason: unknown, at = new Date())
   const e = entry(id);
   e.fallbackCount++;
   e.lastFallbackAt = at.toISOString();
-  // Messages from provider SDKs can echo request URLs; keep the first line and never a query string (Nessie's key rides in one).
+  e.lastFallbackReason = safeReason(reason);
+}
+
+/** A failure reason safe to show: the first line only and never a query string (Nessie's key rides in one), at most 200 characters. */
+export function safeReason(reason: unknown): string {
   const text = reason instanceof Error ? reason.message : String(reason);
-  e.lastFallbackReason = text.split('\n')[0]!.replace(/\?\S*/g, '?…').slice(0, 200);
+  return text.split('\n')[0]!.replace(/\?\S*/g, '?…').slice(0, 200);
 }
 
 /** Await a live call, recording its outcome; rethrows so the caller's own fallback still runs. */
