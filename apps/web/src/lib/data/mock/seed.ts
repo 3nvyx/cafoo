@@ -7,6 +7,11 @@ import journal from './seed/journal.json';
 import governance from './seed/governance.json';
 import group from './seed/group.json';
 import footprint from './seed/footprint.json';
+import financing from './seed/financing.json';
+import people from './seed/people.json';
+import costs from './seed/costs.json';
+import crm from './seed/crm.json';
+import integrations from './seed/integrations.json';
 import type {
 	Account,
 	AgentMessage,
@@ -30,7 +35,23 @@ import type {
 	PublicFootprint,
 	Settings,
 	Subsidiary,
-	Vendor
+	Vendor,
+	UploadedDocument,
+	FundingRound,
+	Investor,
+	Commitment,
+	Instrument,
+	CapTableEntry,
+	Employee,
+	PtoRequest,
+	PayRun,
+	Payslip,
+	CloudCost,
+	Batch,
+	Integration,
+	Deal,
+	Promotion,
+	SupportTicket
 } from '../types';
 
 export interface Tables {
@@ -57,6 +78,22 @@ export interface Tables {
 	fx_rate: FxRate[];
 	charter_version: CharterVersion[];
 	charter_eval: CharterEval[];
+	document: UploadedDocument[];
+	funding_round: FundingRound[];
+	investor: Investor[];
+	commitment: Commitment[];
+	instrument: Instrument[];
+	cap_table_entry: CapTableEntry[];
+	employee: Employee[];
+	pto_request: PtoRequest[];
+	pay_run: PayRun[];
+	payslip: Payslip[];
+	cloud_cost: CloudCost[];
+	batch: Batch[];
+	integration: Integration[];
+	deal: Deal[];
+	promotion: Promotion[];
+	support_ticket: SupportTicket[];
 }
 
 type SeedLine = [string, string, string, { customerId?: string; vendorId?: string; ccy?: string; fxRateE6?: string }?];
@@ -96,7 +133,7 @@ export function loadSeed(): Tables {
 
 	const journal_entry: JournalEntry[] = [];
 	const journal_line: JournalLine[] = [];
-	for (const raw of [...(journal.journalEntries as unknown as SeedEntry[]), ...(group.journalEntries as unknown as SeedEntry[])]) {
+	for (const raw of [...(journal.journalEntries as unknown as SeedEntry[]), ...(reference.journalEntries as unknown as SeedEntry[]), ...(group.journalEntries as unknown as SeedEntry[])]) {
 		const { lines, ...je } = raw;
 		journal_entry.push(je);
 		lines.forEach(([code, debitMinor, creditMinor, extra], i) => {
@@ -134,6 +171,23 @@ export function loadSeed(): Tables {
 		settings: { ...reference.settings, reportingCcy: group.reportingCcy, feedEnabled: false },
 		fx_rate: group.fxRates.map((r, i) => ({ id: `fx-${i + 1}`, ...r, kind: r.kind as FxRate['kind'] })),
 		charter_version: [],
-		charter_eval: []
+		charter_eval: [],
+		// Each area's seed file holds rows already in their table's shape.
+		document: [],
+		funding_round: financing.funding_round as FundingRound[],
+		investor: financing.investor as Investor[],
+		commitment: financing.commitment as Commitment[],
+		instrument: financing.instrument as Instrument[],
+		cap_table_entry: financing.cap_table_entry as CapTableEntry[],
+		employee: people.employee as Employee[],
+		pto_request: people.pto_request as PtoRequest[],
+		pay_run: people.pay_run as PayRun[],
+		payslip: people.payslip as Payslip[],
+		cloud_cost: costs.cloud_cost as CloudCost[],
+		batch: costs.batch as Batch[],
+		integration: integrations.integration as Integration[],
+		deal: crm.deal as Deal[],
+		promotion: crm.promotion as Promotion[],
+		support_ticket: crm.support_ticket as SupportTicket[]
 	});
 }

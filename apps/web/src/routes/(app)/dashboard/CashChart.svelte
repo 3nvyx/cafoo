@@ -1,65 +1,71 @@
 <script lang="ts">
-	// Book cash at each month end, as a line. The axis spans the months' own range rather than starting at zero, so a
-	// month's burn shows as a slope; the tick labels say where it starts. Hover a month to read it.
+	// Book cash at each month end, as a line (shadcn-svelte's chart on LayerChart). The axis spans the months' own range
+	// rather than starting at zero, so a month's burn shows as a slope; the tick labels say where it starts.
+	import { LineChart } from 'layerchart';
+	import * as Chart from '#lib/components/ui/chart/index.js';
 	import type { MonthPoint } from '#lib/data/dashboard.js';
 	import { ymShort } from '#lib/data/derive.js';
-	import { money, niceMax, tick } from './chart.js';
+	import { money, niceMax, padMonths, tick } from './chart.js';
 
 	let { points, selected }: { points: MonthPoint[]; selected: string[] } = $props();
 
-	let w = $state(0);
-	const H = 220, top = 12, bottom = 28, left = 52;
+	const config = { cash: { label: 'Book cash', color: 'var(--ink)' } } satisfies Chart.ChartConfig;
+
+	const monthStart = (ym: string) => new Date(`${ym}-01T00:00:00Z`);
+	const ymOf = (d: Date) => d.toISOString().slice(0, 7);
+	const data = $derived(points.map((p) => ({ month: monthStart(p.ym), cash: p.cash })));
 
 	const scale = $derived.by(() => {
 		const vals = points.map((p) => p.cash);
 		const lo = Math.min(...vals), hi = Math.max(...vals);
 		const step = niceMax((hi - lo) / 2 || Math.abs(hi) / 20 || 1);
 		const from = Math.floor(lo / step) * step;
-		const to = Math.max(from + step, Math.ceil(hi / step) * step);
-		const ticks: number[] = [];
-		for (let t = from; t <= to + step / 2; t += step) ticks.push(t);
-		return { from, to, ticks, step };
+		return { from, to: Math.max(from + step, Math.ceil(hi / step) * step), step };
 	});
-	const band = $derived(Math.max(0, w - left) / Math.max(1, points.length));
-	const x = (i: number) => left + i * band + band / 2;
-	const y = (v: number) => top + (H - top - bottom) * (1 - (v - scale.from) / (scale.to - scale.from));
-	const line = $derived(points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.cash)}`).join(''));
-	const on = (ym: string) => selected.includes(ym);
-	// Month labels need about 64px; with less room, label every nth month, always including the last.
-	const every = $derived(Math.max(1, Math.ceil(64 / Math.max(1, band))));
-	const labelled = (i: number) => (points.length - 1 - i) % every === 0;
 
-	let hover = $state<number | null>(null);
-	const at = $derived(hover ?? points.findLastIndex((p) => on(p.ym)));
-	const shown = $derived(points[at] ?? points.at(-1));
-	const firstOn = $derived(points.findIndex((p) => on(p.ym)));
-	const lastOn = $derived(points.findLastIndex((p) => on(p.ym)));
+	const band = $derived.by(() => {
+		const on = points.filter((p) => selected.includes(p.ym));
+		if (!on.length) return [];
+		const half = 15 * 86_400_000;
+		return [{ type: 'range' as const, layer: 'below' as const, x: [new Date(monthStart(on[0].ym).getTime() - half), new Date(monthStart(on.at(-1)!.ym).getTime() + half)], fill: 'var(--accent-soft)' }];
+	});
+	const last = $derived(points.findLast((p) => selected.includes(p.ym)) ?? points.at(-1));
 </script>
 
 <div class="flex flex-col gap-3">
-	{#if shown}
-		<p class="text-caption text-ink-2" aria-live="polite">
-			<span class="font-medium text-ink">End of {ymShort(shown.ym)}</span>
-			<span class="num">· {money(shown.cash)}</span>
+	{#if last}
+		<p class="text-caption text-ink-2">
+			<span class="font-medium text-ink">End of {ymShort(last.ym)}</span>
+			<span class="num">· {money(last.cash)}</span>
 		</p>
 	{/if}
-	<div bind:clientWidth={w} class="min-h-55 w-full">
-		{#if w > left}
-		<svg width={w} height={H} role="img" aria-label="Book cash at each month end: {points.map((p) => `${ymShort(p.ym)} ${money(p.cash)}`).join(', ')}" onpointerleave={() => (hover = null)}>
-			{#if firstOn >= 0}
-				<rect x={left + firstOn * band + 2} y={top - 8} width={(lastOn - firstOn + 1) * band - 4} height={H - bottom - top + 8} rx="8" fill="var(--accent-soft)" />
-			{/if}
-			{#each scale.ticks as t (t)}
-				<line x1={left} x2={w} y1={y(t)} y2={y(t)} stroke="var(--line)" />
-				<text x={left - 8} y={y(t) + 4} text-anchor="end" font-size="12" fill="var(--ink-3)" class="num">{tick(t, scale.step)}</text>
-			{/each}
-			<path d={line} fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-			{#each points as p, i (p.ym)}
-				<circle cx={x(i)} cy={y(p.cash)} r={i === at ? 5 : 4} fill={on(p.ym) ? 'var(--ink)' : 'var(--ink-3)'} stroke="var(--surface)" stroke-width="2" />
-				{#if labelled(i)}<text x={x(i)} y={H - 8} text-anchor="middle" font-size="12" fill={on(p.ym) ? 'var(--ink)' : 'var(--ink-3)'}>{ymShort(p.ym)}</text>{/if}
-				<rect x={left + i * band} y={top} width={band} height={H - top} fill="transparent" role="presentation" onpointerenter={() => (hover = i)} />
-			{/each}
-		</svg>
-		{/if}
-	</div>
+	<Chart.Container {config} class="h-56 w-full" role="img" aria-label="Book cash at each month end: {points.map((p) => `${ymShort(p.ym)} ${money(p.cash)}`).join(', ')}">
+		<LineChart
+			{data}
+			x="month"
+			xDomain={padMonths(points.map((p) => p.ym))}
+			yDomain={[scale.from, scale.to]}
+			axis
+			annotations={band}
+			series={[{ key: 'cash', label: 'Book cash', color: 'var(--color-cash)' }]}
+			props={{
+				spline: { strokeWidth: 2 },
+				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: data.length },
+				yAxis: { format: (v: number) => tick(v, scale.step), ticks: 3 },
+				highlight: { points: { r: 4 } }
+			}}
+			points={{ r: 3.5 }}
+		>
+			{#snippet tooltip()}
+				<Chart.Tooltip labelFormatter={(d: Date) => `End of ${ymShort(ymOf(d))}`} hideIndicator>
+					{#snippet formatter({ value, name })}
+						<span class="flex flex-1 items-center justify-between gap-4">
+							<span class="text-ink-2">{name}</span>
+							<span class="num font-medium text-ink">{money(Number(value))}</span>
+						</span>
+					{/snippet}
+				</Chart.Tooltip>
+			{/snippet}
+		</LineChart>
+	</Chart.Container>
 </div>

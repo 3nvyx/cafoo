@@ -69,10 +69,14 @@
 	--role-advisor: #075c9e;
 	/* The Bookkeeper agent. */
 	--role-bookkeeper: #57620f;
+	/* The Capital accountant agent, which records SAFEs, notes and shares. */
+	--role-capital: #7a4662;
 	/* The CFO, the human in the loop. */
 	--role-cfo: #151413;
 	/* The Credit agent. */
 	--role-credit: #9a4607;
+	/* The Funding desk agent, which matches investor money to the round. */
+	--role-funding: #207276;
 	/* The Red-team agent. */
 	--role-redteam: #be123c;
 	/* The Revenue agent. */
@@ -263,10 +267,14 @@
 	--role-advisor: #00b4ff;
 	/* The Bookkeeper agent. */
 	--role-bookkeeper: #b5c65a;
+	/* The Capital accountant agent, which records SAFEs, notes and shares. */
+	--role-capital: #b0aac0;
 	/* The CFO, the human in the loop. */
 	--role-cfo: #ede9e2;
 	/* The Credit agent. */
 	--role-credit: #e08a2c;
+	/* The Funding desk agent, which matches investor money to the round. */
+	--role-funding: #2a9d86;
 	/* The Red-team agent. */
 	--role-redteam: #ff758f;
 	/* The Revenue agent. */
@@ -354,10 +362,14 @@
 		--role-advisor: #00b4ff;
 		/* The Bookkeeper agent. */
 		--role-bookkeeper: #b5c65a;
+		/* The Capital accountant agent, which records SAFEs, notes and shares. */
+		--role-capital: #b0aac0;
 		/* The CFO, the human in the loop. */
 		--role-cfo: #ede9e2;
 		/* The Credit agent. */
 		--role-credit: #e08a2c;
+		/* The Funding desk agent, which matches investor money to the round. */
+		--role-funding: #2a9d86;
 		/* The Red-team agent. */
 		--role-redteam: #ff758f;
 		/* The Revenue agent. */
@@ -420,6 +432,8 @@
 	--color-role-bookkeeper: var(--role-bookkeeper);
 	--color-role-revenue: var(--role-revenue);
 	--color-role-credit: var(--role-credit);
+	--color-role-funding: var(--role-funding);
+	--color-role-capital: var(--role-capital);
 	--color-role-redteam: var(--role-redteam);
 	--color-role-cfo: var(--role-cfo);
 	--color-role-system: var(--role-system);

@@ -7,16 +7,17 @@
 	import type { Minor, Proposal } from '#lib/data/types.js';
 	import { lockGate } from '#lib/close.js';
 	import ConfirmAll from '#lib/components/ConfirmAll.svelte';
-	import DebateMessage from '#lib/components/DebateMessage.svelte';
 	import ProposalList from '#lib/components/ProposalList.svelte';
 	import { drill } from '#lib/labels.js';
-	import { arrive } from '#lib/motion.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import CashChart from './CashChart.svelte';
 	import CloseCard from './CloseCard.svelte';
 	import KpiCard, { type Delta } from './KpiCard.svelte';
 	import MonthlyChart from './MonthlyChart.svelte';
 	import StatusStrip from './StatusStrip.svelte';
+	import Workflows from './Workflows.svelte';
+	import MetricTile from '../metrics/MetricTile.svelte';
+	import { aiTiles, efficiencyTiles, quarterStart, usdRate } from '#lib/kpis.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
@@ -47,6 +48,8 @@
 	const ps = $derived(root ? postings(db.accounts().filter((a) => a.subsidiaryId === root.id), db.journalEntries(), db.journalLines()) : []);
 	const contracts = $derived(db.contracts());
 	const s = $derived(range ? summarize(ps, contracts, range) : null);
+	// The strip at the top always shows the selected month, whatever range the figures below show.
+	const monthSummary = $derived(period ? summarize(ps, contracts, monthRange(period.id)) : null);
 	const prevRange = $derived(range ? previousRange(range) : null);
 	const prev = $derived(prevRange && bounds && prevRange.from >= bounds.from ? summarize(ps, contracts, prevRange) : null);
 	const against = $derived(!prevRange ? '' : mode === 'month' ? `vs ${ymShort(prevRange.from.slice(0, 7))}` : `vs the ${rangeDays(prevRange)} days before`);
@@ -100,8 +103,29 @@
 	});
 	const queue = $derived<Proposal[]>(db.proposals().filter((p) => p.status === 'awaiting_cfo' || lingering.includes(p.id)));
 
-	// Every message, including close-thread narration that has no Proposal.
-	const feed = $derived(db.agentMessages().slice(-6).reverse());
+	// The headline readings from the Metrics page, for the month the strip shows.
+	const firstMonth = $derived(db.periods()[0]?.id);
+	const health = $derived.by(() => {
+		if (!period || !monthSummary || !firstMonth) return [];
+		const r = monthRange(period.id);
+		const all = [
+			...efficiencyTiles({ month: monthSummary, from: r.from, to: r.to, quarterFrom: quarterStart(r.from, monthRange(firstMonth).from), contracts, employees: db.employees() }),
+			...aiTiles({
+				ym: period.id,
+				revenueMinor: monthSummary.revenue,
+				now: db.now(),
+				cloudCosts: db.cloudCosts(),
+				employees: db.employees(),
+				batches: db.batches(),
+				deals: db.deals(),
+				tickets: db.supportTickets(),
+				invoices: db.invoices(),
+				contracts,
+				rate: usdRate(db.fxRates())
+			}).unit
+		];
+		return ['runway', 'burn-multiple', 'gm-after-inference', 'ndr'].flatMap((k) => all.filter((t) => t.key === k));
+	});
 </script>
 
 <svelte:head><title>Dashboard · Cafoo</title></svelte:head>
@@ -112,7 +136,7 @@
 		<h1 class="text-display">Dashboard</h1>
 	</header>
 
-	<StatusStrip {period} />
+	{#if monthSummary}<StatusStrip {period} month={monthSummary} />{/if}
 
 	<!-- What needs the CFO comes first; how the business is doing comes after. -->
 	<div class="mt-8 grid gap-8 lg:grid-cols-3">
@@ -133,22 +157,22 @@
 		<!-- With nothing waiting, the close's next step (start it, lock it) leads on narrow screens. -->
 		<div class="flex min-w-0 flex-col gap-8 {queue.length ? '' : 'order-first lg:order-none'}">
 			<CloseCard {period} />
-
-			<section aria-labelledby="feed-h">
-				<div class="mb-4 flex items-baseline justify-between">
-					<h2 id="feed-h" class="text-subtitle">Live from the agents</h2>
-					<a href="/agents" class="drill text-body-sm text-ink-2">Full Debate</a>
-				</div>
-				<ul class="flex flex-col gap-4" aria-live="polite">
-					{#each feed as m (m.id)}
-						<li in:arrive><DebateMessage {m} /></li>
-					{:else}
-						<li class="text-ink-3">Quiet for now. Messages appear here the moment an agent posts.</li>
-					{/each}
-				</ul>
-			</section>
 		</div>
 	</div>
+
+	{#if health.length}
+		<section aria-labelledby="health-h" class="mt-12">
+			<div class="flex flex-wrap items-baseline justify-between gap-3 pb-4">
+				<h2 id="health-h" class="text-title">Health check</h2>
+				<a href="/metrics" class="drill text-body-sm text-ink-2">All metrics</a>
+			</div>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				{#each health as t (t.key)}
+					<MetricTile label={t.label} value={t.value} health={t.health} inputs={t.inputs} yardstick={t.yardstick} href="/metrics" />
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<section aria-labelledby="figures-h" class="mt-12">
 		<div class="flex flex-col gap-4 pb-4 lg:flex-row lg:items-end lg:justify-between">
@@ -196,4 +220,6 @@
 			</div>
 		{/if}
 	</section>
+
+	<Workflows {period} />
 {/if}

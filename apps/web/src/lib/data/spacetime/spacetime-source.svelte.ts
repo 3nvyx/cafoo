@@ -240,6 +240,38 @@ export class SpacetimeDataSource implements DataSource {
 	}
 
 	// Actions
+	// Financing, People, Cost of service, batches and the CRM run in Demo mode only until the ledger module has their
+	// tables; live mode shows them empty and refuses their actions.
+	documents = (): U.UploadedDocument[] => [];
+	fundingRounds = (): U.FundingRound[] => [];
+	investors = (): U.Investor[] => [];
+	commitments = (): U.Commitment[] => [];
+	instruments = (): U.Instrument[] => [];
+	capTable = (): U.CapTableEntry[] => [];
+	employees = (): U.Employee[] => [];
+	ptoRequests = (): U.PtoRequest[] => [];
+	payRuns = (): U.PayRun[] => [];
+	payslips = (): U.Payslip[] => [];
+	cloudCosts = (): U.CloudCost[] => [];
+	batches = (): U.Batch[] => [];
+	integrations = (): U.Integration[] => [];
+	deals = (): U.Deal[] => [];
+	promotions = (): U.Promotion[] => [];
+	supportTickets = (): U.SupportTicket[] => [];
+
+	async uploadDemoDocument(): Promise<U.UploadedDocument> {
+		throw new Error('Uploads work in Demo mode only for now.');
+	}
+	async connectIntegration(): Promise<void> {
+		throw new Error('Connecting tools works in Demo mode only for now.');
+	}
+	async disconnectIntegration(): Promise<void> {
+		throw new Error('Connecting tools works in Demo mode only for now.');
+	}
+	async decidePtoRequest(): Promise<void> {
+		throw new Error('Time off works in Demo mode only for now.');
+	}
+
 	async claimCfo(secret: string, displayName: string): Promise<void> {
 		if (!this.#db || this.#conn.ledger !== 'live') throw new Error('Not connected to the ledger database yet.');
 		// The seat belongs to this connection's identity, which lives in the saved token. If the token cannot be kept,

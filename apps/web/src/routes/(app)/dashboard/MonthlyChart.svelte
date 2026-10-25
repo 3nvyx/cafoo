@@ -1,84 +1,82 @@
 <script lang="ts">
-	// Revenue and expenses side by side for every month on the books. The months the range covers sit on the selection
-	// band at full strength; the rest stay as context. Hover or tap a month to read it; the table holds every figure.
+	// Revenue and expenses as two lines across every month on the books (shadcn-svelte's chart on LayerChart). The
+	// months the range covers sit on the selection band; hover or tap a month to read it; the table holds every figure.
+	import { LineChart } from 'layerchart';
+	import { db } from '#lib/data/index.js';
+	import * as Chart from '#lib/components/ui/chart/index.js';
 	import type { MonthPoint } from '#lib/data/dashboard.js';
 	import { ymShort } from '#lib/data/derive.js';
-	import { column, money, niceMax, tick } from './chart.js';
+	import { money, padMonths, tick } from './chart.js';
 
 	let { points, selected }: { points: MonthPoint[]; selected: string[] } = $props();
 
-	let w = $state(0);
-	const H = 220, top = 12, bottom = 28, left = 52;
-	const SERIES = [
-		{ key: 'revenue', label: 'Revenue', color: 'var(--ink)' },
-		{ key: 'expenses', label: 'Expenses', color: 'var(--ink-3)' }
-	] as const;
+	// Revenue solid in ink, expenses dashed in the quieter ink: told apart by weight and dash, not by colour, and never
+	// in the accent (reserved for actions) or a status colour (they are not good or bad news on their own).
+	const config = {
+		revenue: { label: 'Revenue', color: 'var(--ink)' },
+		expenses: { label: 'Expenses', color: 'var(--ink-3)' }
+	} satisfies Chart.ChartConfig;
 
-	const max = $derived(niceMax(Math.max(...points.flatMap((p) => [p.revenue, p.expenses]))));
-	const band = $derived(Math.max(0, w - left) / Math.max(1, points.length));
-	const bar = $derived(Math.min(24, band * 0.28));
-	const y = (v: number) => top + (H - top - bottom) * (1 - v / max);
-	const base = $derived(y(0));
+	const monthStart = (ym: string) => new Date(`${ym}-01T00:00:00Z`);
+	const ymOf = (d: Date) => d.toISOString().slice(0, 7);
+	// A month still under way would drag both lines towards zero, so it shows only when it is part of the range.
+	const current = $derived(db.now().slice(0, 7));
+	const shown = $derived(points.filter((p) => p.ym < current || selected.includes(p.ym)));
+	const data = $derived(shown.map((p) => ({ month: monthStart(p.ym), revenue: p.revenue, expenses: p.expenses })));
+	// Half a month of room either side, so the first and last months sit inside the plot like the rest.
+	const xDomain = $derived(padMonths(shown.map((p) => p.ym)));
+
+	// The selection band runs half a month either side of the first and last selected month.
+	const band = $derived.by(() => {
+		const on = points.filter((p) => selected.includes(p.ym));
+		if (!on.length) return [];
+		const half = 15 * 86_400_000;
+		return [{ type: 'range' as const, layer: 'below' as const, x: [new Date(monthStart(on[0].ym).getTime() - half), new Date(monthStart(on.at(-1)!.ym).getTime() + half)], fill: 'var(--accent-soft)' }];
+	});
+
 	const on = (ym: string) => selected.includes(ym);
-	// Month labels need about 64px; with less room, label every nth month, always including the last.
-	const every = $derived(Math.max(1, Math.ceil(64 / Math.max(1, band))));
-	const labelled = (i: number) => (points.length - 1 - i) % every === 0;
-
-	let hover = $state<number | null>(null);
-	const shown = $derived(points[hover ?? points.findLastIndex((p) => on(p.ym))] ?? points.at(-1));
-	// The selection band spans the first to the last selected month.
-	const firstOn = $derived(points.findIndex((p) => on(p.ym)));
-	const lastOn = $derived(points.findLastIndex((p) => on(p.ym)));
 </script>
 
 <div class="flex flex-col gap-3">
-	<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-		<ul class="flex gap-4 text-caption text-ink-2" aria-label="Legend">
-			{#each SERIES as s (s.key)}
-				<li class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm" style="background:{s.color}"></span>{s.label}</li>
-			{/each}
-		</ul>
-		{#if shown}
-			<p class="text-caption text-ink-2" aria-live="polite">
-				<span class="font-medium text-ink">{ymShort(shown.ym)}</span>
-				<span class="num">· {money(shown.revenue)} in · {money(shown.expenses)} out · net {money(shown.netIncome)}</span>
-			</p>
-		{/if}
-	</div>
+	<ul class="flex gap-4 text-caption text-ink-2" aria-label="Legend">
+		{#each Object.entries(config) as [key, s] (key)}
+			<li class="flex items-center gap-1.5">
+				<svg class="h-2 w-5" viewBox="0 0 20 8" aria-hidden="true"><line x1="0" x2="20" y1="4" y2="4" stroke={s.color} stroke-width="2" stroke-dasharray={key === 'expenses' ? '5 4' : undefined} /></svg>{s.label}
+			</li>
+		{/each}
+	</ul>
 
-	<div bind:clientWidth={w} class="min-h-55 w-full">
-		{#if w > left}
-		<svg width={w} height={H} role="img" aria-label="Revenue and expenses by month. The table below lists every figure." onpointerleave={() => (hover = null)}>
-			{#if firstOn >= 0}
-				<rect x={left + firstOn * band + 2} y={top - 8} width={(lastOn - firstOn + 1) * band - 4} height={base - top + 8} rx="8" fill="var(--accent-soft)" />
-			{/if}
-			{#each [0, max / 2, max] as t (t)}
-				<line x1={left} x2={w} y1={y(t)} y2={y(t)} stroke="var(--line)" />
-				<text x={left - 8} y={y(t) + 4} text-anchor="end" font-size="12" fill="var(--ink-3)" class="num">{tick(t)}</text>
-			{/each}
-			{#each points as p, i (p.ym)}
-				{@const cx = left + i * band + band / 2}
-				<g opacity={on(p.ym) ? 1 : 0.4}>
-					<path d={column(cx - bar - 1, base, bar, base - y(Math.max(0, p.revenue)))} fill={SERIES[0].color} />
-					<path d={column(cx + 1, base, bar, base - y(Math.max(0, p.expenses)))} fill={SERIES[1].color} />
-				</g>
-				{#if labelled(i)}<text x={cx} y={H - 8} text-anchor="middle" font-size="12" fill={on(p.ym) ? 'var(--ink)' : 'var(--ink-3)'}>{ymShort(p.ym)}</text>{/if}
-				<rect
-					x={left + i * band}
-					y={top}
-					width={band}
-					height={H - top}
-					fill="transparent"
-					role="presentation"
-					onpointerenter={() => (hover = i)}
-				/>
-			{/each}
-			{#if hover !== null}
-				<line x1={left + hover * band + band / 2} x2={left + hover * band + band / 2} y1={top} y2={base} stroke="var(--line-strong)" pointer-events="none" />
-			{/if}
-		</svg>
-		{/if}
-	</div>
+	<Chart.Container {config} class="h-56 w-full" role="img" aria-label="Revenue and expenses by month. The table below lists every figure.">
+		<LineChart
+			{data}
+			x="month"
+			{xDomain}
+			axis
+			annotations={band}
+			series={[
+				{ key: 'revenue', label: 'Revenue', color: 'var(--color-revenue)' },
+				{ key: 'expenses', label: 'Expenses', color: 'var(--color-expenses)', props: { class: '[stroke-dasharray:5_4]' } }
+			]}
+			props={{
+				spline: { strokeWidth: 2 },
+				xAxis: { format: (d: Date) => ymShort(ymOf(d)), ticks: data.length },
+				yAxis: { format: (v: number) => tick(v), ticks: 3 },
+				highlight: { points: { r: 4 } }
+			}}
+		>
+			{#snippet tooltip()}
+				<Chart.Tooltip labelFormatter={(d: Date) => ymShort(ymOf(d))} indicator="line">
+					{#snippet formatter({ value, name, item })}
+						<span class="h-0.5 w-3 shrink-0 self-center rounded-sm" style="background:{item.color}"></span>
+						<span class="flex flex-1 items-center justify-between gap-4">
+							<span class="text-ink-2">{name}</span>
+							<span class="num font-medium text-ink">{money(Number(value))}</span>
+						</span>
+					{/snippet}
+				</Chart.Tooltip>
+			{/snippet}
+		</LineChart>
+	</Chart.Container>
 
 	<details class="text-body-sm">
 		<summary class="cursor-pointer text-ink-2">Show as a table</summary>

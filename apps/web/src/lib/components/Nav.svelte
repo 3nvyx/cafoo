@@ -29,7 +29,17 @@
 			title: 'Books',
 			items: [
 				{ href: '/ledger', label: 'Ledger', icon: 'book' },
-				{ href: '/reports', label: 'Board Pack', icon: 'chart' }
+				{ href: '/reports', label: 'Board Pack', icon: 'chart' },
+				{ href: '/metrics', label: 'Metrics', icon: 'gauge' },
+				{ href: '/financing', label: 'Financing', icon: 'coins' }
+			]
+		},
+		{
+			title: 'Operations',
+			items: [
+				{ href: '/people', label: 'People', icon: 'person' },
+				{ href: '/costs', label: 'Cost of service', icon: 'cloud' },
+				{ href: '/batches', label: 'Batches', icon: 'box' }
 			]
 		},
 		{

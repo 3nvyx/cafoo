@@ -65,6 +65,22 @@ describe('summarize', () => {
 		expect(aug.runwayMonths).toBeCloseTo(19.35, 1);
 		expect(aug.byExpense.map((e) => [e.account.code, e.minor])).toEqual([['6000', '11000'], ['5000', '5000']]);
 	});
+	it('splits the month’s cash into opening, money in and money out', () => {
+		expect([aug.openingCash, aug.cashIn, aug.cashOut]).toEqual(['100000', '0', '5000']);
+		const sep = summarize(ps, [], monthRange('2026-09'));
+		expect([sep.openingCash, sep.cashIn, sep.cashOut, sep.cash]).toEqual(['95000', '20000', '0', '115000']);
+	});
+	it('keeps money raised out of income and out of burn', () => {
+		const raise = postings(
+			[...accounts, acc('2600', 'liability')],
+			[...entries, { id: 'je-safe', periodId: '2026-09', postedAt: '2026-09-20T09:00:00Z', memo: 'SAFE', source: 'agent', postedByRole: 'advisor' }],
+			[...lines, { id: 'je-safe-0', jeId: 'je-safe', accountId: 'acc-1000', debitMinor: '500000', creditMinor: '0' }, { id: 'je-safe-1', jeId: 'je-safe', accountId: 'acc-2600', debitMinor: '0', creditMinor: '500000' }]
+		);
+		const sep = summarize(raise, [], monthRange('2026-09'));
+		expect([sep.cashIn, sep.cashOut, sep.financingCash]).toEqual(['20000', '0', '500000']);
+		expect(sep.operatingCashChange).toBe('20000');
+		expect(BigInt(sep.openingCash) + BigInt(sep.cashIn) - BigInt(sep.cashOut) + BigInt(sep.financingCash)).toBe(BigInt(sep.cash));
+	});
 	it('counts a part of a month by day', () => {
 		const s = summarize(ps, [], { from: '2026-08-15', to: '2026-09-30' });
 		expect(s.revenue).toBe('0');

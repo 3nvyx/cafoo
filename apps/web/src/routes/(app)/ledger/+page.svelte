@@ -17,6 +17,7 @@
 	import { arrive, reveal } from '#lib/motion.js';
 	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
+	import UploadDemo from '#lib/components/UploadDemo.svelte';
 
 	const params = $derived(page.url.searchParams);
 	const parsed = $derived(parseDrill(params.get('drill') ?? ''));
@@ -334,6 +335,8 @@
 		{/each}
 	</ul>
 </div>
+
+<div class="mt-8"><UploadDemo kinds={['bank_statement']} title="Upload a bank statement" /></div>
 
 {#if reversing}
 	<ConfirmDialog

@@ -500,6 +500,56 @@
 					"hex": "#be123c"
 				}
 			}
+		},
+		"teal": {
+			"$description": "A quiet sea green, only for the Funding desk agent: money arriving.",
+			"700": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.1255,
+						0.4471,
+						0.4627
+					],
+					"hex": "#207276"
+				}
+			},
+			"300": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.1647,
+						0.6157,
+						0.5255
+					],
+					"hex": "#2a9d86"
+				}
+			}
+		},
+		"plum": {
+			"$description": "A muted plum, only for the Capital accountant agent. Never an accent or a status.",
+			"700": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.4784,
+						0.2745,
+						0.3843
+					],
+					"hex": "#7a4662"
+				}
+			},
+			"300": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.6902,
+						0.6667,
+						0.7529
+					],
+					"hex": "#b0aac0"
+				}
+			}
 		}
 	},
 	"size": {

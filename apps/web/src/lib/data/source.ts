@@ -33,7 +33,24 @@ import type {
 	Subsidiary,
 	TableName,
 	Vendor,
-	FeedStatus
+	FeedStatus,
+	UploadedDocument,
+	DocumentKind,
+	FundingRound,
+	Investor,
+	Commitment,
+	Instrument,
+	CapTableEntry,
+	Employee,
+	PtoRequest,
+	PayRun,
+	Payslip,
+	CloudCost,
+	Batch,
+	Integration,
+	Deal,
+	Promotion,
+	SupportTicket
 } from './types';
 
 export type ChangeKind = 'insert' | 'update' | 'delete';
@@ -128,6 +145,26 @@ export interface DataSource {
 	dataSets(): DataSet[];
 	/** One table's rows exactly as stored (live: SpacetimeDB values such as bigint, Timestamp, tagged enums). */
 	dataSetRows(id: string): Record<string, unknown>[];
+	/** Every uploaded file, newest last. */
+	documents(): UploadedDocument[];
+	fundingRounds(): FundingRound[];
+	investors(): Investor[];
+	commitments(): Commitment[];
+	instruments(): Instrument[];
+	capTable(): CapTableEntry[];
+	employees(): Employee[];
+	ptoRequests(): PtoRequest[];
+	/** Past and scheduled pay runs, by pay date. */
+	payRuns(): PayRun[];
+	payslips(): Payslip[];
+	/** Cloud and model-usage bill lines, by month. */
+	cloudCosts(): CloudCost[];
+	batches(): Batch[];
+	/** The tools Cafoo reads from, connected or available. */
+	integrations(): Integration[];
+	deals(): Deal[];
+	promotions(): Promotion[];
+	supportTickets(): SupportTicket[];
 	/** What an agent is doing right now, or null when idle. */
 	liveActivity(): LiveActivity | null;
 	/** The source's clock (Demo mode runs on a fixed demo date). ISO string. */
@@ -191,6 +228,21 @@ export interface DataSource {
 	collectFootprint(subjectKind: FootprintSubject, subjectId: string): Promise<void>;
 	/** CFO sets where the business is listed publicly. Replaces all three; blank clears one. */
 	setListings(subjectKind: FootprintSubject, subjectId: string, listings: Listings): Promise<void>;
+	/**
+	 * Upload a sample file of this kind. Demo mode: loads the bundled sample, replays its recorded reading (status
+	 * 'parsing', then 'parsed' or 'needs_review'), and the agent that owns the kind proposes what follows from it, through
+	 * the usual Red Team, Advisor and CFO gate. Resolves with the new document row once it is inserted. Live mode refuses
+	 * until uploads reach the ledger database.
+	 */
+	uploadDemoDocument(kind: DocumentKind): Promise<UploadedDocument>;
+	/**
+	 * Connect a tool. Demo mode: it syncs its recorded records, then keeps streaming new ones in real time (tickets, deal
+	 * moves, spend) while connected. Live mode refuses until the connector exists.
+	 */
+	connectIntegration(id: string): Promise<void>;
+	disconnectIntegration(id: string): Promise<void>;
+	/** The CFO approves or declines a time-off request. */
+	decidePtoRequest(requestId: string, decision: 'approved' | 'declined'): Promise<void>;
 	/** Demo mode only: restore every table to the seed. */
 	resetDemo?(): void;
 }

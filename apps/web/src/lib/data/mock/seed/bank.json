@@ -25,7 +25,7 @@
 		{ "id": "bt23", "bookedAt": "2026-09-26T00:00:00Z", "amountMinor": "320000", "description": "DEPOSIT BLUEFIN LOGISTICS", "counterparty": "Bluefin Logistics", "matched": true },
 		{ "id": "bt24", "bookedAt": "2026-09-28T00:00:00Z", "amountMinor": "70000", "description": "DEPOSIT MARIGOLD FLORISTS", "counterparty": "Marigold Florists", "matched": true },
 		{ "id": "bt25", "bookedAt": "2026-09-29T00:00:00Z", "amountMinor": "60000", "description": "DEPOSIT VELVET HOUR", "counterparty": "Velvet Hour Salon", "matched": true },
-		{ "id": "bt26", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "-8450000", "description": "TIDEWATER PAYROLL SEP", "counterparty": "Tidewater Payroll Services", "matched": true },
+		{ "id": "bt26", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "-8450000", "description": "GUSTO PAYROLL SEP", "counterparty": "Gusto", "matched": true },
 		{ "id": "bt27", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "-80000", "description": "MEADOWLARK INS INSTALLMENT", "counterparty": "Meadowlark Insurance Group", "matched": true },
 		{ "id": "bt28", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "180000", "description": "DEPOSIT WILLOW ST VET", "counterparty": "Willow Street Vet", "matched": true },
 		{ "id": "bt29", "bookedAt": "2026-09-30T00:00:00Z", "amountMinor": "1250", "description": "INTEREST PAID", "counterparty": "Bank", "matched": false },

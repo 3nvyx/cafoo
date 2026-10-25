@@ -16,6 +16,8 @@ export interface Posting {
 	date: string;
 	account: Account;
 	amount: bigint;
+	/** The journal entry the line belongs to; tells operating cash from money raised. */
+	jeId?: string;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -56,7 +58,7 @@ export function postings(accounts: Account[], entries: JournalEntry[], lines: Jo
 		const date = dates.get(l.jeId);
 		if (!account || !date) continue;
 		const net = functionalNet(l);
-		out.push({ date, account, amount: isDebitNormal(account.type) ? net : -net });
+		out.push({ date, account, amount: isDebitNormal(account.type) ? net : -net, jeId: l.jeId });
 	}
 	return out;
 }
@@ -93,6 +95,17 @@ const DEFERRED = ['2400'];
 
 const inRange = (d: string, r: DateRange) => d >= r.from && d <= r.to;
 
+/**
+ * Entries that raise or return money rather than run the business: any entry touching SAFEs, notes and their interest
+ * (26xx), equity (3xxx) or subscriptions receivable (1060). Their cash is not income, and it does not offset burn.
+ */
+const isFinancingAccount = (a: Account) => a.type === 'equity' || a.code.startsWith('26') || a.code === '1060';
+export function financingEntries(ps: Posting[]): Set<string> {
+	const out = new Set<string>();
+	for (const p of ps) if (p.jeId && isFinancingAccount(p.account)) out.add(p.jeId);
+	return out;
+}
+
 function sum(ps: Posting[], keep: (p: Posting) => boolean): bigint {
 	let t = 0n;
 	for (const p of ps) if (keep(p)) t += p.amount;
@@ -125,6 +138,18 @@ export interface Summary {
 	cash: Minor;
 	/** Cash at the end of the range minus cash the day before it began. */
 	cashChange: Minor;
+	/** Cash the day before the range began. */
+	openingCash: Minor;
+	/**
+	 * Operating money into cash over the range, and out of it (a positive amount). Money raised or returned (SAFEs,
+	 * notes, shares) is not income and sits in `financingCash`: opening + in - out + financing = cash.
+	 */
+	cashIn: Minor;
+	cashOut: Minor;
+	/** Net cash from raising money (or repaying it) over the range. */
+	financingCash: Minor;
+	/** Cash change without money raised: what running the business did to cash. Burn and runway read this. */
+	operatingCashChange: Minor;
 	/** Receivables before the Allowance. */
 	receivables: Minor;
 	/** The Allowance for credit losses, as a positive amount. */
@@ -134,7 +159,7 @@ export interface Summary {
 	arr: Minor;
 	/** Days sales outstanding: receivables over the range's revenue, times its days. Null without revenue. */
 	dsoDays: number | null;
-	/** Months of cash at the range's rate of net cash outflow; null when cash did not fall. */
+	/** Months of cash at the range's rate of operating cash outflow; null when operations did not use cash. */
 	runwayMonths: number | null;
 	/** Expense accounts by amount, largest first. */
 	byExpense: ExpenseLine[];
@@ -151,7 +176,15 @@ export function summarize(ps: Posting[], contracts: Contract[], range: DateRange
 	const intercompany = sum(flow, (p) => !!p.account.isIntercompany && p.account.type === 'revenue') - sum(flow, (p) => !!p.account.isIntercompany && p.account.type === 'expense');
 	const netIncome = revenue - expenses;
 	const cash = balanceAt(ps, CASH, range.to);
-	const cashChange = cash - balanceAt(ps, CASH, addDays(range.from, -1));
+	const openingCash = balanceAt(ps, CASH, addDays(range.from, -1));
+	const cashChange = cash - openingCash;
+	const financing = financingEntries(ps);
+	const isCash = (p: Posting) => CASH.includes(p.account.code);
+	const raised = (p: Posting) => !!p.jeId && financing.has(p.jeId);
+	const cashIn = sum(flow, (p) => isCash(p) && !raised(p) && p.amount > 0n);
+	const cashOut = -sum(flow, (p) => isCash(p) && !raised(p) && p.amount < 0n);
+	const financingCash = sum(flow, (p) => isCash(p) && raised(p));
+	const operatingCashChange = cashChange - financingCash;
 	const receivables = balanceAt(ps, RECEIVABLES, range.to);
 	const days = rangeDays(range);
 
@@ -162,7 +195,7 @@ export function summarize(ps: Posting[], contracts: Contract[], range: DateRange
 		row.amount += p.amount;
 		perAccount.set(p.account.id, row);
 	}
-	const burnPerMonth = cashChange < 0n ? (Number(-cashChange) / days) * AVG_MONTH_DAYS : 0;
+	const burnPerMonth = operatingCashChange < 0n ? (Number(-operatingCashChange) / days) * AVG_MONTH_DAYS : 0;
 
 	return {
 		range,
@@ -175,6 +208,11 @@ export function summarize(ps: Posting[], contracts: Contract[], range: DateRange
 		netMarginBp: bp(netIncome, revenue),
 		cash: cash.toString(),
 		cashChange: cashChange.toString(),
+		openingCash: openingCash.toString(),
+		cashIn: cashIn.toString(),
+		cashOut: cashOut.toString(),
+		financingCash: financingCash.toString(),
+		operatingCashChange: operatingCashChange.toString(),
 		receivables: receivables.toString(),
 		allowance: (-balanceAt(ps, ALLOWANCE, range.to)).toString(),
 		payables: balanceAt(ps, PAYABLES, range.to).toString(),

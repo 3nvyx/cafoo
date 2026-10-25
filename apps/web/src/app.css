@@ -56,6 +56,10 @@
 	--role-redteam: #be123c;
 	--role-cfo: #151413;
 	--role-system: #625d56;
+	/* Funding desk and Capital accountant, mixed from the theme's own colours so they follow light and dark.
+	   The token files hold the same results as palette.teal and palette.plum. */
+	--role-funding: color-mix(in srgb, var(--pos) 50%, var(--accent-deep));
+	--role-capital: color-mix(in srgb, var(--neg) 55%, var(--accent-deep));
 	color-scheme: light;
 }
 
@@ -94,6 +98,7 @@
 		--role-redteam: #ff758f;
 		--role-cfo: #ede9e2;
 		--role-system: #9a9389;
+		--role-capital: color-mix(in srgb, var(--neg) 70%, var(--accent));
 		color-scheme: dark;
 	}
 }
@@ -132,6 +137,7 @@
 	--role-redteam: #ff758f;
 	--role-cfo: #ede9e2;
 	--role-system: #9a9389;
+	--role-capital: color-mix(in srgb, var(--neg) 70%, var(--accent));
 	color-scheme: dark;
 }
 
