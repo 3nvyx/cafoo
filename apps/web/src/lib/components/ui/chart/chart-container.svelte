@@ -1,5 +1,5 @@
 <script lang="ts">
-	// From shadcn-svelte (MIT), adapted to Cafoo: #lib imports and design-token classes.
+	// From shadcn-svelte (MIT), adapted to Luyten: #lib imports and design-token classes.
 	import { cn, type WithElementRef } from '#lib/utils.js';
 	import ChartStyle from "./chart-style.svelte";
 	import { setChartContext, type ChartConfig } from "./chart-utils.js";

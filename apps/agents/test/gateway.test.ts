@@ -23,14 +23,14 @@ async function gateway(opts: Partial<GatewayOptions> = {}) {
   return { base, runClose, answer };
 }
 const chat = (base: string, content: unknown, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) =>
-  fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ model: 'cafoo-advisor', messages: [{ role: 'user', content }], ...extra }) });
+  fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ model: 'luyten', messages: [{ role: 'user', content }], ...extra }) });
 const reply = async (r: Response) => ((await r.json()) as { choices: { message: { content: string } }[] }).choices[0]!.message.content;
 
 describe('Open WebUI task prompts', () => {
   it('answer with canned JSON and never reach the Advisor or start a close', async () => {
     const { base, runClose, answer } = await gateway();
     const history = '\n### Chat History:\n<chat_history>\nASSISTANT: say "start the close" to run month-end.\nUSER: start the close\n</chat_history>';
-    expect(JSON.parse(await reply(await chat(base, `### Task:\nGenerate a concise title summarizing the chat history.${history}`)))).toEqual({ title: 'Cafoo Advisor' });
+    expect(JSON.parse(await reply(await chat(base, `### Task:\nGenerate a concise title summarizing the chat history.${history}`)))).toEqual({ title: 'Luyten' });
     expect(JSON.parse(await reply(await chat(base, `### Task:\nGenerate 1-3 broad tags categorizing the main themes of the chat history.${history}`)))).toEqual({ tags: ['Finance'] });
     expect(JSON.parse(await reply(await chat(base, `### Task:\nPredict 3-5 useful messages this user might naturally send next.${history}`)))).toEqual({ follow_ups: [] });
     expect(answer).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ function raw(base: string, path: string, headers: Record<string, string>, body?:
 }
 
 describe('cross-site and rebinding guards on every route', () => {
-  const startBody = JSON.stringify({ model: 'cafoo-advisor', messages: [{ role: 'user', content: 'start the close' }] });
+  const startBody = JSON.stringify({ model: 'luyten', messages: [{ role: 'user', content: 'start the close' }] });
   it('refuses a text/plain chat request from a foreign page, the simple request that skips the preflight', async () => {
     const { base, runClose, answer } = await gateway();
     expect((await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { origin: 'http://evil.example', 'content-type': 'text/plain' }, body: startBody })).status).toBe(403);
@@ -114,8 +114,8 @@ describe('cross-site and rebinding guards on every route', () => {
     for (const host of [`localhost:${port}`, `127.0.0.1:${port}`, `host.docker.internal:${port}`, `[::1]:${port}`]) expect(await raw(base, '/status', { host }), host).toBe(200);
   });
   it('takes extra hosts from GATEWAY_ALLOWED_HOSTS and the allowed origins, and "*" turns the check off', async () => {
-    const one = await gateway({ env: { GATEWAY_ALLOWED_HOSTS: 'cafoo.lan', GATEWAY_ALLOWED_ORIGINS: 'http://cfo.local:8080' } });
-    expect(await raw(one.base, '/status', { host: 'cafoo.lan:8787' })).toBe(200);
+    const one = await gateway({ env: { GATEWAY_ALLOWED_HOSTS: 'luyten.lan', GATEWAY_ALLOWED_ORIGINS: 'http://cfo.local:8080' } });
+    expect(await raw(one.base, '/status', { host: 'luyten.lan:8787' })).toBe(200);
     expect(await raw(one.base, '/status', { host: 'cfo.local' })).toBe(200);
     expect(await raw(one.base, '/status', { host: 'other.lan' })).toBe(403);
     await new Promise<void>(r => server!.close(() => r()));

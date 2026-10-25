@@ -1,4 +1,4 @@
-/** Run one close from the command line: `pnpm -F @cafoo/agents close -- 2026-09`. */
+/** Run one close from the command line: `pnpm -F @luyten/agents close -- 2026-09`. */
 import { runScriptedClose } from './scripted/close';
 import { Cast } from './stdb';
 

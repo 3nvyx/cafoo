@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Cafoo as an exploded stack: six layers pull apart as the section scrolls into view, each
+	// Luyten as an exploded stack: six layers pull apart as the section scrolls into view, each
 	// with a numbered part label. Feeds enter at the worker layer; only the gate writes to the
 	// ledger. What the agent-workflows section above cannot show is the gate at work, so two
 	// calls replay on the plates (a worker's write bounces off the gate; a confirmed Proposal
@@ -189,7 +189,7 @@
 <div use:scrub use:watch>
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
 	<svg viewBox={compact ? '0 30 700 600' : '0 0 1040 640'} class="hidden h-auto w-full lg:block" use:smil={!active} role="img" aria-labelledby="stack-title">
-		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
+		<title id="stack-title">Luyten’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
 			<path d={feedPath(n)} fill="none" class="stroke-ink-3" stroke-width="1" stroke-dasharray="3 4" />

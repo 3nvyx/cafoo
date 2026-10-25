@@ -34,7 +34,7 @@ describe('agent provider mode', () => {
     expect(aliasModels({})).toEqual({ opus: 'gpt-6.1-sol', sonnet: 'gpt-6-luna', haiku: 'gpt-6-luna' });
     const env = anthropicLookingEnv({ PATH: '/usr/bin', OPENAI_API_KEY: 'sk-live', OPENAI_BASE_URL: 'https://example.test/v1', ANTHROPIC_API_KEY: 'sk-ant', ANTHROPIC_AUTH_TOKEN: 'bearer', ANTHROPIC_DEFAULT_OPUS_MODEL: 'gpt-6-astra' }, 'http://127.0.0.1:9');
     expect(env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:9');
-    expect(env.ANTHROPIC_API_KEY).toBe('cafoo-local');
+    expect(env.ANTHROPIC_API_KEY).toBe('luyten-local');
     expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(env.OPENAI_API_KEY).toBeUndefined();
     expect(env.OPENAI_BASE_URL).toBeUndefined();
@@ -127,7 +127,7 @@ describe('bridge HTTP', () => {
     const base = await listen({ env: { OPENAI_API_KEY: 'sk-test', OPENAI_BASE_URL: 'https://example.test/v1' }, fetch: fetchImpl as unknown as typeof fetch });
     const res = await fetch(`${base}/v1/messages`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': 'cafoo-local' },
+      headers: { 'content-type': 'application/json', 'x-api-key': 'luyten-local' },
       body: JSON.stringify({ model: 'opus', max_tokens: 20, system: 'Advisor', messages: [{ role: 'user', content: 'Status?' }] }),
     });
     expect(res.status).toBe(200);

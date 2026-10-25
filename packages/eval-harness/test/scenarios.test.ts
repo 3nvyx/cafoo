@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { personas } from '@cafoo/crs-mcp';
+import { personas } from '@luyten/crs-mcp';
 import { DEFAULT_VARS } from '../src/api.js';
 import type { Row } from '../src/db.js';
 import { charterLineFound, runScenario, type EngineContext } from '../src/engine.js';

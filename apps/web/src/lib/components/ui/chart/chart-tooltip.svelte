@@ -1,5 +1,5 @@
 <script lang="ts">
-	// From shadcn-svelte (MIT), adapted to Cafoo: #lib imports and design-token classes.
+	// From shadcn-svelte (MIT), adapted to Luyten: #lib imports and design-token classes.
 	import { getChartContext, Tooltip as TooltipPrimitive } from "layerchart";
 	import { cn, type WithElementRef, type WithoutChildren } from '#lib/utils.js';
 	import { getPayloadConfigFromPayload, useChart, type TooltipPayload } from "./chart-utils.js";

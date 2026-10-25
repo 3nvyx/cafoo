@@ -12,7 +12,7 @@ const w = (start: number, expansion = 0, contraction = 0, churned = 0, added = 0
 	to: '2026-09-30'
 });
 
-describe('nrrBp (net revenue retention, as @cafoo/ledger-core nrr() reports it)', () => {
+describe('nrrBp (net revenue retention, as @luyten/ledger-core nrr() reports it)', () => {
 	it('is what the starting customers are worth now, in basis points, leaving out new customers', () => {
 		expect(nrrBp(w(100_000, 20_000, 5_000, 10_000, 50_000))).toBe(10_500);
 	});

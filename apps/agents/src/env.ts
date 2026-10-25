@@ -43,7 +43,7 @@ export function anthropicLookingEnv(base: NodeJS.ProcessEnv, shimUrl: string): N
   const next: NodeJS.ProcessEnv = {
     ...base,
     ANTHROPIC_BASE_URL: shimUrl,
-    ANTHROPIC_API_KEY: 'cafoo-local',
+    ANTHROPIC_API_KEY: 'luyten-local',
     ANTHROPIC_DEFAULT_OPUS_MODEL: aliases.opus,
     ANTHROPIC_DEFAULT_SONNET_MODEL: aliases.sonnet,
     ANTHROPIC_DEFAULT_HAIKU_MODEL: aliases.haiku,
@@ -94,7 +94,7 @@ export const agentsLive = () => providers()[0].mode === 'live';
 export const redTeamLive = () => providers()[1].mode === 'live';
 export const geminiLive = () => providers()[2].mode === 'live';
 export const STDB_URI = process.env.SPACETIMEDB_URI?.replace(/^http/, 'ws') ?? 'ws://localhost:3000';
-export const STDB_DB = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
+export const STDB_DB = process.env.SPACETIMEDB_DB_NAME ?? 'luyten';
 export const GATEWAY_PORT = Number(process.env.GATEWAY_PORT ?? 8787);
 /**
  * Gateway address and guards:

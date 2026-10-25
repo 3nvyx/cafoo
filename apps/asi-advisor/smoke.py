@@ -1,6 +1,6 @@
 """End-to-end check before a demo: a test client chats with the orchestrator, which really calls its specialists.
 
-Runs the orchestrator, the five specialists and a client in one local Bureau (port 8019) against the running Cafoo
+Runs the orchestrator, the five specialists and a client in one local Bureau (port 8019) against the running Luyten
 ledger and gateway, sends a few chat messages and checks each reply's card. Exits 0 when every step passes.
 
     .venv/bin/python smoke.py
@@ -21,14 +21,14 @@ from agent import advisor
 from desks import DESKS
 
 STEPS = [
-    ('{"action": "health", "source": "cafoo_advisor"}', lambda root, text: root["title"].startswith("Financial health, ") and "could not answer" not in json.dumps(root)),
-    ('{"action": "credit", "source": "cafoo_advisor"}', lambda root, text: root["title"] == "Credit risk" and "could not answer" not in json.dumps(root)),
-    ('{"action": "needs_ok", "source": "cafoo_advisor"}', lambda root, text: root["title"].startswith(("Needs the CFO's OK", "Cafoo Advisor"))),
-    ('{"action": "explain", "proposal_id": "1", "source": "cafoo_advisor"}', lambda root, text: root["title"] == "Proposal 1"),
+    ('{"action": "health", "source": "luyten_advisor"}', lambda root, text: root["title"].startswith("Financial health, ") and "could not answer" not in json.dumps(root)),
+    ('{"action": "credit", "source": "luyten_advisor"}', lambda root, text: root["title"] == "Credit risk" and "could not answer" not in json.dumps(root)),
+    ('{"action": "needs_ok", "source": "luyten_advisor"}', lambda root, text: root["title"].startswith(("Needs the CFO's OK", "Luyten"))),
+    ('{"action": "explain", "proposal_id": "1", "source": "luyten_advisor"}', lambda root, text: root["title"] == "Proposal 1"),
     ("how much cash do we have?", lambda root, text: root is None and bool(text)),
 ]
 
-client = Agent(name="cafoo-smoke-client", seed=f"{os.environ['CAFOO_ADVISOR_SEED']}/smoke-client")
+client = Agent(name="luyten-smoke-client", seed=f"{os.environ['LUYTEN_ADVISOR_SEED']}/smoke-client")
 proto = Protocol(spec=chat_protocol_spec)
 state = {"step": 0, "failed": 0}
 

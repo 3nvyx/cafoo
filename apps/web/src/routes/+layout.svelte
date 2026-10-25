@@ -15,7 +15,7 @@
 </script>
 
 <svelte:head>
-	<title>Cafoo</title>
+	<title>Luyten</title>
 </svelte:head>
 
 {@render children()}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The public landing page: what Cafoo does, how the gate works, and two small demos on
+	// The public landing page: what Luyten does, how the gate works, and two small demos on
 	// sample data. It never touches the data source; the work happens in /dashboard.
 	import Icon from '#lib/components/Icon.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
@@ -24,14 +24,14 @@
 		{ value: '0', label: 'ledger writes a worker agent can make. Only a ruling or your OK posts' }
 	];
 
-	// The growth story from plan.md, "How Cafoo grows with a startup". `now` marks what ships
+	// The growth story from plan.md, "How Luyten grows with a startup". `now` marks what ships
 	// today; the last stage is on the roadmap (docs/roadmap.md).
 	const stages = [
 		{
 			range: '$10M to $50M',
 			round: 'Seed to Series A',
 			changes: 'One or two entities, a few hundred customers, and the founder still approves spend.',
-			cafoo: 'Agents propose, the Advisor rules, and the CFO confirms anything material. Close in days, not weeks. Cap table and round modeling.',
+			luyten: 'Agents propose, the Advisor rules, and the CFO confirms anything material. Close in days, not weeks. Cap table and round modeling.',
 			now: true,
 			quillmesh: ''
 		},
@@ -39,7 +39,7 @@
 			range: '$50M to $250M',
 			round: 'Series A to Series B',
 			changes: 'A second country and currency, usage pricing, enterprise contracts, and a first controller.',
-			cafoo: 'Multi-currency consolidation, revaluation and eliminations as Proposals. Revenue schedules rebuilt automatically. Credit checks on customers and vendors. Custom Charters that only tighten the gate.',
+			luyten: 'Multi-currency consolidation, revaluation and eliminations as Proposals. Revenue schedules rebuilt automatically. Credit checks on customers and vendors. Custom Charters that only tighten the gate.',
 			now: true,
 			quillmesh: 'a UK subsidiary in GBP, per-page usage pricing, about 15 enterprise contracts and a finance team of three.'
 		},
@@ -47,7 +47,7 @@
 			range: '$250M to $1B',
 			round: 'Series B to growth',
 			changes: 'Many entities, tens of thousands of transactions a month, audit and SOC 2.',
-			cafoo: 'Continuous bookkeeping between closes, per-subsidiary locks, a dedicated evaluator identity, real bank and billing feeds, hosted deployment and SOC 2 controls.',
+			luyten: 'Continuous bookkeeping between closes, per-subsidiary locks, a dedicated evaluator identity, real bank and billing feeds, hosted deployment and SOC 2 controls.',
 			now: false,
 			quillmesh: ''
 		}
@@ -82,8 +82,8 @@
 {/snippet}
 
 <svelte:head>
-	<title>Cafoo · The agentic finance ERP</title>
-	<meta name="description" content="AI agents do your month-end close: matching, accruals and revenue schedules. They only suggest changes; a second AI challenges each one, a reviewing agent rules, and you confirm anything material." />
+	<title>Luyten · Automated finance for 10x growth startups</title>
+	<meta name="description" content="Automated finance for 10x growth startups. Luyten's agents run the books. A second AI checks every entry, and anything material waits for your OK." />
 </svelte:head>
 
 <svelte:window onscroll={onScroll} />
@@ -100,7 +100,7 @@
 		onfocusout={() => (navFocused = false)}
 	>
 		<div class="content flex h-14 items-center justify-between gap-3 rounded-lg bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
-			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
+			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Luyten home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
 					<a href={a.href} class="flex min-h-11 items-center rounded-full px-3.5 text-[15px] text-ink-2 transition-colors duration-150 hover:text-ink">{a.label}</a>
@@ -119,10 +119,10 @@
 		     the pitch and one action over four, set to the heading's last line. Stacked below lg. -->
 		<section class="wide grid grid-cols-2 gap-[14px] pt-16 pb-12 sm:pt-24 sm:pb-16 md:grid-cols-6 md:gap-4 lg:grid-cols-12 lg:gap-[18px] xl:gap-5">
 			<div class="col-span-2 grid grid-cols-subgrid md:col-span-6 lg:col-start-2 lg:col-end-12">
-				<h1 class="col-span-full text-[48px] leading-[0.98] font-medium text-balance sm:text-[64px] lg:col-span-6 xl:text-[72px]" style="letter-spacing:-0.035em">Let expert agents do your <span class="whitespace-nowrap">month-end</span> close</h1>
+				<h1 class="col-span-full text-[48px] leading-[0.98] font-medium text-balance sm:text-[64px] lg:col-span-6 xl:text-[72px]" style="letter-spacing:-0.035em">Automated finance for 10x growth startups</h1>
 				<div class="col-span-full mt-6 flex flex-col gap-6 md:col-span-4 lg:col-span-4 lg:col-start-7 lg:mt-0 lg:self-end">
 					<p class="text-lg text-pretty text-ink-2">
-						Cafoo’s agents match payments, book accruals and consolidate your books. A second AI checks every entry, and anything big waits for your OK.
+						Luyten’s agents run the books. A second AI checks every entry, and anything material waits for your OK.
 					</p>
 					<a href="/dashboard" {...newTab} class="pill pill-primary pill-lg self-start">Get started now{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 				</div>
@@ -138,7 +138,7 @@
 					width="2400"
 					height="1500"
 					fetchpriority="high"
-					alt="The Cafoo Dashboard for September 2026: cash, income and spend, two items waiting for the CFO's OK, the KPIs, and proposals by status."
+					alt="The Luyten Dashboard for September 2026: cash, income and spend, two items waiting for the CFO's OK, the KPIs, and proposals by status."
 					class="block w-full rounded-t-xl border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
 				/>
 				</div>
@@ -176,10 +176,10 @@
 			</div>
 		</section>
 
-		<!-- The gate and the sponsors' APIs behind Cafoo, as two rows of two cards that widen on hover,
+		<!-- The gate and the sponsors' APIs behind Luyten, as two rows of two cards that widen on hover,
 		     set into the hero's painted sky. -->
 		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
-			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
+			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Luyten</h2>
 			<PaintedFrame seed={23} class="p-3 sm:p-6 lg:p-8">
 				<FeatureCards />
 			</PaintedFrame>
@@ -188,7 +188,7 @@
 		<section id="growth" class="content scroll-mt-24 pt-32" aria-labelledby="growth-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
 				<h2 id="growth-h" class="section-h max-w-[20ch]">Built for your 10x</h2>
-				<p class="mt-5 max-w-[56ch] text-subtitle text-ink-2">A startup that grows 10x outgrows its finance stack on the way. Cafoo grows with you from a $10M seed to a $1B growth round, and the gate never loosens as the volume climbs.</p>
+				<p class="mt-5 max-w-[56ch] text-subtitle text-ink-2">A startup that grows 10x outgrows its finance stack on the way. Luyten grows with you from a $10M seed to a $1B growth round, and the gate never loosens as the volume climbs.</p>
 			</div>
 			<div class="mt-14 flex flex-col gap-1 rounded-lg border border-line bg-subtle p-5 sm:flex-row sm:items-baseline sm:gap-4">
 				<p class="shrink-0 font-medium">Worked example: Quillmesh</p>
@@ -214,8 +214,8 @@
 							<p class="text-ink-2">{st.changes}</p>
 						</div>
 						<div class="flex flex-col gap-1">
-							<p class="eyebrow">What Cafoo does</p>
-							<p>{st.cafoo}</p>
+							<p class="eyebrow">What Luyten does</p>
+							<p>{st.luyten}</p>
 						</div>
 						{#if st.quillmesh}
 							<p class="mt-auto rounded-md bg-subtle px-3 py-2 text-body-sm text-ink-2"><span class="font-medium text-ink">Quillmesh is here:</span> {st.quillmesh}</p>
@@ -230,7 +230,7 @@
 		     The river runs down to its top edge. -->
 		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
 			<div class="flex flex-col items-start gap-6 rounded-xl bg-accent px-6 py-10 text-on-accent sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-12">
-				<h2 id="cta-h" class="max-w-[18ch] text-display-sm font-medium sm:text-display">Close your next month with us</h2>
+				<h2 id="cta-h" class="max-w-[18ch] text-display-sm font-medium sm:text-display">Run your finance with us</h2>
 				<a href="/dashboard" {...newTab} class="pill pill-lg shrink-0 bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 			</div>
 		</section>
@@ -240,8 +240,8 @@
 	<footer class="content mt-24 border-t border-line pt-12 pb-8 text-body-sm">
 		<div class="flex flex-col gap-10 md:flex-row md:justify-between">
 			<div class="flex max-w-xs flex-col gap-3">
-				<a href="/" class="self-start" aria-label="Cafoo home"><Wordmark size={20} /></a>
-				<p class="text-ink-3">The agentic finance ERP. Agents propose, an Advisor rules, and you confirm anything material.</p>
+				<a href="/" class="self-start" aria-label="Luyten home"><Wordmark size={20} /></a>
+				<p class="text-ink-3">Automated finance for 10x growth startups. Agents propose, an Advisor rules, and you confirm anything material.</p>
 			</div>
 			<div class="grid grid-cols-2 gap-10 sm:gap-16">
 				<nav aria-labelledby="footer-product" class="flex flex-col gap-1">
@@ -259,7 +259,7 @@
 			</div>
 		</div>
 		<div class="mt-12 border-t border-line pt-6 text-ink-3">
-			<p>© {new Date().getFullYear()} Cafoo</p>
+			<p>© {new Date().getFullYear()} Luyten</p>
 		</div>
 	</footer>
 </div>

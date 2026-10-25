@@ -152,7 +152,7 @@ export function siteSignals(site: SiteSnapshot): SiteSignal[] {
 export async function searchSite(site: SiteSnapshot, queryText: string, topK = 3): Promise<(Hit & { url: string })[]> {
   const docs = site.pages.map((p, i) => ({ id: `${i}`, text: `${p.title}\n${p.text}` }));
   const hash = createHash('sha256').update(JSON.stringify(site.pages)).digest('hex').slice(0, 10);
-  const name = `cafoo-site-${site.domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${hash}`;
+  const name = `luyten-site-${site.domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${hash}`;
   const hits = await search(name, docs, queryText, topK);
   return hits.map(h => ({ ...h, text: siteText(h.text, 400), url: site.pages[Number(h.id)]?.url ?? `https://${site.domain}` }));
 }

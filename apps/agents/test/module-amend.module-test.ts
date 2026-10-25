@@ -3,9 +3,9 @@ import { ConnectionId, Timestamp } from 'spacetimedb';
 import { createModuleTestHarness, TestAuth, TestClock } from 'spacetimedb/server/test-utils';
 import * as module from '../../../spacetimedb/spacetimedb/src/index';
 
-const cfo = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://cafoo.test', sub: 'cfo' }), new ConnectionId(1n));
-const advisor = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://cafoo.test', sub: 'advisor' }), new ConnectionId(2n));
-const credit = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://cafoo.test', sub: 'credit' }), new ConnectionId(3n));
+const cfo = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://luyten.test', sub: 'cfo' }), new ConnectionId(1n));
+const advisor = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://luyten.test', sub: 'advisor' }), new ConnectionId(2n));
+const credit = TestAuth.fromJwtPayload(JSON.stringify({ iss: 'https://luyten.test', sub: 'credit' }), new ConnectionId(3n));
 
 const entry = (minor: bigint) => JSON.stringify({
   subsidiaryId: '1', periodYm: '2026-09', memo: 'Allowance for doubtful accounts: Okafor Dental Group (tier D)',

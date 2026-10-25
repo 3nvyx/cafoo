@@ -2,7 +2,7 @@
 // intercompany side, Cafoo Ltd in pounds and the Elimination subsidiary, turned into the UI's rows the way both data
 // sources deliver them (string ids, minor units as strings).
 import { describe, expect, it } from 'vitest';
-import { eliminations, revaluation, ymFromString } from '@cafoo/ledger-core';
+import { eliminations, revaluation, ymFromString } from '@luyten/ledger-core';
 import { ACCOUNTS as US_ACCOUNTS } from '../../../../../seed/src/accounts';
 import { buildGroup } from '../../../../../seed/src/group';
 import { boardPack, eliminationStatus, functionalNet, rateText, toCore, type GroupBooks } from './group';

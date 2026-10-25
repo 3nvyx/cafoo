@@ -101,7 +101,7 @@
 	const major = (m: Minor) => Number(m) / 100;
 </script>
 
-<svelte:head><title>Cost of service · Cafoo</title></svelte:head>
+<svelte:head><title>Cost of service · Luyten</title></svelte:head>
 
 <div class="flex flex-col gap-8">
 	<header class="flex flex-col gap-2">

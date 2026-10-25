@@ -81,7 +81,7 @@
 	}
 </script>
 
-<svelte:head><title>Settings · Cafoo</title></svelte:head>
+<svelte:head><title>Settings · Luyten</title></svelte:head>
 
 <h1 class="text-[34px] sm:text-[42px]">Settings</h1>
 

@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { creditCheckSummaryJson } from '@cafoo/crs-mcp';
+import { creditCheckSummaryJson } from '@luyten/crs-mcp';
 import { HARNESSES, WORKERS } from '../src/harness';
 import { BOOKS_TOOLS } from '../src/harness/rules';
 import { DEFAULT_PARAMS } from '../src/charter/types';

@@ -1,6 +1,6 @@
 {
 	"$schema": "https://www.designtokens.org/schemas/2025.10/tokens.json",
-	"$description": "Semantic tokens: what each value is for. This tier is what screens and components read, through the CSS variables and Tailwind classes built from it. Values are references into primitives.tokens.json; light and dark live under $extensions.mode. Usage notes for agents live under $extensions[\"com.cafoo\"] as usage (kebab-case use cases) and rules (\"Never\" and \"Only\" sentences).",
+	"$description": "Semantic tokens: what each value is for. This tier is what screens and components read, through the CSS variables and Tailwind classes built from it. Values are references into primitives.tokens.json; light and dark live under $extensions.mode. Usage notes for agents live under $extensions[\"com.luyten\"] as usage (kebab-case use cases) and rules (\"Never\" and \"Only\" sentences).",
 	"color": {
 		"$type": "color",
 		"$description": "Semantic colours: what a value is for. Every name here becomes a CSS variable and a Tailwind class (bg-*, text-*, border-*, fill-*, stroke-*).",
@@ -11,7 +11,7 @@
 					"light": "{palette.neutral.50}",
 					"dark": "{palette.neutral.1000}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"page-background",
 						"app-shell"
@@ -28,7 +28,7 @@
 					"light": "{palette.neutral.0}",
 					"dark": "{palette.neutral.900}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"card",
 						"panel",
@@ -58,7 +58,7 @@
 					"light": "{palette.neutral.100}",
 					"dark": "{palette.neutral.850}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"row-hover",
 						"neutral-chip",
@@ -106,7 +106,7 @@
 					"light": "{palette.neutral.500}",
 					"dark": "{palette.neutral.400}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"eyebrow",
 						"caption",
@@ -125,7 +125,7 @@
 					"light": "{palette.neutral.150}",
 					"dark": "{palette.neutral.800}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"card-border",
 						"divider",
@@ -143,7 +143,7 @@
 					"light": "{palette.neutral.200}",
 					"dark": "{palette.neutral.700}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"button-border",
 						"field-border",
@@ -158,7 +158,7 @@
 			"$value": "{palette.ocean.500}",
 			"$description": "Neon ocean blue. The one main action on a screen, selection, and the live cursor.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"primary-button",
 						"selected-state",
@@ -173,7 +173,7 @@
 			"$value": "{palette.neutral.950}",
 			"$description": "Tar text on the accent. The accent is light, so its text is always dark, in both modes.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"primary-button-label"
 					],
@@ -188,7 +188,7 @@
 					"light": "{palette.ocean.700}",
 					"dark": "{palette.ocean.300}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"link",
 						"drill-hover",
@@ -206,7 +206,7 @@
 					"light": "{palette.ocean.50}",
 					"dark": "{palette.ocean.950}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"selected-row",
 						"selection-highlight",
@@ -234,7 +234,7 @@
 					"light": "{palette.ocean.600}",
 					"dark": "{palette.ocean.800}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"painted-sky",
 						"river-glint",
@@ -252,7 +252,7 @@
 					"light": "{palette.moss.700}",
 					"dark": "{palette.moss.300}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"positive-amount",
 						"approved-state",
@@ -270,7 +270,7 @@
 					"light": "{palette.moss.50}",
 					"dark": "{palette.moss.950}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"positive-badge",
 						"positive-row"
@@ -307,7 +307,7 @@
 					"light": "{palette.ember.700}",
 					"dark": "{palette.ember.300}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"negative-amount",
 						"error-text",
@@ -326,7 +326,7 @@
 					"light": "{palette.ember.50}",
 					"dark": "{palette.ember.950}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"negative-badge",
 						"error-banner",
@@ -364,7 +364,7 @@
 					"light": "{palette.amber.700}",
 					"dark": "{palette.amber.300}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"warning-text",
 						"pending-state",
@@ -382,7 +382,7 @@
 					"light": "{palette.amber.50}",
 					"dark": "{palette.amber.950}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"warning-badge",
 						"warning-banner"
@@ -419,7 +419,7 @@
 					"light": "{palette.neutral.500}",
 					"dark": "{palette.neutral.400}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"info-text",
 						"neutral-status",
@@ -437,7 +437,7 @@
 					"light": "{palette.neutral.150}",
 					"dark": "{palette.neutral.800}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"info-badge",
 						"note-banner"
@@ -471,7 +471,7 @@
 			"$value": "{palette.overlay.40}",
 			"$description": "The dimmer behind dialogs and sheets.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"dialog-backdrop",
 						"sheet-backdrop"
@@ -487,7 +487,7 @@
 					"light": "{palette.neutral.950}",
 					"dark": "{palette.neutral.75}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"toast",
 						"tooltip",
@@ -515,7 +515,7 @@
 					"light": "{palette.neutral.950}",
 					"dark": "{palette.ocean.500}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"focus-ring"
 					],
@@ -531,7 +531,7 @@
 					"light": "{palette.teal.100}",
 					"dark": "{palette.teal.900}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"calendar-tag",
 						"calendar-filter-chip"
@@ -558,7 +558,7 @@
 					"light": "{palette.rose.100}",
 					"dark": "{palette.rose.900}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"calendar-tag",
 						"calendar-filter-chip"
@@ -585,7 +585,7 @@
 					"light": "{palette.olive.100}",
 					"dark": "{palette.olive.900}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"calendar-tag",
 						"calendar-filter-chip"
@@ -612,7 +612,7 @@
 					"light": "{palette.copper.100}",
 					"dark": "{palette.copper.900}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"calendar-tag",
 						"calendar-filter-chip"
@@ -639,7 +639,7 @@
 					"light": "{palette.neutral.150}",
 					"dark": "{palette.neutral.800}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"calendar-tag",
 						"calendar-filter-chip"
@@ -670,7 +670,7 @@
 					"light": "{palette.ocean.700}",
 					"dark": "{palette.ocean.500}"
 				},
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"advisor-avatar",
 						"advisor-name"
@@ -802,7 +802,7 @@
 			},
 			"$description": "Captions, eyebrows, table meta, helper text.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"eyebrow",
 						"caption",
@@ -927,7 +927,7 @@
 			},
 			"$description": "The hero and the one number that matters on a screen.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"hero-heading",
 						"headline-figure"
@@ -948,7 +948,7 @@
 			"$value": "{size.8}",
 			"$description": "Cards and panels.",
 			"$extensions": {
-				"com.cafoo": {
+				"com.luyten": {
 					"usage": [
 						"card",
 						"panel",

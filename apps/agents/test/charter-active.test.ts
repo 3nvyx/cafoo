@@ -48,9 +48,9 @@ describe('activeCharter', () => {
   it('ignores an override meant for another database, or with no database named, with a warning', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const o = { role: 'bookkeeper', bodyMd: draft.bodyMd, mapping: draft.mapping, version: 3 };
-    expect(activeCharter(undefined, 'bookkeeper', overrideEnv(o, 'cafoo-eval-elsewhere'))).toBe(builtinCharter('bookkeeper'));
+    expect(activeCharter(undefined, 'bookkeeper', overrideEnv(o, 'luyten-eval-elsewhere'))).toBe(builtinCharter('bookkeeper'));
     expect(activeCharter(undefined, 'bookkeeper', { CHARTER_OVERRIDE_JSON: JSON.stringify({ ...o, version: 4 }) })).toBe(builtinCharter('bookkeeper'));
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/CHARTER_OVERRIDE_DB is "cafoo-eval-elsewhere", not this process's database .*; ignored/));
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/CHARTER_OVERRIDE_DB is "luyten-eval-elsewhere", not this process's database .*; ignored/));
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/CHARTER_OVERRIDE_DB is unset/));
     warn.mockRestore();
   });

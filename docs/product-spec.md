@@ -1,18 +1,18 @@
-# Cafoo product spec
+# Luyten product spec
 
 Updated 2026-10-24 (group close, feed, charters). Terms follow [CONTEXT.md](../CONTEXT.md).
 
 ## Positioning
 
-Cafoo is the finance ERP where agents do the close and the CFO stays in charge. Worker agents propose every change to the books. A Red Team critiques. The Advisor rules with a written rationale. The CFO confirms anything material and locks the month. Nothing posts without a ruling, and every number drills down to the journal lines behind it.
+Luyten is the finance ERP where agents do the close and the CFO stays in charge. Worker agents propose every change to the books. A Red Team critiques. The Advisor rules with a written rationale. The CFO confirms anything material and locks the month. Nothing posts without a ruling, and every number drills down to the journal lines behind it.
 
-Legacy ERPs record what people type. Spreadsheets hold the real work. Cafoo replaces the people-hours between them with agents, and replaces blind trust in those agents with a gate the database enforces.
+Legacy ERPs record what people type. Spreadsheets hold the real work. Luyten replaces the people-hours between them with agents, and replaces blind trust in those agents with a gate the database enforces.
 
 ## Who it is for
 
 Finance teams at SaaS companies, from a solo controller to a CFO with a small team. The CFO may be technical or not, so every screen leads with a Plain summary and keeps the technical depth one toggle away.
 
-Cafoo fits best when the company sells to small businesses. Those customers are often backed by an owner-guarantor, and the owner's personal credit decides whether an invoice gets paid. Cafoo checks that owner before extending terms and reserves against the receivable when the check fails.
+Luyten fits best when the company sells to small businesses. Those customers are often backed by an owner-guarantor, and the owner's personal credit decides whether an invoice gets paid. Luyten checks that owner before extending terms and reserves against the receivable when the check fails.
 
 ## Modules
 
@@ -107,5 +107,5 @@ Live data motion only. Rows appear, statuses change, and totals count when the u
 
 ## Design tokens
 
-The web app's colors, type and shape are defined once, as design tokens in `packages/design-tokens` (see `packages/design-tokens/NAMING.md` and ADR 0012); the build writes `packages/design-tokens/css/cafoo-tokens.css`, which `apps/web/src/app.css` imports (migration in progress, tracked by the package's raw-values baseline). Components use only token classes: no raw colours, no bracketed pixel sizes.
+The web app's colors, type and shape are defined once, as design tokens in `packages/design-tokens` (see `packages/design-tokens/NAMING.md` and ADR 0012); the build writes `packages/design-tokens/css/luyten-tokens.css`, which `apps/web/src/app.css` imports (migration in progress, tracked by the package's raw-values baseline). Components use only token classes: no raw colours, no bracketed pixel sizes.
 Numbers are always set in tabular figures.

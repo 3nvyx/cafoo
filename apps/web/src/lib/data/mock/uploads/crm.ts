@@ -1,5 +1,5 @@
 // Demo behaviour for the CRM: deals moving through HubSpot, Zendesk tickets arriving and getting solved, and Stripe
-// promotion codes being redeemed. Cafoo only reads these tools, so every change is a non-ledger row update; nothing
+// promotion codes being redeemed. Luyten only reads these tools, so every change is a non-ledger row update; nothing
 // here proposes. Each ticker runs only while its tool is connected.
 import { STAGE_PROBABILITY_BP, SLA_HOURS } from '../../../crm';
 import { toBig } from '../../money';

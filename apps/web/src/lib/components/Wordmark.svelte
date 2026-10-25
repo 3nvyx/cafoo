@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The Cafoo wordmark: the word set tight in Space Grotesk 600 in one ocean blue, bevelled by an
+	// The Luyten wordmark: the word set tight in Space Grotesk 600 in one ocean blue, bevelled by an
 	// SVG filter that runs specular lighting over a blurred copy of the letter shapes. An aria-hidden
 	// copy sits on top, clipped to the letters and filled with a narrow diagonal band of light that
 	// crosses every few seconds. Under reduced motion the band never shows. Screen readers get the
@@ -10,8 +10,8 @@
 
 <span class="wordmark {cls}" style="font-size: {size}px">
 	<!-- The filter sits on a wrapper, not on the background-clip:text node, which WebKit can drop. -->
-	<span class="base" style="filter: url(#{id}-bevel)"><span class="fill">Cafoo</span></span>
-	<span class="fill light" aria-hidden="true">Cafoo</span>
+	<span class="base" style="filter: url(#{id}-bevel)"><span class="fill">Luyten</span></span>
+	<span class="fill light" aria-hidden="true">Luyten</span>
 	<svg aria-hidden="true" width="0" height="0" focusable="false">
 		<filter id="{id}-bevel" x="-10%" y="-30%" width="120%" height="160%" color-interpolation-filters="sRGB">
 			<feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="blur" />

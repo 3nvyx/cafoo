@@ -1,4 +1,4 @@
-// The Board Pack for the group or for one company, computed by the ledger engine (@cafoo/ledger-core): translation
+// The Board Pack for the group or for one company, computed by the ledger engine (@luyten/ledger-core): translation
 // into the Reporting currency, the CTA, eliminations and the consolidated statements all come from its consolidate()
 // and translateBooks(), the same code the agents and the module rely on. This file only turns the UI's rows (string
 // ids, minor units as strings) into the engine's inputs and its results back into rows the page renders.
@@ -24,7 +24,7 @@ import {
 	type JournalLine as CoreLine,
 	type TranslatedBooks,
 	type TranslatedRow
-} from '@cafoo/ledger-core';
+} from '@luyten/ledger-core';
 import type { Account, AccountType, FxRate, JournalEntry, JournalLine, Minor, Subsidiary } from './types';
 
 export interface GroupBooks {

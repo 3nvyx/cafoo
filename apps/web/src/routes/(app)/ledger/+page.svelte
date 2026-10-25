@@ -346,7 +346,7 @@
 	const accountValue = $derived(drillKind === 'account' && parsed.values.length === 1 ? parsed.values[0] : '');
 </script>
 
-<svelte:head><title>Ledger · Cafoo</title></svelte:head>
+<svelte:head><title>Ledger · Luyten</title></svelte:head>
 
 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 	<div>

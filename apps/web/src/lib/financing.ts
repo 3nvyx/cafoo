@@ -225,7 +225,7 @@ export function classify(kind: Instrument['kind'], status: Instrument['status'] 
 		case 'safe_pre_money':
 			return { classification: 'liability', plain: 'A liability, not income: on a sale of the company before it converts, the SAFE pays the investor cash, so it is carried at fair value until it converts into shares.' };
 		case 'convertible_note':
-			return { classification: 'liability', plain: 'A liability, not income: Cafoo owes the principal plus interest until the note converts or is repaid. The interest is an expense each month.' };
+			return { classification: 'liability', plain: 'A liability, not income: Luyten owes the principal plus interest until the note converts or is repaid. The interest is an expense each month.' };
 		case 'warrant':
 			return { classification: 'liability', plain: 'A liability until a person confirms its terms: some warrants settle in cash. A person decides for anything non-standard.' };
 		default:

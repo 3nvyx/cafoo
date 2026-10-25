@@ -4,7 +4,7 @@
  * A close starts only on an explicit command ("start the close") at the start of the CFO's latest message, never
  * because a question or a chat client's background prompt happens to mention the close.
  */
-import { applyFx, closeOrderRefusal, dateLabel, formatMinor, isGroup, LedgerError, targetAllowanceMinor, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
+import { applyFx, closeOrderRefusal, dateLabel, formatMinor, isGroup, LedgerError, targetAllowanceMinor, ymEndMicros, ymFromString, ymToString } from '@luyten/ledger-core';
 import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
@@ -69,7 +69,7 @@ const CLOSE_COMMAND = new RegExp(
 
 /** The policy's sentences that share the most words with the question, in their original order (at most three). */
 /** Words every policy question uses, which say nothing about which passage answers it. */
-const POLICY_QUESTION_WORDS = new Set(stems('policy policies cafoo account house rule'));
+const POLICY_QUESTION_WORDS = new Set(stems('policy policies luyten account house rule'));
 
 export function policyExcerpt(text: string, question: string): string {
   // Stems, so "reserves" finds "reserve" and "accrued" finds "accrual"; synonyms, so "bad debt" finds the allowance.
@@ -369,7 +369,7 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
   }
 
   // "What is our policy on…", "how do we account for…": quote the house policy (Moss, else local search) instead of a figure.
-  if (/\bpolic(?:y|ies)\b|accounting (?:rule|treatment)|how (?:should|do|does) (?:we|cafoo) (?:account|treat|book|recogni[sz]e|reserve|reconcile)/.test(q)) {
+  if (/\bpolic(?:y|ies)\b|accounting (?:rule|treatment)|how (?:should|do|does) (?:we|luyten) (?:account|treat|book|recogni[sz]e|reserve|reconcile)/.test(q)) {
     const hits = await searchPolicies(question, 2);
     if (!hits.length) {
       yield 'No house policy covers that. The policies cover accruals, bank reconciliation, revenue recognition, credit and allowances, consolidation, and materiality.';

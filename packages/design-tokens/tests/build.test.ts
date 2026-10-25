@@ -6,8 +6,8 @@ import { MODES, cssName, loadTokens, resolveValue, toHex } from '../scripts/toke
 const tokens = loadTokens();
 const committed = existsSync(CSS_FILE) ? readFileSync(CSS_FILE, 'utf8') : '';
 
-describe('css/cafoo-tokens.css', () => {
-	it('is exactly what the tokens build; rebuild with: pnpm -F @cafoo/design-tokens build', () => {
+describe('css/luyten-tokens.css', () => {
+	it('is exactly what the tokens build; rebuild with: pnpm -F @luyten/design-tokens build', () => {
 		expect(committed).toBe(generateCSS());
 	}, 60_000);
 

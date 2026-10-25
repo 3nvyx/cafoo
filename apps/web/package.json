@@ -1,5 +1,5 @@
 {
-	"name": "@cafoo/web",
+	"name": "@luyten/web",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -32,7 +32,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"@cafoo/ledger-core": "workspace:*",
+		"@luyten/ledger-core": "workspace:*",
 		"@fontsource-variable/instrument-sans": "5.3.0",
 		"@fontsource-variable/newsreader": "5.3.0",
 		"@fontsource/ibm-plex-mono": "5.3.0",

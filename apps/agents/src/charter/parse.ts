@@ -2,12 +2,12 @@
  * Charter markdown to labelled lines, by the same algorithm as test/coverage.test.ts (and the web editor's
  * parseCharterLines): `## May`, `## Must never`, `## Escalates` sections hold numbered lines ("1. ..."), and the
  * `## Plain summary rule` section is one line, its paragraphs squashed together. Any other heading ends a section.
- * The parser itself lives in @cafoo/eval-harness, which judges charters by the same lines.
+ * The parser itself lives in @luyten/eval-harness, which judges charters by the same lines.
  */
-import { charterLines as sharedCharterLines } from '@cafoo/eval-harness';
+import { charterLines as sharedCharterLines } from '@luyten/eval-harness';
 import type { CharterLine } from '../harness';
 
-export { squash } from '@cafoo/eval-harness';
+export { squash } from '@luyten/eval-harness';
 
 export interface ParsedLine {
   label: CharterLine;

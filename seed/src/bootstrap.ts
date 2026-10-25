@@ -9,7 +9,7 @@ import { armCfoBootstrap, armFailureHelp, DEFAULT_TTL_MINUTES } from './owner';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const uri = process.env.SPACETIMEDB_URI ?? 'ws://localhost:3000';
-const db = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
+const db = process.env.SPACETIMEDB_DB_NAME ?? 'luyten';
 const ttl = Number(process.env.CFO_BOOTSTRAP_TTL_MINUTES ?? DEFAULT_TTL_MINUTES);
 if (!Number.isInteger(ttl) || ttl < 1 || ttl > 10080) {
   console.error(`CFO_BOOTSTRAP_TTL_MINUTES must be a whole number of minutes from 1 to 10080; got ${process.env.CFO_BOOTSTRAP_TTL_MINUTES}.`);

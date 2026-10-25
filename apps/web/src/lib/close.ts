@@ -2,7 +2,7 @@
 // Dashboard and the Close checklist so both screens agree.
 import type { DataSource } from './data/source';
 import type { AgentMessage, Period } from './data/types';
-import { bankExceptionAcceptance, bankExceptionSnapshot, closeOrderRefusal, currentBankExceptions, isBankReconciliationTask } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, bankExceptionSnapshot, closeOrderRefusal, currentBankExceptions, isBankReconciliationTask } from '@luyten/ledger-core';
 
 type CloseBooks = Pick<DataSource, 'periods' | 'connection' | 'closeTasks' | 'proposals' | 'agentMessages' | 'bankTransactions' | 'auditEvents'>;
 

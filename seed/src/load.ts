@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { buildCompany } from './company';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DbConnection } from '@cafoo/stdb-bindings';
+import { DbConnection } from '@luyten/stdb-bindings';
 import { ACCOUNTS, ELIM_ACCOUNTS, UK_ACCOUNTS, type SeedAccount } from './accounts';
 import type { Seed } from './generate';
 import { armCfoBootstrap, armFailureHelp, ownerCall } from './owner';
@@ -17,11 +17,11 @@ import { armCfoBootstrap, armFailureHelp, ownerCall } from './owner';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 const URI = process.env.SPACETIMEDB_URI ?? 'ws://localhost:3000';
-const DB = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
+const DB = process.env.SPACETIMEDB_DB_NAME ?? 'luyten';
 // Kept per database, like the agents' identities (apps/agents/src/stdb.ts), so reseeding one database never
 // replaces the advisor another one registered. The default database still reads the older .secrets/advisor.token.
 const TOKEN_FILE = join(root, '.secrets', DB, 'advisor.token');
-const LEGACY_TOKEN_FILE = DB === 'cafoo' ? join(root, '.secrets', 'advisor.token') : undefined;
+const LEGACY_TOKEN_FILE = DB === 'luyten' ? join(root, '.secrets', 'advisor.token') : undefined;
 
 function loadToken(): string | undefined {
   try {
@@ -71,7 +71,7 @@ function connect(): Promise<DbConnection> {
 /** SEED_PROFILE=quillmesh names the group after the demo company in plan.md; the default keeps the test fixture's names. */
 const PROFILE = process.env.SEED_PROFILE ?? 'default';
 /** An intercompany account name ("Due from Cafoo Ltd") with the profile's company names. */
-const named = (name: string) => (PROFILE === 'quillmesh' ? name.replace(/\bCafoo (Inc|Ltd)\b/g, 'Quillmesh $1') : name);
+const named = (name: string) => (PROFILE === 'quillmesh' ? name.replace(/\bLuyten (Inc|Ltd)\b/g, 'Quillmesh $1') : name);
 const chart = (accounts: SeedAccount[]) => accounts.map(a => ({ ...a, name: named(a.name) }));
 
 /** Charts of accounts come from code (accounts.ts), not seed.json, so a stale seed.json cannot leave an account out. */
@@ -162,7 +162,7 @@ function profileName(code: string, name: string): string {
 
 async function main() {
   const seedPath = join(root, 'seed', 'out', 'seed.json');
-  if (!existsSync(seedPath)) throw new Error('Run `pnpm -F @cafoo/seed generate` first.');
+  if (!existsSync(seedPath)) throw new Error('Run `pnpm -F @luyten/seed generate` first.');
   const seed = JSON.parse(readFileSync(seedPath, 'utf8')) as Seed;
   const conn = await connect();
   const r = conn.reducers;
@@ -187,7 +187,7 @@ async function main() {
     }
   }
   const group = seed.group;
-  if (!group) throw new Error('seed.json has no group data; run `pnpm -F @cafoo/seed generate` again.');
+  if (!group) throw new Error('seed.json has no group data; run `pnpm -F @luyten/seed generate` again.');
 
   // 2. Structure: Cafoo Inc, then the group companies (their periods are the group's: one row per month), then FX rates,
   // which must exist before any entry with a line in another currency.

@@ -1,4 +1,4 @@
-// Terrazzo build: DTCG token files -> css/cafoo-tokens.css.
+// Terrazzo build: DTCG token files -> css/luyten-tokens.css.
 // Only the semantic tier reaches the CSS. Aliases are inlined to literals, so
 // primitives (palette ramps, sizes, font stacks) never exist as CSS variables.
 // scripts/build.mjs runs this, then appends the Tailwind @theme block.
@@ -18,10 +18,10 @@ const MODELESS = ['type.**', 'shape.**'];
 
 export default defineConfig({
 	tokens: ['./tokens/primitives.tokens.json', './tokens/semantic.tokens.json'],
-	outDir: process.env.CAFOO_TOKENS_OUT ?? './css/',
+	outDir: process.env.LUYTEN_TOKENS_OUT ?? './css/',
 	plugins: [
 		css({
-			filename: 'cafoo-tokens.css',
+			filename: 'luyten-tokens.css',
 			legacyHex: true,
 			exclude: PRIMITIVES,
 			variableName,

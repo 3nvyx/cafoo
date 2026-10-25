@@ -9,7 +9,7 @@
  * run is a quick check (`publishable` says which). charterEvalStatus() is merged into GET /status.
  * POST changes state, so the gateway lets it through only from this machine or with the gateway API key (src/http.ts).
  */
-import { labelOfRuleId, loadScenarios, scenariosDir } from '@cafoo/eval-harness';
+import { labelOfRuleId, loadScenarios, scenariosDir } from '@luyten/eval-harness';
 import { HARNESSES, type Role } from '../harness';
 import { BadRequest, json, readJson, type Route } from '../http';
 import type { Cast } from '../stdb';

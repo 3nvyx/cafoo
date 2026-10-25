@@ -1,4 +1,4 @@
-"""Request and response models between the Cafoo Advisor (orchestrator) and its five specialist agents.
+"""Request and response models between Luyten (the orchestrator) and its five specialist agents.
 
 Every response carries ok and error, so the orchestrator can show what one specialist could not answer and still
 render the rest. Money is in minor units (cents or pence) with its currency, never floats.

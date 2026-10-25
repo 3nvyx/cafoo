@@ -23,7 +23,7 @@ import {
   type Entity,
   type PlainSubsidiary,
   type Revaluation,
-} from '@cafoo/ledger-core';
+} from '@luyten/ledger-core';
 import { monthLabel } from '../advisor-chat';
 import { groupSnapshot, type GroupSnapshot } from '../snapshot';
 import { propose, say, type Cast, type RoleConn } from '../stdb';

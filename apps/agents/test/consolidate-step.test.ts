@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFx, ymFromString, type Account, type Entity, type FxRate, type JournalLine } from '@cafoo/ledger-core';
+import { applyFx, ymFromString, type Account, type Entity, type FxRate, type JournalLine } from '@luyten/ledger-core';
 import { alreadyDoneRefusal, planConsolidation, runConsolidationStep } from '../src/scripted/consolidate';
 import { eliminationCritique, type Refusal } from '../src/scripted/rulings';
 import type { Cast } from '../src/stdb';

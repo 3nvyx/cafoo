@@ -1,5 +1,5 @@
 <script lang="ts">
-	// The Fetch.ai slide: a chat with the Cafoo Advisor in ASI:One. The question, the four specialists
+	// The Fetch.ai slide: a chat with the Luyten in ASI:One. The question, the four specialists
 	// it asks at once and its answer card come in one after another each time the slide opens; under
 	// reduced motion they are all there at once. What the card holds follows apps/asi-advisor/README.md.
 	import Icon from '#lib/components/Icon.svelte';
@@ -25,7 +25,7 @@
 	<div class="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
 		<div class="flex items-center gap-2">
 			<Icon name="chat" size={16} />
-			<span class="font-medium">Cafoo Advisor</span>
+			<span class="font-medium">Luyten</span>
 		</div>
 		<span class="text-caption text-ink-3">ASI:One · Agent Chat Protocol 0.3.0</span>
 	</div>
@@ -59,7 +59,7 @@
 		</div>
 	{/key}
 </div>
-<p class="mt-4 text-body-sm text-ink-3">It reads the books and explains them. It never confirms or posts anything: the CFO does that in the Cafoo app.</p>
+<p class="mt-4 text-body-sm text-ink-3">It reads the books and explains them. It never confirms or posts anything: the CFO does that in the Luyten app.</p>
 
 <style>
 	/* Each part rises in after the one before it. */

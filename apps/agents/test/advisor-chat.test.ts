@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bankExceptionSnapshot } from '@cafoo/ledger-core';
+import { bankExceptionSnapshot } from '@luyten/ledger-core';
 import { answerQuestion, CLOSE_COMMAND_SOURCE, closeCommand, isCloseCommand, monthIn, policyExcerpt, resolveYm } from '../src/advisor-chat';
 import type { Cast } from '../src/stdb';
 import { ts } from './fake-conn';

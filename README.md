@@ -1,6 +1,10 @@
-# Cafoo
+# Luyten
 
-Cafoo is an agentic finance ERP for SaaS companies. Worker agents do the month-end close for a group of companies in more than one currency: they match the bank feed, rebuild revenue schedules, accrue late bills, revalue foreign-currency balances, eliminate what the group's companies owe each other, and check the credit of the people behind your customers and vendors. They can only propose. A Chief Finance Advisor agent rules on every Proposal with a written rationale, and anything material waits for the CFO's one-click confirmation. Every number in the Board Pack drills down to the journal lines, the Proposal, and the agent debate that produced it.
+Luyten is automated finance for 10x growth startups.
+Worker agents run the books for a group of companies in more than one currency: they match the bank feed, rebuild revenue schedules, accrue late bills, revalue foreign-currency balances, eliminate what the group's companies owe each other, and check the credit of the people behind your customers and vendors.
+They can only propose.
+A Chief Finance Advisor agent rules on every Proposal with a written rationale, and anything material waits for the CFO's one-click confirmation.
+Every number in the Board Pack drills down to the journal lines, the Proposal, and the agent debate that produced it.
 
 ## The problem
 
@@ -50,10 +54,10 @@ spacetime start
 pnpm demo:fresh                 # prints the one-time CFO claim link
 
 # terminal 3: agent orchestrator and gateway on :8787
-pnpm -F @cafoo/agents orchestrator
+pnpm -F @luyten/agents orchestrator
 
 # terminal 4: the CFO app
-pnpm -F @cafoo/web dev
+pnpm -F @luyten/web dev
 ```
 
 Start a close from the app, or from the shell:
@@ -62,13 +66,13 @@ Start a close from the app, or from the shell:
 curl -X POST http://localhost:8787/close -H 'content-type: application/json' -d '{"periodYm":"2026-09"}'
 ```
 
-`pnpm demo:fresh` publishes the module with `--delete-data` (to the database in `SPACETIMEDB_DB_NAME`, default `cafoo`), generates the demo group and loads it.
+`pnpm demo:fresh` publishes the module with `--delete-data` (to the database in `SPACETIMEDB_DB_NAME`, default `luyten`), generates the demo group and loads it.
 
 **Claim the CFO seat.** Nobody becomes CFO by asking. The seed loader, acting as the database owner through the spacetime CLI, arms a one-time Bootstrap secret and prints a claim link once (`http://localhost:5173/claim#secret=…`, valid for a day). It also saves the link in `.secrets/cfo-bootstrap.<db>.txt`; the gateway prints only that file's path while the seat is empty. Open the link in the browser you will use as the CFO; the secret is then used up. `pnpm cfo:bootstrap` arms a new link while the seat is still empty, for example after it expired. A fresh publish wipes identities, so claim the seat again after each `pnpm demo:fresh`.
 
 The loader takes the `advisor` role (the first connection to ask for it keeps it), and the agents' role identities are kept per database in `.secrets/<db>/` (`advisor.token`, `bookkeeper.token`, and so on), so several databases on one machine never share or overwrite an identity.
 
-`pnpm -F @cafoo/web dev` on its own runs the UI against an in-browser Demo mode with nothing else started. To point it at the live database and gateway, set `PUBLIC_DATA_SOURCE=spacetime`; see `apps/web/README.md`.
+`pnpm -F @luyten/web dev` on its own runs the UI against an in-browser Demo mode with nothing else started. To point it at the live database and gateway, set `PUBLIC_DATA_SOURCE=spacetime`; see `apps/web/README.md`.
 
 Optional chat front-end. Open WebUI talks to the gateway's OpenAI-compatible endpoint.
 The gateway listens on 127.0.0.1 by default, which a container cannot reach, so first set two values in `.env` and restart the orchestrator.
@@ -89,28 +93,28 @@ docker run -d --name open-webui -p 3001:8080 --add-host=host.docker.internal:hos
   -v open-webui:/app/backend/data ghcr.io/open-webui/open-webui:main
 ```
 
-Then open http://localhost:3001 and pick the `cafoo-advisor` model.
+Then open http://localhost:3001 and pick the `luyten` model.
 The image is about 1.6 GB to download.
 The three `ENABLE_*_GENERATION` flags stop Open WebUI from sending its own background prompts (titles, tags, follow-ups) to the Advisor.
 `--add-host=host.docker.internal:host-gateway` makes `host.docker.internal` resolve to the host on Linux, where Docker does not define it.
 Open WebUI in Docker connects from the Docker network, not from loopback, so it needs the key both to chat and to start a close; with the key it can do both.
 Once `GATEWAY_HOST` is `0.0.0.0`, other machines on your network can reach the port too; the key is what keeps them out of `/v1/*` and anything that changes state.
 
-## The Advisor on Agentverse and ASI:One
+## Luyten on Agentverse and ASI:One
 
 ![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
 ![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
 
 | Agent | Address |
 |---|---|
-| Cafoo Advisor (orchestrator, on Agentverse) | `agent1q0umtvqa3es9hwpd04uhu4fman6epdmy4thrqkp50nqk5ra7al8mvqy8rde` |
-| Cafoo Bookkeeper | `agent1q268mjp7znyh33pylwdy23y6tmscxf7h2akfqrkcunumq0fdvt2nsn6cjl4` |
-| Cafoo Revenue | `agent1qd0j6p9yg2uklfjgumrx59fc0fqvr6c6smftht356kkg39lza5tt6n5ppvt` |
-| Cafoo Credit & Risk | `agent1q25a3cnevsjrgmrx9ddy2wqq6ujw0ms6yynpzsqexy2tjmc26gdpz3qjsp6` |
-| Cafoo Consolidation | `agent1q2elptd3ff4sh5htr22h6dc0egmzejqjm07e2wwmmhfvr60z49ekcfgegfw` |
-| Cafoo Red Team | `agent1qwn005l9dqmmnhk703v3r60c2dckj0kmx2s97sh38gfhvdgzpqw0wjklap2` |
+| Luyten (orchestrator, on Agentverse) | `agent1q0umtvqa3es9hwpd04uhu4fman6epdmy4thrqkp50nqk5ra7al8mvqy8rde` |
+| Luyten Bookkeeper | `agent1q268mjp7znyh33pylwdy23y6tmscxf7h2akfqrkcunumq0fdvt2nsn6cjl4` |
+| Luyten Revenue | `agent1qd0j6p9yg2uklfjgumrx59fc0fqvr6c6smftht356kkg39lza5tt6n5ppvt` |
+| Luyten Credit & Risk | `agent1q25a3cnevsjrgmrx9ddy2wqq6ujw0ms6yynpzsqexy2tjmc26gdpz3qjsp6` |
+| Luyten Consolidation | `agent1q2elptd3ff4sh5htr22h6dc0egmzejqjm07e2wwmmhfvr60z49ekcfgegfw` |
+| Luyten Red Team | `agent1qwn005l9dqmmnhk703v3r60c2dckj0kmx2s97sh38gfhvdgzpqw0wjklap2` |
 
-The Advisor is also a uAgent with the Agent Chat Protocol and ASI:One interactive cards, so anyone can chat with it from ASI:One.
+Luyten is a uAgent with the Agent Chat Protocol and ASI:One interactive cards, so anyone can chat with it from ASI:One.
 It orchestrates five specialist uAgents, each with its own request and response models: a financial health check asks them in parallel and returns one card with advice.
 It also lists what waits for the CFO, explains any Proposal with its Red Team critiques and ruling, starts the close, and answers questions from the live books; it never confirms or posts.
 It runs next to this stack as a mailbox agent; see [apps/asi-advisor/README.md](apps/asi-advisor/README.md).
@@ -133,7 +137,7 @@ The agent gateway reports what is running: `GET /status` (providers, closes, `fe
 
 ## Demo mode and environment
 
-With zero API keys, Cafoo runs end to end.
+With zero API keys, Luyten runs end to end.
 Without `ANTHROPIC_API_KEY` no model is called: the close is the scripted close in `apps/agents/src/scripted/`, run over the real accounting engines (bank matching, revenue schedules, accruals, allowances, the credit cascade, consolidation), with scripted narration and scripted Advisor rulings, and the Advisor chat answers from the ledger tables.
 Without `XAI_API_KEY` the Red Team writes rule-based critiques.
 Bright Data and CRS answer from recorded fixtures, Moss becomes a local keyword search over the same policy documents, and Apify reads the demo website snapshots in `fixtures/apify/`.
@@ -158,7 +162,7 @@ Each key you add switches that one provider to live calls.
 | `GOOGLE_SERVICE_ACCOUNT_FILE`, `SLIDES_SHARE_WITH` | Google Slides export of the ledger, Board Pack or CFO queue | CSV export only |
 | `CRS_USERNAME`, `CRS_PASSWORD`, `CRS_BASE_URL`, `CRS_REPLAY` | CRS Credit API sandbox: identity, fraud, bureaus, public records | `fixtures/crs/` |
 | `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Moss: search over the house policies (every agent and the chat) and crawled customer sites | Local keyword search |
-| `SPACETIMEDB_URI`, `SPACETIMEDB_DB_NAME` | Ledger database | `http://localhost:3000`, `cafoo` |
+| `SPACETIMEDB_URI`, `SPACETIMEDB_DB_NAME` | Ledger database | `http://localhost:3000`, `luyten` |
 | `GATEWAY_PORT` | Agent gateway and OpenAI-compatible endpoint | `8787` |
 | `GATEWAY_HOST` | Address the gateway listens on; `0.0.0.0` for Open WebUI in Docker (set `GATEWAY_API_KEY` too) | `127.0.0.1`, this machine only |
 | `GATEWAY_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the gateway and start a close | The web app's dev and preview origins on localhost and 127.0.0.1 (ports 5173 and 4173) |
@@ -170,8 +174,8 @@ Each key you add switches that one provider to live calls.
 | `FEED_DEBOUNCE_MS` | Quiet time after the last new bank line before the continuous Bookkeeper proposes | `2000` |
 | `PUBLIC_WEB_ORIGIN` | Origin of the CFO app in the claim link the seed loader prints | `http://localhost:5173` |
 | `CFO_BOOTSTRAP_TTL_MINUTES` | How long a claim link armed by `pnpm cfo:bootstrap` stays valid (at most a week) | `1440` |
-| `CHARTER_EVAL_DB` | Scratch database the full charter eval resets and closes; never the gateway's own | `cafoo-eval` |
-| `CHARTER_SMOKE_DB` | Database the charter smoke test resets | `cafoo-charter-smoke` |
+| `CHARTER_EVAL_DB` | Scratch database the full charter eval resets and closes; never the gateway's own | `luyten-eval` |
+| `CHARTER_SMOKE_DB` | Database the charter smoke test resets | `luyten-charter-smoke` |
 
 Quote every value in `.env`. Never retry a failed CRS login: repeated failures disable the sandbox account permanently. The variables a full charter eval uses to force a draft Charter are internal, and the agents honour them only on the eval database.
 
@@ -181,16 +185,16 @@ GitHub Actions (`.github/workflows/ci.yml`) runs all of these on every push to `
 
 ```sh
 pnpm test        # every package's tests, including the ledger engine and the credit cascade
-pnpm -F @cafoo/agents test:module  # real datastore regressions for scheduled overdue updates and CFO bank exceptions
+pnpm -F @luyten/agents test:module  # real datastore regressions for scheduled overdue updates and CFO bank exceptions
 pnpm check       # reference lint plus type checks
 ```
 
-The smoke tests need the local SpacetimeDB on :3000 and the spacetime CLI. Each one republishes its own databases, so none of them touches `cafoo`:
+The smoke tests need the local SpacetimeDB on :3000 and the spacetime CLI. Each one republishes its own databases, so none of them touches `luyten`:
 
 ```sh
-pnpm -F @cafoo/stdb-bindings smoke   # every module gate and refusal, on cafoo-smoke and cafoo-smoke-legacy (an in-place upgrade)
-pnpm -F @cafoo/agents smoke:feed     # September close, CFO claim and lock, then the October feed end to end (cafoo-c1; refuses cafoo)
-pnpm -F @cafoo/agents smoke:charter  # draft, eval and publish a stricter Charter (CHARTER_SMOKE_DB and CHARTER_EVAL_DB)
+pnpm -F @luyten/stdb-bindings smoke   # every module gate and refusal, on luyten-smoke and luyten-smoke-legacy (an in-place upgrade)
+pnpm -F @luyten/agents smoke:feed     # September close, CFO claim and lock, then the October feed end to end (luyten-c1; refuses luyten)
+pnpm -F @luyten/agents smoke:charter  # draft, eval and publish a stricter Charter (CHARTER_SMOKE_DB and CHARTER_EVAL_DB)
 pnpm eval --rerun                    # reseed, rerun the scripted close and check every charter scenario against the result
 ```
 

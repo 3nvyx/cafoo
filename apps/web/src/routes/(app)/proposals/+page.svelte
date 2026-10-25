@@ -57,7 +57,7 @@
 	}
 </script>
 
-<svelte:head><title>Proposals · Cafoo</title></svelte:head>
+<svelte:head><title>Proposals · Luyten</title></svelte:head>
 
 <!-- One centered column: heading, tabs and cards share an edge on both sides. 4xl fits all seven tabs without scrolling. -->
 <div class="mx-auto max-w-4xl">

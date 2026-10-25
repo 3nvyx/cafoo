@@ -3,7 +3,7 @@
  * CFO. One shape feeds both the CSV download and the Google Slides deck (slides.ts), so the two never disagree.
  * Amounts are decimal major units of the stated currency ("1234.56"), computed from the same engines as the app.
  */
-import { ymFromString } from '@cafoo/ledger-core';
+import { ymFromString } from '@luyten/ledger-core';
 import { advisorReport } from './advisor-report';
 import type { RoleConn } from './stdb';
 

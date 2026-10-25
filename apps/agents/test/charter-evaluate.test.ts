@@ -2,7 +2,7 @@
 // reseed-and-close step replaced by a seam that hands back the recorded close), what it records, and the plain
 // sentence it writes for the CFO.
 import { describe, expect, it, vi } from 'vitest';
-import { loadScenarios, scenariosDir, snapshotDb } from '@cafoo/eval-harness';
+import { loadScenarios, scenariosDir, snapshotDb } from '@luyten/eval-harness';
 import { builtinCharter } from '../src/charter/active';
 import { defaultMapping } from '../src/charter/build';
 import { evalPlan, evalServer, evalSummary, evaluateCharter, evaluateCharterVersion, runCommand, type CharterUnderEval, type DryRunOptions } from '../src/charter/evaluate';
@@ -111,9 +111,9 @@ describe('evaluateCharter, dry run', () => {
   it('reseeds and closes under the draft, then judges that ledger', async () => {
     const prepare = vi.fn(async (_o: DryRunOptions) => {});
     const steps: string[] = [];
-    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'cafoo-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb(), onStep: m => steps.push(m), ym: '2026-09' });
+    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'luyten-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb(), onStep: m => steps.push(m), ym: '2026-09' });
     expect(prepare).toHaveBeenCalledOnce();
-    expect(prepare.mock.calls[0]![0]).toMatchObject({ db: 'cafoo-eval', server: evalServer().http, ym: '2026-09', role: 'bookkeeper', version: 1, mapping: defaultMapping('bookkeeper'), published: [] });
+    expect(prepare.mock.calls[0]![0]).toMatchObject({ db: 'luyten-eval', server: evalServer().http, ym: '2026-09', role: 'bookkeeper', version: 1, mapping: defaultMapping('bookkeeper'), published: [] });
     expect(r.scenarios.length).toBe(shippedScenarios.filter(s => s.suite === 'charters').length);
     expect(r.scenarios.filter(s => s.status !== 'PASS').map(s => `${s.id}: ${s.detail}`)).toEqual([]);
     expect(r.passed).toBe(true);
@@ -123,7 +123,7 @@ describe('evaluateCharter, dry run', () => {
   });
 
   it('fails when the close under the draft does not finish', async () => {
-    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'cafoo-eval', scenarios: shippedScenarios, prepare: async () => { throw new Error('seed load failed'); } });
+    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'luyten-eval', scenarios: shippedScenarios, prepare: async () => { throw new Error('seed load failed'); } });
     expect(r.scenarios).toEqual([{ label: 'dry run', id: 'dry-run', status: 'ERROR', detail: 'the close with this charter did not finish: seed load failed' }]);
     expect(r.passed).toBe(false);
     expect(evalSummary(r, 1)).toBe('The Bookkeeper charter, version 1, failed its dry run: the close could not run under it.');
@@ -133,7 +133,7 @@ describe('evaluateCharter, dry run', () => {
     const prepare = vi.fn(async (_o: DryRunOptions) => {});
     const revenueBody = builtinCharter('revenue').bodyMd.replace('1. You may propose revenue schedules and revenue journal entries, and nothing else.', '1. You may propose revenue schedules and revenue journal entries, nothing more.');
     const published = [{ role: 'revenue' as const, version: 4, bodyMd: revenueBody, mapping: defaultMapping('revenue', revenueBody) }];
-    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'cafoo-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb(), published });
+    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: 'luyten-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb(), published });
     expect(prepare.mock.calls[0]![0].published).toEqual(published);
     expect(r.published).toEqual({ revenue: 4 });
     // The reworded revenue line is checked through its shipped rule's binding, not skipped and not an error.
@@ -146,7 +146,7 @@ describe('evaluateCharter, dry run', () => {
 
   it("never reseeds the gateway's own database", async () => {
     const prepare = vi.fn(async () => {});
-    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: process.env.SPACETIMEDB_DB_NAME ?? 'cafoo', scenarios: shippedScenarios, prepare });
+    const r = await evaluateCharter(shipped('bookkeeper'), { mode: 'dry_run', evalDb: process.env.SPACETIMEDB_DB_NAME ?? 'luyten', scenarios: shippedScenarios, prepare });
     expect(prepare).not.toHaveBeenCalled();
     expect(r.scenarios[0]!.detail).toMatch(/is the gateway's own; set CHARTER_EVAL_DB/);
     expect(r.passed).toBe(false);
@@ -179,7 +179,7 @@ describe('evaluateCharterVersion', () => {
 
   it("hands a dry run the other roles' published charters from the ledger", async () => {
     const prepare = vi.fn(async (_o: DryRunOptions) => {});
-    const r = await evaluateCharterVersion(castWith(row('Draft')), 7n, { mode: 'dry_run', evalDb: 'cafoo-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb() });
+    const r = await evaluateCharterVersion(castWith(row('Draft')), 7n, { mode: 'dry_run', evalDb: 'luyten-eval', scenarios: shippedScenarios, prepare, dryRunDb: () => snapshotDb() });
     expect(prepare.mock.calls[0]![0].published!.map(p => [p.role, p.version])).toEqual([['revenue', 3]]);
     expect(r.published).toEqual({ revenue: 3 });
   });

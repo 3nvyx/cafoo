@@ -13,7 +13,7 @@ import { createXai } from '@ai-sdk/xai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { CrsClient, runCascade } from '@cafoo/crs-mcp';
+import { CrsClient, runCascade } from '@luyten/crs-mcp';
 import { agentProvider, geminiKey, geminiModel, providers } from './env';
 import { HARNESSES, modelFor } from './harness';
 import { apifyLive, crawlLive } from './apify';
@@ -104,12 +104,12 @@ export function proofSteps(env: NodeJS.ProcessEnv, flags: { crs: boolean; slides
     {
       id: 'moss', name: 'Moss (policy search)', configured: mossConfigured(env),
       run: async () => {
-        const hits = await search('cafoo-proof', [
+        const hits = await search('luyten-proof', [
           { id: 'accruals', text: 'Work performed in the close month but billed after month end is accrued.' },
           { id: 'fx', text: 'Foreign-currency balances are revalued at the closing rate.' },
         ], 'a contractor bill dated after month end', 1);
         if (hits[0]?.via !== 'moss') throw new Error('Moss did not answer; the search fell back to local keyword search');
-        return { index: 'cafoo-proof', topHit: hits[0].id, score: Number(hits[0].score.toFixed(3)) };
+        return { index: 'luyten-proof', topHit: hits[0].id, score: Number(hits[0].score.toFixed(3)) };
       },
     },
     {
@@ -150,7 +150,7 @@ export function proofSteps(env: NodeJS.ProcessEnv, flags: { crs: boolean; slides
       why: !flags.slides ? 'pass --slides to create and share one small deck' : 'missing' in slides ? `not set up: ${slides.missing.join('; ')}` : undefined,
       run: async () => {
         if (!('config' in slides)) throw new Error('not set up');
-        const deck = await exportToSlides(slides.config, 'Cafoo proof deck', 'Created by pnpm proof', [{ title: 'Proof', header: ['Check', 'Result'], rows: [['Slides export', 'ok']] }]);
+        const deck = await exportToSlides(slides.config, 'Luyten proof deck', 'Created by pnpm proof', [{ title: 'Proof', header: ['Check', 'Result'], rows: [['Slides export', 'ok']] }]);
         return { presentationId: deck.presentationId, url: deck.url };
       },
     },
@@ -161,7 +161,7 @@ export function proofMarkdown(proofs: Proof[], commit: string): string {
   const icon = { proved: 'PROVED', failed: 'FAILED', skipped: 'skipped' } as const;
   const rows = proofs.map(p => `| ${p.name} | ${icon[p.status]} | ${p.ms === undefined ? '' : `${p.ms} ms`} | ${p.evidence ? Object.entries(p.evidence).map(([k, v]) => `${k}: ${v}`).join('; ') : p.reason ?? ''} |`);
   return [
-    `# Cafoo live provider proof, ${proofs[0]?.at ?? new Date().toISOString()}`,
+    `# Luyten live provider proof, ${proofs[0]?.at ?? new Date().toISOString()}`,
     '',
     `Commit ${commit}. One minimal real call per configured provider; nothing was written to the books. Skipped means no keys on this machine, never a stand-in.`,
     '',

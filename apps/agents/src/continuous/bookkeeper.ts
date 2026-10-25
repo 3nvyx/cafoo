@@ -8,7 +8,7 @@
  * close has started, is running in this gateway, or is locked. Its Proposals carry no close task, so they never make
  * a month look closed; the close skips any bank line one of them already cites.
  */
-import { findDuplicatePayments, formatMinor, scoreBankMatches, ymLabel, type BankTransaction, type Bill, type Invoice } from '@cafoo/ledger-core';
+import { findDuplicatePayments, formatMinor, scoreBankMatches, ymLabel, type BankTransaction, type Bill, type Invoice } from '@luyten/ledger-core';
 import { classifyOutflow, dayLabel, vendorLookup } from '../bookkeeping';
 import { citedBankTxIds as citedBy, closeOpenedAt, isFeedMonth } from '../close-state';
 import { exactAmount, line, snapshot, type Snapshot } from '../snapshot';

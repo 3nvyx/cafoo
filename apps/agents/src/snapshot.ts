@@ -4,8 +4,8 @@
  * Accounts, customers, vendors, bank transactions, invoices and bills (through their customer or vendor), contracts,
  * schedule lines and journal lines are filtered to that subsidiary, so a second company's rows never enter its close.
  */
-import type { Account, BankTransaction, Bill, Contract, ContractItem, Entity, FxRate, Invoice, JournalLine, Ym } from '@cafoo/ledger-core';
-import { ymFromString } from '@cafoo/ledger-core';
+import type { Account, BankTransaction, Bill, Contract, ContractItem, Entity, FxRate, Invoice, JournalLine, Ym } from '@luyten/ledger-core';
+import { ymFromString } from '@luyten/ledger-core';
 import type { RoleConn } from './stdb';
 
 const lower = <T extends string>(tag: string) => tag.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase() as T;

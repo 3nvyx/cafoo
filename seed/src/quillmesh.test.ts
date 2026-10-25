@@ -72,7 +72,7 @@ describe('the Quillmesh profile', () => {
   });
 
   it('names the group after Quillmesh, and the default profile after the fixture', () => {
-    expect(JSON.stringify(q.group)).not.toMatch(/Cafoo (Inc|Ltd)|CAFOO (INC|LTD)/);
+    expect(JSON.stringify(q.group)).not.toMatch(/Luyten (Inc|Ltd)|CAFOO (INC|LTD)/);
     expect(JSON.stringify(q.group)).toMatch(/Quillmesh Ltd/);
     expect(JSON.stringify(base.group)).toMatch(/Cafoo Ltd/);
   });

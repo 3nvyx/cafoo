@@ -247,7 +247,7 @@
 			"interestBp": 600,
 			"maturityAt": "2028-10-01T00:00:00Z",
 			"classification": "liability",
-			"classificationPlain": "A liability, not income: Cafoo owes the principal plus interest until the note converts or is repaid. The interest is an expense each month.",
+			"classificationPlain": "A liability, not income: Luyten owes the principal plus interest until the note converts or is repaid. The interest is an expense each month.",
 			"status": "draft"
 		},
 		{

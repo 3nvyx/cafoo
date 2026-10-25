@@ -47,7 +47,7 @@ describe('local keyword search', () => {
   });
   it('is what search returns when Moss is not configured', async () => {
     vi.stubEnv('MOSS_PROJECT_ID', '');
-    const hits = await search('cafoo-policies-test', policies, 'bad debt reserves', 1);
+    const hits = await search('luyten-policies-test', policies, 'bad debt reserves', 1);
     expect(hits).toEqual(keywordSearch(policies, 'bad debt reserves', 1));
   });
 });

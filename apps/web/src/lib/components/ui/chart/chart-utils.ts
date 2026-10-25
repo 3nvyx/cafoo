@@ -1,5 +1,5 @@
 // From shadcn-svelte (MIT), the Chart component: https://www.shadcn-svelte.com/docs/components/chart
-// Copied in the shadcn way so it is ours to edit. Adapted to Cafoo: #lib imports and design-token classes.
+// Copied in the shadcn way so it is ours to edit. Adapted to Luyten: #lib imports and design-token classes.
 import { getContext, setContext, type Component, type Snippet } from "svelte";
 import type { Tooltip } from "layerchart";
 

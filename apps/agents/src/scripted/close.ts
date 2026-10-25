@@ -1,6 +1,6 @@
 /**
  * Demo-mode month-end close. The accounting decisions come from the real engines
- * (@cafoo/ledger-core matching, revenue schedules, accruals, allowances; @cafoo/crs-mcp credit cascade).
+ * (@luyten/ledger-core matching, revenue schedules, accruals, allowances; @luyten/crs-mcp credit cascade).
  * Only the narration is scripted. Every write goes through the same role identities and reducers the
  * live agents use, so the UI, the approval gate, and the audit trail are identical in both modes.
  */
@@ -19,10 +19,10 @@ import {
   ymLabel,
   ymToString,
   type RiskTier,
-} from '@cafoo/ledger-core';
+} from '@luyten/ledger-core';
 import { answerSendBack, type ReserveFacts } from './sendback';
 import { tracked } from '../provider-calls';
-import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
+import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@luyten/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
 import { customerSites, siteSignals, sitePlain } from '../apify';
 import { STEP_MS } from '../env';

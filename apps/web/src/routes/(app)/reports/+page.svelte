@@ -140,7 +140,7 @@
 	const neg = (m: string | undefined) => (m ? toBig(m) < 0n : false);
 </script>
 
-<svelte:head><title>Board Pack · Cafoo</title></svelte:head>
+<svelte:head><title>Board Pack · Luyten</title></svelte:head>
 
 {#snippet cell(value: string | undefined, href: string | undefined, strong = false)}
 	{#if value === undefined || (value === '0' && !strong)}

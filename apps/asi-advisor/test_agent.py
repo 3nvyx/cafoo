@@ -1,4 +1,4 @@
-"""Tests for the Cafoo Advisor uAgent: python -m unittest -v (the live tests need the Cafoo stack running)."""
+"""Tests for the Luyten uAgent: python -m unittest -v (the live tests need the Luyten stack running)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import os
 import unittest
 
-os.environ.setdefault("CAFOO_ADVISOR_SEED", "cafoo-advisor-unit-test-seed")
+os.environ.setdefault("LUYTEN_ADVISOR_SEED", "luyten-unit-test-seed")
 
 import cards  # noqa: E402
 import ledger  # noqa: E402
@@ -73,7 +73,7 @@ class Reports(unittest.TestCase):
 
 class Selections(unittest.TestCase):
     def test_json_selection_from_a_direct_mention(self):
-        self.assertEqual(cards.parse_selection('{"action": "explain", "proposal_id": "5", "source": "cafoo_advisor"}')["proposal_id"], "5")
+        self.assertEqual(cards.parse_selection('{"action": "explain", "proposal_id": "5", "source": "luyten_advisor"}')["proposal_id"], "5")
 
     def test_prose_selection_from_the_planner(self):
         self.assertEqual(cards.parse_selection("The user tapped Why? on proposal_id 12."), {"action": "explain", "proposal_id": "12"})
@@ -116,10 +116,10 @@ def stack_up() -> bool:
         return False
 
 
-@unittest.skipUnless(stack_up(), "the Cafoo ledger is not running")
+@unittest.skipUnless(stack_up(), "the Luyten ledger is not running")
 class Live(unittest.TestCase):
     def test_greeting_shows_the_menu_card(self):
-        self.assertEqual(card_of(asyncio.run(reply_to("hi", no_answer)))["root"]["title"], "Cafoo Advisor")
+        self.assertEqual(card_of(asyncio.run(reply_to("hi", no_answer)))["root"]["title"], "Luyten")
 
     def test_health_check_still_renders_when_no_specialist_answers(self):
         root = card_of(asyncio.run(reply_to('{"action": "health"}', no_answer)))["root"]
@@ -129,7 +129,7 @@ class Live(unittest.TestCase):
     def test_needs_ok_lists_what_waits_for_the_cfo(self):
         waiting = asyncio.run(ledger.waiting_for_cfo())
         root = card_of(asyncio.run(reply_to('{"action": "needs_ok"}', no_answer)))["root"]
-        self.assertIn(f": {len(waiting)}", root["title"]) if waiting else self.assertEqual(root["title"], "Cafoo Advisor")
+        self.assertIn(f": {len(waiting)}", root["title"]) if waiting else self.assertEqual(root["title"], "Luyten")
 
     def test_explain_reads_a_real_proposal(self):
         first = asyncio.run(ledger.proposals())[0]

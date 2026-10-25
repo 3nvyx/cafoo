@@ -78,7 +78,7 @@
 	};
 </script>
 
-<svelte:head><title>{c?.name ?? 'Customer'} · Cafoo</title></svelte:head>
+<svelte:head><title>{c?.name ?? 'Customer'} · Luyten</title></svelte:head>
 
 <a href="/customers" class="drill inline-flex min-h-11 items-center gap-1 text-body-sm text-ink-2"><Icon name="chevronLeft" size={16} />Customers</a>
 

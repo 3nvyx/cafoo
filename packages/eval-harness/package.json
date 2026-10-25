@@ -1,5 +1,5 @@
 {
-  "name": "@cafoo/eval-harness",
+  "name": "@luyten/eval-harness",
   "version": "0.1.0",
   "private": true,
   "description": "Charter evals (one scenario per checkable charter line, run against the live ledger) and deterministic credit-cascade correctness. Runs with zero API keys.",
@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cafoo/crs-mcp": "workspace:*",
+    "@luyten/crs-mcp": "workspace:*",
     "yaml": "^2.9.1"
   },
   "devDependencies": {

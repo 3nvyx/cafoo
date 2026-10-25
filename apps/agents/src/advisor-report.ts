@@ -1,5 +1,5 @@
 /** Read-side financial calculations shared by the Advisor's deterministic answers. */
-import { accountBalances, consolidate, customerArr, groupCode, incomeStatement, translate, ymFromString } from '@cafoo/ledger-core';
+import { accountBalances, consolidate, customerArr, groupCode, incomeStatement, translate, ymFromString } from '@luyten/ledger-core';
 import { groupSnapshot, snapshot } from './snapshot';
 import type { RoleConn } from './stdb';
 

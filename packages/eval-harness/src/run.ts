@@ -1,10 +1,10 @@
-// Cafoo eval harness. Usage: pnpm -F @cafoo/eval-harness run [--suite charters|personas|all] [--rerun] [--db cafoo]
+// Luyten eval harness. Usage: pnpm -F @luyten/eval-harness run [--suite charters|personas|all] [--rerun] [--db luyten]
 // [--server local] [--ym 2026-09] [--as-of 2026-10-24] [--only <id substring>]
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { personas } from '@cafoo/crs-mcp';
+import { personas } from '@luyten/crs-mcp';
 import { DEFAULT_VARS, chartersDir, dbVars, liveCharters, scenariosDir, type LiveCharters } from './api.js';
 import type { Scalar } from './conditions.js';
 import { SpacetimeCli, findSpacetimeBin } from './db.js';
@@ -17,7 +17,7 @@ const repoRoot = resolve(pkgRoot, '..', '..');
 const reportsDir = join(pkgRoot, 'reports');
 
 function parseArgs(argv: string[]) {
-  const opts = { suite: 'all' as 'all' | Suite, rerun: false, db: 'cafoo', server: 'local', ym: '', asOf: '2026-10-24', only: '' };
+  const opts = { suite: 'all' as 'all' | Suite, rerun: false, db: 'luyten', server: 'local', ym: '', asOf: '2026-10-24', only: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     const next = () => {
@@ -44,7 +44,7 @@ function parseArgs(argv: string[]) {
 
 function usage(err?: string): never {
   if (err) console.error(`error: ${err}`);
-  console.error('usage: pnpm -F @cafoo/eval-harness run [--suite charters|personas|all] [--rerun] [--db <name>] [--server <name>] [--ym YYYY-MM] [--as-of YYYY-MM-DD] [--only <id substring>]');
+  console.error('usage: pnpm -F @luyten/eval-harness run [--suite charters|personas|all] [--rerun] [--db <name>] [--server <name>] [--ym YYYY-MM] [--as-of YYYY-MM-DD] [--only <id substring>]');
   process.exit(err ? 2 : 0);
 }
 
@@ -57,8 +57,8 @@ function rerun(ym: string, db: string) {
   console.log(`[eval] --rerun: regenerating seed, resetting the database and running the scripted close for ${ym} (about 30 s)`);
   const env = { ...process.env, SPACETIMEDB_DB_NAME: db, CLOSE_NO_WAIT: '1', DEMO_STEP_MS: '0', PATH: `${dirname(findSpacetimeBin())}:${process.env.PATH ?? ''}` };
   const steps: [string, string[], string, Record<string, string>][] = [
-    ['pnpm', ['-F', '@cafoo/seed', 'generate'], repoRoot, {}],
-    ['pnpm', ['-F', '@cafoo/seed', 'load'], repoRoot, { SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' }],
+    ['pnpm', ['-F', '@luyten/seed', 'generate'], repoRoot, {}],
+    ['pnpm', ['-F', '@luyten/seed', 'load'], repoRoot, { SEED_RESET: '1', SEED_NO_BOOTSTRAP: '1' }],
     ['node', ['--import', 'tsx', 'src/cli-close.ts', ym], join(repoRoot, 'apps', 'agents'), {}],
   ];
   for (const [cmd, args, cwd, extra] of steps) {
@@ -88,7 +88,7 @@ const mdEscape = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 function renderMarkdown(results: ScenarioResult[], meta: Record<string, unknown>, score: ReturnType<typeof scoreOf>): string {
   const out: string[] = [];
-  out.push(`# Cafoo eval report ${String(meta.startedAt)}`, '');
+  out.push(`# Luyten eval report ${String(meta.startedAt)}`, '');
   out.push(`Suite \`${String(meta.suite)}\`, database \`${String(meta.db)}\` on \`${String(meta.server)}\`, close month \`${String(meta.close_ym || 'n/a')}\`, materiality ${String(meta.materiality ?? 'n/a')} minor units, persona as-of ${String(meta.asOf)}.`, '');
   const published = Object.entries((meta.charters ?? {}) as Record<string, number>);
   if (published.length) out.push(`Published charters: ${published.map(([r, v]) => `${r} v${v}`).join(', ')}; every other agent by its shipped charter.`, '');

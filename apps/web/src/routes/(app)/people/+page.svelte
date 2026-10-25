@@ -170,7 +170,7 @@
 	const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 </script>
 
-<svelte:head><title>People · Cafoo</title></svelte:head>
+<svelte:head><title>People · Luyten</title></svelte:head>
 
 <header class="flex flex-col gap-1 pb-6">
 	<p class="text-body-sm text-ink-2">{companies.map((c) => c.name).join(' and ')}{providers.length ? ` · payroll through ${providers.join(' and ')}` : ''}</p>

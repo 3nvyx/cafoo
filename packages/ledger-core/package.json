@@ -1,8 +1,8 @@
 {
-  "name": "@cafoo/ledger-core",
+  "name": "@luyten/ledger-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Pure, deterministic double-entry accounting engine for Cafoo. Money is bigint minor units.",
+  "description": "Pure, deterministic double-entry accounting engine for Luyten. Money is bigint minor units.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
