@@ -196,5 +196,523 @@
 				{"label": "Plain summary", "text": "Write every summary as one plain sentence a non-accountant understands, with no account codes and no bookkeeping jargon, and with every amount written as money, for example \"Restate the two hundred thousand dollar loan Cafoo Ltd owes Cafoo Inc at September's closing rate\" or \"$200,000\", never \"20000000\".", "target": {"kind": "rule", "template": "builtin:consolidation.plain"}}
 			]
 		}
+	},
+	"tools": {
+		"sources": {
+			"ledger": "Ledger reducers (SpacetimeDB)",
+			"engine": "Ledger engine (ledger-core)",
+			"crs": "CRS credit MCP tools",
+			"brightdata": "Bright Data",
+			"apify": "Apify",
+			"moss": "Moss search",
+			"nessie": "Capital One Nessie",
+			"agent_sdk": "Claude Agent SDK"
+		},
+		"byRole": {
+			"advisor": [
+				{
+					"name": "approve_proposal",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Approve a Proposal, optionally amended; at or above materiality it waits for the CFO."
+				},
+				{
+					"name": "reject_proposal",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Reject a Proposal with a rationale."
+				},
+				{
+					"name": "post_ruling",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Post a ruling or coordination message in the close thread."
+				},
+				{
+					"name": "update_close_task",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Move a close task forward (only the Advisor or the CFO marks one done)."
+				},
+				{
+					"name": "request_period_lock",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Ask the CFO to lock the month; refused while anything is open or waiting."
+				},
+				{
+					"name": "close_snapshot",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Everything needed to start the close: tasks, unmatched bank lines, open invoices and bills, schedules, receivables, unverified vendors."
+				},
+				{
+					"name": "list_proposals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's Proposals with status, Red Team critiques and the Advisor ruling."
+				},
+				{
+					"name": "score_bank_matches",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Score unmatched bank lines against open invoices and bills: confidence, exact-amount candidates, duplicates."
+				},
+				{
+					"name": "detect_missing_accruals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Bills for work done in the month but billed after it, with ready-to-propose accruals."
+				},
+				{
+					"name": "build_revenue_schedule",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Straight-line ASC 606 schedule for a contract: one line per month of the term."
+				},
+				{
+					"name": "allowance_target",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Expected-credit-loss target for a customer from its Risk Tier, and the change from today."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				},
+				{
+					"name": "Agent",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Hand a task to a worker agent (the Advisor runs the close this way)."
+				},
+				{
+					"name": "SendMessage",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Message another agent in the same run."
+				}
+			],
+			"bookkeeper": [
+				{
+					"name": "propose_bank_match",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose matching bank lines to the invoices or bills they pay, to the cent."
+				},
+				{
+					"name": "propose_journal_entry",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose a balanced journal entry citing the bank lines or bills it explains."
+				},
+				{
+					"name": "propose_accrual",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose an accrual for work done this month and billed later; it reverses in a later month."
+				},
+				{
+					"name": "post_message",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Say something in the close thread or on a Proposal thread."
+				},
+				{
+					"name": "update_close_task",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Move a close task forward (only the Advisor or the CFO marks one done)."
+				},
+				{
+					"name": "close_snapshot",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Everything needed to start the close: tasks, unmatched bank lines, open invoices and bills, schedules, receivables, unverified vendors."
+				},
+				{
+					"name": "list_proposals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's Proposals with status, Red Team critiques and the Advisor ruling."
+				},
+				{
+					"name": "score_bank_matches",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Score unmatched bank lines against open invoices and bills: confidence, exact-amount candidates, duplicates."
+				},
+				{
+					"name": "detect_missing_accruals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Bills for work done in the month but billed after it, with ready-to-propose accruals."
+				},
+				{
+					"name": "build_revenue_schedule",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Straight-line ASC 606 schedule for a contract: one line per month of the term."
+				},
+				{
+					"name": "allowance_target",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Expected-credit-loss target for a customer from its Risk Tier, and the change from today."
+				},
+				{
+					"name": "Counterparty lookup",
+					"source": "brightdata",
+					"kind": "service",
+					"description": "Google results through Bright Data for an unknown payee before a payment is classified."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				},
+				{
+					"name": "Bank feed",
+					"source": "nessie",
+					"kind": "service",
+					"description": "Capital One Nessie deposits and withdrawals arrive as Feed rows the Continuous Bookkeeper matches."
+				},
+				{
+					"name": "SendMessage",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Message another agent in the same run."
+				}
+			],
+			"revenue": [
+				{
+					"name": "propose_revenue_schedule",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose recognition schedule lines for a customer's contract item."
+				},
+				{
+					"name": "propose_journal_entry",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose a balanced journal entry citing the bank lines or bills it explains."
+				},
+				{
+					"name": "post_message",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Say something in the close thread or on a Proposal thread."
+				},
+				{
+					"name": "update_close_task",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Move a close task forward (only the Advisor or the CFO marks one done)."
+				},
+				{
+					"name": "close_snapshot",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Everything needed to start the close: tasks, unmatched bank lines, open invoices and bills, schedules, receivables, unverified vendors."
+				},
+				{
+					"name": "list_proposals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's Proposals with status, Red Team critiques and the Advisor ruling."
+				},
+				{
+					"name": "score_bank_matches",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Score unmatched bank lines against open invoices and bills: confidence, exact-amount candidates, duplicates."
+				},
+				{
+					"name": "detect_missing_accruals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Bills for work done in the month but billed after it, with ready-to-propose accruals."
+				},
+				{
+					"name": "build_revenue_schedule",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Straight-line ASC 606 schedule for a contract: one line per month of the term."
+				},
+				{
+					"name": "allowance_target",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Expected-credit-loss target for a customer from its Risk Tier, and the change from today."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				},
+				{
+					"name": "SendMessage",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Message another agent in the same run."
+				}
+			],
+			"credit": [
+				{
+					"name": "propose_credit_decision",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose a customer's Risk Tier and payment terms, citing the cascade's request ids."
+				},
+				{
+					"name": "propose_journal_entry",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose a balanced journal entry citing the bank lines or bills it explains."
+				},
+				{
+					"name": "propose_vendor_block",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose blocking all payments to a vendor whose owner failed identity or fraud checks."
+				},
+				{
+					"name": "propose_vendor_verify",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose a vendor check: mark a vendor verified from its owner's identity and fraud results."
+				},
+				{
+					"name": "record_credit_check",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Store one evidence row of the cascade just run (product, request id) on the customer or vendor; the books derive the tier."
+				},
+				{
+					"name": "post_message",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Say something in the close thread or on a Proposal thread."
+				},
+				{
+					"name": "update_close_task",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Move a close task forward (only the Advisor or the CFO marks one done)."
+				},
+				{
+					"name": "close_snapshot",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Everything needed to start the close: tasks, unmatched bank lines, open invoices and bills, schedules, receivables, unverified vendors."
+				},
+				{
+					"name": "list_proposals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's Proposals with status, Red Team critiques and the Advisor ruling."
+				},
+				{
+					"name": "score_bank_matches",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Score unmatched bank lines against open invoices and bills: confidence, exact-amount candidates, duplicates."
+				},
+				{
+					"name": "detect_missing_accruals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Bills for work done in the month but billed after it, with ready-to-propose accruals."
+				},
+				{
+					"name": "build_revenue_schedule",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Straight-line ASC 606 schedule for a contract: one line per month of the term."
+				},
+				{
+					"name": "allowance_target",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Expected-credit-loss target for a customer from its Risk Tier, and the change from today."
+				},
+				{
+					"name": "run_credit_cascade",
+					"kind": "tool",
+					"source": "crs",
+					"description": "The full Credit Check cascade on a persona: identity, fraud, three bureaus, public records; returns tier, decision, terms, request ids."
+				},
+				{
+					"name": "crs_personas",
+					"kind": "tool",
+					"source": "crs",
+					"description": "The 20 CRS sandbox personas and the decision each should lead to; only these people can be checked."
+				},
+				{
+					"name": "crs_credit_report",
+					"kind": "tool",
+					"source": "crs",
+					"description": "One bureau soft pull (TransUnion, Equifax or Experian): file status, score, tradelines, derogatories."
+				},
+				{
+					"name": "crs_identity_verify",
+					"kind": "tool",
+					"source": "crs",
+					"description": "TransUnion identity verification: PASS, FAIL or KBA_REQUIRED with message codes (deceased, SSN mismatch)."
+				},
+				{
+					"name": "crs_fraud_score",
+					"kind": "tool",
+					"source": "crs",
+					"description": "Fraud Finder risk check on email, phone, address and IP: score 0 to 100 and plain signals."
+				},
+				{
+					"name": "crs_public_records",
+					"kind": "tool",
+					"source": "crs",
+					"description": "Bankruptcies, liens, judgments, criminal and eviction records."
+				},
+				{
+					"name": "crs_cascade",
+					"kind": "tool",
+					"source": "crs",
+					"description": "Credit cascade on a guarantor or vendor owner: identity, fraud, TransUnion, Equifax, Experian, public records."
+				},
+				{
+					"name": "collect_public_footprint",
+					"kind": "tool",
+					"source": "brightdata",
+					"description": "What a logged-out visitor sees (Yelp, job board, LinkedIn company page), fetched through Bright Data; a signal, never a tier."
+				},
+				{
+					"name": "check_customer_site",
+					"kind": "tool",
+					"source": "apify",
+					"description": "Read a customer's public website (Apify crawl) for closing, insolvency or change-of-owner sentences."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				},
+				{
+					"name": "SendMessage",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Message another agent in the same run."
+				}
+			],
+			"redteam": [
+				{
+					"name": "submit_critique",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Attach a critique to a Proposal before the Advisor rules."
+				},
+				{
+					"name": "search_customer_site",
+					"kind": "tool",
+					"source": "apify",
+					"description": "Search a customer's crawled website (Apify, indexed in Moss) for what the business says about itself."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				}
+			],
+			"consolidation": [
+				{
+					"name": "propose_fx_revaluation",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose restating one company's foreign-currency balances at the month's closing rate."
+				},
+				{
+					"name": "propose_ic_elimination",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Propose removing what group companies owe or charged each other, on the elimination company."
+				},
+				{
+					"name": "post_message",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Say something in the close thread or on a Proposal thread."
+				},
+				{
+					"name": "update_close_task",
+					"kind": "tool",
+					"source": "ledger",
+					"description": "Move a close task forward (only the Advisor or the CFO marks one done)."
+				},
+				{
+					"name": "revaluation_candidates",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Each company's foreign-currency balances restated at the closing rate, ready to propose."
+				},
+				{
+					"name": "elimination_candidates",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's intercompany eliminations, ready to propose, and any pair whose sides differ."
+				},
+				{
+					"name": "close_snapshot",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Everything needed to start the close: tasks, unmatched bank lines, open invoices and bills, schedules, receivables, unverified vendors."
+				},
+				{
+					"name": "list_proposals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "The month's Proposals with status, Red Team critiques and the Advisor ruling."
+				},
+				{
+					"name": "score_bank_matches",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Score unmatched bank lines against open invoices and bills: confidence, exact-amount candidates, duplicates."
+				},
+				{
+					"name": "detect_missing_accruals",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Bills for work done in the month but billed after it, with ready-to-propose accruals."
+				},
+				{
+					"name": "build_revenue_schedule",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Straight-line ASC 606 schedule for a contract: one line per month of the term."
+				},
+				{
+					"name": "allowance_target",
+					"kind": "tool",
+					"source": "engine",
+					"description": "Expected-credit-loss target for a customer from its Risk Tier, and the change from today."
+				},
+				{
+					"name": "search_policies",
+					"kind": "tool",
+					"source": "moss",
+					"description": "Search the house accounting policies through Moss and cite the policy id."
+				},
+				{
+					"name": "SendMessage",
+					"kind": "tool",
+					"source": "agent_sdk",
+					"description": "Message another agent in the same run."
+				}
+			]
+		}
 	}
 }

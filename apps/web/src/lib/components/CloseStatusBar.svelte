@@ -41,11 +41,11 @@
 				</div>
 				<span><Pill tone={STEP_STATE[s.state].tone}>{STEP_STATE[s.state].label}</Pill></span>
 				{#if s.id !== 'lock'}
-					<dl class="grid grid-cols-3 gap-1 text-caption text-ink-2">
-						<div><dt class="sr-only">Proposals made</dt><dd class="num text-ink">{s.made}</dd><dd aria-hidden="true">made</dd></div>
-						<div><dt class="sr-only">Approved</dt><dd class="num text-ink">{s.approved}</dd><dd aria-hidden="true">approved</dd></div>
-						<div><dt class="sr-only">Waiting for the CFO</dt><dd class="num text-ink">{s.waitingCfo}</dd><dd aria-hidden="true">for CFO</dd></div>
-					</dl>
+					<ul class="flex flex-col text-caption text-ink-2">
+						<li><span class="num font-medium text-ink">{s.made}</span> Proposals made</li>
+						<li><span class="num font-medium text-ink">{s.approved}</span> approved</li>
+						<li><span class="num font-medium text-ink">{s.waitingCfo}</span> waiting for the CFO</li>
+					</ul>
 				{/if}
 				<p class="text-caption text-ink-3">{s.note}</p>
 			</li>

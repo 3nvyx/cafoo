@@ -12,6 +12,7 @@
 	import { CHARTER_ROLES, editorProblems, latestEval, parseCharterLines, parseMapping, publishable, remap, scenariosFor, shippedTargets, showParam, templatesFor, templateTarget } from '#lib/charter.js';
 	import { dateTime, roleName, type Tone } from '#lib/labels.js';
 	import { attempt } from '#lib/toast.svelte.js';
+	import { builtinBody, charterView, toolGroups } from '#lib/charter-view.js';
 
 	// The catalog (templates, scenarios, Built-in Charters) comes from the agent gateway.
 	let catalog = $state<CharterCatalog | null>(null);
@@ -175,6 +176,17 @@
 	};
 	let openReport = $state<Record<string, boolean>>({});
 	const roleLabel = (r: string) => roleName(r as Parameters<typeof roleName>[0]);
+
+	// ---------- the Charter in force and the role's tools ----------
+	const builtin = $derived(builtinBody(catalog, role));
+	const inForce = $derived(charterView(live?.bodyMd ?? builtin.bodyMd));
+	const tools = $derived(toolGroups(catalog, role));
+	const toolCount = $derived(tools.groups.reduce((n, g) => n + g.tools.filter((t) => t.kind === 'tool').length, 0));
+	const SECTIONS_SHOWN = [
+		{ key: 'may', title: 'May propose' },
+		{ key: 'mustNever', title: 'Must never' },
+		{ key: 'escalates', title: 'Leaves for a person' }
+	] as const;
 </script>
 
 <svelte:head><title>Charters · Cafoo</title></svelte:head>
@@ -233,6 +245,59 @@
 				<button class="btn" disabled={!canAct} onclick={() => (retireOpen = true)}><Icon name="undo" size={18} />Restore built-in</button>
 			{/if}
 		</div>
+	</div>
+
+	<div class="card flex flex-col gap-5 p-5" aria-labelledby="in-force-h">
+		<div>
+			<h3 id="in-force-h" class="text-subtitle">{live ? `Version ${live.version}` : 'Built-in Charter'}: what the {roleLabel(role)} works to</h3>
+			{#if inForce.intro}<p class="mt-2 max-w-prose text-body-sm text-ink-2">{inForce.intro}</p>{/if}
+			{#if !live && builtin.bundled}<p class="mt-1 text-caption text-ink-3">Shown from the copy bundled with this app, because the agent gateway did not answer.</p>{/if}
+		</div>
+		<div class="grid gap-5 md:grid-cols-3">
+			{#each SECTIONS_SHOWN as sec (sec.key)}
+				<section aria-label={sec.title}>
+					<h4 class="eyebrow">{sec.title}</h4>
+					<ol class="mt-2 flex flex-col gap-3">
+						{#each inForce[sec.key] as l (l.label)}
+							<li class="flex gap-2 text-body-sm"><span class="num shrink-0 text-ink-3">{l.label.replace(/^\D+/, '')}.</span><span>{l.text}</span></li>
+						{:else}
+							<li class="text-body-sm text-ink-3">No lines.</li>
+						{/each}
+					</ol>
+				</section>
+			{/each}
+		</div>
+		{#if inForce.plain}
+			<p class="border-t border-line pt-4 text-body-sm text-ink-2"><span class="font-medium text-ink">Plain summary rule:</span> {inForce.plain}</p>
+		{/if}
+	</div>
+
+	<div class="card flex flex-col gap-4 p-5" aria-labelledby="tools-h">
+		<div>
+			<h3 id="tools-h" class="text-subtitle">Tools</h3>
+			<p class="mt-1 text-body-sm text-ink-2">
+				The {toolCount} tools the {roleLabel(role)} may call. The harness refuses any other tool, and every call is checked against the lines above before it runs; the ledger module checks again when it writes.
+			</p>
+			{#if tools.bundled && tools.groups.length}<p class="mt-1 text-caption text-ink-3">Listed from the copy bundled with this app; the agent gateway did not report its tools.</p>{/if}
+		</div>
+		{#each tools.groups as g (g.source)}
+			<section aria-label={g.label}>
+				<h4 class="eyebrow">{g.label}</h4>
+				<ul class="mt-2 flex flex-col divide-y divide-line border-y border-line">
+					{#each g.tools as t (t.name)}
+						<li class="flex flex-col gap-1 py-2 sm:flex-row sm:items-baseline sm:gap-4">
+							<span class="flex shrink-0 items-center gap-2 sm:w-64">
+								<code class="font-mono text-caption text-ink">{t.name}</code>
+								{#if t.kind === 'service'}<Pill tone="muted">service</Pill>{/if}
+							</span>
+							<span class="text-body-sm text-ink-2">{t.description}</span>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{:else}
+			<p class="text-body-sm text-ink-3">No tool list is available for this role.</p>
+		{/each}
 	</div>
 
 	{#if editing && catalog}
