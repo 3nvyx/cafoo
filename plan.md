@@ -66,7 +66,7 @@ Update this table when a stream lands on `main`.
 | # | Status | Last commit |
 |---|---|---|
 | 1 | In progress | |
-| 2 | In progress | |
+| 2 | Done | 36f150f |
 | 3 | In progress | |
 | 4 | In progress | |
 | 5 | In progress | |
