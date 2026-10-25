@@ -198,12 +198,12 @@ async function main() {
   const subsidiaryId = new Map([...conn.db.subsidiary.iter()].map(x => [x.code, x.id]));
 
   // 3. Parties
-  await r.seedCustomers({ subsidiaryCode: 'US', customers: seed.customers.map(c => ({ name: c.name, domain: c.domain, guarantorPersonaId: c.guarantorPersonaId, guarantorName: c.guarantorName, paymentTermsDays: c.paymentTermsDays })) });
-  await r.seedVendors({ subsidiaryCode: 'US', vendors: seed.vendors.map(v => ({ name: v.name, domain: v.domain, category: v.category, ownerPersonaId: v.ownerPersonaId })) });
+  await r.seedCustomers({ subsidiaryCode: 'US', customers: seed.customers.map(c => ({ name: c.name, domain: c.domain, guarantorPersonaId: c.guarantorPersonaId, guarantorName: c.guarantorName, paymentTermsDays: c.paymentTermsDays, yelpUrl: c.yelpUrl, jobBoard: c.jobBoard, linkedinUrl: c.linkedinUrl })) });
+  await r.seedVendors({ subsidiaryCode: 'US', vendors: seed.vendors.map(v => ({ name: v.name, domain: v.domain, category: v.category, ownerPersonaId: v.ownerPersonaId, yelpUrl: v.yelpUrl, jobBoard: v.jobBoard, linkedinUrl: v.linkedinUrl })) });
   for (const sub of new Set(group.customers.map(c => c.subsidiaryCode))) {
     await r.seedCustomers({
       subsidiaryCode: sub,
-      customers: group.customers.filter(c => c.subsidiaryCode === sub).map(c => ({ name: c.name, domain: c.domain, guarantorPersonaId: c.guarantorPersonaId, guarantorName: c.guarantorName, paymentTermsDays: c.paymentTermsDays })),
+      customers: group.customers.filter(c => c.subsidiaryCode === sub).map(c => ({ name: c.name, domain: c.domain, guarantorPersonaId: c.guarantorPersonaId, guarantorName: c.guarantorName, paymentTermsDays: c.paymentTermsDays, yelpUrl: undefined, jobBoard: undefined, linkedinUrl: undefined })),
     });
   }
   await waitFor(

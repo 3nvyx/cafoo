@@ -26,7 +26,7 @@
 			} else if (m.targetKind === 'bill') {
 				const b = bills.get(m.targetId);
 				const v = b ? vendors.get(b.vendorId) : undefined;
-				target = { kind: 'Bill', label: b?.number ?? m.targetId, party: v?.name, href: v ? `/vendors#vendor-${v.id}` : undefined };
+				target = { kind: 'Bill', label: b?.number ?? m.targetId, party: v?.name, href: v ? `/vendors/${v.id}` : undefined };
 			} else {
 				const j = entries.get(m.targetId);
 				target = { kind: 'Journal Entry', label: j?.memo ?? m.targetId, href: j ? drill({ je: j.id }, j.periodId) : undefined };

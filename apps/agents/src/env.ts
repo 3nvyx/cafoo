@@ -73,7 +73,7 @@ export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[
     { name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: agentsOn ? 'live' : 'demo', detail: agentDetail },
     { name: 'xAI Grok (Red Team)', mode: !demo && has(env, 'XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'XAI_API_KEY') ? 'grok-4.7 critiques' : 'scripted critiques' },
     { name: 'CRS Credit API', mode: !demo && has(env, 'CRS_USERNAME') && env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: 'sandbox persona fixtures' },
-    { name: 'Bright Data', mode: !demo && has(env, 'API_TOKEN') ? 'live' : 'demo', detail: 'recorded vendor lookups' },
+    { name: 'Bright Data', mode: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'live' : 'demo', detail: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'Web Unlocker lookups' : 'recorded vendor lookups' },
     { name: 'Apify', mode: !demo && has(env, 'APIFY_TOKEN') ? 'live' : 'demo', detail: 'crawl skipped' },
     { name: 'Moss', mode: !demo && has(env, 'MOSS_PROJECT_ID') ? 'live' : 'demo', detail: 'local keyword search' },
     { name: 'SpacetimeDB', mode: 'live', detail: env.SPACETIMEDB_URI ?? 'ws://localhost:3000' },

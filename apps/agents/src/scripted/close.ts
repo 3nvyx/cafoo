@@ -21,6 +21,7 @@ import {
   type RiskTier,
 } from '@cafoo/ledger-core';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
+import { collectFootprint, subjectsWithListings } from '../footprint';
 import { STEP_MS } from '../env';
 import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
 import { monthLabel } from '../advisor-chat';
@@ -520,6 +521,16 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   const exposed = s.customers.filter(c => (openAr.get(c.id) ?? 0n) > 0n).sort((a, b) => Number((openAr.get(b.id) ?? 0n) - (openAr.get(a.id) ?? 0n)));
   await say(C, thread, `${exposed.length} customers carry open receivables totaling ${money([...openAr.values()].reduce((a, b) => a + b, 0n))}. Running the credit cascade (identity, fraud, three bureaus, public records) on each guarantor, then checking any vendor due a first payment.`,
     `Credit & Risk is checking the guarantor behind every open invoice.`);
+  // Public footprint first: what a logged-out visitor can see about each business with a listing on file.
+  for (const subject of subjectsWithListings(cast)) {
+    try {
+      const rows = await collectFootprint(cast, subject.subjectKind, subject.subjectId);
+      const okRows = rows.filter(r => r.status === 'ok');
+      if (okRows.length) await say(C, thread, `Public footprint for ${subject.name}: ${okRows.map(r => r.summaryPlain).join(' ')}`, `Credit & Risk looked up ${subject.name}'s public listing.`);
+    } catch (e) {
+      log(`footprint ${subject.name}: ${(e as Error).message}`);
+    }
+  }
   for (const cust of exposed) {
     const result = await runCascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
     for (const ev of result.evidence) {

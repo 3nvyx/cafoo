@@ -142,20 +142,20 @@ export const CLOSE_SCRIPT: Step[] = [
 			kind: 'revenue_schedule',
 			proposerRole: 'revenue',
 			amountMinor: '2200000',
-			summaryPlain: "Move $22,000 of Granite Peak Climbing's yearly payment out of September revenue. Only one month of it has been earned.",
+			summaryPlain: "Move $22,000 of Bansho Ramen's yearly payment out of September revenue. Only one month of it has been earned.",
 			rationale: 'k19 is an annual plan credited in full to revenue by je-0903. Ratable recognition over 12 months earns 2,000.00 in September.',
 			payload: {
 				contractId: 'k19',
 				schedule: { months: 12, convention: 'full-month', earnedThisPeriodMinor: '200000' },
-				memo: 'Defer unearned part of Granite Peak Climbing annual plan',
+				memo: 'Defer unearned part of Bansho Ramen annual plan',
 				lines: [L('4000', '2200000', '0', { customerId: 'c19' }), L('2400', '0', '2200000', { customerId: 'c19' })]
 			},
 			taskId: 'ct-3'
 		},
-		body: 'Contract k19 (Granite Peak Climbing, annual, 24,000.00, start 2026-09-05) was credited in full to 4000 via je-0903. The obligation is satisfied ratably over 12 months. Earned for 2026-09 (full-month convention): 2,000.00. Propose Dr 4000 Subscription Revenue 22,000.00 / Cr 2400 Deferred Revenue 22,000.00, customer c19.',
-		summary: "Revenue wants to move $22,000 of Granite Peak Climbing's yearly payment out of September revenue."
+		body: 'Contract k19 (Bansho Ramen, annual, 24,000.00, start 2026-09-05) was credited in full to 4000 via je-0903. The obligation is satisfied ratably over 12 months. Earned for 2026-09 (full-month convention): 2,000.00. Propose Dr 4000 Subscription Revenue 22,000.00 / Cr 2400 Deferred Revenue 22,000.00, customer c19.',
+		summary: "Revenue wants to move $22,000 of Bansho Ramen's yearly payment out of September revenue."
 	},
-	{ at: 11600, type: 'activity', role: 'redteam', label: 'Checking the Granite Peak schedule', proposalId: 'pr-11' },
+	{ at: 11600, type: 'activity', role: 'redteam', label: 'Checking the Bansho Ramen schedule', proposalId: 'pr-11' },
 	{
 		at: 12600,
 		type: 'message',
@@ -165,7 +165,7 @@ export const CLOSE_SCRIPT: Step[] = [
 		body: 'Agree with the deferral. Challenge: with a daily convention a 2026-09-05 start earns 1,710.00 in September, not 2,000.00. Policy REV-02 sets full-month convention for starts on or before the 15th, so 2,000.00 stands. Checked for a setup fee in the contract: none.',
 		summary: 'Red Team agreed after checking the start-date rule; September keeps $2,000 of it.'
 	},
-	{ at: 13100, type: 'activity', role: 'advisor', label: 'Ruling on the Granite Peak schedule', proposalId: 'pr-11' },
+	{ at: 13100, type: 'activity', role: 'advisor', label: 'Ruling on the Bansho Ramen schedule', proposalId: 'pr-11' },
 	{ at: 13600, type: 'rule', proposalId: 'pr-11', body: 'APPROVE pr-11. Policy REV-02 applied.', summary: 'Advisor approved moving $22,000 to deferred revenue.', rationale: 'Ratable recognition per REV-02.' },
 	{ at: 14200, type: 'activity', role: 'bookkeeper', label: 'Looking for unbilled costs' },
 	{

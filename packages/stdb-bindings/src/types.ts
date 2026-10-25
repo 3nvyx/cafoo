@@ -296,6 +296,9 @@ export const Customer = __t.object("Customer", {
   creditTier: __t.option(__t.string()),
   paymentTermsDays: __t.u16(),
   allowanceMinor: __t.i64(),
+  yelpUrl: __t.option(__t.string()),
+  jobBoard: __t.option(__t.string()),
+  linkedinUrl: __t.option(__t.string()),
 });
 export type Customer = __Infer<typeof Customer>;
 
@@ -305,6 +308,9 @@ export const CustomerArg = __t.object("CustomerArg", {
   guarantorPersonaId: __t.string(),
   guarantorName: __t.string(),
   paymentTermsDays: __t.u16(),
+  yelpUrl: __t.option(__t.string()),
+  jobBoard: __t.option(__t.string()),
+  linkedinUrl: __t.option(__t.string()),
 });
 export type CustomerArg = __Infer<typeof CustomerArg>;
 
@@ -569,6 +575,31 @@ export const ProposalStatus = __t.enum("ProposalStatus", {
 });
 export type ProposalStatus = __Infer<typeof ProposalStatus>;
 
+export const PublicFootprint = __t.object("PublicFootprint", {
+  id: __t.u64(),
+  get subjectKind() {
+    return SubjectKind;
+  },
+  subjectId: __t.u64(),
+  source: __t.string(),
+  sourceUrl: __t.string(),
+  fetchedAt: __t.timestamp(),
+  status: __t.string(),
+  error: __t.string(),
+  summaryPlain: __t.string(),
+  factsJson: __t.string(),
+  ratingTenths: __t.u16(),
+  reviewCount: __t.u32(),
+  isClosed: __t.bool(),
+  isClaimed: __t.bool(),
+  yearEstablished: __t.u16(),
+  openRoles: __t.u32(),
+  employees: __t.u32(),
+  followers: __t.u32(),
+  live: __t.bool(),
+});
+export type PublicFootprint = __Infer<typeof PublicFootprint>;
+
 export const RevenueScheduleLine = __t.object("RevenueScheduleLine", {
   id: __t.u64(),
   contractItemId: __t.u64(),
@@ -645,6 +676,9 @@ export const Vendor = __t.object("Vendor", {
     return Verification;
   },
   verificationNote: __t.string(),
+  yelpUrl: __t.option(__t.string()),
+  jobBoard: __t.option(__t.string()),
+  linkedinUrl: __t.option(__t.string()),
 });
 export type Vendor = __Infer<typeof Vendor>;
 
@@ -653,6 +687,9 @@ export const VendorArg = __t.object("VendorArg", {
   domain: __t.string(),
   category: __t.string(),
   ownerPersonaId: __t.option(__t.string()),
+  yelpUrl: __t.option(__t.string()),
+  jobBoard: __t.option(__t.string()),
+  linkedinUrl: __t.option(__t.string()),
 });
 export type VendorArg = __Infer<typeof VendorArg>;
 

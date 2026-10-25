@@ -50,6 +50,7 @@ import ProposeReducer from "./propose_reducer";
 import PublishCharterReducer from "./publish_charter_reducer";
 import RecordCharterEvalReducer from "./record_charter_eval_reducer";
 import RecordCreditCheckReducer from "./record_credit_check_reducer";
+import RecordFootprintReducer from "./record_footprint_reducer";
 import RegisterAgentReducer from "./register_agent_reducer";
 import RejectProposalReducer from "./reject_proposal_reducer";
 import ReleaseCfoReducer from "./release_cfo_reducer";
@@ -72,6 +73,7 @@ import SeedRevenueScheduleLinesReducer from "./seed_revenue_schedule_lines_reduc
 import SeedSubsidiaryReducer from "./seed_subsidiary_reducer";
 import SeedVendorsReducer from "./seed_vendors_reducer";
 import SetFeedEnabledReducer from "./set_feed_enabled_reducer";
+import SetListingsReducer from "./set_listings_reducer";
 import SetMaterialityReducer from "./set_materiality_reducer";
 import UnlockPeriodReducer from "./unlock_period_reducer";
 import UpdateCloseTaskReducer from "./update_close_task_reducer";
@@ -103,6 +105,7 @@ import MyAgentIdentityRow from "./my_agent_identity_table";
 import PeriodRow from "./period_table";
 import PeriodLockRow from "./period_lock_table";
 import ProposalRow from "./proposal_table";
+import PublicFootprintRow from "./public_footprint_table";
 import RevenueScheduleLineRow from "./revenue_schedule_line_table";
 import SettingsRow from "./settings_table";
 import SubsidiaryRow from "./subsidiary_table";
@@ -450,6 +453,20 @@ const tablesSchema = __schema({
       { name: 'proposal_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ProposalRow),
+  publicFootprint: __table({
+    name: 'public_footprint',
+    indexes: [
+      { accessor: 'id', name: 'public_footprint_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'subjectId', name: 'public_footprint_subject_id_idx_btree', algorithm: 'btree', columns: [
+        'subjectId',
+      ] },
+    ],
+    constraints: [
+      { name: 'public_footprint_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PublicFootprintRow),
   revenueScheduleLine: __table({
     name: 'revenue_schedule_line',
     indexes: [
@@ -534,6 +551,7 @@ const reducersSchema = __reducers(
   __reducerSchema("publish_charter", PublishCharterReducer),
   __reducerSchema("record_charter_eval", RecordCharterEvalReducer),
   __reducerSchema("record_credit_check", RecordCreditCheckReducer),
+  __reducerSchema("record_footprint", RecordFootprintReducer),
   __reducerSchema("register_agent", RegisterAgentReducer),
   __reducerSchema("reject_proposal", RejectProposalReducer),
   __reducerSchema("release_cfo", ReleaseCfoReducer),
@@ -556,6 +574,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_subsidiary", SeedSubsidiaryReducer),
   __reducerSchema("seed_vendors", SeedVendorsReducer),
   __reducerSchema("set_feed_enabled", SetFeedEnabledReducer),
+  __reducerSchema("set_listings", SetListingsReducer),
   __reducerSchema("set_materiality", SetMaterialityReducer),
   __reducerSchema("unlock_period", UnlockPeriodReducer),
   __reducerSchema("update_close_task", UpdateCloseTaskReducer),

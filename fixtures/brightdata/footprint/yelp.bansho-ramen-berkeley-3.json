@@ -1,0 +1,38 @@
+{
+  "_about": "Synthesized from the hackpack's trimmed real sample (2026-10-19) for demo mode. Business facts only; owner and reviewer names were never stored.",
+  "source": "yelp",
+  "sourceUrl": "https://www.yelp.com/biz/bansho-ramen-berkeley-3",
+  "facts": {
+    "name": "Bansho Ramen",
+    "rating": 4.1,
+    "reviewCount": 196,
+    "priceRange": "$$",
+    "isClosed": false,
+    "isClaimed": true,
+    "isYelpAdvertiser": true,
+    "yearEstablished": null,
+    "hours": [
+      {
+        "dayOfWeekShort": "Mon",
+        "hours": [
+          "Closed"
+        ]
+      },
+      {
+        "dayOfWeekShort": "Tue",
+        "hours": [
+          "11:30 AM - 9:00 PM"
+        ]
+      }
+    ],
+    "hoursLastUpdated": "Updated over 3 months ago",
+    "address": {
+      "addressLine1": "2502 Telegraph Ave",
+      "city": "Berkeley",
+      "regionCode": "CA",
+      "postalCode": "94704"
+    },
+    "reviewsSinceAtLeast": "2019-03-27",
+    "datedPhotoReviews": 2
+  }
+}

@@ -19,7 +19,7 @@
 </script>
 
 <header class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-line bg-surface/90 px-4 backdrop-blur-md sm:gap-3 lg:px-8">
-	<div class="-ml-1 md:hidden"><Wordmark compact /></div>
+	<div class="-ml-1 md:hidden"><Wordmark compact href="/dashboard" /></div>
 	{#if canCollapse}
 		<button class="btn btn-quiet btn-icon -ml-2" aria-label={ui.navCollapsed ? 'Expand navigation' : 'Collapse navigation'} onclick={() => ui.toggleNav()}>
 			<Icon name="panel" />

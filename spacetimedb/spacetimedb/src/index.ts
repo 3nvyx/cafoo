@@ -1787,6 +1787,79 @@ export const rejectProposal = spacetimedb.reducer(
   }
 );
 
+// ---------- public footprint (public web data, signals for a person) ----------
+
+export const recordFootprint = spacetimedb.reducer(
+  {
+    subjectKind: t.string(),
+    subjectId: t.u64(),
+    source: t.string(),
+    sourceUrl: t.string(),
+    status: t.string(),
+    error: t.string(),
+    summaryPlain: t.string(),
+    factsJson: t.string(),
+    ratingTenths: t.u16(),
+    reviewCount: t.u32(),
+    isClosed: t.bool(),
+    isClaimed: t.bool(),
+    yearEstablished: t.u16(),
+    openRoles: t.u32(),
+    employees: t.u32(),
+    followers: t.u32(),
+    live: t.bool(),
+  },
+  (ctx, a) => {
+    const role = requireRole(ctx, ['credit', 'advisor', 'cfo'], 'record a public footprint');
+    if (a.subjectKind !== 'customer' && a.subjectKind !== 'vendor') throw new SenderError('subjectKind must be customer or vendor');
+    if (a.subjectKind === 'customer' ? !ctx.db.customer.id.find(a.subjectId) : !ctx.db.vendor.id.find(a.subjectId)) {
+      throw new SenderError(`Unknown ${a.subjectKind} ${a.subjectId}`);
+    }
+    if (!['yelp', 'jobs', 'linkedin', 'search'].includes(a.source)) throw new SenderError(`Unknown footprint source ${a.source}`);
+    if (a.status !== 'ok' && a.status !== 'failed') throw new SenderError('status must be ok or failed');
+    const row = ctx.db.publicFootprint.insert({
+      id: 0n,
+      subjectKind: { tag: a.subjectKind },
+      subjectId: a.subjectId,
+      source: a.source,
+      sourceUrl: a.sourceUrl,
+      fetchedAt: ctx.timestamp,
+      status: a.status,
+      error: a.error,
+      summaryPlain: a.summaryPlain,
+      factsJson: a.factsJson,
+      ratingTenths: a.ratingTenths,
+      reviewCount: a.reviewCount,
+      isClosed: a.isClosed,
+      isClaimed: a.isClaimed,
+      yearEstablished: a.yearEstablished,
+      openRoles: a.openRoles,
+      employees: a.employees,
+      followers: a.followers,
+      live: a.live,
+    });
+    audit(ctx, role, 'record_footprint', 'public_footprint', row.id, `${a.subjectKind} ${a.subjectId} ${a.source}: ${a.status}`);
+  }
+);
+
+export const setListings = spacetimedb.reducer(
+  { subjectKind: t.string(), subjectId: t.u64(), yelpUrl: t.option(t.string()), jobBoard: t.option(t.string()), linkedinUrl: t.option(t.string()) },
+  (ctx, a) => {
+    const role = requireRole(ctx, ['cfo', 'advisor'], 'set public listings');
+    const clean = (v: string | undefined) => (v && v.trim() ? v.trim() : undefined);
+    if (a.subjectKind === 'customer') {
+      const c = ctx.db.customer.id.find(a.subjectId);
+      if (!c) throw new SenderError(`Unknown customer ${a.subjectId}`);
+      ctx.db.customer.id.update({ ...c, yelpUrl: clean(a.yelpUrl), jobBoard: clean(a.jobBoard), linkedinUrl: clean(a.linkedinUrl) });
+    } else if (a.subjectKind === 'vendor') {
+      const v = ctx.db.vendor.id.find(a.subjectId);
+      if (!v) throw new SenderError(`Unknown vendor ${a.subjectId}`);
+      ctx.db.vendor.id.update({ ...v, yelpUrl: clean(a.yelpUrl), jobBoard: clean(a.jobBoard), linkedinUrl: clean(a.linkedinUrl) });
+    } else throw new SenderError('subjectKind must be customer or vendor');
+    audit(ctx, role, 'set_listings', a.subjectKind, a.subjectId, 'Public listings updated.');
+  }
+);
+
 /**
  * Record one row of a Credit Check: the evidence of one product call, with the cascade's facts in summaryJson.facts.
  * The tier and decision on the row are derived here from those facts by the shared tier rules (deriveTier, as of the
@@ -2246,6 +2319,9 @@ const CustomerArg = t.object('CustomerArg', {
   guarantorPersonaId: t.string(),
   guarantorName: t.string(),
   paymentTermsDays: t.u16(),
+  yelpUrl: t.option(t.string()),
+  jobBoard: t.option(t.string()),
+  linkedinUrl: t.option(t.string()),
 });
 
 export const seedCustomers = spacetimedb.reducer(
@@ -2265,6 +2341,9 @@ export const seedCustomers = spacetimedb.reducer(
         creditTier: undefined,
         paymentTermsDays: c.paymentTermsDays,
         allowanceMinor: 0n,
+        yelpUrl: c.yelpUrl,
+        jobBoard: c.jobBoard,
+        linkedinUrl: c.linkedinUrl,
       });
     }
     if (customers.length > 0) audit(ctx, role, 'seed_customers', 'customer', sub.id, `${customers.length} customer(s) added to ${subsidiaryCode}`);
@@ -2276,6 +2355,9 @@ const VendorArg = t.object('VendorArg', {
   domain: t.string(),
   category: t.string(),
   ownerPersonaId: t.option(t.string()),
+  yelpUrl: t.option(t.string()),
+  jobBoard: t.option(t.string()),
+  linkedinUrl: t.option(t.string()),
 });
 
 export const seedVendors = spacetimedb.reducer(
@@ -2294,6 +2376,9 @@ export const seedVendors = spacetimedb.reducer(
         ownerPersonaId: v.ownerPersonaId,
         verification: { tag: 'unverified' },
         verificationNote: '',
+        yelpUrl: v.yelpUrl,
+        jobBoard: v.jobBoard,
+        linkedinUrl: v.linkedinUrl,
       });
     }
     if (vendors.length > 0) audit(ctx, role, 'seed_vendors', 'vendor', sub.id, `${vendors.length} vendor(s) added to ${subsidiaryCode}`);

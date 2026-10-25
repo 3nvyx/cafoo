@@ -16,7 +16,7 @@
 
 {#if variant === 'rail'}
 	<nav aria-label="Main" class="flex h-full flex-col items-center gap-1 overflow-y-auto px-2 py-3">
-		<div class="mb-3"><Wordmark compact /></div>
+		<div class="mb-3"><Wordmark compact href="/dashboard" /></div>
 		{#each NAV as it (it.href)}
 			<a href={it.href} aria-current={active(it.href) ? 'page' : undefined} class="group flex w-full flex-col items-center gap-1 py-1 text-[12px] font-medium">
 				<span
@@ -45,7 +45,7 @@
 	</nav>
 {:else}
 	<nav aria-label="Main" class="flex h-full flex-col gap-0.5 overflow-y-auto px-3 py-3">
-		<div class="mb-4 px-2"><Wordmark /></div>
+		<div class="mb-4 px-2"><Wordmark href="/dashboard" /></div>
 		{#each NAV as it (it.href)}
 			<a
 				href={it.href}

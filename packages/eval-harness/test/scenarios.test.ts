@@ -183,6 +183,15 @@ const MUTATIONS: Record<string, (t: Tables) => void> = {
     // A vendor that turns verified without an approved vendor check.
     first(t.vendor!, (v) => v.verification === 'unverified').verification = 'verified';
   },
+  'credit-footprint-subjects': (t) => {
+    // A footprint row for a customer that does not exist.
+    t.public_footprint!.push({ ...t.public_footprint![0]!, id: nextId(t.public_footprint!), subject_kind: 'customer', subject_id: 999999 });
+  },
+  'credit-footprint-no-people': (t) => {
+    // Facts that carry the listing owner's profile.
+    const f = first(t.public_footprint!, (r) => r.source === 'yelp');
+    f.facts_json = JSON.stringify({ ...JSON.parse(String(f.facts_json)), bizOwnerProfile: { displayName: 'A Person' } });
+  },
   'credit-never-rules': (t) => {
     t.audit_event!.push({ ...t.audit_event![0]!, id: nextId(t.audit_event!), actor_role: 'credit', action: 'approve_approve' });
   },

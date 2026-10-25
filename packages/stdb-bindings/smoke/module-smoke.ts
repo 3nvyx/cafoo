@@ -1087,9 +1087,9 @@ async function legacy() {
     run(tsx, [join(dir, 'seed', 'src', 'load.ts')], { SPACETIMEDB_DB_NAME: LEGACY_DB }, join(dir, 'seed'));
     const oldToken = [join(dir, '.secrets', LEGACY_DB, 'advisor.token'), join(dir, '.secrets', 'advisor.token')].find(f => existsSync(f));
     if (!oldToken) throw new Error('the legacy loader saved no advisor token');
-    // Rows of tables whose schema changed since (bank_match.paymentJeId, subsidiary.isElimination) would not decode with
-    // today's bindings, so these connections do not subscribe to them.
-    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'vendor', 'agent_roster'];
+    // Rows of tables whose schema changed since (bank_match.paymentJeId, subsidiary.isElimination, the listing columns on
+    // customer and vendor) would not decode with today's bindings, so these connections do not subscribe to them.
+    const tables = ['proposal', 'journal_entry', 'bank_transaction', 'bill', 'agent_roster'];
     const A = await connect(LEGACY_DB, 'advisor', readFileSync(oldToken, 'utf8').trim(), tables);
     const B = await connect(LEGACY_DB, 'bookkeeper', undefined, tables);
     // The old module seats the CFO by first claim and records no database owner, so an owner-armed claim is impossible
@@ -1100,9 +1100,9 @@ async function legacy() {
     const db = A.conn.db;
     const sub = [...db.journalEntry.iter()][0]!.subsidiaryId.toString();
     const close = JSON.parse(readFileSync(join(dir, 'seed', 'out', 'seed.json'), 'utf8')).closeYm as string;
-    const lumen = [...db.vendor.iter()].find(v => v.name === 'Lumen Analytics')!;
-    const bill = [...db.bill.iter()].find(b => b.vendorId === lumen.id && b.ym === close)!;
-    const tx = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === close && t.amountMinor === -bill.amountMinor && t.counterparty === lumen.name)!;
+    // The Lumen Analytics payment and the bill it pays, found through the bank line (vendor rows are not subscribed).
+    const tx = [...db.bankTransaction.iter()].find(t => !t.matched && t.ym === close && t.counterparty === 'Lumen Analytics' && t.amountMinor < 0n)!;
+    const bill = [...db.bill.iter()].find(b => b.ym === close && b.amountMinor === -tx.amountMinor)!;
     const proposeOld = async (kind: string, payload: object, label: string) => {
       const summary = `Smoke legacy ${label}, a plain English summary.`;
       await B.conn.reducers.propose({ kind, payloadJson: JSON.stringify(payload), rationale: 'smoke', summaryPlain: summary, amountMinor: 0n, periodYm: close, closeTaskId: undefined });

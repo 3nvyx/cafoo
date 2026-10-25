@@ -133,6 +133,11 @@ _Avoid_: auto-matcher, background job
 **Allowance**: The expected-credit-loss reserve against a customer's receivables, proposed from Risk Tier.
 _Avoid_: bad debt reserve, provision
 
+**Public footprint**: What a logged-out visitor can see about a Customer or Vendor (a Yelp listing, a public job board, a LinkedIn company page), collected on request and stored per run with its fetch time so a person sees change over time. Signals for a person, never a decision; it changes no balance and no Risk Tier by itself.
+_Avoid_: scrape, enrichment, score
+
+**Listing**: A public URL or board on file for a Customer or Vendor that the Public footprint reads from (Yelp URL, job board such as `greenhouse:<org>`, LinkedIn company URL).
+
 ## Relationships
 
 - A **Subsidiary** has many **Accounts**, **Periods**, and **Journal Entries**

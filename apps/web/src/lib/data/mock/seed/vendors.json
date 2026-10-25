@@ -14,7 +14,8 @@
 		{ "id": "v12", "name": "Glasshouse Analytics Tools", "category": "Software", "verification": "verified" },
 		{ "id": "v13", "name": "Morrow & Vance CPAs", "category": "Tax and audit", "verification": "verified" },
 		{ "id": "v14", "name": "Stonebridge Facilities", "category": "Facilities", "verification": "unverified", "notePlain": "New vendor. Tax form not received yet." },
-		{ "id": "v15", "name": "Zephyr Print Works", "category": "Printing", "verification": "blocked", "notePlain": "Invoice sent from a look-alike email domain. Blocked on August 12." }
+		{ "id": "v15", "name": "Zephyr Print Works", "category": "Printing", "verification": "blocked", "notePlain": "Invoice sent from a look-alike email domain. Blocked on August 12." },
+		{ "id": "v16", "name": "Stripe", "category": "Payment processing", "verification": "verified", "linkedinUrl": "https://www.linkedin.com/company/stripe", "jobBoard": "greenhouse:stripe" }
 	],
 	"bills": [
 		{ "id": "b01", "number": "BCH-0731", "vendorId": "v01", "issuedAt": "2026-07-20T00:00:00Z", "dueAt": "2026-08-19T00:00:00Z", "amountMinor": "980000", "status": "paid" },

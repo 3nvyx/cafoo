@@ -1,0 +1,18 @@
+{
+  "_about": "Trimmed real Greenhouse records (2026-10-19) from the hackpack sample; the live board had 723 open roles.",
+  "source": "jobs",
+  "sourceUrl": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true",
+  "facts": {
+    "org": "stripe",
+    "board": "greenhouse",
+    "openRoles": 723,
+    "sample": [
+      {
+        "title": "Country Manager, Israel",
+        "department": "1180 GEO Sales HQ (EMEA)",
+        "location": "Israel",
+        "firstPublished": "2026-10-19T12:18:39-04:00"
+      }
+    ]
+  }
+}

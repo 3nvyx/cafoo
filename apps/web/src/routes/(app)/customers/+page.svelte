@@ -4,6 +4,7 @@
 	import { formatMoney } from '#lib/data/money.js';
 	import type { RiskTier } from '#lib/data/types.js';
 	import Icon from '#lib/components/Icon.svelte';
+	import FootprintChip from '#lib/components/FootprintChip.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { TIER } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
@@ -45,18 +46,20 @@
 </div>
 
 <div class="mt-6 border-t border-line">
-	<div class="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] gap-4 border-b border-line py-2 text-sm text-ink-3 md:grid">
-		<span>Customer</span><span>Guarantor</span><span>Risk Tier</span><span class="text-right">Terms</span><span class="text-right">Owed to us</span>
+	<div class="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] gap-4 border-b border-line py-2 text-sm text-ink-3 md:grid xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_150px_110px_90px_120px]">
+		<span>Customer</span><span>Guarantor</span><span class="hidden xl:block">Public footprint</span><span>Risk Tier</span><span class="text-right">Terms</span><span class="text-right">Owed to us</span>
 	</div>
 	<ul>
 		{#each rows as { c, ar } (c.id)}
 			<li class="border-b border-line">
-				<a href="/customers/{c.id}" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 state md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] md:items-center">
+				<a href="/customers/{c.id}" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3 state md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_110px_90px_120px] md:items-center xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_150px_110px_90px_120px]">
 					<span class="min-w-0">
 						<span class="block truncate font-medium">{c.name}</span>
 						<span class="block truncate text-sm text-ink-3">{c.domain}</span>
+						<FootprintChip kind="customer" id={c.id} class="max-w-full xl:hidden" />
 					</span>
 					<span class="order-3 truncate text-sm text-ink-2 md:order-none md:text-[15px]">{c.guarantorName}</span>
+					<span class="hidden min-w-0 xl:block"><FootprintChip kind="customer" id={c.id} class="max-w-full" /></span>
 					<span class="order-2 justify-self-end md:order-none md:justify-self-start">
 						{#if c.creditTier}<Pill tone={TIER[c.creditTier].tone}>{TIER[c.creditTier].label}</Pill>{:else}<Pill tone="muted">Not checked</Pill>{/if}
 					</span>

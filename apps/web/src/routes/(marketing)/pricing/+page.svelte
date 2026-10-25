@@ -43,7 +43,7 @@
 <div class="min-h-dvh bg-canvas">
 	<header class="mx-auto flex h-16 max-w-[1120px] items-center justify-between px-4 sm:px-8">
 		<Wordmark label="Cafoo home" />
-		<a href="/" class="btn">Open the app</a>
+		<a href="/dashboard" class="btn">Open the app</a>
 	</header>
 
 	<main class="mx-auto max-w-[1120px] px-4 pt-10 pb-20 sm:px-8 sm:pt-16">
@@ -68,7 +68,7 @@
 							<li class="flex gap-2 text-ink-2"><Icon name="check" size={20} class="shrink-0 text-ink-3" />{f}</li>
 						{/each}
 					</ul>
-					<a href="/" class="btn {t.featured ? 'btn-primary' : 'btn-tonal'} w-full">{t.cta}</a>
+					<a href="/dashboard" class="btn {t.featured ? 'btn-primary' : 'btn-tonal'} w-full">{t.cta}</a>
 				</section>
 			{/each}
 		</div>

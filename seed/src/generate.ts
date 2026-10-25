@@ -124,8 +124,8 @@ export type Seed = {
   subsidiary: { code: string; name: string; functionalCcy: string };
   accounts: SeedAccount[];
   periods: { yms: string[]; closedYms: string[] };
-  customers: { idx: number; name: string; domain: string; guarantorPersonaId: string; guarantorName: string; paymentTermsDays: number }[];
-  vendors: { idx: number; name: string; domain: string; category: string; ownerPersonaId?: string; expenseAccountCode: string }[];
+  customers: { idx: number; name: string; domain: string; guarantorPersonaId: string; guarantorName: string; paymentTermsDays: number; yelpUrl?: string; jobBoard?: string; linkedinUrl?: string }[];
+  vendors: { idx: number; name: string; domain: string; category: string; ownerPersonaId?: string; expenseAccountCode: string; yelpUrl?: string; jobBoard?: string; linkedinUrl?: string }[];
   contracts: {
     customerIdx: number;
     code: string;
@@ -165,7 +165,7 @@ const BUSINESSES = [
   ['Oyelaran Legal Services', 'oyelaranlegal.com'],
   ['Castellanos Architecture', 'castellanosarch.com'],
   ['Abernathy Plumbing', 'abernathyplumbing.com'],
-  ['Nakamura Cafe Group', 'nakamuracafe.com'],
+  ['Bansho Ramen', 'banshoramen.com'],
   ['Whitcomb Antiques', 'whitcombantiques.com'],
 ];
 
@@ -185,6 +185,8 @@ const VENDORS: Seed['vendors'] = [
   { idx: 13, name: 'Tidewater Contractors', domain: 'tidewatercontract.com', category: 'Contractors', expenseAccountCode: '5200' },
   { idx: 14, name: 'Brennan Data Services LLC', domain: 'brennandataservices.com', category: 'Contractors', ownerPersonaId: 'P13', expenseAccountCode: '5200' },
   { idx: 15, name: 'Pettigrew Consulting', domain: 'pettigrewconsulting.net', category: 'Professional services', ownerPersonaId: 'P14', expenseAccountCode: '5600' },
+  // A public company we pay for payment processing: no owner check, but a public footprint (LinkedIn, job board).
+  { idx: 16, name: 'Stripe', domain: 'stripe.com', category: 'Payment processing', expenseAccountCode: '6000', linkedinUrl: 'https://www.linkedin.com/company/stripe', jobBoard: 'greenhouse:stripe' },
 ];
 
 function main() {
@@ -224,6 +226,8 @@ function main() {
       guarantorPersonaId: p.id,
       guarantorName: p.name,
       paymentTermsDays: 30,
+      // Customer 19 (the cafe owner persona) has a real public listing for the public-footprint demo.
+      ...(i + 1 === 19 ? { yelpUrl: 'https://www.yelp.com/biz/bansho-ramen-berkeley-3' } : {}),
     });
   });
 

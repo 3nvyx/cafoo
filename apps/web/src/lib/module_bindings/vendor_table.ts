@@ -25,4 +25,7 @@ export default __t.row({
     return Verification;
   },
   verificationNote: __t.string().name("verification_note"),
+  yelpUrl: __t.option(__t.string()).name("yelp_url"),
+  jobBoard: __t.option(__t.string()).name("job_board"),
+  linkedinUrl: __t.option(__t.string()).name("linkedin_url"),
 });

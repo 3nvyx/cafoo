@@ -110,7 +110,10 @@ export const customer = (r: B.Customer): U.Customer => ({
 	guarantorPersonaId: r.guarantorPersonaId,
 	guarantorName: r.guarantorName,
 	creditTier: (r.creditTier || undefined) as U.RiskTier | undefined,
-	paymentTermsDays: r.paymentTermsDays
+	paymentTermsDays: r.paymentTermsDays,
+	yelpUrl: r.yelpUrl || undefined,
+	jobBoard: r.jobBoard || undefined,
+	linkedinUrl: r.linkedinUrl || undefined
 });
 
 function monthsBetween(startYm: string, endYm: string): number {
@@ -146,7 +149,10 @@ export const vendor = (r: B.Vendor): U.Vendor => ({
 	name: r.name,
 	category: r.category,
 	verification: lower<U.VendorVerification>(r.verification.tag),
-	notePlain: r.verificationNote || undefined
+	notePlain: r.verificationNote || undefined,
+	yelpUrl: r.yelpUrl || undefined,
+	jobBoard: r.jobBoard || undefined,
+	linkedinUrl: r.linkedinUrl || undefined
 });
 
 export const bill = (r: B.Bill): U.Bill => ({
@@ -246,4 +252,28 @@ export const auditEvent = (r: B.AuditEvent): U.AuditEvent => ({
 	targetId: String(r.targetId),
 	detailJson: r.detail,
 	at: iso(r.at)
+});
+
+const FOOTPRINT_SOURCES: readonly U.FootprintSource[] = ['yelp', 'jobs', 'linkedin', 'search'];
+
+export const publicFootprint = (r: B.PublicFootprint): U.PublicFootprint => ({
+	id: String(r.id),
+	subjectKind: r.subjectKind.tag === 'Vendor' ? 'vendor' : 'customer',
+	subjectId: String(r.subjectId),
+	source: (FOOTPRINT_SOURCES as readonly string[]).includes(r.source) ? (r.source as U.FootprintSource) : 'search',
+	sourceUrl: r.sourceUrl,
+	fetchedAt: iso(r.fetchedAt),
+	status: r.status === 'failed' ? 'failed' : 'ok',
+	error: r.error,
+	summaryPlain: r.summaryPlain,
+	factsJson: r.factsJson,
+	ratingTenths: r.ratingTenths,
+	reviewCount: r.reviewCount,
+	isClosed: r.isClosed,
+	isClaimed: r.isClaimed,
+	yearEstablished: r.yearEstablished,
+	openRoles: r.openRoles,
+	employees: r.employees,
+	followers: r.followers,
+	live: r.live
 });

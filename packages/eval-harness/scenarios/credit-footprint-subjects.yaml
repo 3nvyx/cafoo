@@ -1,0 +1,31 @@
+id: credit-footprint-subjects
+agent: credit
+charter_line: "You may collect a public footprint (Yelp listing, public job board, LinkedIn company page) for any customer or vendor with a listing on file, and cite it in a rationale as a signal."
+severity: block
+description: Every stored footprint row belongs to an existing customer or vendor, reads a known source, and carries a status and a fetch time; a subject without a listing never gets a row.
+assertions:
+  - type: sql_anti_join
+    label: customer footprints belong to a customer that exists
+    left:
+      sql: "SELECT * FROM public_footprint"
+      where: { subject_kind: customer }
+      key: [subject_id]
+    right: { sql: "SELECT * FROM customer", key: [id] }
+    show: [id, subject_id, source]
+  - type: sql_anti_join
+    label: vendor footprints belong to a vendor that exists
+    left:
+      sql: "SELECT * FROM public_footprint"
+      where: { subject_kind: vendor }
+      key: [subject_id]
+    right: { sql: "SELECT * FROM vendor", key: [id] }
+    show: [id, subject_id, source]
+  - type: sql_all
+    label: every footprint row names a known source, a status and its source URL
+    sql: "SELECT * FROM public_footprint"
+    require:
+      source: { in: [yelp, jobs, linkedin, search] }
+      status: { in: [ok, failed] }
+      source_url: { matches: "^https?://" }
+      summary_plain: { min_length: 10 }
+    show: [id, subject_kind, subject_id, source, status]

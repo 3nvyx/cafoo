@@ -23,6 +23,7 @@ A second dev server started without `PUBLIC_DATA_SOURCE=spacetime` switches a ru
 - `src/lib/data/group.ts`: the Board Pack's P&L and balance sheet, consolidated or for one company, from `@cafoo/ledger-core` (`consolidate`, `translateBooks`): translation into the Reporting currency, the CTA (computed, never posted), the Eliminations column and the rates used.
 - `src/lib/data/derive.ts`: other pure read-side maths (ARR waterfall, aging, Allowance, period labels).
 - `src/lib/charter.ts`: the Charter editor's helpers (the eval harness's line parser, the line mapping, the publish rule). The gateway's eval is the authority; these only flag problems before a draft is saved.
+- `src/lib/footprint.ts`: public footprint derivations (per-source latest and previous run, change since last run, list chip). Rendered by `FootprintPanel` on `/customers/[id]` and `/vendors/[id]`; collecting goes through the gateway, never the browser.
 
 Imports use package `imports` (`#lib/...`); TypeScript modules need a `.js` specifier, for example `#lib/data/index.js`.
 

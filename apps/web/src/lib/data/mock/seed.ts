@@ -6,6 +6,7 @@ import bank from './seed/bank.json';
 import journal from './seed/journal.json';
 import governance from './seed/governance.json';
 import group from './seed/group.json';
+import footprint from './seed/footprint.json';
 import type {
 	Account,
 	AgentMessage,
@@ -26,6 +27,7 @@ import type {
 	JournalLine,
 	Period,
 	Proposal,
+	PublicFootprint,
 	Settings,
 	Subsidiary,
 	Vendor
@@ -50,6 +52,7 @@ export interface Tables {
 	close_task: CloseTask[];
 	credit_check: CreditCheck[];
 	audit_event: AuditEvent[];
+	public_footprint: PublicFootprint[];
 	settings: Settings;
 	fx_rate: FxRate[];
 	charter_version: CharterVersion[];
@@ -127,6 +130,7 @@ export function loadSeed(): Tables {
 		close_task: governance.closeTasks as CloseTask[],
 		credit_check: customers.creditChecks as CreditCheck[],
 		audit_event: governance.auditEvents as AuditEvent[],
+		public_footprint: footprint.publicFootprints as PublicFootprint[],
 		settings: { ...reference.settings, reportingCcy: group.reportingCcy },
 		fx_rate: group.fxRates.map((r, i) => ({ id: `fx-${i + 1}`, ...r, kind: r.kind as FxRate['kind'] })),
 		charter_version: [],

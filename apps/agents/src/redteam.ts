@@ -26,23 +26,42 @@ const judge = (A: RoleConn, proposalId: bigint, c: Critique, ctx: RuleContext): 
 const policiesDir = join(repoRoot, 'fixtures', 'moss');
 
 /** Moss in live mode; local keyword search over the same policy documents otherwise. */
-export async function searchPolicies(queryText: string, topK = 3): Promise<{ id: string; text: string; score: number }[]> {
-  const docs = loadPolicyDocs();
-  if (process.env.MOSS_PROJECT_ID && process.env.MOSS_PROJECT_KEY && process.env.DEMO_MODE !== '1') {
+const POLICY_INDEX = 'cafoo-policies';
+let mossReady: Promise<any | null> | null = null;
+
+/** One shared Moss client with the policy index created once and loaded once; null when Moss is unusable. */
+function mossIndex(docs: { id: string; text: string }[]): Promise<any | null> {
+  if (mossReady) return mossReady;
+  mossReady = (async () => {
     try {
       const moss: any = await import('@moss-js/moss' as string);
       const client = new moss.MossClient(process.env.MOSS_PROJECT_ID, process.env.MOSS_PROJECT_KEY);
-      const name = 'cafoo-policies';
-      try {
-        await client.loadIndex(name);
-      } catch {
-        await client.createIndex(name, docs.map(d => ({ id: d.id, text: d.text })), { modelId: 'moss-minilm' });
-        await client.loadIndex(name);
+      const existing: { name: string; status?: string }[] = await client.listIndexes();
+      if (!existing.some(i => i.name === POLICY_INDEX)) {
+        await client.createIndex(POLICY_INDEX, docs, { modelId: 'moss-minilm' }); // polls until the job completes
       }
-      const res = await client.query(name, queryText, { topK });
-      return (res.docs ?? []).map((d: any) => ({ id: d.id, text: d.text, score: d.score }));
+      await client.loadIndex(POLICY_INDEX);
+      console.log(`[moss] policy index "${POLICY_INDEX}" ready (${docs.length} documents)`);
+      return client;
     } catch (e) {
       console.warn('moss unavailable, using local search:', (e as Error).message);
+      return null;
+    }
+  })();
+  return mossReady;
+}
+
+export async function searchPolicies(queryText: string, topK = 3): Promise<{ id: string; text: string; score: number }[]> {
+  const docs = loadPolicyDocs();
+  if (process.env.MOSS_PROJECT_ID && process.env.MOSS_PROJECT_KEY && process.env.DEMO_MODE !== '1') {
+    const client = await mossIndex(docs.map(d => ({ id: d.id, text: d.text })));
+    if (client) {
+      try {
+        const res = await client.query(POLICY_INDEX, queryText, { topK });
+        return (res.docs ?? []).map((d: any) => ({ id: d.id, text: d.text, score: d.score }));
+      } catch (e) {
+        console.warn('moss query failed, using local search:', (e as Error).message);
+      }
     }
   }
   const terms = queryText.toLowerCase().split(/\W+/).filter(t => t.length > 3);

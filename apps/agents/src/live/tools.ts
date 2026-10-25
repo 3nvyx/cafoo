@@ -20,6 +20,7 @@ import { activeCharter } from '../charter/active';
 import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
+import { collectFootprint } from '../footprint';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
@@ -326,6 +327,19 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
           if (a.tier !== run.tier || a.decision !== run.decision) return fail(`that cascade returned tier ${run.tier} and decision ${run.decision}, not ${a.tier} and ${a.decision}`);
           await worker.reducers.recordCreditCheck({ subjectKind: a.subjectKind, subjectId: BigInt(a.subjectId), personaId: run.personaId, product: a.product, requestId: a.requestId, summaryJson: creditCheckSummaryJson(run, ev) });
           return ok('recorded');
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      }
+    ),
+    tool(
+      'collect_public_footprint',
+      'Collect what a logged-out visitor can see about a customer or vendor (Yelp listing, public job board, LinkedIn company page) and store it as public_footprint rows. Signals for a person, not a decision; cite them in rationales, never in a tier by themselves.',
+      { subjectKind: z.enum(['customer', 'vendor']), subjectId: z.string() },
+      async ({ subjectKind, subjectId }) => {
+        try {
+          const rows = await collectFootprint(cast, subjectKind, BigInt(subjectId));
+          return ok(rows.length ? rows.map(r => ({ source: r.source, status: r.status, summaryPlain: r.summaryPlain, live: r.live })) : 'No public listing on file for this subject.');
         } catch (e) {
           return fail((e as Error).message);
         }
