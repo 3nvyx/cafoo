@@ -4,10 +4,7 @@
 	import { isWholeMonths, monthRange, monthly, monthsIn, postings, previousRange, rangeDays, summarize, type DateRange, type Summary } from '#lib/data/dashboard.js';
 	import { rootOf } from '#lib/data/group.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
-	import type { Minor, Proposal } from '#lib/data/types.js';
-	import { lockGate } from '#lib/close.js';
-	import ConfirmAll from '#lib/components/ConfirmAll.svelte';
-	import ProposalList from '#lib/components/ProposalList.svelte';
+	import type { Minor } from '#lib/data/types.js';
 	import { drill } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
 	import AdvisorChat from './AdvisorChat.svelte';
@@ -99,21 +96,6 @@
 		return toBig(s.operatingCashChange) >= 0n ? 'Running the business did not use cash over this range' : 'Cash is gone at this rate of spend';
 	});
 
-	// Keep a just-confirmed card on screen briefly so the state flip is visible.
-	const gate = $derived(lockGate(db, period?.id ?? ''));
-	const awaiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo'));
-	let lingering = $state<string[]>([]);
-	let prevIds: string[] = [];
-	$effect(() => {
-		const ids = awaiting.map((p) => p.id);
-		const gone = prevIds.filter((id) => !ids.includes(id));
-		prevIds = ids;
-		if (!gone.length) return;
-		lingering = [...lingering, ...gone];
-		setTimeout(() => (lingering = lingering.filter((id) => !gone.includes(id))), 900);
-	});
-	const queue = $derived<Proposal[]>(db.proposals().filter((p) => p.status === 'awaiting_cfo' || lingering.includes(p.id)));
-
 	// The headline readings from the Metrics page, for the month the strip shows.
 	const firstMonth = $derived(db.periods()[0]?.id);
 	const health = $derived.by(() => {
@@ -149,27 +131,8 @@
 
 	{#if monthSummary}<StatusStrip {period} month={monthSummary} />{/if}
 
-	<!-- What needs the CFO comes first; how the business is doing comes after. -->
-	<div class="mt-8 grid gap-8 lg:grid-cols-3">
-		<section aria-labelledby="queue-h" class="min-w-0 lg:col-span-2">
-			<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-				<h2 id="queue-h" class="text-title">Needs your OK</h2>
-				<div class="flex items-center gap-3">
-					<ConfirmAll proposals={awaiting} />
-					<a href="/proposals" class="drill text-body-sm text-ink-2">All Proposals</a>
-				</div>
-			</div>
-			<ProposalList
-				proposals={queue}
-				empty={gate.started ? 'Nothing needs you right now.' : 'Nothing needs you yet. Start the close and the agents will bring you anything above your threshold.'}
-			/>
-		</section>
-
-		<!-- With nothing waiting, the close's next step (start it, lock it) leads on narrow screens. -->
-		<div class="flex min-w-0 flex-col gap-8 {queue.length || period.status === 'closed' ? '' : 'order-first lg:order-none'}">
-			<CloseCard {period} />
-		</div>
-	</div>
+	<!-- Where the close stands and its next step come first; how the business is doing comes after. -->
+	<div class="mt-8"><CloseCard {period} /></div>
 
 	<!-- Then a question box for the Advisor, and the Proposals by status. -->
 	<div class="mt-8 grid gap-8 lg:grid-cols-3">
