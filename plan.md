@@ -20,10 +20,12 @@ Quillmesh, Inc. sells an AI document-automation API to insurance and logistics b
 Customers send claims, invoices and bills of lading and get structured data back.
 Pricing is a platform fee plus per-page usage.
 
-- Stage: Series A, $50M post-money, closed March 2026, $12M raised. About $4.8M ARR, growing about 3x a year.
-- People: 62 (48 in the US, 14 in the UK). Cash about $11M. Runway about 24 months.
+- Stage: Series A, $50M post-money, closed March 2026, $12M raised. About $4.8M ARR, growing about 3x a year: ARR rises every month and September adds about $0.6M.
+- Funding: pre-seed SAFEs $0.75M and seed $3.5M, then the $12M Series A: $16.25M of paid-in capital, the same in the books and on the Financing page.
+- People: 62 (48 in the US, 14 in the UK), all started by the September close. Cash about $11M. Net operating cash burn about $440k a month over July to September (payroll for the US team at about $15k a month each, loaded, plus the hiring and growth spend the Series A pays for), so runway about 24 months.
 - Group: Quillmesh Inc (USD, parent), Quillmesh Ltd (GBP), Elimination.
-- Customers: 80 on annual contracts, 65 mid-market ($18k to $40k a year) and 15 enterprise ($90k to $190k a year, net-60), carrying about $4.75M of ARR, plus the test fixture's customers (103 customer records in all). Self-serve card customers are not individual records: their subscriptions and per-page usage post as one billing-sync entry a month. Say "80 contract customers plus self-serve", never "300 customers".
+- Customers: 80 on annual contracts that renew every 12 months, 65 mid-market ($20k to $40k a year) and 15 enterprise ($100k to $190k a year, net-60), carrying about $4.0M of ARR; the test fixture's annual contracts add about $0.8M (103 customer records in all). Self-serve card customers are not individual records: their subscriptions and per-page usage post as one billing-sync entry a month. Say "80 contract customers plus self-serve", never "300 customers".
+- ARR counts contracts only. Self-serve subscriptions and per-page usage (about $175k a month at the close) are revenue but not ARR, so monthly revenue (about $655k in September) runs well above ARR / 12 (about $400k).
 - Vendors: GPU cloud, a model API, payroll provider, SaaS tools, contractors.
 - Finance team of 3: CFO, controller, AP/AR clerk. Daily bank feed, a two-day close, Board Pack and cap table for investors, credit checks on the owners behind self-serve and mid-market customers and on new vendors.
 - History: 18 months, April 2025 to September 2026. September 2026 is the month the demo closes.
@@ -31,7 +33,7 @@ Pricing is a platform fee plus per-page usage.
 
 The small dataset stays as the test fixture, because CI asserts its exact figures.
 Quillmesh is a second seed profile: `pnpm demo:quillmesh` (that is `SEED_PROFILE=quillmesh pnpm demo:fresh`).
-It adds 15 earlier closed months, the 80 contract customers (all paid before the close), monthly billing-sync revenue and operating costs, and the seed and Series A cash, on top of the fixture's close. The September close then runs exactly as on the fixture (51 Proposals when nobody confirms).
+It adds 15 earlier closed months, the 80 contract customers (every term invoiced and paid by the close), monthly billing-sync revenue and operating costs, and the seed and Series A cash, on top of the fixture's close. The September close then runs exactly as on the fixture (51 Proposals when nobody confirms).
 Company records outside the ledger (people, payroll, funding, cap table, costs, credit packs, CRM) live in the `company_record` table, built by `seed/src/company.ts`.
 
 ## How Cafoo grows with a startup ($10M to $1B valuation)

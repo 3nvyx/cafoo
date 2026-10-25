@@ -20,6 +20,10 @@ describe('Quillmesh company records', () => {
     expect(c.employee.filter(e => e.ccy === 'GBP')).toHaveLength(14);
   });
 
+  it('has everyone started by the close month', () => {
+    expect(c.employee.filter(e => String(e.startAt).slice(0, 7) > input.closeYm)).toEqual([]);
+  });
+
   it('gives every record of a kind a unique id', () => {
     for (const [kind, rows] of Object.entries(c)) {
       const ids = rows.map(r => r.id);

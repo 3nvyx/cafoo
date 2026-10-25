@@ -68,8 +68,14 @@ function connect(): Promise<DbConnection> {
   });
 }
 
+/** SEED_PROFILE=quillmesh names the group after the demo company in plan.md; the default keeps the test fixture's names. */
+const PROFILE = process.env.SEED_PROFILE ?? 'default';
+/** An intercompany account name ("Due from Cafoo Ltd") with the profile's company names. */
+const named = (name: string) => (PROFILE === 'quillmesh' ? name.replace(/\bCafoo (Inc|Ltd)\b/g, 'Quillmesh $1') : name);
+const chart = (accounts: SeedAccount[]) => accounts.map(a => ({ ...a, name: named(a.name) }));
+
 /** Charts of accounts come from code (accounts.ts), not seed.json, so a stale seed.json cannot leave an account out. */
-const CHARTS: Record<string, SeedAccount[]> = { US: ACCOUNTS, UK: UK_ACCOUNTS, ELIM: ELIM_ACCOUNTS };
+const CHARTS: Record<string, SeedAccount[]> = { US: chart(ACCOUNTS), UK: chart(UK_ACCOUNTS), ELIM: chart(ELIM_ACCOUNTS) };
 
 /**
  * Clear the demo. Once setup is sealed the Advisor (this loader's identity) may no longer reset, so fall back to the
@@ -149,8 +155,6 @@ function armClaimLink(conn: DbConnection) {
   }
 }
 
-/** SEED_PROFILE=quillmesh names the group after the demo company in plan.md; the default keeps the test fixture's names. */
-const PROFILE = process.env.SEED_PROFILE ?? 'default';
 function profileName(code: string, name: string): string {
   if (PROFILE !== 'quillmesh') return name;
   return code === 'US' ? 'Quillmesh Inc' : code === 'UK' ? 'Quillmesh Ltd' : name;
@@ -188,7 +192,7 @@ async function main() {
   // 2. Structure: Cafoo Inc, then the group companies (their periods are the group's: one row per month), then FX rates,
   // which must exist before any entry with a line in another currency.
   await r.seedSubsidiary({ code: seed.subsidiary.code, name: profileName(seed.subsidiary.code, seed.subsidiary.name), functionalCcy: seed.subsidiary.functionalCcy, parentCode: undefined, isElimination: false });
-  await r.seedAccounts({ subsidiaryCode: 'US', accounts: ACCOUNTS });
+  await r.seedAccounts({ subsidiaryCode: 'US', accounts: CHARTS.US });
   await r.seedPeriods({ subsidiaryCode: 'US', yms: seed.periods.yms, closedYms: seed.periods.closedYms });
   for (const s of group.subsidiaries) {
     await r.seedSubsidiary({ code: s.code, name: profileName(s.code, s.name), functionalCcy: s.functionalCcy, parentCode: s.parentCode, isElimination: s.isElimination });
