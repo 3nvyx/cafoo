@@ -60,35 +60,30 @@
 	let allPeople = $state(false);
 	let allPending = $state(false);
 
-	// Side by side (lg and up), the roster shows as many whole rows as fit beside the right-hand column, and its card
-	// stretches so both bottoms line up; below lg it shows ROSTER_ROWS. Every row stays rendered so each can be
-	// measured: the list is clipped at the last row that fits, and the rows past it are made inert.
+	// Side by side (lg and up), the roster shows as many whole rows as fit beside the right-hand column: the floor,
+	// so its card ends at or just above the column's bottom and never with an empty strip. Below lg it shows
+	// ROSTER_ROWS. Every row stays rendered so each can be measured: the list is clipped at the last row that fits,
+	// and the rows past it are made inert.
 	let rosterList: HTMLUListElement | undefined = $state();
-	let rosterCard: HTMLDivElement | undefined = $state();
 	let sideColumn: HTMLDivElement | undefined = $state();
-	let rosterFit = $state<{ rows: number; clipPx: number | null; cardPx: number | null }>({ rows: Infinity, clipPx: null, cardPx: null });
+	let rosterFit = $state<{ rows: number; clipPx: number | null }>({ rows: Infinity, clipPx: null });
 
 	function fitRoster() {
-		if (!rosterList || !rosterCard) return;
-		if (allPeople) return void (rosterFit = { rows: Infinity, clipPx: null, cardPx: null });
+		if (!rosterList) return;
+		if (allPeople) return void (rosterFit = { rows: Infinity, clipPx: null });
 		const top = rosterList.getBoundingClientRect().top;
 		// Each row's bottom, measured from the top of the list. A parent's clipping does not move its rows.
 		const bottoms = [...rosterList.children].map((r) => r.getBoundingClientRect().bottom - top);
-		const sideBySide = !!sideColumn && matchMedia('(min-width: 1024px)').matches;
-		if (!sideBySide) {
-			const rows = Math.min(ROSTER_ROWS, bottoms.length);
-			return void (rosterFit = { rows, clipPx: rows < bottoms.length ? bottoms[rows - 1] : null, cardPx: null });
-		}
-		const cardTop = rosterCard.getBoundingClientRect().top;
-		const target = sideColumn!.getBoundingClientRect().bottom;
+		const clipAt = (rows: number) => (rosterFit = { rows, clipPx: rows < bottoms.length ? bottoms[rows - 1] : null });
+		if (!sideColumn || !matchMedia('(min-width: 1024px)').matches) return void clipAt(Math.min(ROSTER_ROWS, bottoms.length));
+		const target = sideColumn.getBoundingClientRect().bottom;
 		const BORDER = 1;
 		// The "Show all" row: 12px padding top and bottom, a 20px line and its top border.
 		const MORE = 45;
-		// Everything fits with no "Show all" row: no clipping, the card just stretches to the target.
-		if (top + (bottoms.at(-1) ?? 0) + BORDER <= target) return void (rosterFit = { rows: Infinity, clipPx: null, cardPx: target - cardTop });
+		// Everything fits with no "Show all" row.
+		if (top + (bottoms.at(-1) ?? 0) + BORDER <= target) return void clipAt(bottoms.length);
 		const room = target - top - MORE - BORDER;
-		const rows = Math.max(3, bottoms.filter((b) => b <= room + 0.5).length);
-		rosterFit = { rows, clipPx: bottoms[rows - 1], cardPx: Math.max(target - cardTop, 0) };
+		clipAt(Math.max(3, bottoms.filter((b) => b <= room + 0.5).length));
 	}
 
 	$effect(() => {
@@ -209,7 +204,7 @@
 			</div>
 		</div>
 
-		<div bind:this={rosterCard} class="card flex flex-col" style:min-height={rosterFit.cardPx === null ? undefined : `${rosterFit.cardPx}px`}>
+		<div class="card">
 			<div class="hidden gap-4 border-b border-line px-5 py-2 text-caption text-ink-3 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]" aria-hidden="true">
 				<span>Name</span><span>Department</span><span>Type</span><span class="text-right">Time off</span><span class="text-right">Pay</span>
 			</div>
@@ -245,7 +240,7 @@
 				{/each}
 			</ul>
 			{#if clipped || (allPeople && roster.length > ROSTER_ROWS)}
-				<button type="button" class="mt-auto w-full border-t border-line px-5 py-3 text-left text-body-sm text-ink-2 hover:bg-subtle hover:text-ink" aria-expanded={allPeople} onclick={() => (allPeople = !allPeople)}>
+				<button type="button" class="w-full border-t border-line px-5 py-3 text-left text-body-sm text-ink-2 hover:bg-subtle hover:text-ink" aria-expanded={allPeople} onclick={() => (allPeople = !allPeople)}>
 					{allPeople ? 'Show fewer' : `Show all ${roster.length} people`}
 				</button>
 			{/if}
