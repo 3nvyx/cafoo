@@ -5,13 +5,28 @@ import { fullyDilutedShares } from '../../../financing';
 import { handlers, tickers } from './financing';
 import type { ArrayTable, MockContext, ProposeInput, RowOf } from './types';
 
-/** A minimal mock engine: every Proposal is approved at once, its lines posted and its onApproved run. */
+/**
+ * A minimal mock engine: every Proposal is approved at once, its lines posted and its onApproved run. With `hold` on,
+ * Proposals wait for the CFO until `approve(id)`.
+ */
 function engine() {
 	const t: Tables = loadSeed();
 	t.period.push({ id: '2026-10', subsidiaryId: 'sub-us', year: 2026, month: 10, status: 'open' });
 	let n = 0;
 	let clock = '2026-10-02T11:00:00Z';
 	const proposals: ProposeInput[] = [];
+	let hold = false;
+	const waiting = new Map<string, ProposeInput>();
+	const post = (id: string, p: ProposeInput) => {
+		const row = t.proposal.find((x) => x.id === id)!;
+		row.status = 'approved';
+		if (p.payload.lines?.length) {
+			const jeId = `je-${id}`;
+			t.journal_entry.push({ id: jeId, periodId: '2026-10', postedAt: clock, memo: p.payload.memo ?? '', source: 'agent', proposalId: id, postedByRole: 'advisor' });
+			p.payload.lines.forEach((l, i) => t.journal_line.push({ id: `${jeId}-l${i}`, jeId, accountId: `acc-${l.account}`, debitMinor: l.debitMinor, creditMinor: l.creditMinor }));
+		}
+		p.onApproved?.(ctx, row);
+	};
 	const ctx: MockContext = {
 		t,
 		now: () => clock,
@@ -29,14 +44,9 @@ function engine() {
 		propose(p) {
 			const id = `pr-${++n}`;
 			proposals.push(p);
-			const row = { id, periodId: p.periodId ?? '2026-10', kind: p.kind, payloadJson: JSON.stringify(p.payload), rationale: p.rationale, summaryPlain: p.summaryPlain, amountMinor: p.amountMinor, proposerRole: p.proposerRole, status: 'approved' as const, createdAt: '2026-10-02T11:00:00Z' };
-			t.proposal.push(row);
-			if (p.payload.lines?.length) {
-				const jeId = `je-${id}`;
-				t.journal_entry.push({ id: jeId, periodId: '2026-10', postedAt: '2026-10-02T11:00:00Z', memo: p.payload.memo ?? '', source: 'agent', proposalId: id, postedByRole: 'advisor' });
-				p.payload.lines.forEach((l, i) => t.journal_line.push({ id: `${jeId}-l${i}`, jeId, accountId: `acc-${l.account}`, debitMinor: l.debitMinor, creditMinor: l.creditMinor }));
-			}
-			p.onApproved?.(ctx, row);
+			t.proposal.push({ id, periodId: p.periodId ?? '2026-10', kind: p.kind, payloadJson: JSON.stringify(p.payload), rationale: p.rationale, summaryPlain: p.summaryPlain, amountMinor: p.amountMinor, proposerRole: p.proposerRole, status: 'awaiting_cfo', createdAt: clock });
+			if (hold) waiting.set(id, p);
+			else post(id, p);
 			return id;
 		}
 	};
@@ -48,7 +58,12 @@ function engine() {
 		return { reading: r, ids: h.apply(ctx, doc) };
 	};
 	const bal = (code: string) => t.journal_line.filter((l) => l.accountId === `acc-${code}`).reduce((s, l) => s + BigInt(l.creditMinor) - BigInt(l.debitMinor), 0n);
-	return { t, ctx, upload, bal, proposals, setNow: (iso: string) => (clock = iso) };
+	const approve = (id: string) => {
+		const p = waiting.get(id)!;
+		waiting.delete(id);
+		post(id, p);
+	};
+	return { t, ctx, upload, bal, proposals, approve, setNow: (iso: string) => (clock = iso), setHold: (on: boolean) => (hold = on) };
 }
 
 describe('financing seed', () => {
@@ -221,5 +236,72 @@ describe('review fixes', () => {
 		expect(b.t.commitment.find((c) => c.id === 'cm-fenwick')?.status).toBe('signed');
 		for (let i = 0; i < 10; i++) tickers[0].tick(b.ctx);
 		expect(b.t.commitment.find((c) => c.id === 'cm-tidewater')?.notePlain).toMatch(/TWA Series 14/);
+	});
+});
+
+describe('nothing books twice around a pending conversion', () => {
+	const conversionId = (e: ReturnType<typeof engine>) => e.t.proposal.find((p) => p.kind === 'instrument_conversion')!.id;
+	const accruals = (e: ReturnType<typeof engine>) => e.t.proposal.filter((p) => p.kind === 'interest_accrual');
+
+	it('note re-uploaded while the conversion waits: no second accrual, interest booked once', () => {
+		const e = engine();
+		e.upload('closing_tracker');
+		e.upload('convertible_note'); // Oct 1..3 booked
+		e.setHold(true);
+		e.setNow('2026-10-20T09:00:00Z');
+		e.upload('term_sheet'); // carries Oct 3..21 to 7200
+		const reading = e.upload('convertible_note');
+		expect(reading.ids).toHaveLength(0);
+		expect(reading.reading.summaryPlain).toMatch(/conversion is waiting; interest is included/);
+		expect(accruals(e)).toHaveLength(1);
+		e.approve(conversionId(e));
+		expect(e.bal('2660')).toBe(0n);
+		// Oct 1 to Oct 21 at 6% on $1M, exactly once: 20 days
+		expect(-e.bal('7200')).toBe(328_767n);
+	});
+
+	it('accrual still in debate when the term sheet arrives: the conversion waits for it', () => {
+		const e = engine();
+		e.upload('closing_tracker');
+		e.setHold(true);
+		e.upload('convertible_note');
+		const pending = accruals(e)[0];
+		expect(e.upload('term_sheet').ids).toHaveLength(0);
+		e.approve(pending.id);
+		e.setHold(false);
+		expect(e.upload('term_sheet').ids).toHaveLength(1);
+		expect(e.bal('2660')).toBe(0n);
+	});
+
+	it('valuation report uploaded while the conversion waits: the converting SAFEs are not restated', () => {
+		const e = engine();
+		e.upload('closing_tracker');
+		e.setHold(true);
+		e.upload('term_sheet');
+		const reading = e.upload('valuation_report');
+		expect(reading.ids).toHaveLength(0);
+		expect(reading.reading.summaryPlain).toMatch(/conversion that is waiting/);
+		e.approve(conversionId(e));
+		expect(e.bal('2600')).toBe(0n);
+		expect(e.bal('7300')).toBe(0n);
+		// a SAFE funded after the conversion can still be restated
+		e.setHold(false);
+		e.upload('wire_confirmation');
+		expect(e.upload('valuation_report').ids).toHaveLength(1);
+		expect(e.bal('2600')).toBe(55_000_000n + 3_410_000n);
+	});
+
+	it('restatement still in debate when the term sheet arrives: the conversion waits for it', () => {
+		const e = engine();
+		e.upload('closing_tracker');
+		e.setHold(true);
+		e.upload('valuation_report');
+		const fv = e.t.proposal.find((p) => p.kind === 'journal_entry' && p.payloadJson.includes('adjustments'))!;
+		expect(e.upload('term_sheet').ids).toHaveLength(0);
+		e.approve(fv.id);
+		e.setHold(false);
+		expect(e.upload('term_sheet').ids).toHaveLength(1);
+		expect(e.bal('2600')).toBe(0n);
+		expect(-e.bal('7300')).toBe(7_440_000n);
 	});
 });
