@@ -68,7 +68,7 @@
 	},
 	"routes/(app)/ledger/+page.svelte": {
 		"bracket-size": 6,
-		"unknown-class": 11
+		"unknown-class": 9
 	},
 	"routes/(app)/proposals/+page.svelte": {
 		"bracket-size": 5,
