@@ -165,7 +165,7 @@ describe('runLiveClose', () => {
     });
     await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 1.25 });
 
-    const opening = fx.calls[0]!;
+    const opening = fx.calls.find(c => c.reducer === 'postAgentMessage')!;
     expect(opening).toMatchObject({ role: 'advisor', reducer: 'postAgentMessage', args: { threadId: 'close:2026-09', kind: 'ruling', summaryPlain: 'The Advisor started the 2026-09 close.' } });
     expect(opening.args.body).toMatch(/^Opening the 2026-09 close for Cafoo Inc\. /);
     expect(runs).toHaveLength(1);
@@ -216,9 +216,9 @@ describe('runLiveClose', () => {
     expect(runs[0]!.options.model).toBe('claude-test-advisor');
     expect(runs[0]!.options.agents.credit.model).toBe('claude-test-worker');
   });
-  it('opens a soft close: the month\'s close tasks leave todo once the Advisor opens it, so the feed stops', async () => {
+  it('opens a soft close: the month\'s close tasks leave todo before the Advisor announces it, so the feed has stopped', async () => {
     await runLiveClose(fx.cast, '2026-09', onStep);
-    expect(fx.calls[0]).toMatchObject({ reducer: 'postAgentMessage' });
+    expect(fx.calls.slice(0, 2).map(c => c.reducer)).toEqual(['updateCloseTask', 'postAgentMessage']);
     expect(fx.callsTo('updateCloseTask')).toEqual([{ role: 'advisor', reducer: 'updateCloseTask', args: { taskId: 5n, status: 'in_progress', note: 'Close started' } }]);
   });
 

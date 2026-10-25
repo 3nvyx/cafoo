@@ -195,13 +195,14 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // Started only now, so a close that fails while setting up (a charter that does not build) leaves no critic running.
   const stopCritic = startCritic(cast);
   try {
-    // The opening message marks the close as started, so a second run resumes instead of proposing twice.
-    await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     // Opening the close is a soft close (docs/adr/0014): with a task out of todo the books stop the feed booking into
-    // the month, as the scripted close does.
+    // the month, as the scripted close does. The tasks move before the opening message, so the feed has stopped by the
+    // time the close is announced; a rerun after a failure here finds no todo task left and goes on.
     for (const t of A.db.closeTask.iter()) {
       if (t.periodId === periodId && t.status.tag === 'Todo') await A.reducers.updateCloseTask({ taskId: t.id, status: 'in_progress', note: 'Close started' });
     }
+    // The opening message marks the close as started, so a second run resumes instead of proposing twice.
+    await say(A, `close:${periodYm}`, `${openingMarker(periodYm)} for ${rootSubsidiary(A).name}. Delegating to the Bookkeeper, Revenue, and Credit & Risk; nothing posts until I rule, and anything material waits for the CFO.`, `The Advisor started the ${periodYm} close.`, 'ruling');
     await run(
       `Close ${periodYm} for Cafoo Inc. Delegate: 1) bookkeeper (bank reconciliation, duplicates, quick entries, accruals), 2) revenue (schedules and recognition), 3) credit (guarantor cascades, allowances, vendor verification)${group ? ', 4) consolidation (revalue Cafoo Ltd\'s foreign-currency balances at the closing rate and propose the balance and activity eliminations; it raises any intercompany difference in the close thread first)' : ''}. Wait for each report. Then list proposals, consider critiques, rule on every one, mark tasks done, and request the lock.`
     );
