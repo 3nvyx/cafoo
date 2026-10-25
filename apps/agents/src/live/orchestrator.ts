@@ -183,7 +183,7 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (!open.length) return;
     onStep(`${open.length} proposal(s) still open after delegation; the Advisor rules on them now`);
     await run(
-      `Delegation is finished for ${periodYm}. ${open.length} proposals are still open. Call list_proposals for ${periodYm} with status Open, weigh each Red Team critique, and rule on every one with approve_proposal or reject_proposal (technical rationale plus a one-sentence plain summary). Do not delegate again and do not propose anything. Then mark the close tasks done and call request_period_lock.`
+      `Delegation is finished for ${periodYm}. ${open.length} proposals are still open. Call list_proposals for ${periodYm} with status Open (it returns a page of 10; pass id to read one payload in full), weigh each Red Team critique, and rule on every one on the page with approve_proposal or reject_proposal (technical rationale plus a one-sentence plain summary). A ruled proposal leaves Open, so call list_proposals with status Open again until total is 0. Do not delegate again and do not propose anything. Then mark the close tasks done and call request_period_lock.`
     );
     open = openProposals();
     if (open.length) {

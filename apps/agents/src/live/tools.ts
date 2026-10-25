@@ -29,6 +29,10 @@ const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
 const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 const readOnly = { annotations: { readOnlyHint: true } };
+/** list_proposals pages: the whole month at once overflowed the tool's output limit on a live close. */
+const LIST_PAGE = 10;
+const LIST_PAGE_MAX = 25;
+const PAYLOAD_PREVIEW = 600;
 /**
  * A row id as the module stores it: "012" becomes "12". Payloads are compared as strings downstream (evals, the web
  * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id: digits only, as
@@ -111,16 +115,22 @@ export function booksServer(cast: Cast) {
       ),
       tool(
         'list_proposals',
-        'Proposals for a month with their status, the Red Team critiques, and the Advisor ruling if any.',
-        { periodYm: z.string(), status: z.enum(['Open', 'AwaitingCfo', 'SentBack', 'Approved', 'Rejected', 'Amended', 'all']).optional() },
-        async ({ periodYm, status }) => {
+        `Proposals for a month with their status, the Red Team critiques, and the Advisor ruling if any. Pages of ${LIST_PAGE} (oldest first): read on with offset = nextOffset until nextOffset is null. A large payload comes as a preview; pass id to read that one Proposal in full.`,
+        {
+          periodYm: z.string(),
+          status: z.enum(['Open', 'AwaitingCfo', 'SentBack', 'Approved', 'Rejected', 'Amended', 'all']).optional(),
+          offset: z.number().int().min(0).optional(),
+          limit: z.number().int().min(1).max(LIST_PAGE_MAX).optional(),
+          id: z.string().regex(/^\d+$/).optional(),
+        },
+        async ({ periodYm, status, offset = 0, limit = LIST_PAGE, id }) => {
           const p = [...A.db.period.iter()].find(x => x.ym === periodYm);
           if (!p) return fail(`No period ${periodYm}`);
           const msgs = [...A.db.agentMessage.iter()];
-          const rows = [...A.db.proposal.iter()]
-            .filter(x => x.periodId === p.id && (!status || status === 'all' || x.status.tag === status))
-            .sort((a, b) => Number(a.id - b.id))
-            .map(x => ({
+          const row = (x: (typeof matching)[number], full: boolean) => {
+            // A month's full payloads overflow the tool's output limit, so a page carries a preview of the large ones.
+            const big = !full && x.payloadJson.length > PAYLOAD_PREVIEW;
+            return {
               id: x.id,
               kind: x.kind.tag,
               status: x.status.tag,
@@ -128,11 +138,21 @@ export function booksServer(cast: Cast) {
               amount: money(x.amountMinor),
               summaryPlain: x.summaryPlain,
               rationale: x.rationale,
-              payload: JSON.parse(x.payloadJson),
+              ...(big ? { payloadPreview: `${x.payloadJson.slice(0, PAYLOAD_PREVIEW)}…`, payloadTruncated: true } : { payload: JSON.parse(x.payloadJson) }),
               critiques: msgs.filter(m => m.proposalId === x.id && m.kind.tag === 'Critique').map(m => m.body),
               cfoNotes: msgs.filter(m => m.proposalId === x.id && m.senderRole === 'cfo').map(m => m.body),
-            }));
-          return ok(rows);
+            };
+          };
+          const matching = [...A.db.proposal.iter()]
+            .filter(x => x.periodId === p.id && (!status || status === 'all' || x.status.tag === status))
+            .sort((a, b) => Number(a.id - b.id));
+          if (id !== undefined) {
+            const one = [...A.db.proposal.iter()].find(x => x.id === BigInt(id) && x.periodId === p.id);
+            return one ? ok(row(one, true)) : fail(`No Proposal ${id} in ${periodYm}`);
+          }
+          const rows = matching.slice(offset, offset + limit).map(x => row(x, false));
+          const next = offset + rows.length;
+          return ok({ total: matching.length, offset, nextOffset: next < matching.length ? next : null, rows });
         },
         readOnly
       ),
