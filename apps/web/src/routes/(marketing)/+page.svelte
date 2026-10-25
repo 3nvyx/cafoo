@@ -133,15 +133,15 @@
 		</section>
 		<!-- The product itself, set into the painted sky and cut off by the frame's bottom edge. -->
 		<div id="hero-art" class="wide pb-16 sm:pb-24">
-			<PaintedFrame seed={11} class="aspect-[16/9] pt-[7%]">
+			<PaintedFrame seed={11} class="aspect-[16/9] pt-[7%] lg:aspect-21/10">
 				<!-- Back on the content column, so the product lines up with the headline above. -->
 				<div class="wide-content">
 				<img
 					src="/product/launchpad.webp"
-					width="2400"
-					height="1500"
+					width="2000"
+					height="1050"
 					fetchpriority="high"
-					alt="The Luyten Dashboard for September 2026: cash, income and spend, the locked September close, the KPIs, and proposals by status."
+					alt="The Luyten Dashboard for September 2026: cash, income and spend, one proposal in debate, the KPIs, proposals by status, close progress, agent status and customer credit."
 					class="block w-full rounded-t-xl border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
 				/>
 				</div>
