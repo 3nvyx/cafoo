@@ -229,3 +229,42 @@ export function classify(kind: Instrument['kind'], status: Instrument['status'] 
 			return { classification: 'equity', plain: 'Equity: shares bought for cash. The money goes to stock and paid-in capital, never to income.' };
 	}
 }
+
+/** When each SAFE or note's money arrived, read from approved funding receipts (`payload.fundedAt`). */
+export function fundedDates(proposals: { kind: string; status: string; payloadJson: string }[]): Map<string, string> {
+	const out = new Map<string, string>();
+	for (const p of proposals) {
+		if (p.kind !== 'funding_receipt' || (p.status !== 'approved' && p.status !== 'amended')) continue;
+		try {
+			const j = JSON.parse(p.payloadJson) as { instrumentId?: string; fundedAt?: string };
+			if (j.instrumentId && j.fundedAt && !out.has(j.instrumentId)) out.set(j.instrumentId, j.fundedAt);
+		} catch {
+			// a payload that is not JSON names no instrument
+		}
+	}
+	return out;
+}
+
+export interface RoundPlanInput {
+	/** Today's cap table; its fully diluted shares are the pre-round shares. */
+	capTable: CapTableEntry[];
+	/** The SAFEs and notes that convert in the round. */
+	converting: Instrument[];
+	holderName: (investorId: string) => string;
+	/** When a note's money arrived; interest runs from then. A note not yet funded converts at principal. */
+	fundedAt: (instrumentId: string) => string | undefined;
+	preMoneyMinor: bigint;
+	newMoneyMinor: bigint;
+	/** The round's closing date, when conversion happens. */
+	closeAt: string;
+}
+
+/** A priced round over today's cap table, with the given SAFEs and notes converting at the close. */
+export function roundPlan(r: RoundPlanInput): PricedRoundResult {
+	return pricedRound({
+		preRoundShares: fullyDilutedShares(r.capTable),
+		preMoneyMinor: r.preMoneyMinor,
+		newMoneyMinor: r.newMoneyMinor,
+		convertibles: r.converting.map((i) => toConvertible(i, r.holderName(i.investorId), i.kind === 'convertible_note' ? r.fundedAt(i.id) : undefined, r.closeAt))
+	});
+}

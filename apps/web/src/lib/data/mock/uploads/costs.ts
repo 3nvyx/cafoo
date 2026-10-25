@@ -262,7 +262,7 @@ function proposeBreakage(ctx: MockContext, b: Batch) {
 		proposerRole: 'revenue',
 		amountMinor: amt.toString(),
 		periodId: periodFor(ctx, b.expiresAt!.slice(0, 7)),
-		summaryPlain: `${customer}'s credit pack expired with ${b.remaining}M of ${b.quantity}M tokens unused: recognize ${usd(amt)} as breakage revenue.`,
+		summaryPlain: `${customer.endsWith('s') ? `${customer}'` : `${customer}'s`} credit pack expired with ${b.remaining}M of ${b.quantity}M tokens unused: recognize ${usd(amt)} as breakage revenue.`,
 		rationale: 'The pack terms say unused credits lapse at expiry and are not refundable, so the remaining customer-credit liability is earned now.',
 		payload: { batchId: b.id, customerId: b.customerId, remaining: b.remaining, quantity: b.quantity, memo: `Credit breakage: ${customer}, ${b.name}`, lines: [L('2450', amt, 0n, { customerId: b.customerId }), L('4300', 0n, amt, { customerId: b.customerId })] },
 		body: `PROPOSE credit_breakage ${b.id}: expiresAt ${b.expiresAt}, remaining ${b.remaining}/${b.quantity} ${b.unit}, paid ${usd(b.amountMinor)}. Unused value ${usd(amt)}. Dr 2450 / Cr 4300.`,

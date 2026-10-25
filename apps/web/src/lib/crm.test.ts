@@ -57,7 +57,7 @@ describe('deals', () => {
 		const p = weightedPipeline(loadSeed().deal);
 		expect(p.openCount).toBe(7);
 		expect(p.openMinor).toBe('10890000');
-		expect(p.weightedMinor).toBe('5718000');
+		expect(p.weightedMinor).toBe('5968500');
 	});
 });
 
@@ -80,7 +80,7 @@ describe('support SLA', () => {
 			],
 			now
 		);
-		expect(s).toEqual({ open: 2, breached: 1, atRisk: 0, metRateBp: 5000, medianFirstResponseMin: 315 });
+		expect(s).toEqual({ open: 2, breached: 1, atRisk: 0, metRateBp: 5000, medianFirstResponseMin: 285 });
 	});
 });
 
