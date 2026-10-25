@@ -28,9 +28,13 @@ const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }]
 const readOnly = { annotations: { readOnlyHint: true } };
 /**
  * A row id as the module stores it: "012" becomes "12". Payloads are compared as strings downstream (evals, the web
- * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id.
+ * app, the scripted close), so every id a tool forwards is sent canonical. Throws on a non-numeric id: digits only, as
+ * the harness reads ids (rules.ts idKey), because BigInt alone reads "" as 0 and "0x3C" as 60, another row.
  */
-const id = (v: string) => BigInt(v).toString();
+const id = (v: string) => {
+  if (!/^\d+$/.test(v)) throw new Error(`"${v}" is not a row id (digits only)`);
+  return BigInt(v).toString();
+};
 const optId = (v: string | undefined) => (v ? id(v) : undefined);
 
 const lineSchema = z.object({
