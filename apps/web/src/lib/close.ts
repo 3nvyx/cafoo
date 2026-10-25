@@ -2,6 +2,23 @@
 // Launchpad and the Close checklist so both screens agree.
 import type { DataSource } from './data/source';
 import type { AgentMessage, Period } from './data/types';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '@cafoo/ledger-core';
+
+type CloseBooks = Pick<DataSource, 'periods' | 'connection' | 'closeTasks' | 'proposals' | 'agentMessages' | 'bankTransactions' | 'auditEvents'>;
+
+/** The same reviewed bank rows and audit revision the ledger module checks when the CFO accepts exceptions. */
+export function bankExceptionState(db: Pick<CloseBooks, 'bankTransactions' | 'auditEvents'>, periodYm: string) {
+	const input = {
+		periodYm,
+		bankRows: db.bankTransactions(),
+		auditEvents: db.auditEvents().map(event => ({ ...event, detail: event.detailJson }))
+	};
+	return {
+		rows: currentBankExceptions(input),
+		snapshot: bankExceptionSnapshot(input),
+		acceptance: bankExceptionAcceptance(input)
+	};
+}
 
 export interface LockGate {
 	period: Period | undefined;
@@ -12,13 +29,15 @@ export interface LockGate {
 	awaiting: number;
 	sentBack: number;
 	pendingTasks: number;
+	/** Unmatched bank lines through this Period, including earlier months. */
+	bankExceptions: ReturnType<typeof bankExceptionState>;
 	/** The Advisor's lock request (its latest ruling in the close thread), while the Period is waiting for the lock. */
 	request: AgentMessage | undefined;
 	/** Plain sentence for why the lock is not available yet ('' when it is). */
 	blocker: string;
 }
 
-export function lockGate(db: DataSource, periodId: string): LockGate {
+export function lockGate(db: CloseBooks, periodId: string): LockGate {
 	const period = db.periods().find((p) => p.id === periodId);
 	const closes = db.connection().closes.filter((c) => c.periodYm === periodId);
 	const tasks = db.closeTasks().filter((t) => t.periodId === periodId);
@@ -28,6 +47,8 @@ export function lockGate(db: DataSource, periodId: string): LockGate {
 	const open = props.filter((p) => p.status === 'open').length;
 	// Advisor-owned tasks (and the CFO's own lock task) finish when the lock lands.
 	const pendingTasks = tasks.filter((t) => t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done').length;
+	const blockedTasks = tasks.filter((t) => t.status === 'blocked').length;
+	const bankExceptions = bankExceptionState(db, periodId);
 	const thread = `close:${periodId}`;
 	// The Advisor's lock request stands only while the month is waiting for the lock: once the CFO locks it, or
 	// unlocks it again, that request is history.
@@ -39,10 +60,12 @@ export function lockGate(db: DataSource, periodId: string): LockGate {
 					.at(-1)
 			: undefined;
 	const started = closes.length > 0 || period?.status === 'closing';
-	const canLock =
+	const workflowReady =
 		!!period &&
 		period.status !== 'closed' &&
-		(period.status === 'closing' || (tasks.length > 0 && pendingTasks === 0 && awaiting + sentBack + open === 0));
+		awaiting + sentBack + open === 0 &&
+		(period.status === 'closing' || (tasks.length > 0 && pendingTasks === 0));
+	const canLock = workflowReady && blockedTasks === 0 && (bankExceptions.rows.length === 0 || bankExceptions.acceptance.accepted);
 
 	let blocker = '';
 	if (period && !canLock && period.status !== 'closed') {
@@ -50,11 +73,13 @@ export function lockGate(db: DataSource, periodId: string): LockGate {
 		else if (awaiting) blocker = `${awaiting} item${awaiting === 1 ? '' : 's'} still need${awaiting === 1 ? 's' : ''} your confirmation.`;
 		else if (sentBack) blocker = `${sentBack} item${sentBack === 1 ? ' you sent back is' : 's you sent back are'} waiting for the agent to resubmit.`;
 		else if (open) blocker = `${open} item${open === 1 ? ' is' : 's are'} still in debate.`;
+		else if (blockedTasks) blocker = `${blockedTasks} close task${blockedTasks === 1 ? ' is' : 's are'} blocked. Resolve them before locking.`;
+		else if (bankExceptions.rows.length && !bankExceptions.acceptance.accepted) blocker = `${bankExceptions.rows.length} unmatched bank line${bankExceptions.rows.length === 1 ? ' needs' : 's need'} your review and explicit acceptance before locking.`;
 		else if (pendingTasks) blocker = `${pendingTasks} task${pendingTasks === 1 ? ' is' : 's are'} not done yet.`;
 		else blocker = 'Waiting for the Advisor to request the lock.';
 	}
 
-	return { period, started, running: closes.some((c) => c.status === 'running'), canLock, awaiting, sentBack, pendingTasks, request, blocker };
+	return { period, started, running: closes.some((c) => c.status === 'running'), canLock, awaiting, sentBack, pendingTasks, bankExceptions, request, blocker };
 }
 
 /** The earliest month after `periodId` that still takes postings, if any. */

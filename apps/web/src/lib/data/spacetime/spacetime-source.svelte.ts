@@ -249,6 +249,10 @@ export class SpacetimeDataSource implements DataSource {
 		await this.#call('Could not update this Close Task.', (c) => c.reducers.updateCloseTask({ taskId: BigInt(taskId), status, note: '' }));
 	}
 
+	async acceptBankExceptions(periodId: string, expectedSnapshot: string, reasonPlain: string): Promise<void> {
+		await this.#call('Could not accept the bank exceptions.', (c) => c.reducers.acceptBankExceptions({ periodYm: periodId, expectedSnapshot, reasonPlain }));
+	}
+
 	async lockPeriod(periodId: string): Promise<void> {
 		await this.#call('Could not lock this Period.', (c) => c.reducers.lockPeriod({ periodYm: periodId, rationale: 'Locked by the CFO from the close checklist' }));
 	}

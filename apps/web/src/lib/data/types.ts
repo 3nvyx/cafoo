@@ -195,11 +195,13 @@ export interface Bill {
 
 export interface BankTransaction {
 	id: string;
+	subsidiaryId: string;
 	bookedAt: Iso;
 	/** The month ("yyyy-mm") whose bank reconciliation this line belongs to. */
 	ym: string;
 	/** Positive is money in, negative is money out. */
 	amountMinor: Minor;
+	ccy: string;
 	description: string;
 	counterparty: string;
 	matched: boolean;

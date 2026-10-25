@@ -1,6 +1,6 @@
 {
 	"app.css": {
-		"raw-colour": 82
+		"raw-colour": 81
 	},
 	"lib/components/BottomNav.svelte": {
 		"bracket-size": 7,
@@ -14,8 +14,7 @@
 		"unknown-class": 6
 	},
 	"lib/components/ConfirmDialog.svelte": {
-		"bracket-size": 1,
-		"unknown-class": 4
+		"bracket-size": 1
 	},
 	"lib/components/DebateMessage.svelte": {
 		"bracket-size": 6,
@@ -43,10 +42,6 @@
 	"lib/components/Nav.svelte": {
 		"bracket-size": 3,
 		"unknown-class": 5
-	},
-	"lib/components/Pill.svelte": {
-		"bracket-size": 2,
-		"unknown-class": 9
 	},
 	"lib/components/ProfileMenu.svelte": {
 		"bracket-size": 2,

@@ -53,20 +53,20 @@
 	onclose={() => (open = false)}
 	aria-labelledby="{id}-t"
 	aria-describedby="{id}-b"
-	class="m-auto w-[min(460px,calc(100vw-32px))] rounded-[var(--radius-dialog)] border-0 bg-surface-3 p-0 text-ink shadow-[var(--elevation-3)]"
+	class="m-auto w-[min(460px,calc(100vw-32px))] rounded-lg border border-line bg-surface p-0 text-ink"
 >
 	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6 sm:p-7">
-		<h2 id="{id}-t" class="text-2xl">{title}</h2>
-		<p id="{id}-b" class="text-ink-2">{body}</p>
+		<h2 id="{id}-t" class="text-title">{title}</h2>
+		<p id="{id}-b" class="text-body text-ink-2">{body}</p>
 		{#if inputLabel}
-			<label class="flex flex-col gap-1.5 text-sm font-medium">
+			<label class="flex flex-col gap-1.5 text-body-sm font-medium">
 				{inputLabel}
 				<!-- svelte-ignore a11y_autofocus -->
-				<input class="field text-base font-normal" bind:value placeholder={inputPlaceholder} maxlength="160" required={inputRequired} autofocus />
+				<input class="field text-body font-normal" bind:value placeholder={inputPlaceholder} maxlength="160" required={inputRequired} autofocus />
 			</label>
 		{/if}
 		<div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-			<button type="button" class="btn btn-text" onclick={() => (open = false)}>Cancel</button>
+			<button type="button" class="btn btn-quiet" onclick={() => (open = false)}>Cancel</button>
 			<button
 				type="submit"
 				class="btn {danger ? 'btn-danger' : 'btn-primary'}"

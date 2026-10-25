@@ -26,6 +26,29 @@
 	--warn-soft: #f6ecd9;
 	--focus: #151413;
 
+	/* Semantic tokens that app.css did not define yet, aliased to the variables above so the token classes render.
+	   Values mirror packages/design-tokens/css/cafoo-tokens.css until this file imports it. */
+	--info: var(--ink-3);
+	--info-soft: var(--line);
+	--on-info: var(--surface);
+	--on-info-soft: var(--ink-2);
+	--on-pos: var(--surface);
+	--on-pos-soft: var(--pos);
+	--on-neg: var(--surface);
+	--on-neg-soft: var(--neg);
+	--on-warn: var(--surface);
+	--on-warn-soft: var(--warn);
+	--on-accent-soft: var(--accent-ink);
+	--on-subtle: var(--ink);
+	--on-surface: var(--ink);
+	--inverse: var(--ink);
+	--on-inverse: var(--surface);
+	--scrim: color-mix(in srgb, var(--on-accent) 40%, transparent);
+	--shape-sm: 4px;
+	--shape-md: 8px;
+	--shape-lg: 16px;
+	--shape-xl: 24px;
+
 	--role-advisor: #075c9e;
 	--role-bookkeeper: #57620f;
 	--role-revenue: #146c35;
@@ -58,6 +81,12 @@
 		--warn: #fbbf24;
 		--warn-soft: #2b2110;
 		--focus: #00b4ff;
+	/* Text on a solid status fill is tar in dark mode, as it is on the accent. */
+		--on-info: var(--on-accent);
+		--on-pos: var(--on-accent);
+		--on-neg: var(--on-accent);
+		--on-warn: var(--on-accent);
+		--on-inverse: var(--on-accent);
 		--role-advisor: #00b4ff;
 		--role-bookkeeper: #b5c65a;
 		--role-revenue: #34c26b;
@@ -90,6 +119,12 @@
 	--warn: #fbbf24;
 	--warn-soft: #2b2110;
 	--focus: #00b4ff;
+	/* Text on a solid status fill is tar in dark mode, as it is on the accent. */
+	--on-info: var(--on-accent);
+	--on-pos: var(--on-accent);
+	--on-neg: var(--on-accent);
+	--on-warn: var(--on-accent);
+	--on-inverse: var(--on-accent);
 	--role-advisor: #00b4ff;
 	--role-bookkeeper: #b5c65a;
 	--role-revenue: #34c26b;
@@ -121,6 +156,22 @@
 	--color-warn: var(--warn);
 	--color-warn-soft: var(--warn-soft);
 	--color-focus: var(--focus);
+	--color-info: var(--info);
+	--color-info-soft: var(--info-soft);
+	--color-on-info: var(--on-info);
+	--color-on-info-soft: var(--on-info-soft);
+	--color-on-pos: var(--on-pos);
+	--color-on-pos-soft: var(--on-pos-soft);
+	--color-on-neg: var(--on-neg);
+	--color-on-neg-soft: var(--on-neg-soft);
+	--color-on-warn: var(--on-warn);
+	--color-on-warn-soft: var(--on-warn-soft);
+	--color-on-accent-soft: var(--on-accent-soft);
+	--color-on-subtle: var(--on-subtle);
+	--color-on-surface: var(--on-surface);
+	--color-inverse: var(--inverse);
+	--color-on-inverse: var(--on-inverse);
+	--color-scrim: var(--scrim);
 
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-display: 'Space Grotesk', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
@@ -128,6 +179,10 @@
 
 	--radius-card: 8px;
 	--radius-btn: 4px;
+	--radius-sm: var(--shape-sm);
+	--radius-md: var(--shape-md);
+	--radius-lg: var(--shape-lg);
+	--radius-xl: var(--shape-xl);
 
 	/* The type scale, mirrored value for value from the @theme block of packages/design-tokens/css/cafoo-tokens.css
 	   until this file imports @cafoo/design-tokens/css (which also retires text-sm and friends). */
@@ -197,7 +252,7 @@
 		cursor: not-allowed;
 	}
 	dialog::backdrop {
-		background: rgb(0 0 0 / 0.4);
+		background: var(--scrim);
 	}
 }
 
@@ -242,6 +297,15 @@
 	/* Mixing toward the page color lightens the primary in light mode and darkens it in dark mode. */
 	.btn-primary:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--accent) 85%, var(--canvas));
+	}
+	/* The one destructive action in a dialog (unlock, reverse). Never the default button. */
+	.btn-danger {
+		background: var(--neg);
+		border-color: var(--neg);
+		color: var(--on-neg);
+	}
+	.btn-danger:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--neg) 85%, var(--canvas));
 	}
 	.btn-lg {
 		min-height: 52px;
