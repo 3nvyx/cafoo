@@ -5,7 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 // GitHub Pages serves the site under /<repo>; scripts/build-pages.mjs sets this and builds a static SPA.
-const pagesBase = process.env.PAGES_BASE;
+// SvelteKit rejects a base without a leading slash at startup, so the cast only tells the types what it checks.
+const pagesBase = process.env.PAGES_BASE as `/${string}` | undefined;
 
 export default defineConfig({
 	plugins: [
