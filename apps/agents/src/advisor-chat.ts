@@ -261,7 +261,7 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
     }
     yield `${pending.length} item${pending.length > 1 ? 's' : ''} need your OK:\n`;
     for (const p of pending) yield `- ${p.summaryPlain} (${money(p.amountMinor)})\n`;
-    yield `Open the Launchpad to approve or send back.`;
+    yield `Open the Dashboard to approve or send back.`;
     return;
   }
   if (/status|where are we|how.*close/.test(q)) {

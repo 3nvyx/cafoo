@@ -5,14 +5,15 @@
 	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
 	import Wordmark from '#lib/components/Wordmark.svelte';
 	import DrillDemo from './DrillDemo.svelte';
-	import FlowDiagram from './FlowDiagram.svelte';
+	import AgentWorkflows from './AgentWorkflows.svelte';
 	import GateStack from './GateStack.svelte';
+	import LogoWall from './LogoWall.svelte';
 	import ModeDemo from './ModeDemo.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
 
 	const anchors = [
-		{ href: '#how', label: 'How it works' },
+		{ href: '#how', label: 'Agents' },
 		{ href: '#demo', label: 'Demo' },
 		{ href: '#gate', label: 'The gate' }
 	];
@@ -134,13 +135,17 @@
 		</section>
 		-->
 
+		<section id="stack" class="calm-section content relative isolate scroll-mt-24 pt-16" aria-labelledby="stack-h">
+			<LogoWall />
+		</section>
+
 		<section id="how" class="calm-section content relative isolate scroll-mt-24 pt-32" aria-labelledby="how-h">
 			<div class="relative flex flex-col items-center text-center">
-				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">How we work</h2>
+				<h2 id="how-h" class="max-w-[18ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Our agent workflows</h2>
 			</div>
-			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-3 sm:p-5">
+			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-4 sm:p-8">
 				{@render marks()}
-				<FlowDiagram />
+				<AgentWorkflows />
 			</div>
 		</section>
 

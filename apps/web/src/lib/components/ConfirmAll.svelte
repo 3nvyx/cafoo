@@ -1,6 +1,6 @@
 <script lang="ts">
 	// "Confirm all N": confirms every ruling waiting for the CFO, one by one, with a progress toast.
-	// Shared by the Launchpad queue and the Proposals page's Needs-your-OK view.
+	// Shared by the Dashboard queue and the Proposals page's Needs-your-OK view.
 	import { db } from '#lib/data/index.js';
 	import type { Proposal } from '#lib/data/types.js';
 	import { confirmEffect } from '#lib/proposals.js';

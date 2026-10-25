@@ -122,7 +122,7 @@
 			<div class="flex flex-col gap-2 sm:flex-row">
 				{#if done}
 					<a href="/proposals?status=awaiting_cfo" class="btn btn-primary btn-lg">Review what needs your OK <Icon name="arrowRight" size={18} /></a>
-					<a href="/dashboard" class="btn btn-tonal btn-lg">Open the Launchpad</a>
+					<a href="/dashboard" class="btn btn-tonal btn-lg">Open the Dashboard</a>
 				{:else if phase === 'failed'}
 					<button class="btn btn-tonal btn-lg" onclick={() => void claim()}>Try again</button>
 					<a href="/dashboard" class="btn btn-text btn-lg">Continue read-only</a>

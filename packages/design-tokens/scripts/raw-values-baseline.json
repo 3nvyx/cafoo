@@ -88,10 +88,6 @@
 		"bracket-size": 5,
 		"unknown-class": 15
 	},
-	"routes/(app)/dashboard/+page.svelte": {
-		"bracket-size": 6,
-		"unknown-class": 5
-	},
 	"routes/(app)/ledger/+page.svelte": {
 		"bracket-size": 6,
 		"unknown-class": 12
@@ -123,9 +119,6 @@
 	"routes/(marketing)/DrillDemo.svelte": {
 		"bracket-size": 5,
 		"unknown-class": 7
-	},
-	"routes/(marketing)/FlowDiagram.svelte": {
-		"bracket-size": 10
 	},
 	"routes/(marketing)/GateStack.svelte": {
 		"bracket-size": 10,

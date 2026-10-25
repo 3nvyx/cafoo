@@ -5,7 +5,7 @@
 	import Icon from './Icon.svelte';
 	import ModeToggle from './ModeToggle.svelte';
 
-	// mobileOnly: the Launchpad repeats the period and its status in its own header, so on wide screens the bar goes.
+	// mobileOnly: the Dashboard has its own period picker and close status, so on wide screens the bar goes.
 	// Phones keep it, since it holds the only button that opens the navigation drawer.
 	let { mobileOnly = false }: { mobileOnly?: boolean } = $props();
 

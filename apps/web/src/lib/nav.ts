@@ -10,7 +10,7 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-	{ href: '/dashboard', label: 'Launchpad', icon: 'home', primary: true },
+	{ href: '/dashboard', label: 'Dashboard', icon: 'home', primary: true },
 	{ href: '/proposals', label: 'Proposals', icon: 'inbox', primary: true },
 	{ href: '/agents', label: 'Agents', icon: 'chat', primary: true },
 	{ href: '/close', label: 'Close', icon: 'checklist', primary: true },

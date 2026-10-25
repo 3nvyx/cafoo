@@ -194,7 +194,7 @@ Its tier rules (`packages/crs-mcp/src/tiers.ts`, no imports, I/O or clock) are a
 ## Repo layout
 
 ```
-apps/web/                 SvelteKit CFO app: landing page (/), Launchpad (/dashboard), Proposals, Agents, Close, Ledger, Board Pack, Charters, Customers, Vendors, Settings, /claim, /pitch
+apps/web/                 SvelteKit CFO app: landing page (/), Dashboard (/dashboard), Proposals, Agents, Close, Ledger, Board Pack, Charters, Customers, Vendors, Settings, /claim, /pitch
 apps/agents/              Orchestrator, gateway (:8787), agent charters, scripted Demo mode close
   src/scripted/           The scripted close, including the Consolidation step (consolidate.ts) and the Advisor's rulings
   src/feed/               The simulated bank and invoice feed (feeder.ts)
