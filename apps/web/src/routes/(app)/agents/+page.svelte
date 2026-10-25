@@ -6,7 +6,9 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import LiveActivity from '#lib/components/LiveActivity.svelte';
 	import Pill from '#lib/components/Pill.svelte';
-	import { KIND, STATUS, roleName } from '#lib/labels.js';
+	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
+	import { ACTIVITY_ROLES, agentActivity, type ActivityRole } from '#lib/agent-activity.js';
+	import { KIND, STATUS, dateTime, roleName } from '#lib/labels.js';
 	import { arrive } from '#lib/motion.js';
 	import { attempt } from '#lib/toast.svelte.js';
 	import { ui } from '#lib/ui.svelte.js';
@@ -48,6 +50,26 @@
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
 	const started = $derived(db.connection().closes.some((c) => c.periodYm === ui.periodId));
+
+	// What each agent did and the tools behind it (#lib/agent-activity.js): this month's Proposals and messages, and
+	// every Credit Check on record.
+	const customerNames = $derived(new Map(db.customers().map((c) => [c.id, c.name])));
+	const vendorNames = $derived(new Map(db.vendors().map((v) => [v.id, v.name])));
+	const activity = $derived(
+		agentActivity({
+			proposals: db.proposals().filter((p) => p.periodId === ui.periodId),
+			messages: db.agentMessages().filter((m) => !m.proposalId || proposals.get(m.proposalId)?.periodId === ui.periodId),
+			creditChecks: db.creditChecks(),
+			nameOf: (kind, id) => (kind === 'customer' ? customerNames.get(id) : vendorNames.get(id)),
+			kindLabel: (k) => KIND[k]
+		})
+	);
+	let agent = $state<ActivityRole>('bookkeeper');
+	const current = $derived(activity.find((a) => a.role === agent)!);
+	const anyActivity = $derived(activity.some((a) => a.items.length));
+	const demo = $derived(db.connection().ledger === 'demo');
+	let showAll = $state(false);
+	const SHOWN = 8;
 </script>
 
 <svelte:head><title>Agents · Cafoo</title></svelte:head>
@@ -63,6 +85,94 @@
 </div>
 
 <div class="mt-4"><LiveActivity periodId={ui.periodId} /></div>
+
+<section class="mt-6 flex flex-col gap-4" aria-labelledby="activity-h">
+	<div>
+		<h2 id="activity-h" class="text-subtitle">What each agent did</h2>
+		<p class="mt-1 text-body-sm text-ink-2">
+			Each line shows the tools on that agent's harness for that kind of work (see <a class="drill" href="/charters">Charters</a>); they describe the work, not a log of model calls.
+			{#if demo}In Demo mode this is the recorded demo close, not a live AI run.{/if}
+		</p>
+	</div>
+	<div class="flex flex-wrap gap-2" role="group" aria-label="Agent">
+		{#each ACTIVITY_ROLES as r (r)}
+			{@const a = activity.find((x) => x.role === r)}
+			<button
+				type="button"
+				class="chip"
+				aria-pressed={agent === r}
+				onclick={() => {
+					agent = r;
+					showAll = false;
+				}}>{roleName(r)} <span class="num text-caption opacity-80">{a?.items.length ?? 0}</span></button
+			>
+		{/each}
+	</div>
+	{#if !anyActivity}
+		<div class="card flex flex-col items-center gap-3 px-5 py-10 text-center">
+			<p class="text-ink-2">No agent has done anything for this month yet. Start the close and the Bookkeeper begins with the bank feed.</p>
+			<a class="btn btn-primary" href="/close"><Icon name="play" size={16} />Start the close</a>
+		</div>
+	{:else if current}
+		<div class="card flex flex-col gap-4 p-4 sm:p-5">
+			<div class="flex flex-wrap items-center gap-3">
+				<RoleAvatar role={current.role} size={32} />
+				<div class="min-w-0 flex-1">
+					<p class="font-medium">{roleName(current.role)}</p>
+					<p class="text-body-sm text-ink-2">
+						{#if current.made}
+							<span class="num">{current.made}</span> Proposals: {current.byKind.map((k) => `${k.count} ${k.label}`).join(', ')} · <span class="num">{current.approved}</span> approved ·
+							<span class="num">{current.waitingCfo}</span> waiting for the CFO
+						{:else}
+							{current.items.length} item{current.items.length === 1 ? '' : 's'} this month
+						{/if}
+					</p>
+				</div>
+			</div>
+			{#if current.toolsUsed.length}
+				<div>
+					<p class="eyebrow">Tools behind this work</p>
+					<ul class="mt-2 flex flex-wrap gap-2">
+						{#each current.toolsUsed as t (t.name)}
+							<li class="rounded-sm border border-line px-2 py-0.5 text-caption"><code class="font-mono">{t.name}</code> <span class="num text-ink-3">×{t.count}</span></li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
+			{#if current.items.length}
+				<ol class="flex flex-col divide-y divide-line border-y border-line">
+					{#each showAll ? current.items : current.items.slice(0, SHOWN) as i (i.id)}
+						<li class="flex flex-col gap-1 py-3">
+							<div class="flex flex-wrap items-center gap-2 text-caption text-ink-3">
+								<span class="font-medium text-ink-2">{i.label}</span>
+								<span>{dateTime(i.at)}</span>
+								{#if i.status}<Pill tone={STATUS[i.status].tone}>{STATUS[i.status].label}</Pill>{/if}
+							</div>
+							{#if i.proposalId}
+								<a class="drill text-body-sm" href="/proposals?status=all#proposal-{i.proposalId}">{i.text}</a>
+							{:else}
+								<p class="text-body-sm">{i.text}</p>
+							{/if}
+							{#if i.tools.length}
+								<p class="text-caption text-ink-3">Tools: {#each i.tools as t, k (t)}<code class="font-mono text-ink-2">{t}</code>{k < i.tools.length - 1 ? ', then ' : ''}{/each}</p>
+							{/if}
+						</li>
+					{/each}
+				</ol>
+				{#if current.items.length > SHOWN}
+					<button class="btn btn-text self-start" aria-expanded={showAll} onclick={() => (showAll = !showAll)}>{showAll ? 'Show fewer' : `Show ${current.items.length - SHOWN} more`}</button>
+				{/if}
+			{:else}
+				<p class="text-body-sm text-ink-3">
+					{roleName(current.role)} has nothing on record for this month yet.
+					{#if !started}<a class="drill" href="/close">Start the close</a> to put it to work.{/if}
+				</p>
+			{/if}
+		</div>
+	{/if}
+</section>
+
+<h2 class="mt-10 text-subtitle">Debate threads</h2>
 
 <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label="Filter threads">
 	{#each FILTERS as f (f.id)}
