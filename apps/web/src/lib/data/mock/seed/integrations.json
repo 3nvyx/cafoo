@@ -1,3 +1,21 @@
 {
-	"integration": []
+	"integration": [
+		{"id": "hubspot", "name": "HubSpot", "category": "crm", "status": "connected", "connectedAt": "2026-02-11T16:20:00Z", "lastSyncAt": "2026-10-02T10:58:41Z", "recordsSynced": 1842, "readsPlain": "Deals, pipeline stages and expected close dates"},
+		{"id": "salesforce", "name": "Salesforce", "category": "crm", "status": "available", "recordsSynced": 0, "readsPlain": "Opportunities, accounts and forecast categories"},
+		{"id": "pipedrive", "name": "Pipedrive", "category": "crm", "status": "available", "recordsSynced": 0, "readsPlain": "Deals and pipeline stages"},
+		{"id": "zendesk", "name": "Zendesk", "category": "support", "status": "connected", "connectedAt": "2026-03-04T09:05:00Z", "lastSyncAt": "2026-10-02T10:59:12Z", "recordsSynced": 6315, "readsPlain": "Support tickets, response times and which customer raised them"},
+		{"id": "intercom", "name": "Intercom", "category": "support", "status": "available", "recordsSynced": 0, "readsPlain": "Conversations and the customers behind them"},
+		{"id": "stripe", "name": "Stripe", "category": "billing", "status": "connected", "connectedAt": "2025-11-18T14:40:00Z", "lastSyncAt": "2026-10-02T10:59:30Z", "recordsSynced": 12907, "readsPlain": "Payments, payouts, credit pack purchases and promotion codes"},
+		{"id": "shopify", "name": "Shopify", "category": "billing", "status": "available", "recordsSynced": 0, "readsPlain": "Orders, refunds and discount codes"},
+		{"id": "gusto", "name": "Gusto", "category": "payroll", "status": "connected", "connectedAt": "2025-10-01T12:00:00Z", "lastSyncAt": "2026-10-02T10:41:05Z", "recordsSynced": 1186, "readsPlain": "Pay runs, payslips, taxes withheld and time-off balances"},
+		{"id": "rippling", "name": "Rippling", "category": "payroll", "status": "available", "recordsSynced": 0, "readsPlain": "Pay runs, benefits and time off"},
+		{"id": "deel", "name": "Deel", "category": "payroll", "status": "available", "recordsSynced": 0, "readsPlain": "Contractor invoices and international payroll"},
+		{"id": "aws", "name": "Amazon Web Services", "category": "cloud", "status": "connected", "connectedAt": "2025-09-15T18:30:00Z", "lastSyncAt": "2026-10-02T10:58:02Z", "recordsSynced": 48211, "readsPlain": "Daily spend by service, environment and product tag"},
+		{"id": "gcp", "name": "Google Cloud", "category": "cloud", "status": "available", "recordsSynced": 0, "readsPlain": "Daily spend by project and service"},
+		{"id": "vercel", "name": "Vercel", "category": "cloud", "status": "connected", "connectedAt": "2026-01-20T10:15:00Z", "lastSyncAt": "2026-10-02T10:57:48Z", "recordsSynced": 2964, "readsPlain": "Hosting and bandwidth spend by project"},
+		{"id": "openai", "name": "OpenAI", "category": "model_usage", "status": "connected", "connectedAt": "2026-04-02T08:45:00Z", "lastSyncAt": "2026-10-02T10:59:51Z", "recordsSynced": 9733, "readsPlain": "Tokens and spend by model, project and API key"},
+		{"id": "anthropic", "name": "Anthropic", "category": "model_usage", "status": "connected", "connectedAt": "2026-05-12T13:10:00Z", "lastSyncAt": "2026-10-02T10:59:44Z", "recordsSynced": 7408, "readsPlain": "Tokens and spend by model and workspace"},
+		{"id": "carta", "name": "Carta", "category": "cap_table", "status": "connected", "connectedAt": "2025-08-21T15:00:00Z", "lastSyncAt": "2026-10-02T09:30:00Z", "recordsSynced": 214, "readsPlain": "Holders, share classes, SAFEs, notes and option grants"},
+		{"id": "pulley", "name": "Pulley", "category": "cap_table", "status": "available", "recordsSynced": 0, "readsPlain": "Holders, share classes and option grants"}
+	]
 }
