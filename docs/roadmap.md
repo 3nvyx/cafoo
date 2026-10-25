@@ -31,19 +31,17 @@ The Board Pack (P&L, Balance Sheet, ARR waterfall, NRR) renders after the lock, 
 
 Every Proposal and ruling carries a Plain summary and a technical rationale. Simple mode shows the sentence; Expert mode shows journal lines, codes, critiques, and raw payloads.
 
-Demo mode runs all of it with zero API keys. Live mode switches on one provider at a time as keys are added. Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine has 142 unit tests, and the credit cascade reproduces all 20 expected decisions in the sandbox dataset.
+Demo mode runs all of it with zero API keys. Live mode switches on one provider at a time as keys are added. Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine has 156 unit tests (1,085 across the workspace, mapped to features in `proofs/`), and the credit cascade reproduces all 20 expected decisions in the sandbox dataset.
 
-Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind the Anthropic Messages API; see `.env.example`), Grok and Gemini through the Vercel AI SDK, Moss, Bright Data, CRS Credit API sandbox, and Open WebUI as an optional chat front-end.
+Integrations today: SpacetimeDB, Claude Agent SDK (OpenAI or Anthropic behind the Anthropic Messages API; see `.env.example`), Grok and Gemini through the Vercel AI SDK, Moss (house policies for every agent and the chat, and crawled customer sites), Bright Data, Apify (customer-site crawls into Moss), the Capital One Nessie sandbox as an optional bank source for the live feed, the CRS Credit API sandbox, CSV and Google Slides exports, and Open WebUI as an optional chat front-end. `/status` says per provider whether it is in demo, configured, verified by a real answer, or fell back, and `pnpm proof` records one real call per configured provider.
 
 ## Next 90 days (roadmap)
 
-**Real bank and billing feeds.** Today's feed is simulated. Next it connects to real bank and billing providers through the same ingest-only role, so nothing about the gate changes.
+**Real bank and billing feeds.** Today's feed is simulated, or reads bank lines from the Capital One Nessie sandbox. Next it connects to production bank and billing providers through the same ingest-only role, so nothing about the gate changes.
 
 **Per-subsidiary locks.** Today the CFO locks the group's month in one step. Each company will get its own lock, with the consolidated Board Pack final only when every company's month is.
 
 **A dedicated evaluator identity.** Charter eval results are recorded under the Advisor's identity today. A separate evaluator identity will record them, so the agent being judged never shares an identity with its judge.
-
-**Customer-site enrichment.** Apify crawls each customer's public site into Moss, so the Credit & Risk agent and the Red Team can check what a business says it does against how it pays.
 
 **Hosted deployment.** A managed Cafoo per customer, so a finance team can start without running a database or a gateway. The CFO seat already needs a one-time Bootstrap secret, so a hosted database never hands the role to whoever connects first.
 

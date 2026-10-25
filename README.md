@@ -136,7 +136,7 @@ The agent gateway reports what is running: `GET /status` (providers, closes, `fe
 With zero API keys, Cafoo runs end to end.
 Without `ANTHROPIC_API_KEY` no model is called: the close is the scripted close in `apps/agents/src/scripted/`, run over the real accounting engines (bank matching, revenue schedules, accruals, allowances, the credit cascade, consolidation), with scripted narration and scripted Advisor rulings, and the Advisor chat answers from the ledger tables.
 Without `XAI_API_KEY` the Red Team writes rule-based critiques.
-Bright Data and CRS answer from recorded fixtures, Moss becomes a local keyword search over the same policy documents, and Apify is skipped.
+Bright Data and CRS answer from recorded fixtures, Moss becomes a local keyword search over the same policy documents, and Apify reads the demo website snapshots in `fixtures/apify/`.
 The writes go through the same role identities and reducers as live agents, so the gate and the audit trail are identical.
 Each key you add switches that one provider to live calls.
 `DEMO_MODE="1"` keeps every provider on its demo stand-in even when keys are present.
@@ -153,9 +153,11 @@ Each key you add switches that one provider to live calls.
 | `GEMINI_API_KEY` (or `GOOGLE_GENERATIVE_AI_API_KEY`) | Gemini: the Red Team's second critic, which reads Grok's critique and adds only what it missed | Scripted critiques from `fixtures/gemini/critiques.json`, labeled "Gemini (scripted)" |
 | `GEMINI_MODEL` | Gemini model id | `gemini-3.8-flash` |
 | `API_TOKEN` | Bright Data: live vendor lookups during the close | `fixtures/brightdata/` |
-| `APIFY_TOKEN` | Apify: customer-site crawls into Moss (roadmap) | Skipped |
+| `APIFY_TOKEN`, `APIFY_ACTOR` | Apify: crawls each exposed customer's website into Moss for Credit & Risk and the Red Team | Demo website snapshots in `fixtures/apify/` |
+| `NESSIE_API_KEY`, `NESSIE_ACCOUNT_IDS` | Capital One Nessie sandbox as the live feed's bank source (USD subsidiaries only) | The simulated bank feed |
+| `GOOGLE_SERVICE_ACCOUNT_FILE`, `SLIDES_SHARE_WITH` | Google Slides export of the ledger, Board Pack or CFO queue | CSV export only |
 | `CRS_USERNAME`, `CRS_PASSWORD`, `CRS_BASE_URL`, `CRS_REPLAY` | CRS Credit API sandbox: identity, fraud, bureaus, public records | `fixtures/crs/` |
-| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Moss: vector search over policies and past entries | Local keyword search |
+| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` | Moss: search over the house policies (every agent and the chat) and crawled customer sites | Local keyword search |
 | `SPACETIMEDB_URI`, `SPACETIMEDB_DB_NAME` | Ledger database | `http://localhost:3000`, `cafoo` |
 | `GATEWAY_PORT` | Agent gateway and OpenAI-compatible endpoint | `8787` |
 | `GATEWAY_HOST` | Address the gateway listens on; `0.0.0.0` for Open WebUI in Docker (set `GATEWAY_API_KEY` too) | `127.0.0.1`, this machine only |
@@ -192,7 +194,7 @@ pnpm -F @cafoo/agents smoke:charter  # draft, eval and publish a stricter Charte
 pnpm eval --rerun                    # reseed, rerun the scripted close and check every charter scenario against the result
 ```
 
-Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine is deterministic and has 142 unit tests. The credit cascade reproduces all 20 expected decisions from the sandbox dataset.
+Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine is deterministic and has 156 unit tests; the whole workspace has 1,085 (see `proofs/`). The credit cascade reproduces all 20 expected decisions from the sandbox dataset.
 Its tier rules (`packages/crs-mcp/src/tiers.ts`, no imports, I/O or clock) are also run by the module, so the tier on a recorded Credit Check is computed, never taken from the agent.
 
 ## Repo layout
