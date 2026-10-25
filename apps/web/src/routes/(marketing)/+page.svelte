@@ -275,9 +275,8 @@
 				</nav>
 			</div>
 		</div>
-		<div class="mt-12 flex flex-col gap-2 border-t border-line pt-6 text-ink-3 sm:flex-row sm:justify-between">
+		<div class="mt-12 border-t border-line pt-6 text-ink-3">
 			<p>© {new Date().getFullYear()} Cafoo</p>
-			<p>Figures on this page come from sample data.</p>
 		</div>
 	</footer>
 </div>

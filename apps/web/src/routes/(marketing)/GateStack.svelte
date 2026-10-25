@@ -216,7 +216,7 @@
 
 				<g opacity="0">
 					{@render chip('post_entry', 'bookkeeper')}
-					<animateMotion path={refusedPath} keyPoints="0;1;0.45;0.45" keyTimes="0;0.22;0.36;1" calcMode="linear" dur={LOOP} repeatCount="indefinite" />
+					<animateMotion path={refusedPath} keyPoints="0;1;0.72;0.72" keyTimes="0;0.22;0.27;1" calcMode="linear" dur={LOOP} repeatCount="indefinite" />
 					<animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.04;0.33;0.38;1" dur={LOOP} repeatCount="indefinite" />
 				</g>
 				<g transform="translate({CX + 46} {gateY - 8})" opacity="0">

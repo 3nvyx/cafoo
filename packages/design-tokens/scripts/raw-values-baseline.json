@@ -92,7 +92,7 @@
 	},
 	"routes/(marketing)/GateStack.svelte": {
 		"bracket-size": 10,
-		"unknown-class": 2
+		"unknown-class": 1
 	},
 	"routes/(marketing)/pitch/+page.svelte": {
 		"bracket-size": 7,
