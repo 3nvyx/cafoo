@@ -253,6 +253,8 @@ export class SpacetimeDataSource implements DataSource {
 	capTable = () => this.#company.cap_table_entry;
 	employees = () => this.#company.employee;
 	ptoRequests = () => this.#company.pto_request;
+	// The seed loader writes no calendar events yet, so People's calendar shows only time off and payroll here.
+	calendarEvents = (): U.CalendarEvent[] => [];
 	payRuns = () => this.#company.pay_run;
 	payslips = () => this.#company.payslip;
 	cloudCosts = () => this.#company.cloud_cost;

@@ -13,6 +13,39 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["-F", "@luyten/web", "dev", "--port", "5174"],
       "port": 5174
+    },
+    {
+      "name": "spacetime",
+      "runtimeExecutable": "spacetime",
+      "runtimeArgs": ["start"],
+      "port": 3000
+    },
+    {
+      "name": "demo-agents",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-F", "@luyten/agents", "orchestrator"],
+      "port": 8790,
+      "env": {
+        "DEMO_MODE": "0",
+        "CRS_REPLAY": "0",
+        "SPACETIMEDB_DB_NAME": "cafoo-demo",
+        "GATEWAY_PORT": "8790",
+        "GATEWAY_ALLOWED_ORIGINS": "http://localhost:5180,http://127.0.0.1:5180",
+        "NESSIE_API_KEY": "",
+        "NESSIE_ACCOUNT_IDS": ""
+      }
+    },
+    {
+      "name": "demo-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-F", "@luyten/web", "dev", "--port", "5180", "--strictPort"],
+      "port": 5180,
+      "env": {
+        "PUBLIC_DATA_SOURCE": "spacetime",
+        "PUBLIC_STDB_DATABASE": "cafoo-demo",
+        "PUBLIC_AGENT_GATEWAY": "http://localhost:8790",
+        "CAFOO_KIT_OUT_DIR": ".svelte-kit-demo"
+      }
     }
   ]
 }

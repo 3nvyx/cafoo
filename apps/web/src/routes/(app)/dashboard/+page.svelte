@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
-	import { periodLabel } from '#lib/data/derive.js';
+	import { monthName, periodLabel } from '#lib/data/derive.js';
 	import { monthRange, monthly, monthsIn, postings, summarize, type DateRange } from '#lib/data/dashboard.js';
 	import { rootOf } from '#lib/data/group.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import type { Minor } from '#lib/data/types.js';
 	import { drill } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
+	import { attempt } from '#lib/toast.svelte.js';
+	import Icon from '#lib/components/Icon.svelte';
+	import LiveActivity from '#lib/components/LiveActivity.svelte';
 	import AgentsPanel from './AgentsPanel.svelte';
 	import CreditPanel from './CreditPanel.svelte';
 	import ProposalsPanel from './ProposalsPanel.svelte';
@@ -21,6 +24,8 @@
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
+	// The close starts here, as on Agent activity: once per open month, then the strip and panels below follow it.
+	const started = $derived(!!period && db.connection().closes.some((c) => c.periodYm === period.id));
 	const bounds = $derived<DateRange | null>(months.length ? { from: monthRange(months[0]).from, to: monthRange(months.at(-1)!).to } : null);
 
 	// The range: one month (the app-wide Period, shared with the sidebar), or any two days.
@@ -104,9 +109,17 @@
 <svelte:head><title>Dashboard · Luyten</title></svelte:head>
 
 {#if period && root}
-	<header class="flex flex-col gap-1 pb-6">
-		<p class="text-body-sm text-ink-2">{root.name} · {periodLabel(period)}</p>
-		<h1 class="text-display">Dashboard</h1>
+	<header class="flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between">
+		<div class="flex min-w-0 flex-col gap-1">
+			<p class="text-body-sm text-ink-2">{root.name} · {periodLabel(period)}</p>
+			<h1 class="text-display">Dashboard</h1>
+			<LiveActivity periodId={period.id} />
+		</div>
+		{#if period.status === 'open' && !started}
+			<button class="btn btn-primary self-start sm:self-auto" onclick={() => attempt(() => db.startClose(period.id))}>
+				<Icon name="play" size={16} />Close {monthName(period.month)}
+			</button>
+		{/if}
 	</header>
 
 	{#if monthSummary}<StatusStrip {period} month={monthSummary} />{/if}
