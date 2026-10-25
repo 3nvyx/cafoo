@@ -15,12 +15,15 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
+import { tracked } from '../provider-calls';
 import { CrsClient, createCrsMcpServer, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { activeCharter } from '../charter/active';
 import { planConsolidation } from '../scripted/consolidate';
 import { exactAmount, groupSnapshot, snapshot } from '../snapshot';
 import { propose, type Cast, type RoleConn } from '../stdb';
 import { collectFootprint } from '../footprint';
+import { searchPolicies } from '../redteam';
+import { UNTRUSTED_SITE_NOTE, customerSite, searchSite, siteSignals, sitePlain } from '../apify';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: typeof data === 'string' ? data : JSON.stringify(data, (_k, v) => (typeof v === 'bigint' ? v.toString() : v), 2) }] });
@@ -53,6 +56,20 @@ export function booksServer(cast: Cast) {
     name: 'books',
     version: '1.0.0',
     tools: [
+      tool(
+        'search_policies',
+        "Search the house accounting policies (accruals, bank reconciliation, revenue recognition, credit and allowance, consolidation, materiality) through Moss, the same search the Red Team uses. Cite the policy id in a rationale or answer.",
+        { query: z.string() },
+        async ({ query }) => {
+          try {
+            const hits = await searchPolicies(query);
+            return ok(hits.length ? hits.map(h => ({ policy: h.id, excerpt: h.text.slice(0, 800) })) : 'No house policy matches that query.');
+          } catch (e) {
+            return fail((e as Error).message);
+          }
+        },
+        readOnly
+      ),
       tool(
         'close_snapshot',
         'Everything an agent needs to start the close for a month: period, close tasks, unmatched bank transactions, open invoices and bills, contracts missing schedules, unrecognized schedule lines, customers with open receivables and their guarantor persona ids, unverified vendors, chart of accounts, materiality threshold.',
@@ -337,6 +354,25 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       }
     ),
     tool(
+      'check_customer_site',
+      "Read a customer's public website (Apify crawl when configured, else the demo snapshot) and return any sentences about closing, insolvency, pausing service or a change of owner, with page URLs. Pass a query to search the site's pages instead. Signals for a person, not a decision; cite them in rationales, never in a tier by themselves.",
+      { customerId: z.string(), query: z.string().optional() },
+      async ({ customerId, query }) => {
+        try {
+          const c = A.db.customer.id.find(BigInt(customerId));
+          if (!c) return fail(`Unknown customer ${customerId}`);
+          const site = await customerSite(c.domain);
+          if (!site) return ok(`No website snapshot for ${c.name} (${c.domain}).`);
+          if (query) return ok({ note: UNTRUSTED_SITE_NOTE, domain: site.domain, source: site.source, hits: (await searchSite(site, query)).map(h => ({ url: h.url, excerpt: h.text })) });
+          const signals = siteSignals(site);
+          return ok({ note: UNTRUSTED_SITE_NOTE, domain: site.domain, source: site.source, crawledAt: site.crawledAt, pages: site.pages.length, signals, summaryPlain: sitePlain(c.name, site, signals) });
+        } catch (e) {
+          return fail((e as Error).message);
+        }
+      },
+      readOnly
+    ),
+    tool(
       'collect_public_footprint',
       'Collect what a logged-out visitor can see about a customer or vendor (Yelp listing, public job board, LinkedIn company page) and store it as public_footprint rows. Signals for a person, not a decision; cite them in rationales, never in a tier by themselves.',
       { subjectKind: z.enum(['customer', 'vendor']), subjectId: z.string() },
@@ -355,7 +391,8 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       { personaId: z.string(), subjectKind: z.enum(['customer_guarantor', 'vendor_owner']) },
       async ({ personaId, subjectKind }) => {
         try {
-          const r = await runCascade(new CrsClient(), personaId, { subjectKind });
+          const crs = new CrsClient();
+          const r = crs.mode === 'live' ? await tracked('crs', () => runCascade(crs, personaId, { subjectKind })) : await runCascade(crs, personaId, { subjectKind });
           cascades.set(r.personaId.toUpperCase(), r);
           return ok(r);
         } catch (e) {

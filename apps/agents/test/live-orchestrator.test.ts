@@ -64,7 +64,7 @@ function setup(r: Rows = books()) {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-02T12:00:00Z'));
-  for (const k of ['CLOSE_BUDGET_USD', 'CLOSE_NO_WAIT', 'ADVISOR_MODEL', 'WORKER_MODEL', 'CHARTER_OVERRIDE_JSON', 'CHARTER_OVERRIDE_DB']) vi.stubEnv(k, undefined);
+  for (const k of ['CLOSE_BUDGET_USD', 'CHAT_BUDGET_USD', 'CLOSE_CFO_WAIT_MS', 'CLOSE_NO_WAIT', 'ADVISOR_MODEL', 'WORKER_MODEL', 'CHARTER_OVERRIDE_JSON', 'CHARTER_OVERRIDE_DB']) vi.stubEnv(k, undefined);
   vi.stubEnv('DEMO_MODE', '1');
   vi.stubEnv('CRS_REPLAY', '1');
   vi.stubEnv('CRS_USERNAME', '');
@@ -338,15 +338,59 @@ describe('what the live close does with work the Advisor leaves', () => {
     expect(runs[1]!.prompt).toMatch(/1 proposals are still open/);
   });
 
-  it('when the Advisor errors, rejects with the error, stops the Red Team and rules nothing', async () => {
+  it('when the Advisor errors, rules only open proposals in this period without another model call', async () => {
     scripts.push(async function* () {
       yield { type: 'assistant', message: { content: [{ type: 'text', text: 'Starting.' }] } };
+      fx.insert('proposal', proposal(14n));
+      fx.insert('proposal', proposal(15n, { status: { tag: 'AwaitingCfo' } }));
+      fx.insert('proposal', proposal(16n, { periodId: 10n }));
       throw new Error('Claude Code process exited with code 1');
     });
-    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('Claude Code process exited with code 1');
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 0 });
     expect(stopCritic).toHaveBeenCalledTimes(1);
-    expect(ruleOpen).not.toHaveBeenCalled();
-    expect(steps).toEqual(['advisor: Starting.']);
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(ruleOpen).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ruleOpen).mock.calls[0]![1].map(p => p.id)).toEqual([14n]);
+    expect(steps).toContain('Advisor run failed: Claude Code process exited with code 1; applying standard rulings to remaining proposals');
+    expect(fx.callsTo('cfoConfirm')).toHaveLength(0);
+    expect(fx.callsTo('requestPeriodLock')).toHaveLength(0);
+  });
+
+  it('after the Advisor fails, hands the close to the scripted path to finish tasks, catch-up and the lock request', async () => {
+    scripts.push(async function* () { throw new Error('SDK unavailable'); });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
+    expect(steps).toContain('the Advisor is unavailable, so the scripted close finishes this one: close tasks, revenue catch-up and the lock request');
+    // Only after the live critic stopped, so the two never critique side by side.
+    expect(vi.mocked(stopCritic).mock.invocationCallOrder[0]!).toBeLessThan(vi.mocked(runScriptedClose).mock.invocationCallOrder[0]!);
+  });
+
+  it('does not hand over a close the Advisor ran without failing', async () => {
+    scripts.push(async function* () { yield { type: 'result', subtype: 'success', total_cost_usd: 0 }; });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).not.toHaveBeenCalled();
+  });
+
+  it('waits for a late worker proposal after the Advisor fails before applying standard rulings', async () => {
+    scripts.push(async function* () { throw new Error('SDK unavailable'); });
+    const sleep = vi.mocked(stdbSleep);
+    const real = sleep.getMockImplementation()!;
+    let filed = false;
+    sleep.mockImplementation(async (ms: number) => {
+      await real(ms);
+      if (!filed && Date.now() >= Date.parse('2026-10-02T12:00:10Z')) {
+        filed = true;
+        fx.insert('proposal', proposal(14n));
+      }
+    });
+    try {
+      await runLiveClose(fx.cast, '2026-09', onStep);
+    } finally {
+      sleep.mockImplementation(real);
+    }
+    expect(filed).toBe(true);
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(ruleOpen).mock.calls[0]![1].map(p => p.id)).toEqual([14n]);
   });
 
   it('when a run ends in an error result, still rules on what is open', async () => {
@@ -355,6 +399,14 @@ describe('what the live close does with work the Advisor leaves', () => {
     expect(steps).toContain('done (error_during_execution), cost $0.50');
     expect(runs).toHaveLength(2);
     expect(ruleOpen).toHaveBeenCalledTimes(1);
+    // The second run succeeded, so the Advisor finished the close itself.
+    expect(runScriptedClose).not.toHaveBeenCalled();
+  });
+
+  it('hands over to the scripted close when the last run also ends in an error result', async () => {
+    scripts.push(files(0.5, [proposal(14n)], 'error_during_execution'), files(0.25, [], 'error_max_turns'));
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
   });
 
   it('stops the Red Team even when the close fails before its first Advisor run', async () => {
@@ -413,6 +465,15 @@ describe('the revenue catch-up', () => {
     expect(steps).toContain('revenue catch-up for 1 customer(s)');
   });
 
+  it('hands over to the scripted close when the Advisor fails during the catch-up', async () => {
+    rows.proposal = [approvedSchedule()];
+    rows.revenueScheduleLine!.push({ id: 91n, contractItemId: 80n, customerId: 20n, ym: '2026-09', amountMinor: 100000n, recognized: false });
+    scripts.push(plain(0), async function* () { throw new Error('SDK unavailable'); });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runs).toHaveLength(2);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
+  });
+
   it('with CLOSE_NO_WAIT, leaves a schedule still waiting for the CFO to the next close', async () => {
     vi.stubEnv('CLOSE_NO_WAIT', '1');
     rows.proposal = [approvedSchedule('AwaitingCfo')];
@@ -420,6 +481,43 @@ describe('the revenue catch-up', () => {
     expect(steps).toContain('revenue schedules still wait for the CFO; their revenue catch-up rolls into the next close');
     expect(runs).toHaveLength(1);
     expect(stopCritic).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns with catch-up pending when the configured CFO wait expires', async () => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', '1000');
+    rows.proposal = [approvedSchedule('AwaitingCfo')];
+    const sleep = vi.mocked(stdbSleep);
+    const real = sleep.getMockImplementation()!;
+    let waited = 0;
+    sleep.mockImplementation(async (ms: number) => {
+      if (steps.includes('waiting for the CFO to decide the revenue schedules before the revenue catch-up')) waited += ms;
+      await real(ms);
+    });
+    try {
+      await expect(runLiveClose(fx.cast, '2026-09', onStep)).resolves.toEqual({ costUsd: 0 });
+    } finally {
+      sleep.mockImplementation(real);
+    }
+    expect(waited).toBe(1000);
+    expect(runs).toHaveLength(1);
+    expect(steps).toContain('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+    expect(fx.callsTo('requestPeriodLock')).toHaveLength(0);
+    expect(rows.proposal![0].status.tag).toBe('AwaitingCfo');
+  });
+
+  it('allows a zero CFO wait without advancing the clock for a pending schedule', async () => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', '0');
+    rows.proposal = [approvedSchedule('AwaitingCfo')];
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(Date.now()).toBe(Date.parse('2026-10-02T12:00:30Z'));
+    expect(steps).toContain('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+  });
+
+  it.each(['-1', '0.5', 'Infinity', 'not a number'])('rejects invalid CFO wait %s before starting the close', async value => {
+    vi.stubEnv('CLOSE_CFO_WAIT_MS', value);
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('CLOSE_CFO_WAIT_MS must be a non-negative safe integer');
+    expect(sdk.query).not.toHaveBeenCalled();
+    expect(fx.calls).toHaveLength(0);
   });
 
   it('otherwise waits for the CFO to decide the schedule, then catches up', async () => {
@@ -443,6 +541,38 @@ describe('the revenue catch-up', () => {
 });
 
 describe('liveAnswer', () => {
+  it('fails an answer that ends in an error result instead of returning it as verified', async () => {
+    scripts.push(async function* () { yield result(0.5, 'error_max_budget_usd'); });
+    const read = async () => { for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume */ } };
+    await expect(read()).rejects.toThrow('the Advisor could not answer (error_max_budget_usd)');
+  });
+
+  it('caps the default spend of one answer at fifty cents', async () => {
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.5);
+  });
+
+  it.each(['', '   '])('uses the default answer budget when CHAT_BUDGET_USD is blank', async value => {
+    vi.stubEnv('CHAT_BUDGET_USD', value);
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.5);
+  });
+
+  it('uses the configured answer budget', async () => {
+    vi.stubEnv('CHAT_BUDGET_USD', ' 0.25 ');
+    for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    expect(runs[0]!.options.maxBudgetUsd).toBe(0.25);
+  });
+
+  it.each(['0', '-1', 'Infinity', 'not a number'])('rejects invalid answer budget %s before calling the SDK', async value => {
+    vi.stubEnv('CHAT_BUDGET_USD', value);
+    const consume = async () => {
+      for await (const _ of liveAnswer(fx.cast, 'How much cash?')) { /* consume the answer */ }
+    };
+    await expect(consume()).rejects.toThrow('CHAT_BUDGET_USD must be a positive finite number');
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
   it('answers from the books tools only, streaming the text deltas', async () => {
     scripts.push(async function* () {
       yield { type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Cash is ' } } };

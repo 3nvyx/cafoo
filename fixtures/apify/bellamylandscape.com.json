@@ -1,0 +1,16 @@
+{
+  "synthesized": "Demo snapshot of a fictional seed customer's site, written for demo mode. Not a real crawl.",
+  "crawledAt": "2026-10-20T16:00:00.000Z",
+  "pages": [
+    {
+      "url": "https://bellamylandscape.com/",
+      "title": "Bellamy Landscaping",
+      "text": "Design, installation and seasonal maintenance for homes and small businesses in the East Bay. Now booking fall cleanups and winter pruning."
+    },
+    {
+      "url": "https://bellamylandscape.com/services",
+      "title": "Services",
+      "text": "Weekly maintenance plans, irrigation repair, drought-tolerant planting and hardscape. Licensed and insured; free estimates."
+    }
+  ]
+}

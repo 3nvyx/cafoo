@@ -14,9 +14,12 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
 import { labeled, scriptedGeminiCritique, unlabeled } from './gemini';
+import { UNTRUSTED_SITE_NOTE, customerSite, searchSite } from './apify';
+import { search } from './moss';
+import { tracked } from './provider-calls';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
-import { eliminationCritique } from './scripted/rulings';
+import { eliminationCritique, weakBankMatchCritique } from './scripted/rulings';
 import { statusKey } from './harness/rules';
 import { Cast, repoRoot, type RoleConn } from './stdb';
 
@@ -28,51 +31,23 @@ const judge = (A: RoleConn, proposalId: bigint, c: Critique, ctx: RuleContext): 
 
 const policiesDir = join(repoRoot, 'fixtures', 'moss');
 
-/** Moss in live mode; local keyword search over the same policy documents otherwise. */
+/** Moss in live mode; local keyword search over the same policy documents otherwise (moss.ts). */
 const POLICY_INDEX = 'cafoo-policies';
-let mossReady: Promise<any | null> | null = null;
-
-/** One shared Moss client with the policy index created once and loaded once; null when Moss is unusable. */
-function mossIndex(docs: { id: string; text: string }[]): Promise<any | null> {
-  if (mossReady) return mossReady;
-  mossReady = (async () => {
-    try {
-      const moss: any = await import('@moss-js/moss' as string);
-      const client = new moss.MossClient(process.env.MOSS_PROJECT_ID, process.env.MOSS_PROJECT_KEY);
-      const existing: { name: string; status?: string }[] = await client.listIndexes();
-      if (!existing.some(i => i.name === POLICY_INDEX)) {
-        await client.createIndex(POLICY_INDEX, docs, { modelId: 'moss-minilm' }); // polls until the job completes
-      }
-      await client.loadIndex(POLICY_INDEX);
-      console.log(`[moss] policy index "${POLICY_INDEX}" ready (${docs.length} documents)`);
-      return client;
-    } catch (e) {
-      console.warn('moss unavailable, using local search:', (e as Error).message);
-      return null;
-    }
-  })();
-  return mossReady;
-}
 
 export async function searchPolicies(queryText: string, topK = 3): Promise<{ id: string; text: string; score: number }[]> {
   const docs = loadPolicyDocs();
-  if (process.env.MOSS_PROJECT_ID && process.env.MOSS_PROJECT_KEY && process.env.DEMO_MODE !== '1') {
-    const client = await mossIndex(docs.map(d => ({ id: d.id, text: d.text })));
-    if (client) {
-      try {
-        const res = await client.query(POLICY_INDEX, queryText, { topK });
-        return (res.docs ?? []).map((d: any) => ({ id: d.id, text: d.text, score: d.score }));
-      } catch (e) {
-        console.warn('moss query failed, using local search:', (e as Error).message);
-      }
-    }
-  }
-  const terms = queryText.toLowerCase().split(/\W+/).filter(t => t.length > 3);
-  return docs
-    .map(d => ({ ...d, score: terms.reduce((n, t) => n + (d.text.toLowerCase().includes(t) ? 1 : 0), 0) }))
-    .filter(d => d.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK);
+  const hits = await search(POLICY_INDEX, docs.map(d => ({ id: d.id, text: d.text })), queryText, topK);
+  return hits.map(({ id, text, score }) => ({ id, text, score }));
+}
+
+/** The Red Team's site search: page excerpts with URLs, or why there is nothing to search. */
+export async function searchCustomerSite(A: RoleConn, customerId: string, queryText: string): Promise<string | { note: string; source: string; hits: { url: string; excerpt: string }[] }> {
+  if (!/^\d+$/.test(customerId)) return 'customerId must be a numeric id';
+  const c = A.db.customer.id.find(BigInt(customerId));
+  if (!c) return `Unknown customer ${customerId}`;
+  const site = await customerSite(c.domain);
+  if (!site) return `No website snapshot for ${c.name}.`;
+  return { note: UNTRUSTED_SITE_NOTE, source: site.source, hits: (await searchSite(site, queryText)).map(h => ({ url: h.url, excerpt: h.text })) };
 }
 
 function loadPolicyDocs() {
@@ -88,7 +63,7 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   const payload = JSON.parse(p.payloadJson);
   const kind = p.kind.tag;
   if (kind === 'BankMatch' && payload.matches?.length === 1 && payload.matches[0].scoreBp < 7500) {
-    return { body: `Confidence ${(payload.matches[0].scoreBp / 100).toFixed(0)}% is below the auto threshold and the counterparty only partly matches. A wrong match shows an invoice as paid when it is not. Ask the customer for remittance detail instead of matching now.`, summaryPlain: `The Red Team doubts this match: the name only partly fits.` };
+    return weakBankMatchCritique(payload.matches[0].scoreBp);
   }
   if (kind === 'RevenueSchedule') return { body: `Straight-line is right for a flat annual subscription. Confirm the schedule starts in the invoice month and runs 12 months inclusive.`, summaryPlain: `The Red Team agrees with straight-line and asks to confirm the start month.` };
   if (kind === 'VendorVerify') return { body: `The owner's identity and fraud checks are clean, so verification is reasonable. Before the first payment, confirm the bank account on the bill belongs to the vendor and not to a look-alike.`, summaryPlain: `The Red Team agrees and asks to confirm the bank details before the first payment.` };
@@ -103,6 +78,15 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
   if (kind === 'IcElimination') return eliminationCritique(payload);
   if (kind === 'JournalEntry' && p.amountMinor >= materiality) return { body: `Material entry. Confirm the account coding against the policy and that the bank transactions it explains are not also matched to a bill.`, summaryPlain: `The Red Team asks for a second look at a large entry.` };
   return null;
+}
+
+/** Per-critique model deadline, shared by both critics; a timed-out critic falls back like any other failure. */
+function redTeamTimeoutMs(): number {
+  const timeoutMs = Number(process.env.REDTEAM_TIMEOUT_MS?.trim() || 30_000);
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2_147_483_647) {
+    throw new Error('REDTEAM_TIMEOUT_MS must be a positive integer no greater than 2147483647');
+  }
+  return timeoutMs;
 }
 
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
@@ -126,12 +110,18 @@ async function modelCritique(A: RoleConn, p: ProposalRow, materiality: bigint, c
   const charter = red(A);
   let submitted: Critique | null = null;
   await generateText({
+    abortSignal: AbortSignal.timeout(redTeamTimeoutMs()),
     model,
     // The harness instructions say how to use the tools; the charter and the gate formats follow them.
     system: brief ? `${charter.prompt}\n\n${brief}` : charter.prompt,
     prompt: `Proposal ${p.id} (${p.kind.tag}, ${p.proposerRole}, amount minor units ${p.amountMinor}, materiality ${materiality}):\nPlain: ${p.summaryPlain}\nRationale: ${p.rationale}\nPayload: ${p.payloadJson.slice(0, 4000)}`,
     tools: {
       search_policies: aiTool({ description: 'Search the house accounting policies', inputSchema: z.object({ query: z.string() }), execute: async ({ query }) => searchPolicies(query) }),
+      search_customer_site: aiTool({
+        description: "Search a customer's public website (crawled by Apify, indexed in Moss) for what the business says about itself, e.g. closing, new owners, services. Pass the customerId from the payload.",
+        inputSchema: z.object({ customerId: z.string(), query: z.string() }),
+        execute: async ({ customerId, query }) => searchCustomerSite(A, customerId, query),
+      }),
       submit_critique: aiTool({
         description: 'Submit the critique',
         inputSchema: z.object({ body: z.string(), summaryPlain: z.string() }),
@@ -153,6 +143,8 @@ async function modelCritique(A: RoleConn, p: ProposalRow, materiality: bigint, c
 
 /** Watch for open proposals and critique each one once. Returns a stop function. */
 export function startCritic(cast: Cast): () => void {
+  // A bad REDTEAM_TIMEOUT_MS is a configuration error: refuse to start rather than log it as a model fallback per Proposal.
+  if (redTeamLive() || geminiLive()) redTeamTimeoutMs();
   const RT = cast.redteam;
   const A = cast.advisor;
   const seen = new Set<bigint>();
@@ -173,7 +165,7 @@ export function startCritic(cast: Cast): () => void {
       // Grok first when live; the scripted critique when Grok fails (outage, timeout, rate limit) or submits nothing
       // the harness accepts within its step cap.
       const grok = redTeamLive()
-        ? await grokCritique(A, p, materiality, ctx).catch(e => {
+        ? await tracked('grok', () => grokCritique(A, p, materiality, ctx)).catch(e => {
             console.warn(`[redteam] proposal ${p.id}: Grok failed, using the scripted critique:`, (e as Error).message);
             return null;
           })
@@ -183,7 +175,7 @@ export function startCritic(cast: Cast): () => void {
       // Gemini second. Live, a failure or "nothing to add" writes nothing: the first critique already stands, and a
       // scripted line must never appear under Gemini's live label. Without a key, the scripted stand-in.
       const g = geminiLive()
-        ? await geminiCritique(A, p, materiality, ctx, c)
+        ? await tracked('gemini', () => geminiCritique(A, p, materiality, ctx, c))
             .then(x => (x ? labeled(x, false) : null))
             .catch(e => {
               console.warn(`[redteam] proposal ${p.id}: Gemini failed, no second critique:`, (e as Error).message);

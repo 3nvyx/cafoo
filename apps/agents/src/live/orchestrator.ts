@@ -13,6 +13,7 @@ import { HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from
 import { activeCharter, activeHarnessResolver } from '../charter/active';
 import { harnessGate } from '../harness/hook';
 import { BOOKS_TOOLS, mcp } from '../harness/rules';
+import { recordFallback, recordOk } from '../provider-calls';
 import { catchUpAmounts } from '../revenue-catchup';
 import { groupSnapshot, rootSubsidiary, snapshot } from '../snapshot';
 import { ruleOpen } from '../scripted/rulings';
@@ -35,6 +36,8 @@ function subagent(conn: RoleConn, role: WorkerRole): AgentDefinition {
 }
 
 export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: string) => void) {
+  const cfoWaitMs = Number(process.env.CLOSE_CFO_WAIT_MS?.trim() || 45 * 60_000);
+  if (!Number.isSafeInteger(cfoWaitMs) || cfoWaitMs < 0) throw new Error('CLOSE_CFO_WAIT_MS must be a non-negative safe integer');
   // Resume only a close that has work of its own (src/close-state.ts): not the live feed's Proposals of an open month,
   // and not a close that failed right after opening, before it filed anything.
   if (closeHasWork(cast.advisor, periodYm)) {
@@ -83,47 +86,64 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   // The root pre-approves every harness tool so subagents can use theirs under dontAsk; the gate keeps each to its own list.
   const allowedTools = [...new Set([advisorCharter.harness, ...WORKERS.map(r => activeCharter(A, r).harness)].flatMap(h => h.tools))];
   let total = 0;
+  let advisorUnavailable = false;
+  /** Did the latest Advisor run fail (threw, or ended in an error result)? Then it did not finish the close (below). */
+  let lastRunFailed = false;
+  /** The close stopped on purpose to wait for the CFO's revenue-schedule decisions. */
+  let waitingOnCfo = false;
   /** The most the whole close may spend (CLOSE_BUDGET_USD, empty means the default); each run gets what is left. */
   const budget = Number(process.env.CLOSE_BUDGET_USD?.trim() || 15);
   /** One Advisor query over the same servers, subagents and gate. */
   const run = async (prompt: string) => {
+    if (advisorUnavailable) return;
     const left = budget - total;
     if (!(left > 0)) {
       onStep(`the close budget of $${budget.toFixed(2)} is spent ($${total.toFixed(2)}); no further Advisor run`);
       return;
     }
-    const env = await claudeProcessEnv();
-    for await (const msg of query({
-      prompt,
-      options: {
-        model: modelFor(advisorCharter.harness),
-        systemPrompt: advisorCharter.prompt,
-        tools: advisorCharter.harness.tools.filter(t => !t.startsWith('mcp__')),
-        allowedTools,
-        ...(advisorCharter.harness.maxTurns ? { maxTurns: advisorCharter.harness.maxTurns } : {}),
-        permissionMode: 'dontAsk',
-        mcpServers: { books, advisor, bookkeeper, revenue, credit, consolidation, crs },
-        agents: Object.fromEntries(WORKERS.filter(r => group || r !== 'consolidation').map(r => [r, subagent(A, r)])),
-        // The gate judges on PreToolUse and learns from results (history of successful calls) on the other two.
-        hooks: {
-          PreToolUse: [{ matcher: '^mcp__', hooks: [gate] }],
-          PostToolUse: [{ matcher: 'SendMessage', hooks: [mirror] }, { matcher: '^mcp__', hooks: [gate] }],
-          PostToolUseFailure: [{ matcher: '^mcp__', hooks: [gate] }],
+    try {
+      const env = await claudeProcessEnv();
+      for await (const msg of query({
+        prompt,
+        options: {
+          model: modelFor(advisorCharter.harness),
+          systemPrompt: advisorCharter.prompt,
+          tools: advisorCharter.harness.tools.filter(t => !t.startsWith('mcp__')),
+          allowedTools,
+          ...(advisorCharter.harness.maxTurns ? { maxTurns: advisorCharter.harness.maxTurns } : {}),
+          permissionMode: 'dontAsk',
+          mcpServers: { books, advisor, bookkeeper, revenue, credit, consolidation, crs },
+          agents: Object.fromEntries(WORKERS.filter(r => group || r !== 'consolidation').map(r => [r, subagent(A, r)])),
+          // The gate judges on PreToolUse and learns from results (history of successful calls) on the other two.
+          hooks: {
+            PreToolUse: [{ matcher: '^mcp__', hooks: [gate] }],
+            PostToolUse: [{ matcher: 'SendMessage', hooks: [mirror] }, { matcher: '^mcp__', hooks: [gate] }],
+            PostToolUseFailure: [{ matcher: '^mcp__', hooks: [gate] }],
+          },
+          env,
+          maxBudgetUsd: left,
+          settingSources: [],
         },
-        env,
-        maxBudgetUsd: left,
-        settingSources: [],
-      },
-    })) {
-      if (msg.type === 'assistant') {
-        for (const block of (msg as any).message?.content ?? []) {
-          if (block.type === 'text' && block.text?.trim()) onStep(`${(msg as any).agent_id ? 'agent' : 'advisor'}: ${String(block.text).slice(0, 200)}`);
-          if (block.type === 'tool_use') onStep(`tool ${block.name}`);
+      })) {
+        if (msg.type === 'assistant') {
+          for (const block of (msg as any).message?.content ?? []) {
+            if (block.type === 'text' && block.text?.trim()) onStep(`${(msg as any).agent_id ? 'agent' : 'advisor'}: ${String(block.text).slice(0, 200)}`);
+            if (block.type === 'tool_use') onStep(`tool ${block.name}`);
+          }
+        } else if (msg.type === 'result') {
+          total += (msg as any).total_cost_usd ?? 0;
+          onStep(`done (${(msg as any).subtype}), cost $${total.toFixed(2)}`);
+          lastRunFailed = (msg as any).subtype !== 'success' || (msg as any).is_error === true;
         }
-      } else if (msg.type === 'result') {
-        total += (msg as any).total_cost_usd ?? 0;
-        onStep(`done (${(msg as any).subtype}), cost $${total.toFixed(2)}`);
       }
+      if (lastRunFailed) recordFallback('agents', 'the Advisor run ended in an error result');
+      else recordOk('agents');
+    } catch (error) {
+      advisorUnavailable = true;
+      lastRunFailed = true;
+      recordFallback('agents', error);
+      const why = error instanceof Error ? error.message : String(error);
+      onStep(`Advisor run failed: ${why}; applying standard rulings to remaining proposals`);
     }
   };
   const periodId = [...A.db.period.iter()].find(p => p.ym === periodYm)?.id;
@@ -183,12 +203,19 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     if (pendingSchedules().length) {
       if (process.env.CLOSE_NO_WAIT === '1') {
         onStep('revenue schedules still wait for the CFO; their revenue catch-up rolls into the next close');
+        waitingOnCfo = true;
         return { costUsd: total };
       }
       onStep('waiting for the CFO to decide the revenue schedules before the revenue catch-up');
-      const start = Date.now();
-      while (pendingSchedules().length && Date.now() - start < 45 * 60_000) await sleep(2000);
+      const deadline = Date.now() + cfoWaitMs;
+      while (pendingSchedules().length && Date.now() < deadline) await sleep(Math.min(2000, deadline - Date.now()));
+      if (pendingSchedules().length) {
+        onStep('CFO wait limit reached; revenue schedules still await a decision, so revenue catch-up remains pending');
+        waitingOnCfo = true;
+        return { costUsd: total };
+      }
     }
+    // An unavailable Advisor cannot run the catch-up; the scripted close below does it.
     const s = snapshot(A, periodYm);
     const due = catchUpAmounts(A, s);
     if (due.size) {
@@ -200,24 +227,46 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     }
   } finally {
     stopCritic();
+    // A failed last Advisor run (thrown, or an error result) was the one asked to finish the close: mark tasks done,
+    // catch up revenue and request the lock. Nothing else would, so the scripted close resumes this one (it rules only
+    // what is still open and never proposes twice) once the live critic has stopped, wherever the failure came. A close
+    // that waits on the CFO stays waiting.
+    if (lastRunFailed && !waitingOnCfo && [...A.db.period.iter()].find(p => p.ym === periodYm)?.status.tag === 'Open') {
+      onStep('the Advisor is unavailable, so the scripted close finishes this one: close tasks, revenue catch-up and the lock request');
+      const { runScriptedClose } = await import('../scripted/close');
+      await runScriptedClose(cast, periodYm, { onStep });
+    }
   }
   return { costUsd: total };
 }
 
 /** Ask-the-books in live mode: the Advisor answers with read-only tools. */
 export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<string> {
+  const budget = Number(process.env.CHAT_BUDGET_USD?.trim() || 0.5);
+  if (!Number.isFinite(budget) || budget <= 0) throw new Error('CHAT_BUDGET_USD must be a positive finite number');
   const books = booksServer(cast);
   const env = await claudeProcessEnv();
+  try {
+    yield* streamAnswer(question, books, env, budget);
+    recordOk('agents');
+  } catch (error) {
+    recordFallback('agents', error);
+    throw error;
+  }
+}
+
+async function* streamAnswer(question: string, books: ReturnType<typeof booksServer>, env: NodeJS.ProcessEnv, budget: number): AsyncGenerator<string> {
   for await (const msg of query({
     prompt: question,
     options: {
       model: modelFor(ADVISOR),
-      systemPrompt: `You are the Chief Finance Advisor of Cafoo Inc. Answer the CFO's question from the books using the books tools. Plain language, amounts spelled out, under 120 words, and say which page in the app shows the detail (Ledger, Board Pack, Proposals, Customers, Vendors).`,
+      systemPrompt: `You are the Chief Finance Advisor of Cafoo Inc. Answer the CFO's question from the books using the books tools; for how something is accounted for, quote the house policy from search_policies and name it. Plain language, amounts spelled out, under 120 words, and say which page in the app shows the detail (Ledger, Board Pack, Proposals, Customers, Vendors).`,
       tools: [],
       allowedTools: mcp('books', BOOKS_TOOLS),
       permissionMode: 'dontAsk',
       mcpServers: { books },
       maxTurns: 6,
+      maxBudgetUsd: budget,
       includePartialMessages: true,
       settingSources: [],
       env,
@@ -226,6 +275,9 @@ export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<
     if (msg.type === 'stream_event') {
       const ev = (msg as any).event;
       if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta') yield ev.delta.text as string;
+    } else if (msg.type === 'result' && ((msg as any).subtype !== 'success' || (msg as any).is_error === true)) {
+      // A rejected key or a spent budget ends in an error result, not a throw: never report that answer as verified.
+      throw new Error(`the Advisor could not answer (${(msg as any).subtype})`);
     }
   }
 }

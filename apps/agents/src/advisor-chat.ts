@@ -4,13 +4,49 @@
  * A close starts only on an explicit command ("start the close") at the start of the CFO's latest message, never
  * because a question or a chat client's background prompt happens to mention the close.
  */
-import { formatMinor } from '@cafoo/ledger-core';
+import { applyFx, dateLabel, formatMinor, LedgerError, ymEndMicros, ymFromString, ymToString } from '@cafoo/ledger-core';
+import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
-import { closeHasWork } from './close-state';
+import { bankExceptionsOf, closeHasWork } from './close-state';
 import type { Cast } from './stdb';
+import { advisorReport } from './advisor-report';
+import { searchPolicies } from './redteam';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
+/** Whole minor units as the module's parseLines reads them: a string or number of digits; absent or "" is the default. */
+const minor = (fallback: bigint) => z.union([z.string(), z.number()]).optional().transform((x, ctx) => {
+  const s = x === undefined ? '' : String(x).trim();
+  if (s === '') return fallback;
+  if (!/^-?\d+$/.test(s)) {
+    ctx.addIssue({ code: 'custom', message: 'not whole minor units' });
+    return z.NEVER;
+  }
+  return BigInt(s);
+});
+const pendingEntry = z.object({ lines: z.array(z.object({ accountCode: z.string(), debitMinor: minor(0n), creditMinor: minor(0n), fxRateE6: minor(1_000_000n) })) });
+/**
+ * Revenue a pending journal entry would post, in the functional currency, the way the module posts it: each side
+ * converted on its own, and a zero rate read as 1.0. A payload the module would refuse counts as nothing.
+ */
+function pendingRevenue(payloadJson: string, isRevenue: (code: string) => boolean): bigint {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payloadJson);
+  } catch {
+    return 0n;
+  }
+  const parsed = pendingEntry.safeParse(raw);
+  if (!parsed.success) return 0n;
+  let total = 0n;
+  for (const l of parsed.data.lines) {
+    if (!isRevenue(l.accountCode)) continue;
+    const rate = l.fxRateE6 === 0n ? 1_000_000n : l.fxRateE6;
+    if (rate < 0n) return 0n;
+    total += applyFx(l.creditMinor, rate) - applyFx(l.debitMinor, rate);
+  }
+  return total;
+}
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_WORD = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
@@ -29,6 +65,16 @@ const CLOSE_COMMAND = new RegExp(
   `^\\s*(?:please\\s+)?(?:start|run|begin|kick\\s+off)\\s+(?:the\\s+)?(?:(?<slot>${MONTH_SLOT})(?:'s)?\\s+)?(?:month.?end\\s+)?close(?:\\s+for\\s+(?:the\\s+month\\s+of\\s+)?(?<for>${MONTH_SLOT}))?(?:[\\s,]+(?:please|now)\\b)*[\\s.!]*$`,
   'i'
 );
+
+/** The policy's sentences that share the most words with the question, in their original order (at most three). */
+function policyExcerpt(text: string, question: string): string {
+  const terms = new Set(question.toLowerCase().split(/\W+/).filter(t => t.length > 3 && !['what', 'policy', 'does', 'should', 'cafoo', 'account', 'about'].includes(t)));
+  const sentences = text.replace(/^#.*$/gm, '').split(/(?<=[.!?])\s+|\n+/).map(s => s.replace(/^[-*\d.\s]+/, '').trim()).filter(s => s.length > 20);
+  const scored = sentences.map((s, i) => ({ s, i, n: [...terms].filter(t => s.toLowerCase().includes(t)).length }));
+  const best = scored.filter(x => x.n > 0).sort((a, b) => b.n - a.n || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i);
+  // Nothing shared with the question: a semantic hit, not a passage that answers it. Quote nothing rather than guess.
+  return best.map(x => x.s).join(' ');
+}
 
 /** "September 2026" for "2026-09". */
 export const monthLabel = (ym: string) => `${MONTH_NAMES[Number(ym.slice(5, 7)) - 1] ?? ym} ${ym.slice(0, 4)}`;
@@ -134,10 +180,12 @@ function lockOutlook(A: Cast['advisor'], ym: string, periodId: bigint): string {
   const blocked = [...A.db.closeTask.iter()].filter(t => t.periodId === periodId && t.status.tag === 'Blocked');
   const subscription = new Set([...A.db.contractItem.iter()].filter(i => i.kind.tag === 'Subscription').map(i => i.id));
   const unrecognized = [...A.db.revenueScheduleLine.iter()].filter(l => l.ym <= ym && !l.recognized && subscription.has(l.contractItemId)).reduce((a, l) => a + l.amountMinor, 0n);
+  const bank = bankExceptionsOf(A, ym);
   const left = [
     undecided ? `${undecided} item${undecided === 1 ? '' : 's'} still need${undecided === 1 ? 's' : ''} a decision` : '',
     blocked.length ? `${blocked.length === 1 ? 'one close task is' : `${blocked.length} close tasks are`} blocked (${blocked.map(t => `"${t.title}"`).join(', ')}) and need${blocked.length === 1 ? 's' : ''} a person` : '',
     unrecognized > 0n ? `${money(unrecognized)} of subscription revenue through ${monthLabel(ym)} is not recognized yet` : '',
+    bank.rows.length && !bank.accepted ? `${bank.rows.length} unmatched bank line${bank.rows.length === 1 ? '' : 's'} through ${monthLabel(ym)} need${bank.rows.length === 1 ? 's' : ''} reconciling or your explicit acceptance` : '',
   ].filter(Boolean);
   if (!left.length) return 'everything is decided, so I will ask to lock it.';
   return `${left.join('; ')}. I will ask to lock only once ${left.length === 1 ? 'that is' : 'those are'} resolved.`;
@@ -201,56 +249,189 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
     return;
   }
 
-  // Balances as of the asked month's end, or as of now when no month is named.
-  const at = asked ? closeYm : undefined;
-  const cash = s.balance('1000', at);
-  const ar = s.balance('1100', at);
-  const allowance = -s.balance('1150', at);
-  const deferred = -s.balance('2400', at);
-  const ap = -s.balance('2000', at);
-  const revenue = -(s.balance('4000', at) + s.balance('4100', at));
+  // "What is our policy on…", "how do we account for…": quote the house policy (Moss, else local search) instead of a figure.
+  if (/\bpolic(?:y|ies)\b|accounting (?:rule|treatment)|how (?:should|do|does) (?:we|cafoo) (?:account|treat|book|recogni[sz]e|reserve|reconcile)/.test(q)) {
+    const hits = await searchPolicies(question, 2);
+    if (!hits.length) {
+      yield 'No house policy covers that. The policies cover accruals, bank reconciliation, revenue recognition, credit and allowances, consolidation, and materiality.';
+      return;
+    }
+    const quoted = hits.map(h => ({ name: h.id.replace(/-/g, ' '), excerpt: policyExcerpt(h.text, question) }));
+    if (!quoted.some(h => h.excerpt)) {
+      yield `No passage in the house policies answers that directly; the closest is the ${quoted[0]!.name} policy, on the Charters page. `;
+    } else {
+      for (const h of quoted) if (h.excerpt) yield `From the ${h.name} policy: ${h.excerpt} `;
+    }
+    yield 'The Red Team checks every Proposal against these same policies before the Advisor rules.';
+    return;
+  }
+
   const pending = [...A.db.proposal.iter()].filter(p => p.status.tag === 'AwaitingCfo');
-  const overdue = [...A.db.invoice.iter()].filter(i => i.status.tag === 'Overdue');
-  const asOf = asked ? ` at the end of ${monthLabel(closeYm)}` : '';
+  const asOf = asked ? closeYm < ymOf(now) ? ` at the end of ${monthLabel(closeYm)}` : ` as of ${dateLabel(BigInt(now.getTime()) * 1000n)}` : '';
+  const reportFor = (ym: string) => {
+    const report = advisorReport(A, ym);
+    const named = report.companies.filter(company => {
+      if (q.includes(company.entity.name.toLowerCase())) return true;
+      const code = company.entity.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // "us" is normally a pronoun. Only an explicitly capitalized US names that subsidiary.
+      return new RegExp(`\\b${code}\\b`, company.entity.code.toUpperCase() === 'US' ? '' : 'i').test(question);
+    });
+    const companies = /consolidat|\bgroup\b|by company|per company/.test(q) || !named.length ? report.companies : named;
+    return { ...report, companies, includeGroup: companies.length > 1 && companies.length === report.companies.length };
+  };
+  const wantsBank = /unmatched|unresolved.*(?:receipt|bank)|(?:bank|receipts?|payments?).{0,25}reconcil|reconcil.{0,25}(?:bank|receipts?|payments?)/.test(q);
+  const wantsPnl = /\bp\s*(?:&|and|\/)\s*l\b|profit|loss|income statement|expenses?/.test(q);
+  const requested: string[] = [];
+  if (/cash|runway|bank balance/.test(q)) requested.push(/runway/.test(q) ? 'cash runway' : 'cash');
+  if (/\barr\b|annual recurring/.test(q)) requested.push('ARR');
+  if (wantsPnl) requested.push('P&L');
+  else if (/deferred|recogni[sz]e|revenue/.test(q)) requested.push('recognized revenue');
+  if (/allowance|reserve|adequacy/.test(q)) requested.push('allowance adequacy');
+  if (/receivable|\bar\b|overdue|owe us|customers owe/.test(q)) requested.push('overdue receivables');
+  if (/payable|\bap\b|vendor|supplier|bills?/.test(q)) requested.push('payables');
+  if (wantsBank) requested.push('unmatched bank receipts');
+  if (requested.length > 1) {
+    const scope = reportFor(closeYm);
+    const prefix = /consolidat|\bgroup\b/.test(q) ? 'consolidated group' : scope.companies.map(company => company.entity.name).join(' and ');
+    for (const intent of requested) {
+      yield* answerQuestion(cast, `${prefix} ${intent}${asked ? ` for ${closeYm}` : ''}`, [], opts);
+      yield '\n\n';
+    }
+    return;
+  }
+
+  if (wantsBank) {
+    const report = reportFor(closeYm);
+    let count = 0;
+    yield `Current unmatched bank lines through ${monthLabel(closeYm)}. `;
+    for (const company of report.companies) {
+      // Every unmatched line of the month or earlier, dated or not yet: exactly what the lock gate counts.
+      const unmatched = company.books.bankTxRows.filter(tx => !tx.matched && tx.ym <= closeYm);
+      count += unmatched.length;
+      const totals = (rows: typeof unmatched) => {
+        const byCcy = new Map<string, bigint>();
+        for (const row of rows) byCcy.set(row.ccy.toUpperCase(), (byCcy.get(row.ccy.toUpperCase()) ?? 0n) + (row.amountMinor < 0n ? -row.amountMinor : row.amountMinor));
+        return [...byCcy].sort(([a], [b]) => a.localeCompare(b)).map(([ccy, amount]) => formatMinor(amount, ccy, { trimZeroCents: true })).join(' and ');
+      };
+      const receipts = unmatched.filter(tx => tx.amountMinor > 0n);
+      const outflows = unmatched.filter(tx => tx.amountMinor < 0n);
+      yield `${company.entity.name}: ${receipts.length} unmatched receipt${receipts.length === 1 ? '' : 's'}${receipts.length ? ` totaling ${totals(receipts)}` : ''}; ${outflows.length} unmatched outflow${outflows.length === 1 ? '' : 's'}${outflows.length ? ` totaling ${totals(outflows)}` : ''}. `;
+    }
+    yield count ? 'The bank is not fully reconciled. Resolve these lines or explicitly accept the exceptions as CFO before locking; accepting exceptions does not match the receipts. ' : 'No unmatched bank lines are recorded in this scope. ';
+    yield 'Open the Ledger and close checklist for the details.';
+    return;
+  }
+
+  if (/allowance|reserve|adequacy/.test(q)) {
+    const report = reportFor(closeYm);
+    yield `Receivables through ${monthLabel(closeYm)}. `;
+    for (const company of report.companies) {
+      const gross = company.balance('1100');
+      const reserved = -company.balance('1150');
+      const fmt = (amount: bigint) => formatMinor(amount, company.entity.functionalCcy, { trimZeroCents: true });
+      yield `${company.entity.name}: gross receivables ${fmt(gross)}, allowance ${fmt(reserved)}, net receivables ${fmt(gross - reserved)}. `;
+    }
+    yield 'I cannot conclude reserve adequacy from balances alone: review the latest credit checks, specific exposures and unmatched receipts before changing the allowance. Open Customers and the Ledger for the evidence.';
+    return;
+  }
+
+  if (/\barr\b|annual recurring/.test(q)) {
+    const report = reportFor(closeYm);
+    yield `ARR from active subscription contracts for ${monthLabel(closeYm)}: ${report.companies.map(company => `${company.entity.name}: ${formatMinor(company.arr, company.entity.functionalCcy, { trimZeroCents: true })}`).join('; ')}. `;
+    if (report.includeGroup) {
+      try {
+        yield `Consolidated group ARR: ${formatMinor(report.groupArr(), report.group.reportingCcy, { trimZeroCents: true })}, translated at the month's closing rates. `;
+      } catch (error) {
+        if (!(error instanceof LedgerError)) throw error;
+        yield `I cannot calculate consolidated ARR: ${error.message} `;
+      }
+    }
+    const missing = report.companies.filter(company => company.books.contracts.length === 0);
+    if (missing.length) yield `${missing.map(company => `${company.entity.name}: no contracts on file`).join('; ')}. Contract coverage is incomplete, so group ARR reflects recorded contracts only. `;
+    yield 'Usage contracts are excluded. Open the Board Pack for the ARR waterfall.';
+    return;
+  }
+
+  if (wantsPnl) {
+    const ym = asked?.ym ?? periods.filter(p => p.ym < ymOf(now)).at(-1)?.ym ?? closeYm;
+    const report = reportFor(ym);
+    const figures = (revenue: bigint, expenses: bigint, ccy: string) => {
+      const net = revenue - expenses;
+      const fmt = (amount: bigint) => formatMinor(amount, ccy, { trimZeroCents: true });
+      return `revenue ${fmt(revenue)}, expenses ${fmt(expenses)}, net ${net < 0n ? 'loss' : 'income'} ${fmt(net < 0n ? -net : net)}`;
+    };
+    yield `P&L for ${monthLabel(ym)}. `;
+    for (const company of report.companies) yield `${company.entity.name}: ${figures(company.pnl.totalRevenueMinor, company.pnl.totalExpensesMinor, company.entity.functionalCcy)}. `;
+    if (report.includeGroup) {
+      try {
+        const rows = report.consolidated().incomeStatement.month;
+        const revenue = rows.filter(row => row.type === 'revenue').reduce((total, row) => total + row.consolidatedMinor, 0n);
+        const expenses = rows.filter(row => row.type === 'expense').reduce((total, row) => total + row.consolidatedMinor, 0n);
+        yield `Consolidated group: ${figures(revenue, expenses, report.group.reportingCcy)}, including posted eliminations and translation at monthly average rates. `;
+      } catch (error) {
+        if (!(error instanceof LedgerError)) throw error;
+        yield `I cannot calculate the consolidated P&L: ${error.message} `;
+      }
+    }
+    yield 'Open the Board Pack for the full statement and Ledger drill-down.';
+    return;
+  }
 
   if (/cash|runway|bank balance/.test(q)) {
-    yield `Cash is ${money(cash)}${asOf}. `;
-    const monthlyBurn = [...A.db.bill.iter()].filter(b => b.ym === closeYm).reduce((a, b) => a + b.amountMinor, 0n);
-    yield `Bills recorded for ${closeYm} total ${money(monthlyBurn)}, so at that pace cash covers roughly ${monthlyBurn > 0n ? Number(cash / monthlyBurn) : 'many'} months before new collections.`;
+    const report = reportFor(closeYm);
+    const atMicros = asked && closeYm < ymOf(now) ? ymEndMicros(ymFromString(closeYm)) - 1n : BigInt(now.getTime()) * 1000n;
+    yield `Book cash as of ${dateLabel(atMicros)}: ${report.companies.map(company => `${company.entity.name}: ${formatMinor(company.balance('1000'), company.entity.functionalCcy, { trimZeroCents: true })}`).join('; ')}. `;
+    if (report.includeGroup && /consolidat|\bgroup\b/.test(q)) {
+      try {
+        yield `Consolidated group cash: ${formatMinor(report.groupBalance('1000'), report.group.reportingCcy, { trimZeroCents: true })}, translated at ${monthLabel(closeYm)} closing rates. `;
+      } catch (error) {
+        if (!(error instanceof LedgerError)) throw error;
+        yield `I cannot calculate consolidated cash: ${error.message} `;
+      }
+    }
+    yield 'These are posted book balances; unmatched bank lines still need reconciliation. ';
+    if (/runway/.test(q)) yield 'I cannot estimate runway reliably from the recorded bills alone; that needs a complete cash-flow forecast.';
+    yield 'Open the Ledger for the entries.';
     return;
   }
   if (/receivable|\bar\b|overdue|owe us|collect/.test(q)) {
-    yield `Open receivables total ${money(ar)}${asOf} with an allowance of ${money(allowance)} set aside. `;
-    if (overdue.length) {
-      const names = overdue.map(i => `${s.customerName.get(i.customerId)} (${money(i.amountMinor)})`).join(', ');
-      yield `${overdue.length} invoice${overdue.length > 1 ? 's are' : ' is'} overdue: ${names}.`;
-    } else yield `Nothing is overdue.`;
+    const report = reportFor(closeYm);
+    const cutoff = asked && closeYm < ymOf(now) ? ymEndMicros(ymFromString(closeYm)) - 1n : BigInt(now.getTime()) * 1000n;
+    yield `Receivables through ${monthLabel(closeYm)}; overdue evaluated as of ${dateLabel(cutoff)} using current unpaid invoice status. `;
+    for (const company of report.companies) {
+      const overdue = company.books.invoices.filter(invoice => invoice.status !== 'paid' && ymToString(invoice.ym) <= closeYm && invoice.dueAt < cutoff);
+      const total = overdue.reduce((sum, invoice) => sum + invoice.amountMinor, 0n);
+      const fmt = (amount: bigint) => formatMinor(amount, company.entity.functionalCcy, { trimZeroCents: true });
+      yield `${company.entity.name}: ${overdue.length} overdue invoice${overdue.length === 1 ? '' : 's'}${overdue.length ? ` totaling ${fmt(total)}` : ''}; gross receivables ${fmt(company.balance('1100'))}, allowance ${fmt(-company.balance('1150'))}. `;
+    }
+    yield 'Open Customers for invoice details. Historical payment status is not reconstructed from current rows.';
     return;
   }
   if (/deferred|recogni[sz]e|revenue/.test(q)) {
-    if (asked) {
-      // The month's movement on the revenue accounts: balance at its end minus balance at the previous month's end.
-      const prev = prevYm(closeYm);
-      const month = -(s.balance('4000', closeYm) - s.balance('4000', prev) + (s.balance('4100', closeYm) - s.balance('4100', prev)));
-      const undecided = [...A.db.proposal.iter()]
-        .filter(p => p.periodId === period.id && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag) && p.kind.tag === 'JournalEntry')
-        .map(p => {
-          const lines = (JSON.parse(p.payloadJson).lines ?? []) as { accountCode?: string; debitMinor?: string; creditMinor?: string }[];
-          return lines.filter(l => /^4\d{3}$/.test(String(l.accountCode))).reduce((a, l) => a + BigInt(l.creditMinor ?? '0') - BigInt(l.debitMinor ?? '0'), 0n);
-        })
-        .filter(v => v !== 0n);
-      yield `Revenue for ${monthLabel(closeYm)} is ${money(month)} on the books. `;
-      if (undecided.length) yield `${undecided.length} revenue proposal${undecided.length > 1 ? 's' : ''} worth ${money(undecided.reduce((a, b) => a + b, 0n))} for that month ${undecided.length > 1 ? 'are' : 'is'} still waiting for a ruling or your OK, so the month is not final yet. `;
-      yield `Deferred revenue still to be earned at the end of ${monthLabel(closeYm)} is ${money(deferred)}.`;
-      return;
+    const report = reportFor(closeYm);
+    for (const company of report.companies) {
+      const fmt = (amount: bigint) => formatMinor(amount, company.entity.functionalCcy, { trimZeroCents: true });
+      if (report.companies.length > 1) yield `${company.entity.name}: `;
+      if (asked) {
+        const month = company.pnl.totalRevenueMinor;
+        const undecided = [...A.db.proposal.iter()]
+          .filter(p => p.periodId === period.id && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag) && p.kind.tag === 'JournalEntry')
+          .map(p => pendingRevenue(p.payloadJson, code => company.books.accountByCode.get(code)?.type === 'revenue'))
+          .filter(v => v !== 0n);
+        yield `Revenue for ${monthLabel(closeYm)} is ${fmt(month)} on the books. `;
+        if (undecided.length) yield `${undecided.length} revenue proposal${undecided.length > 1 ? 's' : ''} worth ${fmt(undecided.reduce((a, b) => a + b, 0n))} for that month ${undecided.length > 1 ? 'are' : 'is'} still waiting for a ruling or your OK, so the month is not final yet. `;
+        yield `Deferred revenue still to be earned through ${monthLabel(closeYm)} is ${fmt(company.balance('2400'))}. `;
+      } else {
+        yield `Revenue recognized to date is ${fmt(company.revenueToDate)}, and deferred revenue still to be earned is ${fmt(company.balance('2400'))}. `;
+      }
     }
-    yield `Revenue recognized to date is ${money(revenue)}, and deferred revenue still to be earned is ${money(deferred)}. `;
     yield `Revenue is recognized evenly over each annual contract and in the month of use for metered plans; every number drills down to its journal lines in the Ledger.`;
     return;
   }
-  if (/payable|\bap\b|vendor|bills?/.test(q)) {
-    const blocked = [...A.db.vendor.iter()].filter(v => v.verification.tag === 'Blocked');
-    yield `Accounts payable stands at ${money(ap)}${asOf}. `;
+  if (/payable|\bap\b|vendor|supplier|bills?/.test(q)) {
+    const report = reportFor(closeYm);
+    const blocked = report.companies.flatMap(company => company.books.vendors).filter(v => v.verification.tag === 'Blocked');
+    for (const company of report.companies) yield `${company.entity.name}: accounts payable stands at ${formatMinor(company.balance('2000'), company.entity.functionalCcy, { trimZeroCents: true })}${asOf}. `;
     yield blocked.length ? `${blocked.length} vendor${blocked.length > 1 ? 's are' : ' is'} blocked from payment: ${blocked.map(v => v.name).join(', ')}.` : `No vendors are blocked.`;
     return;
   }
@@ -267,9 +448,33 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
   if (/status|where are we|how.*close/.test(q)) {
     const tasks = s.closeTasks;
     const done = tasks.filter(t => t.status.tag === 'Done').length;
-    yield `${closeYm} is ${period.status.tag === 'Closed' ? 'closed' : 'open'}: ${done} of ${tasks.length} close tasks done, ${pending.length} item${pending.length === 1 ? '' : 's'} waiting for your OK. Cash ${money(cash)}, receivables ${money(ar)}, deferred revenue ${money(deferred)}.`;
+    const report = reportFor(closeYm);
+    const unmatched = report.companies.flatMap(company => company.books.bankTxRows).filter(tx => !tx.matched && tx.ym <= closeYm);
+    yield `${closeYm} is ${period.status.tag === 'Closed' ? 'closed' : 'open'}: ${done} of ${tasks.length} close tasks done, ${pending.length} item${pending.length === 1 ? '' : 's'} waiting for your OK. `;
+    if (unmatched.length) yield `${unmatched.length} unmatched bank line${unmatched.length === 1 ? '' : 's'} remain; the bank is not fully reconciled even if processing tasks are done. `;
+    for (const company of report.companies) yield `${company.entity.name}: cash ${formatMinor(company.balance('1000'), company.entity.functionalCcy, { trimZeroCents: true })}. `;
     return;
   }
-  yield `Here is where ${s.subsidiary.name} stands for ${closeYm}: cash ${money(cash)}, receivables ${money(ar)} (allowance ${money(allowance)}), payables ${money(ap)}, deferred revenue ${money(deferred)}, revenue to date ${money(revenue)}. `;
+  if (/consolidat|\bgroup\b/.test(q)) {
+    const ym = asked?.ym ?? periods.filter(p => p.ym < ymOf(now)).at(-1)?.ym ?? closeYm;
+    const report = reportFor(ym);
+    yield `Consolidated group for ${monthLabel(ym)}. `;
+    try {
+      const fmt = (amount: bigint) => formatMinor(amount, report.group.reportingCcy, { trimZeroCents: true });
+      yield `Book cash ${fmt(report.groupBalance('1000'))}, gross receivables ${fmt(report.groupBalance('1100'))}, allowance ${fmt(-report.groupBalance('1150'))}, payables ${fmt(report.groupBalance('2000'))}. `;
+      const net = report.consolidated().incomeStatement.netIncomeMonthMinor;
+      yield `The month's P&L shows net ${net < 0n ? 'loss' : 'income'} ${fmt(net < 0n ? -net : net)}, including posted eliminations. `;
+      yield 'Balances use closing rates and P&L uses monthly average rates. ';
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      yield `I cannot complete the consolidated view: ${error.message} `;
+    }
+    yield 'Open the Board Pack for company columns, translation and drill-down.';
+    return;
+  }
+  for (const company of reportFor(closeYm).companies) {
+    const fmt = (amount: bigint) => formatMinor(amount, company.entity.functionalCcy, { trimZeroCents: true });
+    yield `Here is where ${company.entity.name} stands for ${closeYm}: cash ${fmt(company.balance('1000'))}, receivables ${fmt(company.balance('1100'))} (allowance ${fmt(-company.balance('1150'))}), payables ${fmt(company.balance('2000'))}, deferred revenue ${fmt(company.balance('2400'))}, revenue to date ${fmt(company.revenueToDate)}. `;
+  }
   yield `Ask me about cash, receivables, revenue, vendors, or what needs your OK, or say "start the close" to run month-end.`;
 }

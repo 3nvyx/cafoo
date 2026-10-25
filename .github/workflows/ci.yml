@@ -27,6 +27,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
+      - run: pnpm -F @cafoo/agents test:module
 
   ledger:
     name: Ledger smoke and eval (SpacetimeDB)

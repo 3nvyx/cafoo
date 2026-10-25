@@ -33,6 +33,11 @@ _Avoid_: group period, company month
 
 **Close Task**: A checklist item in the month-end close with an owner (human or agent role), a status, and evidence.
 
+**Bank Exception**: An unmatched bank line that still needs reconciliation.
+
+**Bank Exception Acceptance**: The CFO's recorded decision to close a Period with a specific set of Bank Exceptions and a stated reason.
+It leaves those bank lines unmatched and requires renewed acceptance when the reviewed books change.
+
 **Board Pack**: The deterministic report bundle (P&L, Balance Sheet, ARR waterfall, NRR) rendered after a Period locks, consolidated for the group or for one Subsidiary.
 
 ### Group and currency

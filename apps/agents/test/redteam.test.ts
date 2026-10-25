@@ -51,8 +51,8 @@ describe('red team harness as a whole', () => {
     const d = checkCall(h, critique(), status('Rejected'));
     expect(d).toMatchObject({ allow: false, ruleIds: ['redteam.may.1', 'redteam.never.3'] });
   });
-  it('has only its two Vercel AI SDK tools and the step cap it ran with before', () => {
-    expect([...h.tools]).toEqual(['search_policies', 'submit_critique']);
+  it('has only its three Vercel AI SDK tools (two read-only searches and submit) and the step cap it ran with before', () => {
+    expect([...h.tools]).toEqual(['search_policies', 'search_customer_site', 'submit_critique']);
     expect(h.maxTurns).toBe(6);
   });
 });
@@ -114,8 +114,8 @@ describe('Gemini provider status', () => {
   it('is live only with a key and without DEMO_MODE, and defaults the model', () => {
     const gem = (env: NodeJS.ProcessEnv) => providers(env).find(p => p.name.startsWith('Google Gemini'))!;
     expect(gem({}).mode).toBe('demo');
-    expect(gem({ GEMINI_API_KEY: 'k' })).toMatchObject({ mode: 'live', detail: `${DEFAULT_GEMINI_MODEL} critiques` });
-    expect(gem({ GOOGLE_GENERATIVE_AI_API_KEY: 'k', GEMINI_MODEL: 'gemini-pro-latest' })).toMatchObject({ mode: 'live', detail: 'gemini-pro-latest critiques' });
+    expect(gem({ GEMINI_API_KEY: 'k' })).toMatchObject({ mode: 'live', detail: `configured for ${DEFAULT_GEMINI_MODEL} critiques; status does not verify a call` });
+    expect(gem({ GOOGLE_GENERATIVE_AI_API_KEY: 'k', GEMINI_MODEL: 'gemini-pro-latest' })).toMatchObject({ mode: 'live', detail: 'configured for gemini-pro-latest critiques; status does not verify a call' });
     expect(gem({ GEMINI_API_KEY: 'k', DEMO_MODE: '1' }).mode).toBe('demo');
     // geminiLive() reads the list by position.
     expect(providers({})[2]!.name).toMatch(/^Google Gemini/);

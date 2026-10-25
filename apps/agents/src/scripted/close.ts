@@ -20,8 +20,11 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
+import { answerSendBack, type ReserveFacts } from './sendback';
+import { tracked } from '../provider-calls';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
+import { customerSites, siteSignals, sitePlain } from '../apify';
 import { STEP_MS } from '../env';
 import { exactAmount, groupSnapshot, line, snapshot, type Snapshot } from '../snapshot';
 import { monthLabel } from '../advisor-chat';
@@ -515,6 +518,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   // ---------------- Credit & Risk ----------------
   const C = cast.credit;
   const crs = new CrsClient();
+  const cascade: typeof runCascade = (c, id, o) => (crs.mode === 'live' ? tracked('crs', () => runCascade(c, id, o)) : runCascade(c, id, o));
   s = snapshot(A, closeYm);
   const openAr = new Map<bigint, bigint>();
   for (const i of s.invoices) if (i.status !== 'paid') openAr.set(i.customerId, (openAr.get(i.customerId) ?? 0n) + i.amountMinor);
@@ -531,8 +535,25 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
       log(`footprint ${subject.name}: ${(e as Error).message}`);
     }
   }
+  // Then each exposed customer's own website: what the business says about itself, against what it owes us.
+  const sites: string[] = [];
+  let read = 0;
+  const crawled = await customerSites(exposed.map(c => c.domain));
   for (const cust of exposed) {
-    const result = await runCascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
+    const site = cust.domain ? crawled.get(cust.domain.toLowerCase()) : undefined;
+    if (!site) continue;
+    read++;
+    const signals = siteSignals(site);
+    if (signals.length) sites.push(`${sitePlain(cust.name, site, signals)} ${money(openAr.get(cust.id) ?? 0n)} is open.`);
+  }
+  if (read) {
+    await say(C, thread, sites.length
+      ? `Checked ${read} customer website(s). ${sites.join(' ')} A signal for a person to follow up, not a change to any tier.`
+      : `Checked ${read} customer website(s): none mentions closing, insolvency or a change of owner.`,
+      sites.length ? `Credit & Risk found ${sites.length} customer website(s) worth a follow-up call.` : `Credit & Risk read customer websites and found nothing worrying.`);
+  }
+  for (const cust of exposed) {
+    const result = await cascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
     for (const ev of result.evidence) {
       // The row carries the cascade's facts; the books derive its tier and decision from them, never from us.
       await C.reducers.recordCreditCheck({ subjectKind: 'customer', subjectId: cust.id, personaId: cust.guarantorPersonaId, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
@@ -585,7 +606,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   const pendingCheck = new Set([...A.db.proposal.iter()].filter(p => p.kind.tag === 'VendorVerify' && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag)).map(p => canonical(JSON.parse(p.payloadJson).vendorId)));
   const unverified = s.vendors.filter(v => v.verification.tag === 'Unverified' && v.ownerPersonaId && !pendingCheck.has(v.id.toString()));
   for (const v of unverified) {
-    const result = await runCascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
+    const result = await cascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
     for (const ev of result.evidence) {
       await C.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: v.id, personaId: v.ownerPersonaId!, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
     }
@@ -628,10 +649,15 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
 
   // ---------------- Red Team (scripted) then Advisor rulings ----------------
   const ruled = await ruleOpenProposals();
+  const unmatchedBankLines = [...A.db.bankTransaction.iter()].filter(tx => !tx.matched && tx.ym <= closeYm).length;
   for (const t of [...[1, 2, 3, 4, 5].map(task), consolidationTask]) {
     if (t === undefined) continue;
     const blocked = refused.filter(r => r.closeTaskId === t).length;
-    await A.reducers.updateCloseTask(blocked ? { taskId: t, status: 'blocked', note: `${blocked} proposal(s) refused by the books; a person must fix and resubmit` } : { taskId: t, status: 'done', note: 'Rulings issued' });
+    await A.reducers.updateCloseTask(blocked
+      ? { taskId: t, status: 'blocked', note: `${blocked} proposal(s) refused by the books; a person must fix and resubmit` }
+      : t === task(1) && unmatchedBankLines
+        ? { taskId: t, status: 'in_progress', note: `${unmatchedBankLines} unmatched bank line(s) still need reconciliation or explicit CFO exception acceptance` }
+        : { taskId: t, status: 'done', note: 'Rulings issued' });
   }
 
   const awaiting = [...A.db.proposal.iter()].filter(p => p.periodId === period.id && p.status.tag === 'AwaitingCfo');
@@ -656,7 +682,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     await waitForCfo(A, period.id);
   }
   // Request the lock, unless something is left for a person (a refusal, a blocked task) or the books refuse it.
-  await requestLock(`All ${ruled} proposals are decided and the bank feed is reconciled.`);
+  await requestLock(`All ${ruled} proposals are decided. Any remaining bank exceptions require the CFO's explicit acceptance before locking.`);
   return { proposals: ruled, awaitingCfo: awaiting.length, refused: refused.length };
 }
 
@@ -666,10 +692,23 @@ async function waitForCfo(A: RoleConn, periodId: bigint, timeoutMs = 45 * 60_000
     // Only the CFO's queue: a proposal left Open (a ruling the books refused) is a refusal for a person, not a wait.
     const pending = [...A.db.proposal.iter()].filter(p => p.periodId === periodId && (p.status.tag === 'AwaitingCfo' || p.status.tag === 'SentBack'));
     if (pending.length === 0) return;
-    // Re-propose anything the CFO sent back: the Advisor re-approves with the CFO's note acknowledged.
-    for (const p of pending.filter(x => x.status.tag === 'SentBack')) {
-      const note = [...A.db.agentMessage.iter()].filter(m => m.proposalId === p.id && m.senderRole === 'cfo').pop();
-      await A.reducers.approveProposal({ proposalId: p.id, rationale: `The CFO sent this back: "${note?.body ?? ''}". Re-reviewed the evidence; the proposal stands as written, resubmitting for confirmation.`, summaryPlain: `Resubmitting after the CFO's note: ${note?.summaryPlain ?? 'please take another look.'}`, amendedPayloadJson: undefined });
+    // Answer anything the CFO sent back: apply the note as an amendment (which returns to the CFO) or reject the
+    // proposal with the reason, never resubmit it unchanged (sendback.ts).
+    const sentBack = pending.filter(x => x.status.tag === 'SentBack');
+    if (sentBack.length) {
+      const ym = A.db.period.id.find(periodId)?.ym;
+      const s = ym ? snapshot(A, ym) : undefined;
+      const facts: ReserveFacts = {
+        openArMinor: id => (s?.invoices ?? []).filter(i => i.customerId === id && i.status !== 'paid').reduce((a, i) => a + i.amountMinor, 0n),
+        allowanceMinor: id => (s ? existingAllowance(s, id) : 0n),
+        customerName: id => s?.customerName.get(id) ?? `customer ${id}`,
+      };
+      for (const p of sentBack) {
+        const note = [...A.db.agentMessage.iter()].filter(m => m.proposalId === p.id && m.senderRole === 'cfo').pop()?.body ?? '';
+        const a = answerSendBack(p, note, facts);
+        if (a.action === 'amend') await A.reducers.approveProposal({ proposalId: p.id, rationale: a.rationale, summaryPlain: a.summaryPlain, amendedPayloadJson: a.payloadJson });
+        else await A.reducers.rejectProposal({ proposalId: p.id, rationale: a.rationale, summaryPlain: a.summaryPlain });
+      }
     }
     await sleep(1000);
   }

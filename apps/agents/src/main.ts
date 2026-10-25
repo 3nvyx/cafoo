@@ -8,6 +8,7 @@ import { bootstrapFile, cfoSeated, readBootstrapSecret } from './cfo-seat';
 import { startContinuousBookkeeper } from './continuous/bookkeeper';
 import { feedRoutes, startFeeder } from './feed/feeder';
 import { footprintRoutes } from './footprint-routes';
+import { exportRoutes } from './export-routes';
 
 async function main() {
   console.log('providers:');
@@ -31,7 +32,7 @@ async function main() {
     isClosing: ym => closes.get(ym)?.status === 'running',
     params: () => activeCharter(cast.advisor, 'bookkeeper').params,
   });
-  startGateway(cast, liveClose, [...feedRoutes(feeder), ...charterRoutes(cast), ...footprintRoutes(cast)], {
+  startGateway(cast, liveClose, [...feedRoutes(feeder), ...charterRoutes(cast), ...footprintRoutes(cast), ...exportRoutes(cast)], {
     closes,
     // A close starts only once the continuous Bookkeeper's in-flight batch is done.
     beforeClose: () => bookkeeper.idle(),

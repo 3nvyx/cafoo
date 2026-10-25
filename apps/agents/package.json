@@ -9,8 +9,10 @@
     "close": "node --env-file-if-exists=../../.env --import tsx src/cli-close.ts",
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:module": "vitest run --config vitest.module.config.ts",
     "smoke:feed": "node --env-file-if-exists=../../.env --import tsx src/smoke/feed.ts",
-    "smoke:charter": "node --env-file-if-exists=../../.env --import tsx src/charter/smoke.ts"
+    "smoke:charter": "node --env-file-if-exists=../../.env --import tsx src/charter/smoke.ts",
+    "proof": "node --env-file-if-exists=../../.env --import tsx src/proof.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.94",

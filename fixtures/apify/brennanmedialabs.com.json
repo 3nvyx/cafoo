@@ -1,0 +1,16 @@
+{
+  "synthesized": "Demo snapshot of a fictional seed customer's site, written for demo mode. Not a real crawl.",
+  "crawledAt": "2026-10-20T16:00:00.000Z",
+  "pages": [
+    {
+      "url": "https://brennanmedialabs.com/",
+      "title": "Brennan Media Labs",
+      "text": "Video production and social content for consumer brands. Recent work for regional food and beverage companies."
+    },
+    {
+      "url": "https://brennanmedialabs.com/careers",
+      "title": "Careers",
+      "text": "We are hiring a senior editor and a motion designer for our San Francisco studio."
+    }
+  ]
+}

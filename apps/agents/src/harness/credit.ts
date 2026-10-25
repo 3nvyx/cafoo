@@ -24,7 +24,7 @@ export const credit: Harness = {
   model: { env: 'WORKER_MODEL', default: 'sonnet' },
   tools: [
     'SendMessage',
-    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'propose_vendor_verify', 'record_credit_check', 'run_credit_cascade', 'collect_public_footprint', 'post_message', 'update_close_task']),
+    ...mcp('credit', ['propose_credit_decision', 'propose_journal_entry', 'propose_vendor_block', 'propose_vendor_verify', 'record_credit_check', 'run_credit_cascade', 'collect_public_footprint', 'check_customer_site', 'post_message', 'update_close_task']),
     ...mcp('books', BOOKS_TOOLS),
     ...mcp('crs', CRS_TOOLS),
   ],
