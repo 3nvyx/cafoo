@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACCOUNTS, type SeedAccount } from './accounts';
 import { buildGroup, type GroupSeed } from './group';
+import { scaleToQuillmesh } from './quillmesh';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -489,6 +490,9 @@ function main() {
   ];
 
   // Prior-month bank activity is already matched (its entries are seeded); the close month is the Bookkeeper's job.
+  // The demo company's scale (plan.md). The default profile is the test fixture, whose exact figures CI asserts.
+  if (process.env.SEED_PROFILE === 'quillmesh') scaleToQuillmesh(seed, close);
+
   for (const t of seed.bankTransactions) t.matched = t.ym !== closeYm;
   // Open invoices past due at the end of the close month are overdue from the start.
   const closeEnd = BigInt(micros(close.year, close.month, daysInMonth(close), 23));
