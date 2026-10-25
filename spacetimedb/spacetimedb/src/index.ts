@@ -2303,6 +2303,31 @@ export const sealSetup = spacetimedb.reducer((ctx) => {
   audit(ctx, role, 'seal_setup', 'settings', 0n, 'Seed data sealed; seeding is now CFO-only.');
 });
 
+/** Company records (people, financing, costs, CRM, integrations), one JSON object each; see the company_record table. */
+const COMPANY_KINDS = new Set([
+  'employee', 'pto_request', 'pay_run', 'payslip', 'funding_round', 'investor', 'commitment', 'instrument',
+  'cap_table_entry', 'cloud_cost', 'batch', 'integration', 'deal', 'promotion', 'support_ticket',
+]);
+
+export const seedCompanyRecords = spacetimedb.reducer(
+  { kind: t.string(), rows: t.array(t.string()) },
+  (ctx, { kind, rows }) => {
+    const role = requireSeeder(ctx);
+    if (!COMPANY_KINDS.has(kind)) throw new SenderError(`Unknown company record kind: ${kind}.`);
+    for (const json of rows) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(json);
+      } catch {
+        throw new SenderError(`A ${kind} record is not valid JSON.`);
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new SenderError(`A ${kind} record must be a JSON object.`);
+      ctx.db.companyRecord.insert({ id: 0n, kind, json });
+    }
+    audit(ctx, role, 'seed_company_records', 'company_record', 0n, `${rows.length} ${kind}`);
+  }
+);
+
 export const seedSubsidiary = spacetimedb.reducer(
   { code: t.string(), name: t.string(), functionalCcy: t.string(), parentCode: t.option(t.string()), isElimination: t.bool() },
   (ctx, { code, name, functionalCcy, parentCode, isElimination }) => {
@@ -2718,7 +2743,7 @@ export const resetDemo = spacetimedb.reducer(
     const tables: Array<keyof Ctx['db']> = [
       'journalLine', 'journalEntry', 'bankMatch', 'bankTransaction', 'revenueScheduleLine', 'contractItem', 'contract',
       'invoice', 'bill', 'vendor', 'customer', 'periodLock', 'period', 'account', 'fxRate', 'subsidiary',
-      'proposal', 'approval', 'agentMessage', 'closeTask', 'creditCheck', 'auditEvent', 'feedEvent',
+      'proposal', 'approval', 'agentMessage', 'closeTask', 'creditCheck', 'auditEvent', 'feedEvent', 'companyRecord',
     ];
     for (const name of tables) {
       const table = ctx.db[name] as any;

@@ -20,6 +20,7 @@
     "gen:bindings": "cd spacetimedb && spacetime generate --lang typescript --out-dir ../packages/stdb-bindings/src --module-path ./spacetimedb --yes && spacetime generate --lang typescript --out-dir ../apps/web/src/lib/module_bindings --module-path ./spacetimedb --yes",
     "publish:local": "cd spacetimedb && spacetime publish cafoo --server local --yes",
     "cfo:bootstrap": "pnpm -F @cafoo/seed bootstrap",
-    "proof": "pnpm -F @cafoo/agents proof"
+    "proof": "pnpm -F @cafoo/agents proof",
+    "demo:quillmesh": "SEED_PROFILE=quillmesh pnpm demo:fresh"
   }
 }

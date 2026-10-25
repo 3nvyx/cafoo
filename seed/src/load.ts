@@ -6,6 +6,7 @@
  * owner (spacetime CLI), prints it and saves it in .secrets/cfo-bootstrap.<db>.txt.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { buildCompany } from './company';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DbConnection } from '@cafoo/stdb-bindings';
@@ -148,6 +149,13 @@ function armClaimLink(conn: DbConnection) {
   }
 }
 
+/** SEED_PROFILE=quillmesh names the group after the demo company in plan.md; the default keeps the test fixture's names. */
+const PROFILE = process.env.SEED_PROFILE ?? 'default';
+function profileName(code: string, name: string): string {
+  if (PROFILE !== 'quillmesh') return name;
+  return code === 'US' ? 'Quillmesh Inc' : code === 'UK' ? 'Quillmesh Ltd' : name;
+}
+
 async function main() {
   const seedPath = join(root, 'seed', 'out', 'seed.json');
   if (!existsSync(seedPath)) throw new Error('Run `pnpm -F @cafoo/seed generate` first.');
@@ -179,11 +187,11 @@ async function main() {
 
   // 2. Structure: Cafoo Inc, then the group companies (their periods are the group's: one row per month), then FX rates,
   // which must exist before any entry with a line in another currency.
-  await r.seedSubsidiary({ code: seed.subsidiary.code, name: seed.subsidiary.name, functionalCcy: seed.subsidiary.functionalCcy, parentCode: undefined, isElimination: false });
+  await r.seedSubsidiary({ code: seed.subsidiary.code, name: profileName(seed.subsidiary.code, seed.subsidiary.name), functionalCcy: seed.subsidiary.functionalCcy, parentCode: undefined, isElimination: false });
   await r.seedAccounts({ subsidiaryCode: 'US', accounts: ACCOUNTS });
   await r.seedPeriods({ subsidiaryCode: 'US', yms: seed.periods.yms, closedYms: seed.periods.closedYms });
   for (const s of group.subsidiaries) {
-    await r.seedSubsidiary({ code: s.code, name: s.name, functionalCcy: s.functionalCcy, parentCode: s.parentCode, isElimination: s.isElimination });
+    await r.seedSubsidiary({ code: s.code, name: profileName(s.code, s.name), functionalCcy: s.functionalCcy, parentCode: s.parentCode, isElimination: s.isElimination });
     await r.seedAccounts({ subsidiaryCode: s.code, accounts: CHARTS[s.code] ?? group.accounts.filter(a => a.subsidiaryCode === s.code).map(({ subsidiaryCode: _, ...a }) => a) });
   }
   for (const x of group.fxRates) await r.seedFxRate({ fromCcy: x.fromCcy, toCcy: x.toCcy, ym: x.ym, rateE6: BigInt(x.rateE6), kind: x.kind });
@@ -348,6 +356,22 @@ async function main() {
   await r.seedCloseTasks({ periodYm: seed.closeYm, tasks });
 
   await waitFor(() => conn.db.journalEntry.count() >= BigInt(posted), 'journal entries');
+
+  // 8. Company records outside the ledger: people, payroll, funding, the cap table, cost of service, the CRM.
+  const company = buildCompany({
+    closeYm: seed.closeYm,
+    subsidiaryIds: new Map([...conn.db.subsidiary.iter()].map(x => [x.code, String(x.id)])),
+    customers: [...conn.db.customer.iter()].map(c => ({ id: String(c.id), name: c.name })),
+  });
+  let companyRows = 0;
+  for (const [kind, rows] of Object.entries(company)) {
+    for (let i = 0; i < rows.length; i += 200) {
+      await r.seedCompanyRecords({ kind, rows: rows.slice(i, i + 200).map(x => JSON.stringify(x)) });
+    }
+    companyRows += rows.length;
+  }
+  await waitFor(() => conn.db.companyRecord.count() >= BigInt(companyRows), 'company records');
+
   await r.sealSetup({});
   console.log('setup sealed: seeding is now CFO-only until a reset');
   console.log(

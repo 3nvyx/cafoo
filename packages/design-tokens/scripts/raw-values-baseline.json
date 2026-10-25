@@ -66,13 +66,9 @@
 		"bracket-size": 4,
 		"unknown-class": 4
 	},
-	"routes/(app)/customers/[id]/+page.svelte": {
-		"bracket-size": 5,
-		"unknown-class": 12
-	},
 	"routes/(app)/ledger/+page.svelte": {
 		"bracket-size": 6,
-		"unknown-class": 11
+		"unknown-class": 9
 	},
 	"routes/(app)/proposals/+page.svelte": {
 		"bracket-size": 5,
@@ -86,21 +82,13 @@
 		"bracket-size": 3,
 		"unknown-class": 12
 	},
-	"routes/(app)/vendors/+page.svelte": {
-		"bracket-size": 6,
-		"unknown-class": 3
-	},
-	"routes/(app)/vendors/[id]/+page.svelte": {
-		"bracket-size": 4,
-		"unknown-class": 8
-	},
 	"routes/(marketing)/+page.svelte": {
-		"bracket-size": 17,
-		"unknown-class": 14
+		"bracket-size": 7,
+		"unknown-class": 9
 	},
 	"routes/(marketing)/DrillDemo.svelte": {
 		"bracket-size": 5,
-		"unknown-class": 7
+		"unknown-class": 6
 	},
 	"routes/(marketing)/GateStack.svelte": {
 		"bracket-size": 10,

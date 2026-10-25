@@ -233,6 +233,13 @@ export const CloseTaskArg = __t.object("CloseTaskArg", {
 });
 export type CloseTaskArg = __Infer<typeof CloseTaskArg>;
 
+export const CompanyRecord = __t.object("CompanyRecord", {
+  id: __t.u64(),
+  kind: __t.string(),
+  json: __t.string(),
+});
+export type CompanyRecord = __Infer<typeof CompanyRecord>;
+
 export const Contract = __t.object("Contract", {
   id: __t.u64(),
   customerId: __t.u64(),

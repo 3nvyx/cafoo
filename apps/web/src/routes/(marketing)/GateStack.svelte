@@ -19,12 +19,15 @@
 		dots: string[];
 	}
 
+	// Top to bottom in the order a Proposal meets them: a worker agent proposes, the Red Team
+	// critiques, the Advisor rules, the CFO confirms anything material, and the reducers check
+	// every caller before the ledger changes.
 	const layers: Layer[] = [
-		{ name: 'CFO APP', title: 'CFO app', lines: ['Plain summaries, live from the ledger.', 'The CFO seat is claimed once, with a one-time secret.'], tone: 'plain', dots: ['cfo'] },
-		{ name: 'ADVISOR', title: 'Advisor', lines: ['Rules on every Proposal and writes down why.', 'Anything material goes to the CFO.'], tone: 'plain', dots: ['advisor'] },
-		{ name: 'RED TEAM', title: 'Red Team', lines: ['A second model attacks each Proposal', 'before anyone rules on it.'], tone: 'plain', dots: ['redteam'] },
-		{ name: 'AGENTS', title: 'Worker agents', lines: ['Bookkeeper, Revenue, Credit & Risk. Each signs in', 'as its own role. They propose, never post.'], tone: 'plain', dots: ['bookkeeper', 'revenue', 'credit'] },
-		{ name: 'GATE', title: 'Approval gate', lines: ['Reducers check who is calling. An agent that', 'ignores its prompt still cannot write.'], tone: 'gate', dots: [] },
+		{ name: 'AGENTS', title: 'Worker agents propose', lines: ['Bookkeeper, Revenue, Credit & Risk. Each signs in', 'as its own role. They propose, never post.'], tone: 'plain', dots: ['bookkeeper', 'revenue', 'credit'] },
+		{ name: 'RED TEAM', title: 'Red Team critiques', lines: ['Grok attacks each Proposal first, then Gemini', 'adds what that critique missed.'], tone: 'plain', dots: ['redteam'] },
+		{ name: 'ADVISOR', title: 'Advisor rules', lines: ['Approves or rejects every Proposal and', 'writes down the rationale.'], tone: 'plain', dots: ['advisor'] },
+		{ name: 'CFO', title: 'CFO confirms', lines: ['Anything at or above Materiality waits for', 'the CFO, a seat claimed with a one-time secret.'], tone: 'plain', dots: ['cfo'] },
+		{ name: 'REDUCERS', title: 'SpacetimeDB reducers check identity', lines: ['Every write checks who is calling. An agent that', 'ignores its prompt still cannot post.'], tone: 'gate', dots: [] },
 		{ name: 'LEDGER', title: 'Ledger', lines: ['Journal Lines, Proposals and the audit trail,', 'streamed to the app as they change.'], tone: 'ledger', dots: [] }
 	];
 	const feeds = [
@@ -56,8 +59,8 @@
 		ledger: { top: 'fill-ink stroke-ink', side: 'fill-ink-2 stroke-ink', text: 'fill-canvas' }
 	} as const;
 
-	const agentsY = $derived(cy(3));
-	const feedY = (n: number) => 300 + n * 64;
+	const agentsY = $derived(cy(0));
+	const feedY = (n: number) => 150 + n * 64;
 	const feedPath = (n: number) => `M150 ${feedY(n)} C230 ${feedY(n)} 220 ${agentsY + 4} ${CX - A} ${agentsY + 4}`;
 	const leader = (i: number) => `M${CX + A} ${cy(i)} L${LABEL_X - 24} ${labelY(i)} L${LABEL_X - 8} ${labelY(i)}`;
 
@@ -183,7 +186,7 @@
 	{/if}
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
 	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={paused} role="img" aria-labelledby="stack-title">
-		<title id="stack-title">Cafoo’s layers: CFO app, Advisor, Red Team, worker agents, the approval gate and the ledger</title>
+		<title id="stack-title">Cafoo’s security layers, in order: worker agents propose, the Red Team critiques, the Advisor rules, the CFO confirms anything material, and SpacetimeDB reducers check every caller before the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}
 			<path d={feedPath(n)} fill="none" class="stroke-ink-3" stroke-width="1" stroke-dasharray="3 4" />
@@ -201,7 +204,7 @@
 				<text x="14" y="23" class="fill-ink text-[13px] font-medium">{fd.label}</text>
 			</g>
 		{/each}
-		<text x="20" y="270" class="fill-ink-3 font-mono text-[11px]">FEEDS · INGEST ONLY</text>
+		<text x="20" y="120" class="fill-ink-3 font-mono text-[11px]">FEEDS · INGEST ONLY</text>
 
 		{@render plates(true)}
 

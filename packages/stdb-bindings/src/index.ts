@@ -64,6 +64,7 @@ import SeedAccountsReducer from "./seed_accounts_reducer";
 import SeedBankTransactionsReducer from "./seed_bank_transactions_reducer";
 import SeedBillReducer from "./seed_bill_reducer";
 import SeedCloseTasksReducer from "./seed_close_tasks_reducer";
+import SeedCompanyRecordsReducer from "./seed_company_records_reducer";
 import SeedContractReducer from "./seed_contract_reducer";
 import SeedCustomersReducer from "./seed_customers_reducer";
 import SeedFxRateReducer from "./seed_fx_rate_reducer";
@@ -93,6 +94,7 @@ import BillRow from "./bill_table";
 import CharterEvalRow from "./charter_eval_table";
 import CharterVersionRow from "./charter_version_table";
 import CloseTaskRow from "./close_task_table";
+import CompanyRecordRow from "./company_record_table";
 import ContractRow from "./contract_table";
 import ContractItemRow from "./contract_item_table";
 import CreditCheckRow from "./credit_check_table";
@@ -276,6 +278,20 @@ const tablesSchema = __schema({
       { name: 'close_task_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CloseTaskRow),
+  companyRecord: __table({
+    name: 'company_record',
+    indexes: [
+      { accessor: 'id', name: 'company_record_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'kind', name: 'company_record_kind_idx_btree', algorithm: 'btree', columns: [
+        'kind',
+      ] },
+    ],
+    constraints: [
+      { name: 'company_record_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CompanyRecordRow),
   contract: __table({
     name: 'contract',
     indexes: [
@@ -566,6 +582,7 @@ const reducersSchema = __reducers(
   __reducerSchema("seed_bank_transactions", SeedBankTransactionsReducer),
   __reducerSchema("seed_bill", SeedBillReducer),
   __reducerSchema("seed_close_tasks", SeedCloseTasksReducer),
+  __reducerSchema("seed_company_records", SeedCompanyRecordsReducer),
   __reducerSchema("seed_contract", SeedContractReducer),
   __reducerSchema("seed_customers", SeedCustomersReducer),
   __reducerSchema("seed_fx_rate", SeedFxRateReducer),

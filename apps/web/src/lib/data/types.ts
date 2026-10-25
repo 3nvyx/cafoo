@@ -476,6 +476,25 @@ export interface CharterCatalog {
 	templates: CharterTemplate[];
 	scenarios: { id: string; agent: string; charterLine: string }[];
 	builtin: Record<string, { bodyMd: string; mapping: CharterMappingEntry[] }>;
+	/** The tools each role may call (apps/agents/src/charter/tools.ts); absent from an older gateway. */
+	tools?: CharterToolCatalog;
+}
+
+/** Where a tool's work happens: ledger reducers, the ledger-core engine, the CRS credit MCP server, or an outside service. */
+export type CharterToolSource = 'ledger' | 'engine' | 'crs' | 'brightdata' | 'apify' | 'moss' | 'nessie' | 'agent_sdk';
+
+export interface CharterTool {
+	name: string;
+	source: CharterToolSource;
+	description: string;
+	/** 'tool': on the role's harness allowlist. 'service': used by the role's code path, not called by the model. */
+	kind: 'tool' | 'service';
+}
+
+export interface CharterToolCatalog {
+	/** Display name of each source, in display order. */
+	sources: Record<CharterToolSource, string>;
+	byRole: Record<string, CharterTool[]>;
 }
 
 /** The eval runner's progress for one version, as the gateway reports it. */

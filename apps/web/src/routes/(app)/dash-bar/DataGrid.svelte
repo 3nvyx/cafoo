@@ -4,7 +4,9 @@
 	import { tick } from 'svelte';
 	import { db, type DataSet } from '#lib/data/index.js';
 	import { cell, columnLabel, columnsOf, compareCells, type Cell } from '#lib/data/cell.js';
+	import ExportMenu from '#lib/components/ExportMenu.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import { gridCell, type ExportTable } from '#lib/export.js';
 	import { isTyping, ui } from '#lib/ui.svelte.js';
 
 	let { set, sets, choose, offline = false }: { set: DataSet; sets: DataSet[]; choose: (id: string) => void; offline?: boolean } = $props();
@@ -156,6 +158,11 @@
 	let searchEl: HTMLInputElement | undefined = $state();
 	const n = (x: number) => x.toLocaleString('en-US');
 	const countText = $derived(term ? `${n(filtered.length)} of ${n(rows.length)} rows` : `${n(rows.length)} row${rows.length === 1 ? '' : 's'}`);
+	// Export what the grid shows: the visible columns, the rows the search keeps, in the current sort (every row, not
+	// only the ones scrolled into view).
+	const exportTables = (): ExportTable[] => [
+		{ title: set.label, header: visibleColumns.map(columnLabel), rows: filtered.map((r) => visibleColumns.map((c) => gridCell(r.cells[c]))) }
+	];
 	const idCell = $derived(openRow && columns.includes('id') ? openRow.cells.id : undefined);
 </script>
 
@@ -206,6 +213,7 @@
 			{#if offline}<span class="mr-2 rounded-sm bg-warn-soft px-1.5 text-caption text-on-warn-soft">Offline · last rows received</span>{/if}
 			<span class="num mr-2 text-caption text-ink-3" aria-live="polite">{countText}</span>
 			{#if columns.length}
+				<ExportMenu tables={exportTables} title="{set.label} {new Date().toISOString().slice(0, 10)}" compact />
 				<details
 					class="relative"
 					bind:this={columnsMenu}

@@ -10,15 +10,17 @@
     "generate": "tsx src/generate.ts",
     "load": "tsx src/load.ts",
     "check": "tsc --noEmit -p tsconfig.json",
-    "bootstrap": "tsx src/bootstrap.ts"
+    "bootstrap": "tsx src/bootstrap.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cafoo/stdb-bindings": "workspace:*",
     "spacetimedb": "2.13.*"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^5.0.5"
   }
 }
