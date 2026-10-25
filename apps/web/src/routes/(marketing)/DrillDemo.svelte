@@ -13,11 +13,11 @@
 	}
 
 	const entries: Entry[] = [
-		{ id: 'JE-0931', memo: 'Subscription, Acme Analytics', amount: 18400, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0932', memo: 'Subscription, Brightline Health', amount: 12250, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0933', memo: 'Revenue Schedule 1 of 12, Harbor & Pine', amount: 2200, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0934', memo: 'Usage, September', amount: 31600, debit: '1100 Accounts receivable', credit: '4100 Usage revenue' },
-		{ id: 'JE-0935', memo: 'Implementation fee, Northgate', amount: 6500, debit: '1100 Accounts receivable', credit: '4200 Services revenue' }
+		{ id: 'JE-0931', memo: 'Subscription, Acme Analytics', amount: 18400, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0932', memo: 'Subscription, Brightline Health', amount: 12250, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0933', memo: 'Revenue Schedule 1 of 12, Harbor & Pine', amount: 2200, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0934', memo: 'Usage, September', amount: 31600, debit: '1100 Accounts Receivable', credit: '4100 Usage Revenue' },
+		{ id: 'JE-0935', memo: 'Subscription, Northgate', amount: 6500, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' }
 	];
 	const revenue = entries.reduce((s, e) => s + e.amount, 0);
 	const pnl = [
@@ -33,11 +33,11 @@
 	let picked = $state<Entry | null>(null);
 </script>
 
-<div class="card grid divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+<div class="card grid divide-y divide-line rounded-2xl lg:grid-cols-3 lg:divide-x lg:divide-y-0">
 	<section class="flex flex-col gap-3 p-4" aria-labelledby="drill-pnl">
 		<h3 id="drill-pnl" class="eyebrow">Board Pack · September P&L</h3>
 		<button
-			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-btn border px-3 text-left transition-colors duration-150 {open ? 'border-accent bg-accent-soft' : 'border-line-strong hover:border-accent'}"
+			class="num flex min-h-[44px] items-center justify-between gap-3 rounded-lg border px-3 text-left transition-colors duration-150 border-line {open ? 'bg-accent-soft' : 'hover:bg-subtle'}"
 			aria-expanded={open}
 			aria-controls="drill-entries"
 			onclick={() => {
@@ -62,7 +62,7 @@
 				{#each entries as e (e.id)}
 					<li>
 						<button
-							class="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-btn px-3 text-left text-sm transition-colors duration-150 {picked?.id === e.id ? 'bg-subtle font-medium' : 'hover:bg-subtle'}"
+							class="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm transition-colors duration-150 {picked?.id === e.id ? 'bg-subtle font-medium' : 'hover:bg-subtle'}"
 							aria-pressed={picked?.id === e.id}
 							onclick={() => (picked = e)}
 						>
@@ -94,8 +94,8 @@
 						<li class="flex items-center gap-2"><RoleAvatar role="revenue" size={24} />Proposed by the Revenue agent</li>
 						<li class="flex items-center gap-2"><RoleAvatar role="redteam" size={24} />Checked by the Red Team: no critique</li>
 						<li class="flex items-center gap-2">
-							{#if picked.amount > 10000}
-								<RoleAvatar role="cfo" size={24} />Above $10,000, so the CFO confirmed it
+							{#if picked.amount >= 10000}
+								<RoleAvatar role="cfo" size={24} />$10,000 or more, so the CFO confirmed it
 							{:else}
 								<RoleAvatar role="advisor" size={24} />Approved and posted by the Advisor
 							{/if}
