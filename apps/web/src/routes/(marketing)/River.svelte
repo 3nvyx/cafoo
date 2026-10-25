@@ -1,25 +1,38 @@
 <script lang="ts">
-	// A river of brushstrokes winding down the page behind the content. It rises where the
-	// element matched by `from` ends and fades out before `to`. Scrolling carries the strokes
-	// downstream a little faster than the page moves, so it reads as current; nothing moves
-	// while the page is still. Under reduced motion the river stays painted on the page.
-	// One viewport-sized canvas redraws only the visible stretch, once per frame at most.
+	// A river winding down the page behind the content. It rises to a point where the element
+	// matched by `from` ends, widens, meanders, and narrows away before `to`. Its currents are
+	// evenly spaced hairlines (flow.ts); scrolling slides a glint along each one downstream, a
+	// little faster than the page moves. The lines themselves never move, so nothing pops.
+	// Under reduced motion the glints stay put. One viewport-sized canvas draws the visible part.
 	import { prefersReducedMotion } from 'svelte/motion';
+	import { drawLines, noise2, streamlines, type Line } from './flow';
 
-	let { from = '', to = '', alpha = 0.3, seed = 5 }: { from?: string; to?: string; alpha?: number; seed?: number } = $props();
+	let {
+		from = '',
+		to = '',
+		seed = 5,
+		sep = 11,
+		lineAlpha = 0.18,
+		glintAlpha = 0.6
+	}: { from?: string; to?: string; seed?: number; sep?: number; lineAlpha?: number; glintAlpha?: number } = $props();
 
-	const ROW = 14; // strokes per row along the river, rows this far apart
-	const FLOW = 0.55; // how far the current runs per pixel scrolled
+	const FLOW = 0.6; // glint travel per pixel scrolled
 
-	// Stable pseudo-random value for a (row, column) pair, so strokes keep their identity as they flow.
-	function hash(a: number, b: number) {
-		let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + seed, 0xc2b2ae35);
-		h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
-		h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
-		return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+	function river(w: number, start: number, end: number): Line[] {
+		const n = noise2(seed);
+		const centre = (y: number) => w * 0.5 + w * 0.28 * Math.sin(y / 620 + 1.1) + w * 0.05 * n(0.5, y / 380);
+		const breadth = (y: number) => Math.min(300, Math.max(130, w * 0.2)) * (1 + 0.28 * Math.sin(y / 470 + 0.6));
+		// Narrow to a point at the source and the mouth.
+		const taper = (y: number) => Math.max(0, Math.min(1, (y - start) / 420, (end - y) / 420));
+		const slope = (y: number) => (centre(y + 2) - centre(y - 2)) / 4;
+		const field = (x: number, y: number) => Math.atan2(1, slope(y)) + 0.32 * n(x * 0.006, y * 0.0035);
+		const inside = (x: number, y: number) => Math.abs(x - centre(y)) < (breadth(y) / 2) * taper(y);
+		return streamlines(field, { x0: 0, y0: start, x1: w, y1: end, sep, seed, inside, minLength: sep * 8 });
 	}
 
 	function paint(canvas: HTMLCanvasElement) {
+		let lines: Line[] = [];
+		let built = '';
 		let raf = 0;
 
 		const draw = () => {
@@ -33,71 +46,31 @@
 				canvas.width = Math.round(w * dpr);
 				canvas.height = Math.round(vh * dpr);
 			}
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-			ctx.clearRect(0, 0, w, vh);
 
 			const scroll = window.scrollY;
 			const fromEl = from ? document.querySelector(from) : null;
 			const toEl = to ? document.querySelector(to) : null;
-			const start = fromEl ? fromEl.getBoundingClientRect().bottom + scroll - 120 : 0;
-			const end = toEl ? toEl.getBoundingClientRect().top + scroll : document.documentElement.scrollHeight;
+			const start = Math.round(fromEl ? fromEl.getBoundingClientRect().bottom + scroll - 160 : 0);
+			const end = Math.round(toEl ? toEl.getBoundingClientRect().top + scroll : document.documentElement.scrollHeight);
+			// Lay the river out again only when the page's width or length changes.
+			const key = `${w}:${start}:${end}`;
+			if (key !== built) {
+				built = key;
+				lines = river(w, start, end);
+			}
 
-			// The riverbed in page coordinates: a slow meander with a faster wobble, swelling and narrowing.
-			const centre = (y: number) => w * 0.5 + w * 0.3 * Math.sin(y / 560 + 1.1) + w * 0.06 * Math.sin(y / 170);
-			const breadth = (y: number) => Math.min(280, Math.max(120, w * 0.2)) * (1 + 0.3 * Math.sin(y / 430 + 0.6));
-			const fade = (y: number) => Math.max(0, Math.min(1, (y - start) / 320, (end - y) / 320));
-
+			ctx.setTransform(dpr, 0, 0, dpr, 0, -scroll * dpr);
+			ctx.clearRect(0, scroll, w, vh);
 			const css = getComputedStyle(canvas);
-			const tone = ['--accent-deep', '--accent-ink', '--accent'].map((v) => css.getPropertyValue(v).trim());
-			const buckets = new Map<string, Path2D>();
-			const bucket = (key: string) => buckets.get(key) ?? buckets.set(key, new Path2D()).get(key)!;
-
-			// The current: rows slide downstream by `offset`; each row keeps its strokes as it travels.
-			const offset = prefersReducedMotion.current ? 0 : scroll * FLOW;
-			const shift = Math.floor(offset / ROW);
-			const frac = offset - shift * ROW;
-			const top = Math.max(start, scroll - 40);
-			const bottom = Math.min(end, scroll + vh + 40);
-
-			for (let j = Math.floor((top - frac) / ROW); j * ROW + frac < bottom; j++) {
-				const y = j * ROW + frac;
-				const f = fade(y);
-				if (f <= 0) continue;
-				const id = j - shift;
-				const cx = centre(y);
-				const half = breadth(y) / 2;
-				const slope = (centre(y + 1) - centre(y - 1)) / 2;
-				const cols = Math.max(6, Math.round((half * 2) / 12));
-				for (let k = 0; k < cols; k++) {
-					const u = (k + hash(id, k)) / cols * 2 - 1; // -1 at one bank, 1 at the other
-					if (hash(id, k + 97) > f) continue; // thin out where the river rises and ends
-					let x = cx + u * half + (hash(id, k + 31) - 0.5) * 6;
-					let py = y + (hash(id, k + 53) - 0.5) * ROW - scroll;
-					// Downstream along the bed, with eddies that curl harder near the banks.
-					const eddy = 0.7 * u * Math.sin(y / 85 + u * 3 + id * 0.15);
-					const a = Math.atan2(1, slope) + eddy;
-					const edge = Math.abs(u);
-					const t = edge < 0.3 ? (hash(id, k + 7) < 0.55 ? 2 : 1) : edge < 0.7 ? (hash(id, k + 7) < 0.5 ? 1 : 0) : 0;
-					const strength = edge < 0.45 ? 'a' : edge < 0.8 ? 'b' : 'c';
-					const p = bucket(`${t}${hash(id, k + 11) < 0.4 ? 'w' : 'n'}${strength}`);
-					p.moveTo(x, py);
-					const steps = 2 + Math.floor(hash(id, k + 3) * 2);
-					for (let i = 0; i < steps; i++) {
-						x += Math.cos(a) * 5;
-						py += Math.sin(a) * 5;
-						p.lineTo(x, py);
-					}
-				}
-			}
-
-			ctx.lineCap = 'round';
-			const bank = { a: 1, b: 0.6, c: 0.3 } as const;
-			for (const [key, p] of buckets) {
-				ctx.strokeStyle = tone[Number(key[0])];
-				ctx.lineWidth = key[1] === 'w' ? 3.6 : 2.2;
-				ctx.globalAlpha = alpha * bank[key[2] as keyof typeof bank];
-				ctx.stroke(p);
-			}
+			drawLines(ctx, lines, {
+				line: css.getPropertyValue('--ink-3').trim(),
+				glint: css.getPropertyValue('--accent').trim(),
+				lineAlpha,
+				glintAlpha,
+				offset: prefersReducedMotion.current ? 0 : scroll * FLOW,
+				top: scroll - 40,
+				bottom: scroll + vh + 40
+			});
 		};
 
 		const request = () => (raf ||= requestAnimationFrame(draw));

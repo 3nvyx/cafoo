@@ -10,7 +10,7 @@ The monthly close still takes a team of people about ten days. Most of that time
 
 Agents propose, an Advisor rules, the CFO confirms, and every number drills down.
 
-Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) create Proposals and can never commit them. A Red Team agent on a second model vendor critiques each Proposal. The Advisor approves, rejects, or amends it, always with a rationale. Any ruling at or above the Materiality threshold (default $10,000) waits in the CFO's "Needs your OK" queue. The CFO confirms or sends it back, can reverse any entry, and always confirms the period lock.
+Worker agents (Bookkeeper, Revenue, Credit & Risk, Consolidation) create Proposals and can never commit them. A Red Team on two other model vendors critiques each Proposal: Grok first, then Gemini adds what Grok missed. The Advisor approves, rejects, or amends it, always with a rationale. Any ruling at or above the Materiality threshold (default $10,000) waits in the CFO's "Needs your OK" queue. The CFO confirms or sends it back, can reverse any entry, and always confirms the period lock.
 
 The gate is enforced in the database, not in prompts. SpacetimeDB reducers check the caller's identity, so a worker agent that ignores its instructions still cannot write to the ledger. The live feed has its own identity that can only add raw bank lines and invoices, and nobody becomes CFO by asking: the seat is claimed with a one-time secret. Every Proposal and ruling carries a Plain summary (one sentence, no jargon) and a technical rationale. Simple mode shows the sentence. Expert mode shows the journal lines, account codes, critiques, and raw payloads.
 
@@ -21,7 +21,7 @@ SvelteKit UI (CFO app)      <- live subscriptions ->  SpacetimeDB module (ledger
                                                       charter versions, feed log, audit trail)
 Agent orchestrator (:8787)  -- reducer calls, one identity per role -->  SpacetimeDB
   Advisor, Bookkeeper, Revenue, Credit & Risk, Consolidation: Claude Agent SDK (TypeScript), OpenAI or Anthropic behind the same Anthropic Messages API
-  Red Team: Grok through the Vercel AI SDK
+  Red Team: Grok, then Gemini as the second critic, both through the Vercel AI SDK
   Feed: simulated bank and invoice feed (ingest only) and the continuous Bookkeeper
   Charter eval runner: full eval on a scratch database, or a quick check against the recorded close
   Tools: ledger-core engine, CRS Credit API cascade, Bright Data lookups, Moss vector search
@@ -103,6 +103,8 @@ With zero API keys, Cafoo runs end to end. Every external call replays recorded 
 | `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL` | OpenAI model ids for the SDK aliases opus (Advisor), sonnet (workers), and haiku (SDK background work) | `gpt-6.1-sol`, `gpt-6-luna`, `gpt-6-luna` |
 | `ANTHROPIC_API_KEY` | Claude Agent SDK when `AGENT_PROVIDER=anthropic`. Ignored in openai mode | Replays `fixtures/agents/` |
 | `XAI_API_KEY` | Grok: Red Team | Scripted critiques |
+| `GEMINI_API_KEY` (or `GOOGLE_GENERATIVE_AI_API_KEY`) | Gemini: the Red Team's second critic, which reads Grok's critique and adds only what it missed | Scripted critiques from `fixtures/gemini/critiques.json`, labeled "Gemini (scripted)" |
+| `GEMINI_MODEL` | Gemini model id | `gemini-3.8-flash` |
 | `API_TOKEN` | Bright Data: live vendor lookups during the close | `fixtures/brightdata/` |
 | `APIFY_TOKEN` | Apify: customer-site crawls into Moss (roadmap) | Skipped |
 | `CRS_USERNAME`, `CRS_PASSWORD`, `CRS_BASE_URL`, `CRS_REPLAY` | CRS Credit API sandbox: identity, fraud, bureaus, public records | `fixtures/crs/` |
@@ -159,7 +161,7 @@ packages/stdb-bindings/   Generated SpacetimeDB client bindings and the module s
 spacetimedb/spacetimedb/  SpacetimeDB module: tables and reducers, including the approval gate
 seed/                     Deterministic demo group (Cafoo Inc, Cafoo Ltd, eliminations) with planted anomalies, the October feed
                           plan, and the CFO bootstrap (bootstrap.ts)
-fixtures/                 Recorded responses for Demo mode (agents, brightdata, crs, moss)
+fixtures/                 Recorded responses for Demo mode (agents, brightdata, crs, moss) and Gemini's scripted critiques (gemini)
 docs/                     Product spec, pitch, roadmap, ADRs
 ```
 

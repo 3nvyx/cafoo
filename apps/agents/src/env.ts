@@ -59,6 +59,11 @@ export function anthropicLookingEnv(base: NodeJS.ProcessEnv, shimUrl: string): N
   return next;
 }
 
+/** Gemini, the Red Team's second critic. GEMINI_API_KEY, or the Google provider's own GOOGLE_GENERATIVE_AI_API_KEY. */
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const geminiKey = (env: NodeJS.ProcessEnv = process.env) => (env.GEMINI_API_KEY?.trim() || env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() || undefined);
+export const geminiModel = (env: NodeJS.ProcessEnv = process.env) => env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+
 export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[] {
   const demo = forcedDemo(env);
   const provider = agentProvider(env);
@@ -72,6 +77,7 @@ export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[
   return [
     { name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: agentsOn ? 'live' : 'demo', detail: agentDetail },
     { name: 'xAI Grok (Red Team)', mode: !demo && has(env, 'XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'XAI_API_KEY') ? 'grok-4.7 critiques' : 'scripted critiques' },
+    { name: 'Google Gemini (Red Team, second critic)', mode: !demo && geminiKey(env) ? 'live' : 'demo', detail: !demo && geminiKey(env) ? `${geminiModel(env)} critiques` : 'scripted critiques' },
     { name: 'CRS Credit API', mode: !demo && has(env, 'CRS_USERNAME') && env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: 'sandbox persona fixtures' },
     { name: 'Bright Data', mode: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'live' : 'demo', detail: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'Web Unlocker lookups' : 'recorded vendor lookups' },
     { name: 'Apify', mode: !demo && has(env, 'APIFY_TOKEN') ? 'live' : 'demo', detail: 'crawl skipped' },
@@ -82,6 +88,7 @@ export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[
 
 export const agentsLive = () => providers()[0].mode === 'live';
 export const redTeamLive = () => providers()[1].mode === 'live';
+export const geminiLive = () => providers()[2].mode === 'live';
 export const STDB_URI = process.env.SPACETIMEDB_URI?.replace(/^http/, 'ws') ?? 'ws://localhost:3000';
 export const STDB_DB = process.env.SPACETIMEDB_DB_NAME ?? 'cafoo';
 export const GATEWAY_PORT = Number(process.env.GATEWAY_PORT ?? 8787);

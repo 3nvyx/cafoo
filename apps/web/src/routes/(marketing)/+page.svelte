@@ -8,6 +8,7 @@
 	import FlowDiagram from './FlowDiagram.svelte';
 	import GateStack from './GateStack.svelte';
 	import ModeDemo from './ModeDemo.svelte';
+	import PaintedSky from './PaintedSky.svelte';
 	import River from './River.svelte';
 	import Swirls from './Swirls.svelte';
 
@@ -30,6 +31,19 @@
 	// landing page stays where the visitor left it.
 	const newTab = { target: '_blank', rel: 'noopener' } as const;
 	const corners = ['-top-2 -left-2', '-top-2 -right-2', '-bottom-2 -left-2', '-bottom-2 -right-2'];
+
+	// The header slides away while scrolling down and returns on any scroll up. It always shows
+	// near the top of the page and while focus is inside it, so keyboard users never tab into
+	// a hidden link. Small jitters (under 6px) are ignored.
+	let navHidden = $state(false);
+	let navFocused = $state(false);
+	let lastY = 0;
+	function onScroll() {
+		const y = window.scrollY;
+		if (Math.abs(y - lastY) < 6) return;
+		navHidden = y > 80 && y > lastY;
+		lastY = y;
+	}
 </script>
 
 {#snippet eyebrow(n: string, text: string)}
@@ -50,13 +64,19 @@
 	<meta name="description" content="Agents close your books. A Red Team critiques, an Advisor rules, and the CFO confirms anything material. Every number drills down." />
 </svelte:head>
 
+<svelte:window onscroll={onScroll} />
+
 <a href="#main" class="sr-only z-50 rounded-full bg-surface px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">Skip to content</a>
 
 <div class="relative isolate min-h-dvh bg-canvas">
 	<!-- Rises out of the hero's brushwork and winds down behind the page as you scroll. -->
 	<River from="#hero" to="footer" />
 
-	<header class="sticky top-0 z-30 px-4 pt-3 sm:px-8">
+	<header
+		class="sticky top-0 z-30 px-4 pt-3 transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] sm:px-8 {navHidden && !navFocused ? '-translate-y-[120%]' : ''}"
+		onfocusin={() => (navFocused = true)}
+		onfocusout={() => (navFocused = false)}
+	>
 		<div class="mx-auto flex h-14 max-w-[1120px] items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center gap-2.5" aria-label="Cafoo home">
 				<span class="grid size-7 place-items-center rounded-full bg-accent font-display text-[15px] font-medium text-on-accent">C</span>
@@ -77,7 +97,7 @@
 	<main id="main">
 		<!-- The brushwork runs up behind the floating header (68px) and clears away under the headline. -->
 		<div id="hero" class="relative isolate -mt-[68px] overflow-hidden pt-[68px]">
-			<div class="sky absolute inset-0 -z-10"><Swirls seed={11} spacing={20} alpha={0.32} /></div>
+			<div class="sky absolute inset-0 -z-10"><PaintedSky seed={11} /></div>
 		<section class="mx-auto flex max-w-[1120px] flex-col items-center px-4 pt-20 pb-24 text-center sm:px-8 sm:pt-32 sm:pb-32">
 			<h1 class="max-w-[15ch] text-[48px] leading-[0.95] font-medium sm:text-[84px]" style="letter-spacing:-0.035em">Agents close your books. You keep the last word.</h1>
 			<p class="mt-8 max-w-[54ch] text-lg text-ink-2">
@@ -169,7 +189,7 @@
 
 		<section class="mx-auto max-w-[1120px] px-4 pt-32 pb-8 sm:px-8" aria-labelledby="cta-h">
 			<div class="relative isolate flex flex-col items-center overflow-hidden rounded-3xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
-				<div class="sky-panel absolute inset-0 -z-10"><Swirls seed={3} spacing={22} alpha={0.22} /></div>
+				<div class="sky-panel absolute inset-0 -z-10"><Swirls seed={3} sep={18} line="--on-accent" glint="--canvas" lineAlpha={0.16} glintAlpha={0.45} /></div>
 				<h2 id="cta-h" class="max-w-[16ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Close your next month with us</h2>
 				<p class="mt-5 max-w-[46ch] text-lg opacity-80">Close September on sample data, confirm what matters, and lock the month yourself.</p>
 				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -190,10 +210,10 @@
 </div>
 
 <style>
-	/* A quiet frame: the brushwork shows only at the hero's edges and fades out toward the
-	   middle and the bottom, so the headline and buttons sit on plain paper. */
+	/* The painted sky frames the hero: it clears under the headline and buttons and fades out
+	   toward the bottom, so the copy sits on plain paper. */
 	.sky {
-		mask-image: radial-gradient(ellipse 85% 70% at 50% 50%, transparent 0%, transparent 55%, rgb(0 0 0 / 0.35) 80%, black 100%),
+		mask-image: radial-gradient(ellipse 62% 56% at 50% 50%, transparent 0%, transparent 30%, rgb(0 0 0 / 0.45) 70%, black 100%),
 			linear-gradient(to bottom, black 70%, transparent);
 		mask-composite: intersect;
 	}

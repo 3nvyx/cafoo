@@ -84,6 +84,15 @@ export const CLOSE_SCRIPT: Step[] = [
 		body: 'No other open invoice for c05 at 600.00. The missing reference lowers confidence, but amount and payer are unique this month. No objection.',
 		summary: 'Red Team checked for look-alike invoices and found none.'
 	},
+	{
+		at: 4000,
+		type: 'message',
+		proposalId: 'pr-09',
+		role: 'redteam',
+		kind: 'critique',
+		body: 'Gemini (scripted): Agree there is no look-alike invoice. One addition: ask Harbor Yoga to put the invoice number on future payments, so next month this matches on the reference instead of the amount.',
+		summary: 'Gemini agrees and suggests asking the customer to quote the invoice number on future payments.'
+	},
 	{ at: 4200, type: 'activity', role: 'advisor', label: 'Ruling on the Harbor Yoga match', proposalId: 'pr-09' },
 	{ at: 4800, type: 'rule', proposalId: 'pr-09', body: 'APPROVE pr-09.', summary: 'Advisor approved the match.', rationale: 'Unique amount and payer; Red Team found no conflict.' },
 	{ at: 5000, type: 'activity', role: 'credit', label: 'Following up on Copperline Electric', proposalId: 'pr-06' },

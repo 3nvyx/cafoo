@@ -1,16 +1,19 @@
 /**
  * The Red Team: a second model vendor (xAI Grok through the Vercel AI SDK) that critiques every open
  * proposal before the Advisor rules. Runs as its own database identity; it can critique, never propose or rule.
- * Without XAI_API_KEY it falls back to rule-based critiques so demo mode still shows a debate. Either way the
- * Red Team harness (src/harness/redteam.ts) judges the critique before it is written: open Proposals only, a plain
- * summary, critiques only.
+ * Without XAI_API_KEY it falls back to rule-based critiques so demo mode still shows a debate. Gemini (src/gemini.ts)
+ * then reads the same Proposal and that critique and adds what it missed: live with GEMINI_API_KEY, scripted fixtures
+ * otherwise. Either way the Red Team harness (src/harness/redteam.ts) judges each critique before it is written: open
+ * Proposals only, a plain summary, critiques only.
  */
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createXai } from '@ai-sdk/xai';
-import { generateText, stepCountIs, tool as aiTool } from 'ai';
+import { generateText, stepCountIs, tool as aiTool, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { redTeamLive } from './env';
+import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
+import { labeled, scriptedGeminiCritique } from './gemini';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
 import { eliminationCritique } from './scripted/rulings';
@@ -104,12 +107,26 @@ function scriptedCritique(p: ProposalRow, materiality: bigint): Critique | null 
 
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
+  return modelCritique(A, p, materiality, ctx, xai.responses(modelFor(red(A).harness)));
+}
+
+/** Gemini as the second critic: it sees the first critique and submits only what that critique missed. */
+async function geminiCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext, first: Critique | null): Promise<Critique | null> {
+  const google = createGoogleGenerativeAI({ apiKey: geminiKey() });
+  const brief = first
+    ? `You are the Red Team's second critic. The first critic already wrote:\n${first.body}\nDo not repeat it. Submit a critique only for a material point it missed; if you have nothing to add, do not call submit_critique.`
+    : `You are the Red Team's second critic. The first critic raised nothing on this Proposal. Submit a critique only for a material point; if you have nothing to add, do not call submit_critique.`;
+  return modelCritique(A, p, materiality, ctx, google(geminiModel()), brief);
+}
+
+/** One critique from a Vercel AI SDK model through the Red Team's two tools; null when it submits nothing the harness accepts. */
+async function modelCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext, model: LanguageModel, brief?: string): Promise<Critique | null> {
   const charter = red(A);
   let submitted: Critique | null = null;
   await generateText({
-    model: xai.responses(modelFor(charter.harness)),
+    model,
     // The harness instructions say how to use the tools; the charter and the gate formats follow them.
-    system: charter.prompt,
+    system: brief ? `${charter.prompt}\n\n${brief}` : charter.prompt,
     prompt: `Proposal ${p.id} (${p.kind.tag}, ${p.proposerRole}, amount minor units ${p.amountMinor}, materiality ${materiality}):\nPlain: ${p.summaryPlain}\nRationale: ${p.rationale}\nPayload: ${p.payloadJson.slice(0, 4000)}`,
     tools: {
       search_policies: aiTool({ description: 'Search the house accounting policies', inputSchema: z.object({ query: z.string() }), execute: async ({ query }) => searchPolicies(query) }),
@@ -139,6 +156,13 @@ export function startCritic(cast: Cast): () => void {
   const seen = new Set<bigint>();
   let stopped = false;
   const ctx = (): RuleContext => ({ proposalStatus: id => (/^\d+$/.test(id) ? A.db.proposal.id.find(BigInt(id))?.status.tag : undefined), accountCodes: [...A.db.account.iter()].map(a => a.code) });
+  /** Judge a critique again at write time (the Advisor may have ruled while a model was thinking), then write it. */
+  const write = async (p: ProposalRow, c: Critique) => {
+    const d = judge(A, p.id, c, ctx());
+    if (!d.allow) return console.warn(`[redteam] proposal ${p.id}: critique withheld: ${d.reason}`);
+    await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
+  };
+  const vendorName = (id: bigint) => A.db.vendor.id.find(id)?.name;
   const critique = async (p: ProposalRow) => {
     if (seen.has(p.id) || p.status.tag !== 'Open') return;
     seen.add(p.id);
@@ -153,11 +177,18 @@ export function startCritic(cast: Cast): () => void {
           })
         : null;
       const c = grok ?? scriptedCritique(p, materiality);
-      if (!c) return;
-      // Judged again at write time: the Advisor may have ruled while Grok was thinking.
-      const d = judge(A, p.id, c, ctx());
-      if (!d.allow) return console.warn(`[redteam] proposal ${p.id}: critique withheld: ${d.reason}`);
-      await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
+      if (c) await write(p, c);
+      // Gemini second. Live, a failure or "nothing to add" writes nothing: the first critique already stands, and a
+      // scripted line must never appear under Gemini's live label. Without a key, the scripted stand-in.
+      const g = geminiLive()
+        ? await geminiCritique(A, p, materiality, ctx, c)
+            .then(x => (x ? labeled(x, false) : null))
+            .catch(e => {
+              console.warn(`[redteam] proposal ${p.id}: Gemini failed, no second critique:`, (e as Error).message);
+              return null;
+            })
+        : scriptedGeminiCritique(p, materiality, vendorName);
+      if (g) await write(p, g);
     } catch (e) {
       console.error(`[redteam] proposal ${p.id}:`, (e as Error).message);
     }
@@ -167,7 +198,7 @@ export function startCritic(cast: Cast): () => void {
   };
   A.db.proposal.onInsert(onInsert as any);
   for (const p of A.db.proposal.iter()) if (p.status.tag === 'Open') void critique(p);
-  console.log(`[redteam] watching proposals (${redTeamLive() ? modelFor(red(A).harness) : 'scripted'})`);
+  console.log(`[redteam] watching proposals (${redTeamLive() ? modelFor(red(A).harness) : 'scripted'}, then ${geminiLive() ? geminiModel() : 'scripted Gemini'})`);
   return () => {
     stopped = true;
     try {

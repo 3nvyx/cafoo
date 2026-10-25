@@ -5,7 +5,7 @@
 	import { db } from '#lib/data/index.js';
 	import { formatMoney } from '#lib/data/money.js';
 	import type { Proposal } from '#lib/data/types.js';
-	import { KIND, STATUS, drill, dateTime, roleName } from '#lib/labels.js';
+	import { KIND, STATUS, criticOf, drill, dateTime, roleName } from '#lib/labels.js';
 	import { arrive, reveal } from '#lib/motion.js';
 	import { confirmEffect, journalLinesOf, matchesOf, parsePayload, scheduleLinesOf } from '#lib/proposals.js';
 	import { attempt } from '#lib/toast.svelte.js';
@@ -171,7 +171,7 @@
 			</section>
 			{#each critiques as c (c.id)}
 				<section aria-label="Red Team critique">
-					<p class="eyebrow mb-1">Red Team critique, verbatim</p>
+					<p class="eyebrow mb-1">Red Team critique{criticOf(c.body) ? ` (${criticOf(c.body)?.name})` : ''}, verbatim</p>
 					<blockquote class="border-l-2 py-1 pl-3 font-mono text-[13px] leading-5 text-ink" style="border-color: var(--role-redteam)">{c.body}</blockquote>
 				</section>
 			{:else}

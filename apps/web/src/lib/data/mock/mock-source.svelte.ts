@@ -18,6 +18,7 @@ const PROVIDERS: ProviderStatus[] = [
 	{ id: 'ledger', name: 'Ledger database', purpose: 'Books, Proposals and the agent message bus', mode: 'demo', detail: 'In-browser tables seeded from fixtures' },
 	{ id: 'advisor-model', name: 'Advisor and worker models', purpose: 'Proposals, rulings and Plain summaries', mode: 'demo', detail: 'Recorded transcript replayed on Close' },
 	{ id: 'redteam-model', name: 'Red Team model', purpose: 'Critiques on a second model', mode: 'demo', detail: 'Recorded critiques' },
+	{ id: 'gemini', name: 'Google Gemini', purpose: "The Red Team's second critic: adds what the first critique missed", mode: 'demo', detail: 'Scripted critiques' },
 	{ id: 'bank-feed', name: 'Bank feed', purpose: 'Daily bank transactions', mode: 'demo', detail: '30 September transactions from fixtures' },
 	{ id: 'credit-cascade', name: 'Credit check cascade', purpose: 'Identity, fraud, credit report, public records', mode: 'demo', detail: 'Sandbox personas, stored request ids' },
 	{ id: 'public-web', name: 'Public web data', purpose: 'What a logged-out visitor sees about a customer or vendor', mode: 'demo', detail: 'Recorded Yelp, job board and LinkedIn pages' },
