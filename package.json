@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "lint:refs": "bash scripts/lint-refs.sh",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present --workspace-concurrency=1 test",
     "check": "pnpm lint:refs && pnpm -r --if-present check",
     "build": "pnpm -r --if-present build",
     "dev:web": "pnpm -F @cafoo/web dev",
