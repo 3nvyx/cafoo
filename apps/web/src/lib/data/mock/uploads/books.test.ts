@@ -121,7 +121,7 @@ describe('Books uploads over the seed', () => {
 			['i28', '600000'],
 			['i09', '80000'],
 			['b06', '360000'],
-			['i29', '2400000']
+			['i29', '2387400']
 		]);
 		expect(proposed.every((p) => p.kind === 'bank_match' && p.periodId === '2026-10' && balanced(p))).toBe(true);
 		// A second upload of the same file imports nothing.

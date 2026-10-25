@@ -80,7 +80,7 @@ describe('seeded cost of service', () => {
 	it('production cloud ties out to 5000 Hosting costs for July to September', () => {
 		const ledger = ledgerByMonth(t.account, t.journal_entry, t.journal_line, '5000');
 		const tie = hostingTieOut(t.cloud_cost, ledger, ['2026-07', '2026-08', '2026-09']);
-		expect(tie.map((x) => x.cloudMinor)).toEqual(['980000', '1840000', '1120000']);
+		expect(tie.map((x) => x.cloudMinor)).toEqual(['981744', '1842391', '1120000']);
 		expect(tie.every((x) => x.gapMinor === '0')).toBe(true);
 	});
 

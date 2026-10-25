@@ -1,5 +1,5 @@
 {
-	"_note": "Cost of service rows as each provider reports them, in minor units. Production hosting reconciles to the ledger: Brightline Cloud Hosting (v01) resells our production AWS and Vercel usage on one monthly bill posted to 5000 Hosting costs, so the production cost_of_revenue rows from aws and vercel sum to 5000 for each month: July $9,800 (BCH-0731), August $18,400 (BCH-0820 $8,600 plus the $9,800 egress-over-commit accrual je-0814), September $11,200 (BCH-0920). Staging, development, shared tooling and model usage are not in 5000: the Bookkeeper books them through cost_allocation Proposals (the cloud_bill upload adds September's research-account AWS rows; the model_usage upload books September inference to 5200). October rows are month to date and grow with the live meters. Packs and lots already past expiry are seeded 'expired'; the Revenue agent and Bookkeeper raise their breakage and write-off once, into the open month. Credit packs are prepaid Copilot tokens (liability 2450 until used); stock lots are hardware and consumables (1300).",
+	"_note": "Cost of service rows as each provider reports them, in minor units. Production hosting reconciles to the ledger: Brightline Cloud Hosting (v01) resells our production AWS and Vercel usage on one monthly bill posted to 5000 Hosting costs, so the production cost_of_revenue rows from aws and vercel sum to 5000 for each month: July $9,817.44 (BCH-0731), August $18,423.91 (BCH-0820 $8,623.91 plus the $9,800 egress-over-commit accrual je-0814), September $11,200 (BCH-0920). Staging, development, shared tooling and model usage are not in 5000: the Bookkeeper books them through cost_allocation Proposals (the cloud_bill upload adds September's research-account AWS rows; the model_usage upload books September inference to 5200). October rows are month to date and grow with the live meters. Packs and lots already past expiry are seeded 'expired'; the Revenue agent and Bookkeeper raise their breakage and write-off once, into the open month. Credit packs are prepaid Copilot tokens (liability 2450 until used); stock lots are hardware and consumables (1300).",
 	"cloud_cost": [
 		{
 			"id": "cc-001",
@@ -9,7 +9,7 @@
 			"ym": "2026-07",
 			"environment": "production",
 			"category": "cost_of_revenue",
-			"amountMinor": "310000",
+			"amountMinor": "311744",
 			"ccy": "USD",
 			"usageQuantity": 21587.25,
 			"usageUnit": "instance-hours",
@@ -93,7 +93,7 @@
 			"ym": "2026-08",
 			"environment": "production",
 			"category": "cost_of_revenue",
-			"amountMinor": "295000",
+			"amountMinor": "297391",
 			"ccy": "USD",
 			"usageQuantity": 20512.5,
 			"usageUnit": "instance-hours",

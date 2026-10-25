@@ -56,6 +56,10 @@ import type { ArrayTable, MockContext, ProposeInput, RowOf } from './uploads/typ
 
 /** The demo's "now": the morning of October 2, 2026, ticking in real time. */
 const DEMO_EPOCH = Date.parse('2026-10-02T11:00:00Z');
+/** The recorded close plays in about 23 seconds but stamps its rows as if the agents took a couple of hours:
+ * each step lands at its script time times this scale, plus an uneven extra so no two steps look evenly spaced. */
+const SCRIPT_TIME_SCALE = 360;
+const scriptLagMs = (at: number) => at * (SCRIPT_TIME_SCALE - 1) + ((at * 7919) % 97) * 1000;
 
 const PROVIDERS: ProviderStatus[] = [
 	{ id: 'ledger', name: 'Ledger database', purpose: 'Books, Proposals and the agent message bus', mode: 'demo', detail: 'In-browser tables seeded from fixtures' },
@@ -96,6 +100,8 @@ export class MockDataSource implements DataSource {
 	#subs = new Map<TableName, Set<(e: ChangeEvent) => void>>();
 	#timers: ReturnType<typeof setTimeout>[] = [];
 	#boot = Date.now();
+	/** How far the demo clock has jumped ahead of real time; only ever grows, so times never run backwards. */
+	#lagMs = 0;
 	#seq = 0;
 	#evalRuns = new Map<string, CharterEvalRun>();
 	#collecting = new Set<string>();
@@ -199,8 +205,14 @@ export class MockDataSource implements DataSource {
 		}
 		this.#closes.push({ periodYm: periodId, status: 'running' });
 		this.#audit('cfo', 'close.start', 'period', periodId, {});
+		const lagAtStart = this.#lagMs;
 		for (const step of CLOSE_SCRIPT) {
-			this.#timers.push(setTimeout(() => this.#run(step, periodId), step.at));
+			this.#timers.push(
+				setTimeout(() => {
+					this.#lagMs = Math.max(this.#lagMs, lagAtStart + scriptLagMs(step.at));
+					this.#run(step, periodId);
+				}, step.at)
+			);
 		}
 	}
 
@@ -659,6 +671,7 @@ export class MockDataSource implements DataSource {
 		this.#onApproved.clear();
 		this.#t = loadSeed();
 		this.#boot = Date.now();
+		this.#lagMs = 0;
 		this.#stopLoop();
 		this.#startLoop();
 	}
@@ -1187,7 +1200,7 @@ export class MockDataSource implements DataSource {
 	}
 
 	#now(): string {
-		return new Date(DEMO_EPOCH + (Date.now() - this.#boot)).toISOString();
+		return new Date(DEMO_EPOCH + (Date.now() - this.#boot) + this.#lagMs).toISOString();
 	}
 
 	#id(prefix: string): string {

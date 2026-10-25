@@ -55,9 +55,9 @@ describe('deals', () => {
 
 	it('seeds a pipeline the Metrics page can quote', () => {
 		const p = weightedPipeline(loadSeed().deal);
-		expect(p.openCount).toBe(7);
-		expect(p.openMinor).toBe('10890000');
-		expect(p.weightedMinor).toBe('5968500');
+		expect(p.openCount).toBe(39);
+		expect(p.openMinor).toBe('66784562');
+		expect(p.weightedMinor).toBe('22738704');
 	});
 });
 
@@ -96,8 +96,8 @@ describe('repeat customers', () => {
 
 	it('flags the seeded repeat customers', () => {
 		const t = loadSeed();
-		expect([...repeatCustomers(t.invoice, t.contract, t.batch).keys()].sort()).toEqual(['c01', 'c04', 'c07']);
-		expect(repeatRateBp(t.invoice, t.contract, t.batch)).toBe(1500);
+		expect([...repeatCustomers(t.invoice, t.contract, t.batch).keys()].sort()).toEqual(['c01', 'c03', 'c04', 'c05', 'c07', 'c08', 'c09', 'c10', 'c11', 'c12', 'c13', 'c16', 'c17']);
+		expect(repeatRateBp(t.invoice, t.contract, t.batch)).toBe(6500);
 	});
 
 	it('counts credit-pack buyers in the denominator too, so the rate never passes 100%', () => {

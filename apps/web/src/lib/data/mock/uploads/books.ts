@@ -128,7 +128,7 @@ export const STATEMENT: StatementLine[] = [
 	{ bookedAt: '2026-10-01T00:00:00Z', amountMinor: '80000', description: 'DEPOSIT CEDAR PINE DENTAL', counterparty: 'Cedar & Pine Dental' },
 	{ bookedAt: '2026-10-01T00:00:00Z', amountMinor: '-21840', description: 'CARD 4471 HOTEL', counterparty: 'Unknown' },
 	{ bookedAt: '2026-10-02T00:00:00Z', amountMinor: '-360000', description: 'ACH HELPDESK COLLECTIVE HC-2609', counterparty: 'Helpdesk Collective' },
-	{ bookedAt: '2026-10-02T00:00:00Z', amountMinor: '2400000', description: 'WIRE IN BANSHO RAMEN INV-1061', counterparty: 'Bansho Ramen' }
+	{ bookedAt: '2026-10-02T00:00:00Z', amountMinor: '2387400', description: 'WIRE IN BANSHO RAMEN INV-1061', counterparty: 'Bansho Ramen' }
 ];
 
 const alreadyImported = (ctx: MockContext, l: StatementLine) =>
