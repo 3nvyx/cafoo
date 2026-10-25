@@ -24,6 +24,10 @@ describe('provider state on Settings', () => {
 		expect(providerState(provider('agents', 'live'), { ...up, agents: 'unknown' })).toMatchObject({ label: 'Not checked', tone: 'neutral' });
 	});
 
+	it('calls a feature the gateway has not built Not available, not Demo', () => {
+		expect(providerState({ ...provider('gw-4', 'demo'), detail: 'crawl not implemented' }, up)).toMatchObject({ label: 'Not available', tone: 'muted' });
+	});
+
 	it('never calls a gateway-reported provider Connected: a key proves nothing about calls', () => {
 		const state = providerState(provider('gw-0', 'live'), up);
 		expect(state).toMatchObject({ label: 'Configured', tone: 'neutral' });

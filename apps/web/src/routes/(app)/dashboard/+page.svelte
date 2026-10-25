@@ -59,8 +59,13 @@
 
 	const headline = $derived.by(() => {
 		if (!period) return '';
-		if (period.status === 'closed') return `${month} is locked. The Board Pack is final.`;
-		if (gate.canLock) return `Every item is resolved. You can lock ${month}.`;
+		const open = bankN ? ` with ${bankN} unmatched bank line${bankN === 1 ? '' : 's'}` : '';
+		if (period.status === 'closed') return `${month} is locked${open}. The Board Pack is final.`;
+		if (gate.canLock) {
+			return bankN && gate.bankExceptions.acceptance.accepted
+				? `All proposals are resolved and ${bankN} bank line${bankN === 1 ? ' is' : 's are'} accepted as open. You can lock ${month}.`
+				: `Every item is resolved. You can lock ${month}.`;
+		}
 		if (gate.started) {
 			const n = gate.awaiting;
 			return n ? `The agents are closing ${month}. ${n} item${n === 1 ? ' needs' : 's need'} your OK.` : `The agents are closing ${month}.`;

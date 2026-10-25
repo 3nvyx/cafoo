@@ -21,10 +21,11 @@ describe('closeRunNotes', () => {
 		expect(n.body).toContain('the provider returned 529 overloaded');
 	});
 
-	it('sends the CFO to the revenue schedules when the wait limit is reached', () => {
+	it('says the revenue catch-up did not post when the wait limit is reached, without implying a fix', () => {
 		const [n] = closeRunNotes({ status: 'done', steps: [WAIT] });
-		expect(n).toMatchObject({ tone: 'warn', title: 'Revenue catch-up is waiting on your decision', href: '/proposals', action: 'Decide the schedules' });
-		expect(n.body).toMatch(/has not posted/);
+		expect(n).toMatchObject({ tone: 'warn', title: 'Revenue catch-up did not post in this close' });
+		expect(n.href).toBeUndefined();
+		expect(n.body).toMatch(/did not post/);
 	});
 
 	it('quotes the budget and the spend', () => {
@@ -33,6 +34,7 @@ describe('closeRunNotes', () => {
 		expect(n.body).toContain('$15.12');
 		expect(n.body).toContain('$15.00');
 		expect(n.body).toMatch(/no further runs/);
+		expect(n).toMatchObject({ href: '/proposals', action: 'Open Proposals' });
 	});
 
 	it('reports an errored close, with a fallback reason', () => {
@@ -43,13 +45,13 @@ describe('closeRunNotes', () => {
 		expect(closeRunNotes({ status: 'error' })[0].body).toBe('No reason was reported.');
 	});
 
-	it('dedupes repeated steps and keeps the order they first appeared in', () => {
+	it('puts a failed close first, then dedupes the fallbacks in the order they first appeared', () => {
 		const notes = closeRunNotes({ status: 'error', steps: [BUDGET, ADVISOR, BUDGET, WAIT, ADVISOR, WAIT] });
 		expect(notes.map((n) => n.title)).toEqual([
+			'The close stopped with an error',
 			'The close budget is spent',
 			'The Advisor was unavailable for part of this close',
-			'Revenue catch-up is waiting on your decision',
-			'The close stopped with an error'
+			'Revenue catch-up did not post in this close'
 		]);
 	});
 });

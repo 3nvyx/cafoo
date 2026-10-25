@@ -19,12 +19,14 @@ const LEDGER_HINT: Record<ConnectionState['ledger'], string> = {
 };
 
 const AGENTS_HINT: Record<ConnectionState['agents'], string> = {
-	online: 'The gateway answered /status in this session',
-	offline: 'The gateway did not answer /status in this session',
-	unknown: 'The gateway has not answered /status yet in this session'
+	online: 'This browser reached the agent service in this session',
+	offline: 'This browser could not reach the agent service in this session',
+	unknown: 'This browser has not checked the agent service yet in this session'
 };
 
 export function providerState(p: ProviderStatus, conn: Pick<ConnectionState, 'ledger' | 'agents'>): ProviderState {
+	// The gateway lists features it has not built yet (the site crawl) as demo providers; they replay nothing.
+	if (/not implemented/i.test(p.detail)) return { label: 'Not available', tone: 'muted', hint: 'Not built yet; a key alone does not enable it' };
 	if (p.mode === 'demo') return { label: 'Demo', tone: 'muted', hint: 'Replays recorded fixtures' };
 	if (p.id === 'ledger') {
 		if (conn.ledger === 'live') return { label: 'Connected', tone: 'pos', hint: LEDGER_HINT.live };

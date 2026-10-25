@@ -13,10 +13,12 @@
 	const step = $derived(latestStep(running));
 </script>
 
-<div class="min-h-[32px]" aria-live="polite">
+<!-- Only the headline state is announced; the gateway's step text changes on every tool call. -->
+<span class="sr-only" aria-live="polite">{act ? `${roleName(act.role)} · ${act.labelPlain}` : working ? 'Agents are working on the close' : ''}</span>
+<div class="min-h-8">
 	{#if act}
 		{#key act.labelPlain}
-			<p class="flex items-center gap-2 text-sm text-ink-2" in:appear>
+			<p class="flex items-center gap-2 text-body-sm text-ink-2" in:appear>
 				<RoleAvatar role={act.role} size={24} />
 				<span><span class="font-medium text-ink">{roleName(act.role)}</span> · {act.labelPlain}</span>
 				<span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>

@@ -31,7 +31,16 @@
 	const bankN = $derived(bank.rows.length);
 	const bankLines = $derived(`${bankN} unmatched bank line${bankN === 1 ? '' : 's'}`);
 	const bankBlocks = $derived(!!period && period.status !== 'closed' && bankN > 0 && !bank.acceptance.accepted);
-	const bankHeld = $derived(bankN > 0 && (bank.acceptance.accepted || period?.status === 'closed'));
+	const bankAccepted = $derived(bankN > 0 && bank.acceptance.accepted);
+	// The link on the bank task: what the lines mean for it right now. A locked month whose acceptance was voided by
+	// later evidence (the live feed can do that) says "locked", not "accepted", so it agrees with the Board Pack.
+	const bankTaskNote = $derived(
+		bankAccepted
+			? `${bankN} line${bankN === 1 ? '' : 's'} accepted unmatched, so this task stays open`
+			: period?.status === 'closed'
+				? `${bankN} line${bankN === 1 ? '' : 's'} locked unmatched, so this task stays open`
+				: `${bankLines} · review below`
+	);
 	const bankHeldNote = $derived(`The ${bankN} accepted bank line${bankN === 1 ? ' stays' : 's stay'} unmatched and ${bankN === 1 ? 'its' : 'their'} task stays open.`);
 
 	// What the agent gateway reported for this month's close run (live mode only).
@@ -122,7 +131,7 @@
 						{#if bankN && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })}
 							<p class="mt-2 text-caption text-ink-2">
 								<a class="drill" href="#bank-exceptions">
-									{bankHeld ? `${bankN} line${bankN === 1 ? '' : 's'} accepted unmatched, so this task stays open` : `${bankLines} · review below`}
+									{bankTaskNote}
 								</a>
 							</p>
 						{/if}
@@ -134,7 +143,12 @@
 								id="st-{t.id}"
 								class="field text-sm"
 								value={t.status}
-								onchange={(e) => attempt(() => db.setCloseTaskStatus(t.id, (e.currentTarget as HTMLSelectElement).value as CloseTaskStatus))}
+								onchange={async (e) => {
+									// The books may keep a different status (the bank task cannot be done while lines are unmatched), so show theirs.
+									const el = e.currentTarget as HTMLSelectElement;
+									await attempt(() => db.setCloseTaskStatus(t.id, el.value as CloseTaskStatus));
+									el.value = t.status;
+								}}
 							>
 								{#each STATUSES as s (s)}<option value={s}>{TASK_STATUS[s].label}</option>{/each}
 							</select>
@@ -158,7 +172,7 @@
 				<h2 id="lock-h" class="text-xl">{period.status === 'closed' ? `${month} is locked` : `Lock ${month}`}</h2>
 				<p class="mt-1 text-ink-2">
 					{#if period.status === 'closed'}
-						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}. Nothing can post to {month} anymore. The Board Pack is final. {reversalNote}
+						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}{bankN ? ` with ${bankLines} on record` : ''}. Nothing can post to {month} anymore. The Board Pack is final. {reversalNote}
 					{:else if canLock}
 						{#if gate.request}<span class="mb-1 block text-ink"><span class="font-medium">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</span>{/if}
 						Locking stops anyone, including the agents, from posting to {month}.
@@ -170,12 +184,13 @@
 			</div>
 		</div>
 		{#if period.status !== 'closed'}
-			<div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row-reverse sm:items-center">
-				<button class="btn btn-primary btn-lg w-full sm:w-auto" disabled={!canLock} onclick={() => (confirmOpen = true)}>
+			<div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto">
+				<!-- One primary action per view: while the bank lines hold the lock, reviewing them is the live action. -->
+				<button class="btn btn-lg w-full sm:w-auto {bankBlocks && gate.started ? '' : 'btn-primary'}" disabled={!canLock} onclick={() => (confirmOpen = true)}>
 					<Icon name="lock" size={18} />Lock {month}
 				</button>
 				{#if bankBlocks && gate.started}
-					<a class="btn btn-lg w-full sm:w-auto" href="#bank-exceptions">Review the bank lines</a>
+					<a class="btn btn-primary btn-lg w-full sm:w-auto" href="#bank-exceptions">Review the bank lines</a>
 				{/if}
 			</div>
 		{:else}

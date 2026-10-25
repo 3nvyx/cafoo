@@ -301,7 +301,7 @@
 	/* The one destructive action in a dialog (unlock, reverse). Never the default button. */
 	.btn-danger {
 		background: var(--neg);
-		border-color: var(--neg);
+		border-color: var(--line);
 		color: var(--on-neg);
 	}
 	.btn-danger:hover:not(:disabled) {

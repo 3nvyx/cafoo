@@ -1,5 +1,7 @@
 <script lang="ts">
 	// Native <dialog>: focus is trapped and Esc closes it for free.
+	import Notice from './Notice.svelte';
+
 	let {
 		open = $bindable(false),
 		title,
@@ -9,6 +11,8 @@
 		inputLabel,
 		inputPlaceholder = '',
 		inputRequired = false,
+		notice,
+		blocked = false,
 		onconfirm
 	}: {
 		open?: boolean;
@@ -19,6 +23,10 @@
 		inputLabel?: string;
 		inputPlaceholder?: string;
 		inputRequired?: boolean;
+		/** A warning shown inside the dialog, e.g. that what it describes changed underneath it. */
+		notice?: string;
+		/** Keeps the dialog open but disables confirming, so what was typed is not lost. */
+		blocked?: boolean;
 		onconfirm: (value: string) => void | Promise<void>;
 	} = $props();
 
@@ -37,7 +45,7 @@
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
-		if (inputRequired && !value.trim()) return;
+		if (blocked || (inputRequired && !value.trim())) return;
 		busy = true;
 		try {
 			await onconfirm(value.trim());
@@ -58,6 +66,7 @@
 	<form method="dialog" onsubmit={submit} class="flex flex-col gap-4 p-6 sm:p-7">
 		<h2 id="{id}-t" class="text-title">{title}</h2>
 		<p id="{id}-b" class="text-body text-ink-2">{body}</p>
+		{#if notice}<Notice tone="warn">{notice}</Notice>{/if}
 		{#if inputLabel}
 			<label class="flex flex-col gap-1.5 text-body-sm font-medium">
 				{inputLabel}
@@ -70,7 +79,7 @@
 			<button
 				type="submit"
 				class="btn {danger ? 'btn-danger' : 'btn-primary'}"
-				disabled={busy || (inputRequired && !value.trim())}>{busy ? 'Working…' : confirmLabel}</button
+				disabled={busy || blocked || (inputRequired && !value.trim())}>{busy ? 'Working…' : confirmLabel}</button
 			>
 		</div>
 	</form>

@@ -53,7 +53,8 @@
 
 	// Receivables and ARR come from invoices and contracts, not the ledger. One company: its own customers in its own
 	// currency. The group: every company's, translated at the month's closing rate.
-	const customerSub = $derived(new Map(db.customers().map((c) => [c.id, c.subsidiaryId ?? root?.id ?? ''])));
+	// A customer with no company (and no root company to fall back on) is left out, so the report stops with a plain error.
+	const customerSub = $derived(new Map(db.customers().flatMap((c): [string, string][] => ((c.subsidiaryId ?? root?.id) ? [[c.id, (c.subsidiaryId ?? root?.id) as string]] : []))));
 	const subCcy = $derived(new Map(subsidiaries.map((s) => [s.id, s.baseCurrency])));
 	// A customer with no company, or a company with no currency or rate, stops these tables rather than dropping rows.
 	type Supplemental = { kind: 'ready'; invoices: Invoice[]; contracts: Contract[] } | { kind: 'error'; message: string };
@@ -171,7 +172,7 @@
 			{#if acceptance.accepted}
 				The CFO accepted this exact set on {dateTime(acceptance.at)}: “{acceptance.reasonPlain}”. Acceptance records the decision; it does not reconcile the bank.
 			{:else}
-				No current acceptance is recorded. Review the lines on the close checklist before treating this pack as reconciled.
+				No current acceptance is recorded for this exact set. Match these lines or accept them as open exceptions on the close page; either way this pack is not reconciled.
 			{/if}
 		</Notice>
 	{/if}

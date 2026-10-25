@@ -7,7 +7,8 @@
 	import { periodLabel, ymShort } from '#lib/data/derive.js';
 	import { formatMoney, sumMinor, toBig } from '#lib/data/money.js';
 	import { dateTime, shortDate } from '#lib/labels.js';
-	import { attempt, toasts } from '#lib/toast.svelte.js';
+	import { attempt } from '#lib/toast.svelte.js';
+	import { tick } from 'svelte';
 	import { ui } from '#lib/ui.svelte.js';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Notice from './Notice.svelte';
@@ -44,8 +45,15 @@
 			}
 			by.set(r.ccy, t);
 		}
-		return [...by].map(([ccy, t]) => ({ ccy, inN: t.inN, inSum: sumMinor(t.inSum), outN: t.outN, outSum: sumMinor(t.outSum) }));
+		// Money out is shown as a positive figure next to the word "out".
+		return [...by].map(([ccy, t]) => ({ ccy, inN: t.inN, inSum: sumMinor(t.inSum), outN: t.outN, outSum: sumMinor(t.outSum).replace(/^-/, '') }));
 	});
+	const totalsText = $derived(
+		totals
+			.flatMap((t) => [t.inN ? `${t.inN} in ${formatMoney(t.inSum, { currency: t.ccy })}` : '', t.outN ? `${t.outN} out ${formatMoney(t.outSum, { currency: t.ccy })}` : ''])
+			.filter(Boolean)
+			.join(', ')
+	);
 
 	// Earlier months show under their own heading, marked as carried forward.
 	const groups = $derived.by(() => {
@@ -54,18 +62,25 @@
 		return [...by].map(([ym, items]) => ({ ym, items }));
 	});
 
-	// An acceptance for this month exists in the audit log but no longer matches the live lines.
-	const staleAcceptance = $derived(
-		!acceptance.accepted &&
-			db.auditEvents().some((e) => {
-				if (e.action !== 'accept_bank_exceptions' || e.actorRole !== 'cfo') return false;
+	// The latest acceptance for this month in the audit log when it no longer matches the live lines: its reason is
+	// shown so the CFO can tell whether it still holds.
+	const voided = $derived.by(() => {
+		if (acceptance.accepted) return undefined;
+		const events = db
+			.auditEvents()
+			.filter((e) => e.action === 'accept_bank_exceptions' && e.actorRole === 'cfo')
+			.map((e) => {
 				try {
-					return (JSON.parse(e.detailJson) as { periodYm?: unknown }).periodYm === periodId;
+					const d = JSON.parse(e.detailJson) as { periodYm?: unknown; reasonPlain?: unknown };
+					return d.periodYm === periodId ? { at: e.at, reason: typeof d.reasonPlain === 'string' ? d.reasonPlain : '' } : undefined;
 				} catch {
-					return e.detailJson.includes(`"periodYm":"${periodId}"`);
+					return e.detailJson.includes(`"periodYm":"${periodId}"`) ? { at: e.at, reason: '' } : undefined;
 				}
 			})
-	);
+			.filter((e): e is { at: string; reason: string } => !!e)
+			.sort((a, b) => b.at.localeCompare(a.at));
+		return events[0];
+	});
 
 	// The bank feed writes "Unknown" when it cannot name the other side; the description says more then.
 	const main = (r: (typeof rows)[number]) => {
@@ -82,49 +97,42 @@
 
 	let dialogOpen = $state(false);
 	let reviewedSnapshot = $state('');
-	let submitting = false;
 
 	function review() {
 		reviewedSnapshot = ex.snapshot;
 		dialogOpen = true;
 	}
 
-	// The CFO accepts the exact lines on screen. If they change underneath the open dialog, start the review over.
-	$effect(() => {
-		const live = ex.snapshot;
-		if (!dialogOpen || submitting || !reviewedSnapshot || live === reviewedSnapshot) return;
-		dialogOpen = false;
-		toasts.push('The bank lines changed while you were reviewing them. Review the current lines again.', 'info', 6000);
-	});
+	// The CFO accepts the exact lines they reviewed. If the lines change underneath the open dialog, it stays open
+	// with the typed reason but cannot confirm: the module would refuse the old snapshot anyway.
+	const stale = $derived(dialogOpen && !!reviewedSnapshot && ex.snapshot !== reviewedSnapshot);
 
 	async function accept(reason: string) {
-		submitting = true;
-		try {
-			await attempt(() => db.acceptBankExceptions(periodId, reviewedSnapshot, reason), 'Bank exceptions accepted. They stay unmatched.');
-		} finally {
-			submitting = false;
-		}
+		const ok = await attempt(() => db.acceptBankExceptions(periodId, reviewedSnapshot, reason), 'Bank exceptions accepted. They stay unmatched.');
+		if (!ok) return;
+		// The button that had focus disappears with the acceptance; keep focus in the card.
+		await tick();
+		document.getElementById('bank-exceptions-h')?.focus();
 	}
 </script>
 
 {#if period && n}
 	<section id="bank-exceptions" class="card scroll-mt-24 p-5" aria-labelledby="bank-exceptions-h">
-		<div class="flex flex-wrap items-start justify-between gap-3">
-			<div class="min-w-0 flex-1">
-				<p class="eyebrow">Bank reconciliation</p>
-				<h2 id="bank-exceptions-h" class="text-title">{lines}</h2>
-				<p class="mt-1 text-body-sm text-ink-2">
-					{n === 1 ? 'This line' : 'These lines'} came in from the bank but match nothing in the books yet, including any carried forward from earlier months.
-				</p>
-			</div>
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<p class="eyebrow">Bank reconciliation</p>
 			{#if closed}
 				<Pill tone="neutral">Locked with exceptions</Pill>
 			{:else if acceptance.accepted}
-				<Pill tone="pos">Accepted by the CFO</Pill>
+				<!-- Not pos: accepting records a decision; the lines are still unmatched. -->
+				<Pill tone="neutral">Accepted by the CFO</Pill>
 			{:else}
 				<Pill tone="warn">Needs your decision</Pill>
 			{/if}
 		</div>
+		<h2 id="bank-exceptions-h" class="mt-1 text-title outline-none" tabindex="-1">{lines}</h2>
+		<p class="mt-1 text-body-sm text-ink-2">
+			{n === 1 ? 'This line' : 'These lines'} came in from the bank but match nothing in the books yet, including any carried forward from earlier months.
+		</p>
 
 		<dl class="num mt-4 flex flex-wrap gap-x-6 gap-y-1 text-body-sm text-ink-2">
 			{#each totals as t (t.ccy)}
@@ -137,7 +145,7 @@
 				{#if t.outN}
 					<div class="flex gap-1.5">
 						<dt>{t.outN} out</dt>
-						<dd class="text-neg">{formatMoney(t.outSum, { currency: t.ccy })}</dd>
+						<dd class="text-ink">{formatMoney(t.outSum, { currency: t.ccy })}</dd>
 					</div>
 				{/if}
 			{/each}
@@ -154,7 +162,7 @@
 					{#each g.items as r (r.id)}
 						<li class="flex items-start justify-between gap-4 py-3">
 							<div class="min-w-0">
-								<p class="truncate text-body-sm font-medium">{main(r)}</p>
+								<p class="text-body-sm font-medium break-words">{main(r)}</p>
 								<p class="mt-0.5 text-caption break-words text-ink-3">{detail(r)}</p>
 							</div>
 							<span class="num shrink-0 text-body-sm {toBig(r.amountMinor) < 0n ? 'text-neg' : 'text-ink'}">
@@ -169,7 +177,7 @@
 		<div class="mt-4 flex flex-col gap-3 border-t border-line pt-4">
 			{#if acceptance.accepted}
 				<Notice tone="info">
-					You accepted this exact set on {dateTime(acceptance.at)}. Reason: “{acceptance.reasonPlain}”. The lines stay unmatched and the reconciliation task stays open.
+					The CFO accepted this exact set on {dateTime(acceptance.at)}. Reason: “{acceptance.reasonPlain}”. The lines stay unmatched and the reconciliation task stays open.
 				</Notice>
 			{/if}
 			{#if closed}
@@ -177,9 +185,9 @@
 					{label} locked with {n === 1 ? 'this line' : 'these lines'} unmatched. Unlocking the month lets {n === 1 ? 'it' : 'them'} be matched.
 				</p>
 			{:else if !acceptance.accepted}
-				{#if staleAcceptance}
-					<Notice tone="warn" title="Your earlier acceptance no longer applies">
-						The bank or ledger evidence changed after you accepted, so these lines need a fresh review.
+				{#if voided}
+					<Notice tone="warn" title="The earlier acceptance no longer applies">
+						The bank or ledger evidence changed after the CFO accepted on {dateTime(voided.at)}{voided.reason ? ` (“${voided.reason}”)` : ''}, so these lines need a fresh review.
 					</Notice>
 				{/if}
 				<div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
@@ -199,11 +207,13 @@
 	<ConfirmDialog
 		bind:open={dialogOpen}
 		title="Accept {lines}?"
-		body="{n === 1 ? 'The line stays' : 'The lines stay'} unmatched and the reconciliation task stays open, so {label} can lock with {n === 1 ? 'it' : 'them'} on record. Any later bank or ledger change needs a fresh acceptance. Your reason is kept in the audit log."
+		body="That is {totalsText}. {n === 1 ? 'The line stays' : 'The lines stay'} unmatched and the reconciliation task stays open, so {label} can lock with {n === 1 ? 'it' : 'them'} on record. Any later bank or ledger change needs a fresh acceptance. Your reason is kept in the audit log."
 		confirmLabel="Accept {n === 1 ? 'the line' : `${n} lines`}"
 		inputLabel="Why can {label} close with {n === 1 ? 'this line' : 'these lines'} open?"
 		inputPlaceholder="e.g. Remittance details are still pending"
 		inputRequired
+		notice={stale ? 'The bank lines changed while you were reviewing them. Cancel, look at the current lines, and accept again.' : undefined}
+		blocked={stale}
 		onconfirm={accept}
 	/>
 {/if}
