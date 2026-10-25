@@ -99,14 +99,17 @@
 		onfocusin={() => (navFocused = true)}
 		onfocusout={() => (navFocused = false)}
 	>
-		<div class="content flex h-14 items-center justify-between gap-3 rounded-lg bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
-			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Luyten home"><Wordmark size={24} /></a>
+		<div class="content flex h-14 items-center justify-between gap-3 rounded-lg bg-canvas/85 px-1.5 backdrop-blur">
+			<!-- Equal-width sides keep the page links on the bar's true centre. -->
+			<div class="flex flex-1">
+				<a href="/" class="flex min-h-11 items-center px-3.5" aria-label="Luyten home"><Wordmark size={24} /></a>
+			</div>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
 					<a href={a.href} class="flex min-h-11 items-center rounded-full px-3.5 text-[15px] text-ink-2 transition-colors duration-150 hover:text-ink">{a.label}</a>
 				{/each}
 			</nav>
-			<div class="flex items-center gap-1">
+			<div class="flex flex-1 items-center justify-end gap-1">
 				<a href="/dashboard" {...newTab} class="pill pill-quiet hidden sm:inline-flex">Sign in{@render tabNote()}</a>
 				<a href="/dashboard" {...newTab} class="pill pill-primary">Get started{@render tabNote()}</a>
 			</div>

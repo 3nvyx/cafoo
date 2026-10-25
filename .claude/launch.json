@@ -46,18 +46,6 @@
         "PUBLIC_AGENT_GATEWAY": "http://localhost:8790",
         "CAFOO_KIT_OUT_DIR": ".svelte-kit-demo"
       }
-    },
-    {
-      "name": "shot-web",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-F", "@luyten/web", "dev", "--port", "5191", "--strictPort"],
-      "port": 5191,
-      "env": {
-        "PUBLIC_DATA_SOURCE": "spacetime",
-        "PUBLIC_STDB_DATABASE": "luyten-shot",
-        "PUBLIC_AGENT_GATEWAY": "http://localhost:8799",
-        "CAFOO_KIT_OUT_DIR": ".svelte-kit-shot"
-      }
     }
   ]
 }
