@@ -116,17 +116,22 @@
 			<div class="mx-auto max-w-[1120px] px-4 py-20 sm:px-8">
 				<p class="eyebrow mb-3 text-accent-ink">Try it here</p>
 				<h2 id="demo-h" class="max-w-[22ch] text-[32px] sm:text-[44px]">One sentence for you. Every line for your controller.</h2>
-				<p class="mt-4 max-w-[60ch] text-lg text-ink-2">Each Proposal comes with a plain summary and the full workings. Switch between them, then follow a Board Pack number down to the entries behind it. Both use sample numbers.</p>
+				<p class="mt-4 max-w-[60ch] text-lg text-ink-2">Both demos below run on sample numbers. Click around.</p>
 
-				<div class="mt-12 grid gap-6 lg:grid-cols-[400px_minmax(0,1fr)]">
+				<div class="mt-12 grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-16">
 					<div class="flex flex-col gap-3">
-						<h3 class="text-xl">Simple and Expert mode</h3>
-						<ModeDemo />
+						<h3 class="text-2xl">Simple and Expert mode</h3>
+						<p class="max-w-[48ch] text-ink-2">
+							Every Proposal carries a plain summary and the full workings. Simple mode shows the sentence. Expert mode shows the Journal Lines, account codes, the Red Team's critique, the Advisor's ruling and the raw payload.
+						</p>
 					</div>
-					<div class="flex flex-col gap-3">
-						<h3 class="text-xl">Every number drills down</h3>
-						<DrillDemo />
-					</div>
+					<ModeDemo />
+				</div>
+
+				<div class="mt-16 flex flex-col gap-3">
+					<h3 class="text-2xl">Every number drills down</h3>
+					<p class="max-w-[60ch] text-ink-2">Click a figure in the Board Pack and land on the Journal Entries behind it, then on each entry's lines and who proposed, checked and approved them.</p>
+					<div class="mt-3"><DrillDemo /></div>
 				</div>
 
 				<div class="mt-12 flex flex-col items-start gap-4 rounded-card border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between">

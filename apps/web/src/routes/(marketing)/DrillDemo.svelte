@@ -33,7 +33,7 @@
 	let picked = $state<Entry | null>(null);
 </script>
 
-<div class="card grid h-full gap-0 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0">
+<div class="card grid divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
 	<section class="flex flex-col gap-3 p-4" aria-labelledby="drill-pnl">
 		<h3 id="drill-pnl" class="eyebrow">Board Pack · September P&L</h3>
 		<button

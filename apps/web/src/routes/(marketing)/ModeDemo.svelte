@@ -15,7 +15,7 @@
   "amount": "8750.00", "reverse_on": "2026-10-01" }`;
 </script>
 
-<div class="card flex h-full flex-col">
+<div class="card flex flex-col">
 	<div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
 		<div class="flex items-center gap-2">
 			<Pill tone="neutral">Accrual</Pill>
