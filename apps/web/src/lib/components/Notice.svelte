@@ -42,6 +42,6 @@
 	<div class="min-w-0 flex-1">
 		{#if title}<p class="font-medium">{title}</p>{/if}
 		<div class={title ? 'mt-0.5' : ''}>{@render children()}</div>
-		{#if href && action}<a class="drill mt-2 inline-block font-medium" {href}>{action}</a>{/if}
+		{#if href && action}<a class="drill -mb-2 inline-flex min-h-11 items-center font-medium" {href}>{action}</a>{/if}
 	</div>
 </div>

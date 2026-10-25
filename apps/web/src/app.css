@@ -316,6 +316,34 @@
 		border-color: transparent;
 		background: transparent;
 	}
+	/* A segmented filter (company, thread filter). Selection is the accent pair; the border is the one border. */
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-height: 36px;
+		padding: 0 0.75rem;
+		border-radius: 999px;
+		border: 1px solid var(--line);
+		background: var(--surface);
+		color: var(--ink-2);
+		font-size: var(--text-body-sm);
+		line-height: var(--text-body-sm--line-height);
+		font-weight: 500;
+		white-space: nowrap;
+		transition:
+			background-color 120ms ease-out,
+			color 120ms ease-out;
+	}
+	.chip:hover {
+		background: var(--subtle);
+		color: var(--ink);
+	}
+	.chip[aria-pressed='true'],
+	.chip[aria-current] {
+		background: var(--accent-soft);
+		color: var(--on-accent-soft);
+	}
 	.num {
 		font-family: var(--font-mono);
 		font-variant-numeric: tabular-nums;
