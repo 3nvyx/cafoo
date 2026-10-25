@@ -1,7 +1,422 @@
 {
-	"funding_round": [],
-	"investor": [],
-	"commitment": [],
-	"instrument": [],
-	"cap_table_entry": []
+	"funding_round": [
+		{
+			"id": "rd-preseed-2025",
+			"subsidiaryId": "sub-us",
+			"name": "Pre-seed 2025",
+			"targetMinor": "260000000",
+			"ccy": "USD",
+			"openedAt": "2025-01-15T00:00:00Z",
+			"closedAt": "2025-04-30T00:00:00Z",
+			"status": "closed",
+			"leadInvestorId": "inv-northfold",
+			"pricePerShareE4": "1040000"
+		},
+		{
+			"id": "rd-seed-2026",
+			"subsidiaryId": "sub-us",
+			"name": "Seed 2026",
+			"targetMinor": "300000000",
+			"ccy": "USD",
+			"openedAt": "2026-08-17T00:00:00Z",
+			"status": "open",
+			"leadInvestorId": "inv-harrow"
+		}
+	],
+	"investor": [
+		{
+			"id": "inv-northfold",
+			"name": "Northfold Ventures",
+			"kind": "fund",
+			"country": "US",
+			"payerNames": [
+				"Northfold Ventures Fund I LP"
+			],
+			"contactName": "Elena Marsh"
+		},
+		{
+			"id": "inv-kiln",
+			"name": "Kiln Street Angels",
+			"kind": "angel",
+			"country": "US",
+			"payerNames": [
+				"Kiln Street Angels LLC"
+			],
+			"contactName": "Marcus Bell"
+		},
+		{
+			"id": "inv-harrow",
+			"name": "Harrow Lane Capital",
+			"kind": "fund",
+			"country": "US",
+			"payerNames": [
+				"Harrow Lane Capital Fund II LP",
+				"HLC FUND II"
+			],
+			"contactName": "Sofia Lindqvist"
+		},
+		{
+			"id": "inv-orrin",
+			"name": "Orrin Strategic Partners",
+			"kind": "corporate",
+			"country": "US",
+			"payerNames": [
+				"Orrin Strategic Partners Inc"
+			],
+			"contactName": "Graham Doyle"
+		},
+		{
+			"id": "inv-tidewater",
+			"name": "Tidewater Angels",
+			"kind": "spv",
+			"country": "US",
+			"payerNames": [
+				"Tidewater Angels"
+			],
+			"contactName": "Renee Ocampo"
+		},
+		{
+			"id": "inv-fenwick",
+			"name": "Fenwick Row Ventures",
+			"kind": "family_office",
+			"country": "GB",
+			"payerNames": [
+				"Fenwick Row Ventures Ltd"
+			],
+			"contactName": "Harriet Lyle"
+		},
+		{
+			"id": "inv-brightwater",
+			"name": "Brightwater Family Office",
+			"kind": "family_office",
+			"country": "US",
+			"payerNames": [
+				"Brightwater Holdings LLC"
+			],
+			"contactName": "Owen Park"
+		}
+	],
+	"commitment": [
+		{
+			"id": "cm-northfold",
+			"roundId": "rd-preseed-2025",
+			"investorId": "inv-northfold",
+			"instrumentId": "ins-northfold",
+			"amountMinor": "156000000",
+			"ccy": "USD",
+			"receivedMinor": "156000000",
+			"status": "funded",
+			"expectedBy": "2025-02-14T00:00:00Z"
+		},
+		{
+			"id": "cm-kiln",
+			"roundId": "rd-preseed-2025",
+			"investorId": "inv-kiln",
+			"instrumentId": "ins-kiln",
+			"amountMinor": "104000000",
+			"ccy": "USD",
+			"receivedMinor": "104000000",
+			"status": "funded",
+			"expectedBy": "2025-03-10T00:00:00Z"
+		},
+		{
+			"id": "cm-harrow",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-harrow",
+			"instrumentId": "ins-harrow",
+			"amountMinor": "100000000",
+			"ccy": "USD",
+			"receivedMinor": "0",
+			"status": "signed",
+			"expectedBy": "2026-10-01T00:00:00Z",
+			"notePlain": "Lead. Wire instructions sent 28 September."
+		},
+		{
+			"id": "cm-orrin",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-orrin",
+			"instrumentId": "ins-orrin",
+			"amountMinor": "100000000",
+			"ccy": "USD",
+			"receivedMinor": "0",
+			"status": "signed",
+			"expectedBy": "2026-10-01T00:00:00Z",
+			"notePlain": "Convertible note, 6% a year, matures 1 October 2028."
+		},
+		{
+			"id": "cm-tidewater",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-tidewater",
+			"instrumentId": "ins-tidewater",
+			"amountMinor": "55000000",
+			"ccy": "USD",
+			"receivedMinor": "0",
+			"status": "signed",
+			"expectedBy": "2026-10-07T00:00:00Z",
+			"notePlain": "An SPV of 31 angels; the money comes from the SPV's own bank account."
+		},
+		{
+			"id": "cm-fenwick",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-fenwick",
+			"instrumentId": "ins-fenwick",
+			"amountMinor": "15625000",
+			"ccy": "GBP",
+			"receivedMinor": "0",
+			"status": "committed",
+			"expectedBy": "2026-10-09T00:00:00Z",
+			"notePlain": "A $200,000 SAFE paid in pounds (£156,250 at 1.28) into Cafoo Ltd's account."
+		},
+		{
+			"id": "cm-brightwater",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-brightwater",
+			"instrumentId": "ins-brightwater",
+			"amountMinor": "25000000",
+			"ccy": "USD",
+			"receivedMinor": "0",
+			"status": "overdue",
+			"expectedBy": "2026-09-30T00:00:00Z",
+			"notePlain": "Wire promised by 30 September and not yet arrived."
+		}
+	],
+	"instrument": [
+		{
+			"id": "ins-northfold",
+			"roundId": "rd-preseed-2025",
+			"investorId": "inv-northfold",
+			"kind": "safe_post_money",
+			"principalMinor": "156000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": true,
+			"documentIds": [],
+			"signedAt": "2025-02-10T00:00:00Z",
+			"valuationCapMinor": "1300000000",
+			"shares": 1500000,
+			"classification": "equity",
+			"classificationPlain": "Equity: converted into common stock when the pre-seed closed in April 2025, so no SAFE balance remains. The money sits in account 3000 with the founders' stock; none of it was income.",
+			"status": "converted"
+		},
+		{
+			"id": "ins-kiln",
+			"roundId": "rd-preseed-2025",
+			"investorId": "inv-kiln",
+			"kind": "safe_post_money",
+			"principalMinor": "104000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": false,
+			"documentIds": [],
+			"signedAt": "2025-03-04T00:00:00Z",
+			"valuationCapMinor": "1300000000",
+			"shares": 1000000,
+			"classification": "equity",
+			"classificationPlain": "Equity: converted into common stock when the pre-seed closed in April 2025, so no SAFE balance remains. The money sits in account 3000 with the founders' stock; none of it was income.",
+			"status": "converted"
+		},
+		{
+			"id": "ins-harrow",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-harrow",
+			"kind": "safe_post_money",
+			"principalMinor": "100000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": true,
+			"documentIds": [],
+			"signedAt": "2026-09-22T00:00:00Z",
+			"valuationCapMinor": "2400000000",
+			"classification": "liability",
+			"classificationPlain": "A liability, not income: on a sale of the company before it converts, the SAFE pays the investor cash, so it is carried at fair value until it converts into shares.",
+			"status": "draft"
+		},
+		{
+			"id": "ins-orrin",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-orrin",
+			"kind": "convertible_note",
+			"principalMinor": "100000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": false,
+			"documentIds": [],
+			"signedAt": "2026-09-28T00:00:00Z",
+			"valuationCapMinor": "2400000000",
+			"discountBp": 2000,
+			"interestBp": 600,
+			"maturityAt": "2028-10-01T00:00:00Z",
+			"classification": "liability",
+			"classificationPlain": "A liability, not income: Cafoo owes the principal plus interest until the note converts or is repaid. The interest is an expense each month.",
+			"status": "draft"
+		},
+		{
+			"id": "ins-tidewater",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-tidewater",
+			"kind": "safe_post_money",
+			"principalMinor": "55000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": false,
+			"documentIds": [],
+			"signedAt": "2026-09-29T00:00:00Z",
+			"valuationCapMinor": "2400000000",
+			"classification": "liability",
+			"classificationPlain": "A liability, not income: on a sale of the company before it converts, the SAFE pays the investor cash, so it is carried at fair value until it converts into shares.",
+			"status": "draft"
+		},
+		{
+			"id": "ins-fenwick",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-fenwick",
+			"kind": "safe_post_money",
+			"principalMinor": "20000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": false,
+			"documentIds": [],
+			"valuationCapMinor": "2400000000",
+			"classification": "liability",
+			"classificationPlain": "A liability, not income: on a sale of the company before it converts, the SAFE pays the investor cash, so it is carried at fair value until it converts into shares.",
+			"status": "draft"
+		},
+		{
+			"id": "ins-brightwater",
+			"roundId": "rd-seed-2026",
+			"investorId": "inv-brightwater",
+			"kind": "safe_post_money",
+			"principalMinor": "25000000",
+			"ccy": "USD",
+			"mfn": false,
+			"proRata": false,
+			"documentIds": [],
+			"signedAt": "2026-09-24T00:00:00Z",
+			"valuationCapMinor": "2400000000",
+			"classification": "liability",
+			"classificationPlain": "A liability, not income: on a sale of the company before it converts, the SAFE pays the investor cash, so it is carried at fair value until it converts into shares.",
+			"status": "draft"
+		}
+	],
+	"cap_table_entry": [
+		{
+			"id": "ct-okafor",
+			"holderName": "Maya Okafor",
+			"security": "common",
+			"shares": 4500000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-01-06T00:00:00Z",
+			"employeeId": "emp-01"
+		},
+		{
+			"id": "ct-reyes",
+			"holderName": "Daniel Reyes",
+			"security": "common",
+			"shares": 3500000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-01-06T00:00:00Z",
+			"employeeId": "emp-02"
+		},
+		{
+			"id": "ct-northfold",
+			"holderName": "Northfold Ventures",
+			"security": "common",
+			"shares": 1500000,
+			"investedMinor": "156000000",
+			"ccy": "USD",
+			"asOf": "2025-04-30T00:00:00Z",
+			"investorId": "inv-northfold"
+		},
+		{
+			"id": "ct-kiln",
+			"holderName": "Kiln Street Angels",
+			"security": "common",
+			"shares": 1000000,
+			"investedMinor": "104000000",
+			"ccy": "USD",
+			"asOf": "2025-04-30T00:00:00Z",
+			"investorId": "inv-kiln"
+		},
+		{
+			"id": "ct-emp-03",
+			"holderName": "Priya Raman",
+			"security": "options_granted",
+			"shares": 300000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-05-12T00:00:00Z",
+			"employeeId": "emp-03"
+		},
+		{
+			"id": "ct-emp-04",
+			"holderName": "Jordan Kim",
+			"security": "options_granted",
+			"shares": 200000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-06-02T00:00:00Z",
+			"employeeId": "emp-04"
+		},
+		{
+			"id": "ct-emp-05",
+			"holderName": "Ben Carter",
+			"security": "options_granted",
+			"shares": 150000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-09-15T00:00:00Z",
+			"employeeId": "emp-05"
+		},
+		{
+			"id": "ct-emp-09",
+			"holderName": "Nora Hassan",
+			"security": "options_granted",
+			"shares": 100000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2025-11-03T00:00:00Z",
+			"employeeId": "emp-09"
+		},
+		{
+			"id": "ct-emp-13",
+			"holderName": "Oliver Hughes",
+			"security": "options_granted",
+			"shares": 150000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2026-02-02T00:00:00Z",
+			"employeeId": "emp-13"
+		},
+		{
+			"id": "ct-emp-14",
+			"holderName": "Hannah Price",
+			"security": "options_granted",
+			"shares": 100000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2026-04-06T00:00:00Z",
+			"employeeId": "emp-14"
+		},
+		{
+			"id": "ct-emp-15",
+			"holderName": "Isla Morgan",
+			"security": "options_granted",
+			"shares": 150000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2026-10-01T00:00:00Z",
+			"employeeId": "emp-15"
+		},
+		{
+			"id": "ct-pool",
+			"holderName": "Unallocated option pool",
+			"security": "option_pool",
+			"shares": 850000,
+			"investedMinor": "0",
+			"ccy": "USD",
+			"asOf": "2026-10-01T00:00:00Z"
+		}
+	]
 }

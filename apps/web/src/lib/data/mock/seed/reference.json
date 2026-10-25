@@ -49,5 +49,9 @@
 		{ "id": "2026-09", "year": 2026, "month": 9, "status": "open" },
 		{ "id": "2026-10", "year": 2026, "month": 10, "status": "open" }
 	],
-	"settings": { "materialityThresholdMinor": "1000000" }
+	"settings": { "materialityThresholdMinor": "1000000" },
+	"_journalEntries": "Opening balances of accounts added after the July opening entry, same shape as journal.json. Lines are [accountCode, debitMinor, creditMinor, {customerId, vendorId}?].",
+	"journalEntries": [
+		{ "id": "je-0002", "periodId": "2026-07", "postedAt": "2026-07-01T08:05:00Z", "memo": "Opening balances: unused prepaid credit packs and stock on hand", "source": "seed", "postedByRole": "seed", "lines": [["2400", "1185900", "0"], ["2450", "0", "1185900"], ["1300", "358460", "0"], ["3100", "0", "358460"]] }
+	]
 }

@@ -32,12 +32,15 @@ import { editorProblems } from '../../charter';
 import { eliminations, formatMinor, isBankReconciliationTask, revaluation, translate, ymFromString, type JournalEntryInput } from '@cafoo/ledger-core';
 import { bankExceptionState } from '../../close';
 import { toCore } from '../group';
-import { roleName } from '../../labels';
+import { DOCUMENT, KIND, roleName } from '../../labels';
 import catalogJson from './seed/charters.json';
 import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
-import { accountIdFor, loadSeed, type Tables } from './seed';
+import { accountIdFor, loadSeed, SUBSIDIARY_ID, type Tables } from './seed';
 import { CLOSE_SCRIPT, type ScriptLine, type Step } from './script';
+import { currentOpenPeriodId, monthEnded } from './periods';
+import { HANDLERS, TICKERS } from './uploads';
+import type { ArrayTable, MockContext, ProposeInput, RowOf } from './uploads/types';
 
 /** The demo's "now": the morning of October 2, 2026, ticking in real time. */
 const DEMO_EPOCH = Date.parse('2026-10-02T11:00:00Z');
@@ -71,6 +74,17 @@ export class MockDataSource implements DataSource {
 	#seq = 0;
 	#evalRuns = new Map<string, CharterEvalRun>();
 	#collecting = new Set<string>();
+	/** What runs once a Proposal raised through the context is approved, by Proposal id. */
+	#onApproved = new Map<string, (ctx: MockContext) => void>();
+	/** The live-ticker loop (browser only) and when each ticker last ran (wall-clock ms). */
+	#loop: ReturnType<typeof setInterval> | null = null;
+	#tickedAt = new Map<string, number>();
+	/** The seam each area's upload handlers and tickers act through (see ./uploads/types.ts). */
+	#ctx: MockContext = this.#context();
+
+	constructor() {
+		this.#startLoop();
+	}
 
 	// Reads
 	subsidiaries = () => this.#t.subsidiary;
@@ -151,6 +165,7 @@ export class MockDataSource implements DataSource {
 		if (!period) throw new Error(`Unknown period ${periodId}`);
 		if (period.status !== 'open') throw new Error('This period is already locked or waiting for your lock.');
 		if (this.#closes.some((c) => c.periodYm === periodId)) return;
+		if (!monthEnded(periodId, this.#now())) throw new Error(`${monthName(period.year, period.month)} is not over yet. Close it once the month has ended.`);
 		this.#closes.push({ periodYm: periodId, status: 'running' });
 		this.#audit('cfo', 'close.start', 'period', periodId, {});
 		for (const step of CLOSE_SCRIPT) {
@@ -170,7 +185,7 @@ export class MockDataSource implements DataSource {
 		}
 		this.#message({ proposalId, role: 'cfo', kind: 'statement', body: `CONFIRM ${proposalId}.`, summary: 'You confirmed it.' });
 		this.#audit('cfo', 'proposal.confirm', 'proposal', proposalId, {});
-		this.#applyApproved(p);
+		this.#approved(p);
 		this.#settle(p.periodId);
 	}
 
@@ -489,24 +504,107 @@ export class MockDataSource implements DataSource {
 		this.#audit('cfo', 'set_listings', subjectKind, subjectId, { yelpUrl: subject.yelpUrl, jobBoard: subject.jobBoard, linkedinUrl: subject.linkedinUrl });
 	}
 
-	/** Demo only: put every table back to the seed. */
-	// TODO(ledger): run the upload handlers and live tickers from ./uploads (see ./uploads/types.ts).
+	/**
+	 * Loads the bundled sample of this kind: the row lands as 'parsing' at once, the reader's recorded reading lands
+	 * about 1.5 s later, then the area's handler raises what follows from it. The file is 'applied' once every Proposal
+	 * it led to is approved.
+	 */
 	async uploadDemoDocument(kind: DocumentKind): Promise<UploadedDocument> {
-		throw new Error(`Demo uploads are not wired yet (${kind}).`);
+		const handler = HANDLERS.find((h) => h.kind === kind);
+		const label = DOCUMENT[kind]?.label ?? kind;
+		if (!handler) throw new Error(`There is no demo ${label.toLowerCase()} to upload yet.`);
+		const ctx = this.#ctx;
+		const doc = ctx.insert('document', {
+			id: this.#id('doc'),
+			kind,
+			fileName: handler.fileName,
+			sizeBytes: handler.sizeBytes,
+			uploadedAt: this.#now(),
+			status: 'parsing',
+			extractedJson: '{}',
+			summaryPlain: `${roleName(handler.readByRole)} is reading ${handler.fileName}.`,
+			flagsPlain: [],
+			readByRole: handler.readByRole,
+			proposalIds: [],
+			subsidiaryId: SUBSIDIARY_ID
+		});
+		this.#audit('cfo', 'document.upload', 'document', doc.id, { kind, fileName: handler.fileName });
+		const reading = this.#setActivity(handler.readByRole, `Reading ${handler.fileName}`);
+		this.#later(1500, () => {
+			try {
+				const r = handler.read(ctx);
+				doc.extractedJson = JSON.stringify(r.extracted ?? {});
+				doc.summaryPlain = r.summaryPlain;
+				doc.flagsPlain = r.flagsPlain ?? [];
+				doc.status = doc.flagsPlain.length ? 'needs_review' : 'parsed';
+				ctx.update('document', doc);
+				const ids = handler.apply(ctx, doc);
+				if (ids.length) {
+					doc.proposalIds = [...doc.proposalIds, ...ids.filter((id) => !doc.proposalIds.includes(id))];
+					ctx.update('document', doc);
+				}
+				this.#documentsApplied();
+			} catch (err) {
+				console.error(err);
+				doc.status = 'rejected';
+				doc.summaryPlain = `Cafoo could not use ${handler.fileName}: ${err instanceof Error ? err.message : String(err)}`;
+				ctx.update('document', doc);
+			} finally {
+				this.#clearActivity(reading);
+			}
+		});
+		return doc;
 	}
 
+	/** Syncs the tool's records (about 1.5 s), then it streams in real time while connected. */
 	async connectIntegration(id: string): Promise<void> {
-		throw new Error(`Connecting ${id} is not wired yet.`);
+		const i = this.#t.integration.find((x) => x.id === id);
+		if (!i) throw new Error(`There is no tool called ${id} to connect.`);
+		if (i.status === 'connected' || i.status === 'syncing') return;
+		i.status = 'syncing';
+		i.connectedAt = this.#now();
+		this.#emit('integration', 'update', i);
+		this.#audit('cfo', 'integration.connect', 'integration', id, {});
+		this.#later(1500, () => {
+			const live = this.#t.integration.find((x) => x.id === id);
+			if (!live || live.status !== 'syncing') return;
+			live.status = 'connected';
+			live.lastSyncAt = this.#now();
+			live.recordsSynced += firstSyncRecords(id);
+			this.#emit('integration', 'update', live);
+		});
 	}
 
 	async disconnectIntegration(id: string): Promise<void> {
-		throw new Error(`Disconnecting ${id} is not wired yet.`);
+		const i = this.#t.integration.find((x) => x.id === id);
+		if (!i) throw new Error(`There is no tool called ${id} to disconnect.`);
+		if (i.status === 'available') return;
+		i.status = 'available';
+		i.connectedAt = undefined;
+		this.#emit('integration', 'update', i);
+		this.#audit('cfo', 'integration.disconnect', 'integration', id, {});
 	}
 
 	async decidePtoRequest(requestId: string, decision: 'approved' | 'declined'): Promise<void> {
-		throw new Error(`Deciding ${requestId} (${decision}) is not wired yet.`);
+		const r = this.#t.pto_request.find((x) => x.id === requestId);
+		if (!r) throw new Error(`Unknown time-off request ${requestId}`);
+		if (r.status !== 'pending') throw new Error('Only pending time-off requests can be approved or declined.');
+		r.status = decision;
+		this.#emit('pto_request', 'update', r);
+		this.#audit('cfo', 'pto_request.decide', 'pto_request', requestId, { decision });
+		const who = this.#t.employee.find((e) => e.id === r.employeeId)?.name ?? 'the employee';
+		const days = r.hours / 8;
+		const span = `${days === 1 ? 'one day' : `${Number.isInteger(days) ? days : days.toFixed(1)} days`} of ${r.kind.replace(/_/g, ' ')}`;
+		this.#message({
+			role: 'cfo',
+			kind: 'statement',
+			threadId: `pto:${requestId}`,
+			body: `${decision === 'approved' ? 'APPROVE' : 'DECLINE'} time off ${requestId}: ${who}, ${r.hours} h ${r.kind}, ${r.startAt.slice(0, 10)} to ${r.endAt.slice(0, 10)}.`,
+			summary: `You ${decision} ${who}'s ${span}.`
+		});
 	}
 
+	/** Demo only: put every table back to the seed. */
 	resetDemo(): void {
 		for (const t of this.#timers) clearTimeout(t);
 		this.#timers = [];
@@ -514,8 +612,11 @@ export class MockDataSource implements DataSource {
 		this.#closes = [];
 		this.#evalRuns.clear();
 		this.#collecting.clear();
+		this.#onApproved.clear();
 		this.#t = loadSeed();
 		this.#boot = Date.now();
+		this.#stopLoop();
+		this.#startLoop();
 	}
 
 	// Script runner
@@ -661,7 +762,7 @@ export class MockDataSource implements DataSource {
 		});
 		p.status = material ? 'awaiting_cfo' : 'approved';
 		this.#emit('proposal', 'update', p);
-		if (!material) this.#applyApproved(p);
+		if (!material) this.#approved(p);
 		this.#settle(p.periodId);
 	}
 
@@ -676,6 +777,16 @@ export class MockDataSource implements DataSource {
 		old.status = 'superseded';
 		old.supersededBy = id;
 		this.#emit('proposal', 'update', old);
+		// What the old Proposal was waiting to do, and the files that led to it, follow the resubmission.
+		const hook = this.#onApproved.get(old.id);
+		if (hook) {
+			this.#onApproved.delete(old.id);
+			this.#onApproved.set(id, hook);
+		}
+		for (const d of this.#t.document.filter((d) => d.proposalIds.includes(old.id))) {
+			d.proposalIds.push(id);
+			this.#emit('document', 'update', d);
+		}
 		this.#message({ proposalId: id, role: old.proposerRole, kind: 'statement', body: `Resubmission of ${old.id} after CFO note: "${note}". Evidence re-checked; same entry proposed.`, summary: 'I looked again and resubmitted it with your note addressed.' });
 		this.#later(1500, () => this.#rule(fresh, `APPROVE ${id}.`, 'Advisor approved the resubmission.', `Resubmitted after CFO note: ${note}`));
 	}
@@ -695,7 +806,7 @@ export class MockDataSource implements DataSource {
 
 	// Effects of an approved Proposal on the books
 	#applyApproved(p: Proposal) {
-		let payload: { memo?: string; lines?: ScriptLine[]; bankTransactionId?: string; invoiceId?: string; scoreBp?: number; bucket?: 'exact' | 'strong' | 'weak' } = {};
+		let payload: { memo?: string; lines?: ScriptLine[]; bankTransactionId?: string; invoiceId?: string; billId?: string; scoreBp?: number; bucket?: 'exact' | 'strong' | 'weak' } = {};
 		try {
 			payload = JSON.parse(p.payloadJson);
 		} catch {
@@ -724,6 +835,15 @@ export class MockDataSource implements DataSource {
 					this.#emit('invoice', 'update', inv);
 				}
 				const m = { id: this.#id('bm'), bankTransactionId: payload.bankTransactionId, targetKind: 'invoice' as const, targetId: payload.invoiceId, scoreBp: payload.scoreBp ?? 9000, bucket: payload.bucket ?? 'strong', proposalId: p.id, paymentJeId: jeId };
+				this.#t.bank_match.push(m);
+				this.#emit('bank_match', 'insert', m);
+			} else if (payload.billId) {
+				const bill = this.#t.bill.find((b) => b.id === payload.billId);
+				if (bill) {
+					bill.status = 'paid';
+					this.#emit('bill', 'update', bill);
+				}
+				const m = { id: this.#id('bm'), bankTransactionId: payload.bankTransactionId, targetKind: 'bill' as const, targetId: payload.billId, scoreBp: payload.scoreBp ?? 9000, bucket: payload.bucket ?? 'strong', proposalId: p.id, paymentJeId: jeId };
 				this.#t.bank_match.push(m);
 				this.#emit('bank_match', 'insert', m);
 			}
@@ -782,6 +902,169 @@ export class MockDataSource implements DataSource {
 		}
 	}
 
+	// The context each area's upload handlers and live tickers act through
+	#context(): MockContext {
+		const self = this;
+		return {
+			get t() {
+				return self.#t;
+			},
+			now: () => this.#now(),
+			id: (prefix: string) => this.#id(prefix),
+			insert: <K extends ArrayTable>(table: K, row: RowOf<K>): RowOf<K> => {
+				const rows = this.#t[table] as unknown as RowOf<K>[];
+				rows.push(row);
+				const stored = rows[rows.length - 1];
+				this.#emit(table, 'insert', stored);
+				return stored;
+			},
+			update: <K extends ArrayTable>(table: K, row: RowOf<K>): void => {
+				const rows = this.#t[table] as unknown as { id: string }[];
+				const changed = row as unknown as { id: string };
+				const i = rows.findIndex((r) => r.id === changed.id);
+				// A copy rather than the stored row replaces it; the stored row itself is already up to date.
+				if (i >= 0 && rows[i] !== changed) rows[i] = changed;
+				this.#emit(table, 'update', i >= 0 ? rows[i] : row);
+			},
+			message: (m) => this.#message({ ...m, threadId: m.proposalId ? undefined : `live:${this.#openPeriodId()}` }),
+			activity: (role, label) => {
+				this.#activity = role ? { role, labelPlain: label ?? '' } : null;
+			},
+			propose: (p) => this.#propose(p),
+			later: (ms, fn) => this.#later(ms, fn),
+			openPeriodId: () => this.#openPeriodId(),
+			synced: (integrationId, n = 1) => {
+				const i = this.#t.integration.find((x) => x.id === integrationId);
+				if (!i) return;
+				i.lastSyncAt = this.#now();
+				i.recordsSynced += n;
+				this.#emit('integration', 'update', i);
+			}
+		};
+	}
+
+	#openPeriodId(): string {
+		return currentOpenPeriodId(this.#t.period, this.#now()) ?? this.#now().slice(0, 7);
+	}
+
+	/**
+	 * A Proposal raised by an upload or a connected tool: the proposer's message now, the Red Team's critique about
+	 * 1.2 s later when there is one, and the Advisor's ruling about 2.5 s later (posts below materiality, waits for the
+	 * CFO at or above it).
+	 */
+	#propose(input: ProposeInput): string {
+		const id = this.#id('pr');
+		const row = this.#addProposal({
+			id,
+			periodId: input.periodId ?? this.#openPeriodId(),
+			kind: input.kind,
+			payloadJson: JSON.stringify(input.payload),
+			rationale: input.rationale,
+			summaryPlain: input.summaryPlain,
+			amountMinor: toBig(input.amountMinor).toString(),
+			proposerRole: input.proposerRole,
+			status: 'open',
+			createdAt: this.#now()
+		});
+		if (input.onApproved) this.#onApproved.set(id, input.onApproved);
+		this.#message({ proposalId: id, role: input.proposerRole, kind: 'statement', body: input.body, summary: input.summaryPlain });
+		const critique = input.critique;
+		if (critique) {
+			this.#later(1200, () => {
+				const a = this.#setActivity('redteam', 'Reviewing a new proposal', id);
+				this.#message({ proposalId: id, role: 'redteam', kind: 'critique', body: critique.body, summary: critique.summary });
+				this.#later(500, () => this.#clearActivity(a));
+			});
+		}
+		this.#later(2000, () => {
+			const a = this.#setActivity('advisor', `Ruling on the ${KIND[input.kind].toLowerCase()}`, id);
+			this.#later(500, () => {
+				this.#clearActivity(a);
+				const p = this.#t.proposal.find((x) => x.id === id);
+				if (!p || p.status !== 'open') return;
+				this.#rule(p, `APPROVE ${id}.${critique ? ' Red Team critique considered.' : ''} Evidence in the payload.`, `Advisor approved the ${KIND[p.kind].toLowerCase()}`, input.rationale);
+			});
+		});
+		return row.id;
+	}
+
+	/** An approved Proposal posts, then whatever its proposer asked to happen on approval runs. */
+	#approved(p: Proposal) {
+		this.#applyApproved(p);
+		const hook = this.#onApproved.get(p.id);
+		if (hook) {
+			this.#onApproved.delete(p.id);
+			try {
+				hook(this.#ctx);
+			} catch (err) {
+				console.error(err);
+			}
+		}
+		this.#documentsApplied();
+	}
+
+	/** A file is 'applied' once every Proposal it led to is approved (a resubmitted one counts through its successor). */
+	#documentsApplied() {
+		const byId = new Map(this.#t.proposal.map((p) => [p.id, p]));
+		for (const d of this.#t.document) {
+			if ((d.status !== 'parsed' && d.status !== 'needs_review') || !d.proposalIds.length) continue;
+			const ps = d.proposalIds.map((id) => byId.get(id));
+			if (ps.every((p) => p && (p.status === 'approved' || p.status === 'superseded')) && ps.some((p) => p?.status === 'approved')) {
+				d.status = 'applied';
+				this.#emit('document', 'update', d);
+			}
+		}
+	}
+
+	#setActivity(role: AgentRole, labelPlain: string, proposalId?: string): LiveActivity {
+		const a = { role, labelPlain, proposalId };
+		this.#activity = a;
+		return a;
+	}
+
+	/** Clears the activity only if it is still the one set, so a close running alongside keeps its own. */
+	#clearActivity(a: LiveActivity) {
+		const now = this.#activity;
+		if (now && now.role === a.role && now.labelPlain === a.labelPlain && now.proposalId === a.proposalId) this.#activity = null;
+	}
+
+	// Live tickers: one loop, browser only. Each ticker runs every `everyMs` while its integration (if any) is connected;
+	// its clock starts when the loop starts and again whenever its integration reconnects.
+	#startLoop() {
+		if (typeof window === 'undefined' || this.#loop || !TICKERS.length) return;
+		this.#tickedAt.clear();
+		this.#loop = setInterval(() => this.#tickAll(), 1000);
+	}
+
+	#stopLoop() {
+		if (this.#loop) clearInterval(this.#loop);
+		this.#loop = null;
+		this.#tickedAt.clear();
+	}
+
+	#tickAll() {
+		const now = Date.now();
+		for (const ticker of TICKERS) {
+			const on = !ticker.integrationId || this.#t.integration.some((i) => i.id === ticker.integrationId && i.status === 'connected');
+			if (!on) {
+				this.#tickedAt.delete(ticker.name);
+				continue;
+			}
+			const last = this.#tickedAt.get(ticker.name);
+			if (last === undefined) {
+				this.#tickedAt.set(ticker.name, now);
+				continue;
+			}
+			if (now - last < ticker.everyMs) continue;
+			this.#tickedAt.set(ticker.name, now);
+			try {
+				ticker.tick(this.#ctx);
+			} catch (err) {
+				console.error(`Live ticker ${ticker.name} failed`, err);
+			}
+		}
+	}
+
 	// Helpers
 	#later(ms: number, fn: () => void) {
 		this.#timers.push(setTimeout(fn, ms));
@@ -825,4 +1108,13 @@ export class MockDataSource implements DataSource {
 		this.#seq += 1;
 		return `${prefix}-live-${this.#seq}`;
 	}
+}
+
+const monthName = (year: number, month: number) => new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+
+/** How many records a tool's first sync brings in: steady per tool, so the demo replays the same way. */
+function firstSyncRecords(id: string): number {
+	let h = 0;
+	for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 997;
+	return 60 + (h % 240);
 }

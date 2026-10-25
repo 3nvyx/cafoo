@@ -133,7 +133,7 @@ export function loadSeed(): Tables {
 
 	const journal_entry: JournalEntry[] = [];
 	const journal_line: JournalLine[] = [];
-	for (const raw of [...(journal.journalEntries as unknown as SeedEntry[]), ...(group.journalEntries as unknown as SeedEntry[])]) {
+	for (const raw of [...(journal.journalEntries as unknown as SeedEntry[]), ...(reference.journalEntries as unknown as SeedEntry[]), ...(group.journalEntries as unknown as SeedEntry[])]) {
 		const { lines, ...je } = raw;
 		journal_entry.push(je);
 		lines.forEach(([code, debitMinor, creditMinor, extra], i) => {

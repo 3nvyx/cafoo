@@ -2,7 +2,7 @@
 // Pure maths over DataSource rows and the Dashboard's Summary; the Metrics page renders them.
 import type { Summary } from './data/dashboard';
 import { arrAt, arrWaterfall, nrrBp } from './data/derive';
-import { toBig } from './data/money';
+import { formatMoney, toBig } from './data/money';
 import type { Contract, Employee, Minor } from './data/types';
 
 const big = (m: Minor | bigint): bigint => (typeof m === 'bigint' ? m : toBig(m));
@@ -91,3 +91,93 @@ export function shareOfRevenueBp(cost: Minor | bigint, revenue: Minor): number |
 }
 
 export const inferenceShareHealth = (bp: number | null): Health => (bp === null ? null : bp <= 1500 ? 'good' : bp <= 2500 ? 'watch' : 'poor');
+
+// One month's efficiency readings, shared by the Metrics page and the Dashboard's health check so they never disagree.
+
+export interface Tile {
+	key: string;
+	label: string;
+	value: string;
+	health: Health;
+	/** The figures the reading is made from. */
+	inputs: string;
+	/** What good looks like. */
+	yardstick: string;
+	href?: string;
+}
+
+/** The day before the quarter ending `range.to`, or before the books' first month when they start later. */
+export function quarterStart(rangeFrom: string, firstMonthFrom: string): string {
+	const d = new Date(`${rangeFrom}T00:00:00Z`);
+	d.setUTCMonth(d.getUTCMonth() - 2);
+	const from = d.toISOString().slice(0, 10);
+	const start = from < firstMonthFrom ? firstMonthFrom : from;
+	const back = new Date(`${start}T00:00:00Z`);
+	back.setUTCDate(back.getUTCDate() - 1);
+	return back.toISOString().slice(0, 10);
+}
+
+export function efficiencyTiles(input: { month: Summary; from: string; to: string; quarterFrom: string; contracts: Contract[]; employees: Employee[] }): Tile[] {
+	const { month: s, from, to, quarterFrom, contracts, employees } = input;
+	const money = (m: bigint | string) => formatMoney(m.toString(), { whole: true });
+	const before = (() => {
+		const d = new Date(`${from}T00:00:00Z`);
+		d.setUTCDate(d.getUTCDate() - 1);
+		return d.toISOString().slice(0, 10);
+	})();
+	const burn = netBurn(s);
+	const added = netNewArr(contracts, before, to);
+	const multiple = burnMultiple(burn, added);
+	const perFte = arrPerFte(contracts, employees, to);
+	const heads = fte(employees, to);
+	// Growth over the same window as retention, annualized; one month alone swings too much early on.
+	const months = Math.max(1, Math.round((Date.parse(to) - Date.parse(quarterFrom)) / (30.44 * 86_400_000)));
+	const r40 = ruleOf40(contracts, quarterFrom, to, months, s.netMarginBp);
+	const ndr = ndrBp(contracts, quarterFrom, to);
+	const runway = s.runwayMonths;
+	return [
+		{
+			key: 'burn-multiple',
+			label: 'Burn multiple',
+			value: multiple === null ? (burn > 0n ? 'No ARR added' : '–') : `${multiple.toFixed(1)}×`,
+			health: burnMultipleHealth(multiple, burn),
+			inputs: `${money(burn)} burned · ${money(added)} net new ARR`,
+			yardstick: 'Cash burned per dollar of new ARR. Under 1× is excellent, over 2× means growth is expensive.'
+		},
+		{
+			key: 'runway',
+			label: 'Runway',
+			value: runway === null ? 'Cash not falling' : runway > 36 ? 'Over 3 years' : `${Math.round(runway)} months`,
+			health: runwayHealth(runway),
+			inputs: `${money(s.cash)} book cash`,
+			yardstick: '18 months or more is comfortable between rounds; under 9, raise now.',
+			href: '/dashboard'
+		},
+		{
+			key: 'arr-per-employee',
+			label: 'ARR per employee',
+			value: perFte === null ? '–' : money(perFte),
+			health: arrPerFteHealth(perFte),
+			inputs: `${money(s.arr)} ARR · ${heads} full-time equivalents`,
+			yardstick: 'Early AI companies are often read against $150k to $250k.',
+			href: '/people'
+		},
+		{
+			key: 'rule-of-40',
+			label: 'Rule of 40',
+			value: r40 ? `${r40.score.toFixed(0)}` : '–',
+			health: ruleOf40Health(r40?.score ?? null),
+			inputs: r40 ? `${r40.growthPct.toFixed(0)}% ARR growth, annualized · ${r40.marginPct.toFixed(0)}% net margin` : 'Needs ARR and revenue',
+			yardstick: 'ARR growth over the quarter, annualized, plus net margin. 40 or more is healthy.'
+		},
+		{
+			key: 'ndr',
+			label: 'Net dollar retention',
+			value: ndr === null ? '–' : `${(ndr / 100).toFixed(1)}%`,
+			health: ndrHealth(ndr),
+			inputs: "Existing customers' ARR, start of quarter to now",
+			yardstick: 'Over 110% means customers grow faster than they churn.',
+			href: '/reports'
+		}
+	];
+}
