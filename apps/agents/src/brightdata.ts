@@ -5,6 +5,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { recordFallback, recordOk } from './provider-calls';
 import { repoRoot } from './stdb';
 
 const API = 'https://api.brightdata.com';
@@ -65,11 +66,16 @@ async function request(body: Record<string, unknown>, attempts = 3): Promise<{ s
     const text = await res.text();
     last = { status: res.status, text, code: res.headers.get('x-brd-error-code') };
     // A 200 with an empty or tiny body is a failure (captcha, rate limit): retry after a short wait.
-    if (res.status === 200 && text.length > 200) return last;
+    if (res.status === 200 && text.length > 200) {
+      recordOk('brightdata');
+      return last;
+    }
     if (res.status === 401 || res.status === 403) break;
     await new Promise(r => setTimeout(r, 1500 * (i + 1)));
   }
-  throw new BrightDataError(`Bright Data request failed (HTTP ${last.status}${last.code ? `, ${last.code}` : ''}, ${last.text.length} bytes).`, last.status, last.code);
+  const failed = new BrightDataError(`Bright Data request failed (HTTP ${last.status}${last.code ? `, ${last.code}` : ''}, ${last.text.length} bytes).`, last.status, last.code);
+  recordFallback('brightdata', failed);
+  throw failed;
 }
 
 /** Fetch any public page through Web Unlocker. Raw HTML by default (markdown rounds numbers on some sites). */

@@ -15,6 +15,7 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
+import { tracked } from '../provider-calls';
 import { CrsClient, createCrsMcpServer, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { activeCharter } from '../charter/active';
 import { planConsolidation } from '../scripted/consolidate';
@@ -355,7 +356,8 @@ export function workerServer(worker: RoleConn, cast: Cast, extraTools: ReturnTyp
       { personaId: z.string(), subjectKind: z.enum(['customer_guarantor', 'vendor_owner']) },
       async ({ personaId, subjectKind }) => {
         try {
-          const r = await runCascade(new CrsClient(), personaId, { subjectKind });
+          const crs = new CrsClient();
+          const r = crs.mode === 'live' ? await tracked('crs', () => runCascade(crs, personaId, { subjectKind })) : await runCascade(crs, personaId, { subjectKind });
           cascades.set(r.personaId.toUpperCase(), r);
           return ok(r);
         } catch (e) {

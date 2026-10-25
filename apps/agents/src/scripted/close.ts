@@ -20,6 +20,7 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
+import { tracked } from '../provider-calls';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
 import { STEP_MS } from '../env';
@@ -515,6 +516,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   // ---------------- Credit & Risk ----------------
   const C = cast.credit;
   const crs = new CrsClient();
+  const cascade: typeof runCascade = (c, id, o) => (crs.mode === 'live' ? tracked('crs', () => runCascade(c, id, o)) : runCascade(c, id, o));
   s = snapshot(A, closeYm);
   const openAr = new Map<bigint, bigint>();
   for (const i of s.invoices) if (i.status !== 'paid') openAr.set(i.customerId, (openAr.get(i.customerId) ?? 0n) + i.amountMinor);
@@ -532,7 +534,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     }
   }
   for (const cust of exposed) {
-    const result = await runCascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
+    const result = await cascade(crs, cust.guarantorPersonaId, { subjectKind: 'customer_guarantor' });
     for (const ev of result.evidence) {
       // The row carries the cascade's facts; the books derive its tier and decision from them, never from us.
       await C.reducers.recordCreditCheck({ subjectKind: 'customer', subjectId: cust.id, personaId: cust.guarantorPersonaId, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
@@ -585,7 +587,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   const pendingCheck = new Set([...A.db.proposal.iter()].filter(p => p.kind.tag === 'VendorVerify' && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag)).map(p => canonical(JSON.parse(p.payloadJson).vendorId)));
   const unverified = s.vendors.filter(v => v.verification.tag === 'Unverified' && v.ownerPersonaId && !pendingCheck.has(v.id.toString()));
   for (const v of unverified) {
-    const result = await runCascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
+    const result = await cascade(crs, v.ownerPersonaId!, { subjectKind: 'vendor_owner' });
     for (const ev of result.evidence) {
       await C.reducers.recordCreditCheck({ subjectKind: 'vendor', subjectId: v.id, personaId: v.ownerPersonaId!, product: ev.product, requestId: ev.requestId ?? '', summaryJson: creditCheckSummaryJson(result, ev) });
     }

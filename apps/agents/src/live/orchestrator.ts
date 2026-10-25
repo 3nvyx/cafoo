@@ -13,6 +13,7 @@ import { HARNESSES, modelFor, WORKERS, type ProposalKind, type WorkerRole } from
 import { activeCharter, activeHarnessResolver } from '../charter/active';
 import { harnessGate } from '../harness/hook';
 import { BOOKS_TOOLS, mcp } from '../harness/rules';
+import { recordFallback, recordOk } from '../provider-calls';
 import { catchUpAmounts } from '../revenue-catchup';
 import { groupSnapshot, rootSubsidiary, snapshot } from '../snapshot';
 import { ruleOpen } from '../scripted/rulings';
@@ -130,8 +131,10 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
           onStep(`done (${(msg as any).subtype}), cost $${total.toFixed(2)}`);
         }
       }
+      recordOk('agents');
     } catch (error) {
       advisorUnavailable = true;
+      recordFallback('agents', error);
       const why = error instanceof Error ? error.message : String(error);
       onStep(`Advisor run failed: ${why}; applying standard rulings to remaining proposals`);
     }
@@ -224,6 +227,16 @@ export async function* liveAnswer(cast: Cast, question: string): AsyncGenerator<
   if (!Number.isFinite(budget) || budget <= 0) throw new Error('CHAT_BUDGET_USD must be a positive finite number');
   const books = booksServer(cast);
   const env = await claudeProcessEnv();
+  try {
+    yield* streamAnswer(question, books, env, budget);
+    recordOk('agents');
+  } catch (error) {
+    recordFallback('agents', error);
+    throw error;
+  }
+}
+
+async function* streamAnswer(question: string, books: ReturnType<typeof booksServer>, env: NodeJS.ProcessEnv, budget: number): AsyncGenerator<string> {
   for await (const msg of query({
     prompt: question,
     options: {

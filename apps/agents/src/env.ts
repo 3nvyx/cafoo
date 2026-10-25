@@ -1,5 +1,7 @@
-/** Runtime selection, not evidence that a provider request succeeded. */
-export type ProviderStatus = { name: string; mode: 'live' | 'demo'; detail: string };
+import type { ProviderId } from './provider-calls';
+
+/** Runtime selection, not evidence that a provider request succeeded (provider-calls.ts records that). */
+export type ProviderStatus = { id: ProviderId; name: string; mode: 'live' | 'demo'; detail: string };
 
 /**
  * Which vendor the Claude Agent SDK calls. The SDK always speaks the Anthropic Messages API.
@@ -75,15 +77,15 @@ export function providers(env: NodeJS.ProcessEnv = process.env): ProviderStatus[
       : 'Anthropic Claude Agent SDK configured for live calls; success is not checked by status'
     : 'scripted close over the real accounting engines';
   return [
-    { name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: agentsOn ? 'live' : 'demo', detail: agentDetail },
-    { name: 'xAI Grok (Red Team)', mode: !demo && has(env, 'XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'XAI_API_KEY') ? 'configured for Grok critiques; status does not verify a call' : 'scripted critiques' },
-    { name: 'Google Gemini (Red Team, second critic)', mode: !demo && geminiKey(env) ? 'live' : 'demo', detail: !demo && geminiKey(env) ? `configured for ${geminiModel(env)} critiques; status does not verify a call` : 'scripted critiques' },
-    { name: 'CRS Credit API', mode: !demo && has(env, 'CRS_USERNAME') && has(env, 'CRS_PASSWORD') && env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: !demo && has(env, 'CRS_USERNAME') && has(env, 'CRS_PASSWORD') && env.CRS_REPLAY !== '1' ? 'sandbox configured; status does not verify a request' : 'sandbox persona fixtures' },
-    { name: 'Bright Data', mode: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'live' : 'demo', detail: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'Web Unlocker configured; status does not verify a lookup' : 'recorded vendor lookups' },
-    { name: 'Capital One Nessie', mode: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'live' : 'demo', detail: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'bank source configured; status does not verify fetched transactions' : 'simulated bank feed' },
-    { name: 'Apify', mode: 'demo', detail: 'crawl not implemented' },
-    { name: 'Moss', mode: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'hosted policy search configured; local fallback on failure' : 'local keyword search' },
-    { name: 'SpacetimeDB', mode: 'live', detail: `configured URI ${env.SPACETIMEDB_URI ?? 'ws://localhost:3000'}; gateway status does not verify a connection` },
+    { id: 'agents', name: 'Claude Agent SDK (Advisor, Bookkeeper, Revenue, Credit & Risk)', mode: agentsOn ? 'live' : 'demo', detail: agentDetail },
+    { id: 'grok', name: 'xAI Grok (Red Team)', mode: !demo && has(env, 'XAI_API_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'XAI_API_KEY') ? 'configured for Grok critiques; status does not verify a call' : 'scripted critiques' },
+    { id: 'gemini', name: 'Google Gemini (Red Team, second critic)', mode: !demo && geminiKey(env) ? 'live' : 'demo', detail: !demo && geminiKey(env) ? `configured for ${geminiModel(env)} critiques; status does not verify a call` : 'scripted critiques' },
+    { id: 'crs', name: 'CRS Credit API', mode: !demo && has(env, 'CRS_USERNAME') && has(env, 'CRS_PASSWORD') && env.CRS_REPLAY !== '1' ? 'live' : 'demo', detail: !demo && has(env, 'CRS_USERNAME') && has(env, 'CRS_PASSWORD') && env.CRS_REPLAY !== '1' ? 'sandbox configured; status does not verify a request' : 'sandbox persona fixtures' },
+    { id: 'brightdata', name: 'Bright Data', mode: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'live' : 'demo', detail: !demo && (has(env, 'API_TOKEN') || has(env, 'BRIGHTDATA_API_TOKEN') || has(env, 'BRIGHTDATA_API_KEY')) ? 'Web Unlocker configured; status does not verify a lookup' : 'recorded vendor lookups' },
+    { id: 'nessie', name: 'Capital One Nessie', mode: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'live' : 'demo', detail: !demo && has(env, 'NESSIE_API_KEY') && has(env, 'NESSIE_ACCOUNT_IDS') ? 'bank source configured; status does not verify fetched transactions' : 'simulated bank feed' },
+    { id: 'apify', name: 'Apify', mode: 'demo', detail: 'crawl not implemented' },
+    { id: 'moss', name: 'Moss', mode: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'live' : 'demo', detail: !demo && has(env, 'MOSS_PROJECT_ID') && has(env, 'MOSS_PROJECT_KEY') ? 'hosted policy search configured; local fallback on failure' : 'local keyword search' },
+    { id: 'spacetimedb', name: 'SpacetimeDB', mode: 'live', detail: `configured URI ${env.SPACETIMEDB_URI ?? 'ws://localhost:3000'}; gateway status does not verify a connection` },
   ];
 }
 

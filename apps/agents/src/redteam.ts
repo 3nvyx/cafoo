@@ -14,6 +14,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { geminiKey, geminiLive, geminiModel, redTeamLive } from './env';
 import { labeled, scriptedGeminiCritique, unlabeled } from './gemini';
+import { recordFallback, recordOk, tracked } from './provider-calls';
 import { checkCall, modelFor, type Decision, type RuleContext } from './harness';
 import { activeCharter } from './charter/active';
 import { eliminationCritique, weakBankMatchCritique } from './scripted/rulings';
@@ -31,6 +32,8 @@ const policiesDir = join(repoRoot, 'fixtures', 'moss');
 /** Moss in live mode; local keyword search over the same policy documents otherwise. */
 const POLICY_INDEX = 'cafoo-policies';
 let mossReady: Promise<any | null> | null = null;
+/** Why the Moss client could not be set up, reported on every search that falls back because of it. */
+let mossDown = '';
 
 /** One shared Moss client with the policy index created once and loaded once; null when Moss is unusable. */
 function mossIndex(docs: { id: string; text: string }[]): Promise<any | null> {
@@ -48,6 +51,7 @@ function mossIndex(docs: { id: string; text: string }[]): Promise<any | null> {
       return client;
     } catch (e) {
       console.warn('moss unavailable, using local search:', (e as Error).message);
+      mossDown = (e as Error).message;
       return null;
     }
   })();
@@ -61,10 +65,14 @@ export async function searchPolicies(queryText: string, topK = 3): Promise<{ id:
     if (client) {
       try {
         const res = await client.query(POLICY_INDEX, queryText, { topK });
+        recordOk('moss');
         return (res.docs ?? []).map((d: any) => ({ id: d.id, text: d.text, score: d.score }));
       } catch (e) {
         console.warn('moss query failed, using local search:', (e as Error).message);
+        recordFallback('moss', e);
       }
+    } else {
+      recordFallback('moss', `Moss unavailable: ${mossDown}`);
     }
   }
   const terms = queryText.toLowerCase().split(/\W+/).filter(t => t.length > 3);
@@ -183,7 +191,7 @@ export function startCritic(cast: Cast): () => void {
       // Grok first when live; the scripted critique when Grok fails (outage, timeout, rate limit) or submits nothing
       // the harness accepts within its step cap.
       const grok = redTeamLive()
-        ? await grokCritique(A, p, materiality, ctx).catch(e => {
+        ? await tracked('grok', () => grokCritique(A, p, materiality, ctx)).catch(e => {
             console.warn(`[redteam] proposal ${p.id}: Grok failed, using the scripted critique:`, (e as Error).message);
             return null;
           })
@@ -193,7 +201,7 @@ export function startCritic(cast: Cast): () => void {
       // Gemini second. Live, a failure or "nothing to add" writes nothing: the first critique already stands, and a
       // scripted line must never appear under Gemini's live label. Without a key, the scripted stand-in.
       const g = geminiLive()
-        ? await geminiCritique(A, p, materiality, ctx, c)
+        ? await tracked('gemini', () => geminiCritique(A, p, materiality, ctx, c))
             .then(x => (x ? labeled(x, false) : null))
             .catch(e => {
               console.warn(`[redteam] proposal ${p.id}: Gemini failed, no second critique:`, (e as Error).message);

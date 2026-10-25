@@ -15,6 +15,7 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { GATEWAY_PORT, agentsLive, gatewayAllowedHosts, gatewayAllowedOrigins, gatewayHost, providers } from './env';
+import { withEvidence } from './provider-calls';
 import { BadRequest, TooLarge, changesState, matchRoute, readJson, type Route } from './http';
 import { runScriptedClose } from './scripted/close';
 import type { Cast } from './stdb';
@@ -164,7 +165,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
     }
     try {
       if (req.method === 'GET' && url.pathname === '/status') {
-        return json(200, { ...opts.status?.(), providers: providers(), closes: [...closes.values()] });
+        return json(200, { ...opts.status?.(), providers: withEvidence(providers()), closes: [...closes.values()] });
       }
       if (req.method === 'POST' && url.pathname === '/close') {
         if (!mayChangeState(req)) return json(apiKey ? 401 : 403, { error: notFromHere });

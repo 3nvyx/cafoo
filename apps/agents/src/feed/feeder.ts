@@ -15,6 +15,7 @@ import { closeOpened, lockedByCfo, previousYm } from '../close-state';
 import { json, type Route } from '../http';
 import { rootSubsidiary } from '../snapshot';
 import type { Cast, RoleConn } from '../stdb';
+import { tracked } from '../provider-calls';
 import { fetchNessieBankEvents, nessieConfig, type NessieConfig } from '../nessie';
 
 export interface FeedStatus {
@@ -147,11 +148,11 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
     const next = (async () => {
       assertSourceConsistent(ym);
       const simulatedInvoices = feedPlan(feedContext(A, ym), opts.seed === undefined ? {} : { seed: opts.seed }).filter(e => e.kind === 'invoice');
-      const bank = await fetchNessieBankEvents(nessie, {
+      const bank = await tracked('nessie', () => fetchNessieBankEvents(nessie, {
         ym,
         subsidiaries: [...A.db.subsidiary.iter()].filter(sub => !sub.isElimination).map(sub => ({ code: sub.code, functionalCcy: sub.functionalCcy })),
         materialityMinor: A.db.settings.key.find('materiality_threshold_minor')?.valueI64 ?? 1_000_000n,
-      }, opts.fetcher);
+      }, opts.fetcher));
       const p: FeedEvent[] = [...simulatedInvoices, ...bank].sort((a, b) => a.atMicros < b.atMicros ? -1 : a.atMicros > b.atMicros ? 1 : a.externalId.localeCompare(b.externalId));
       plans.set(ym, p);
       log(`planned ${bank.length} Nessie bank line(s) and ${simulatedInvoices.length} simulated billing event(s) for ${ym}`);
