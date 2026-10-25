@@ -55,7 +55,7 @@
 		"unknown-class": 1
 	},
 	"routes/(app)/agents/+page.svelte": {
-		"bracket-size": 5,
+		"bracket-size": 3,
 		"unknown-class": 5
 	},
 	"routes/(app)/charters/+page.svelte": {

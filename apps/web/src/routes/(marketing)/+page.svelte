@@ -168,7 +168,7 @@
 
 		<section id="how" class="calm-section content relative isolate scroll-mt-24 pt-32" aria-labelledby="how-h">
 			<div class="relative flex flex-col items-center text-center">
-				<h2 id="how-h" class="section-h max-w-[18ch]">Our agent workflows</h2>
+				<h2 id="how-h" class="section-h max-w-[18ch]">Our automated agent workflow</h2>
 			</div>
 			<div class="relative mt-14 rounded-3xl border border-line bg-surface p-4 sm:p-8">
 				{@render marks()}

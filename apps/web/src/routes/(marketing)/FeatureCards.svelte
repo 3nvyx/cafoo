@@ -5,8 +5,9 @@
 	// then have widths set from the row, not the card, so nothing re-wraps and the row's height never
 	// changes (the page does not move under the pointer); widening a card only reveals the rest of its
 	// diagram, which fades out at the card's edge until then. Without hover (touch screens) and below lg,
-	// every diagram fits its card's width. A card is never taller than the screen: a tall diagram is cut
-	// off at the card's bottom edge. A diagram animates only while its card is on screen.
+	// every diagram fits its card's width. A second-row card is never taller than the screen: a tall
+	// diagram is cut off at the card's bottom edge. First-row cards show their whole diagram. A diagram
+	// animates only while its card is on screen.
 	import GateStack from './GateStack.svelte';
 	import CreditCascade from './CreditCascade.svelte';
 	import AdvisorChat from './AdvisorChat.svelte';
@@ -77,7 +78,7 @@
 
 <div class="flex flex-col gap-2">
 	{#each rows as row, r (r)}
-		<div class="row flex flex-col gap-2">
+		<div class="row flex flex-col gap-2" class:full={r === 0}>
 			{#each row as f (f.id)}
 				<article class="card flex flex-col overflow-hidden rounded-xl border border-line bg-surface" aria-labelledby="feature-{f.id}" use:inView={f.id}>
 					<div class="copy flex flex-col gap-3 p-6 sm:p-8">
@@ -145,6 +146,12 @@
 		min-height: 0;
 		overflow: hidden;
 		mask-image: var(--fade-bottom);
+	}
+	/* The first row's diagrams (the gate stack and the credit cascade) are shown whole: no height cap,
+	   no bottom fade. */
+	.full .card {
+		--fade-bottom: linear-gradient(black, black);
+		max-height: none;
 	}
 
 	/* From lg up: two cards side by side. The row is the size container for the widths below. */
