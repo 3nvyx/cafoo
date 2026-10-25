@@ -14,7 +14,7 @@
 	const anchors = [
 		{ href: '#how', label: 'Agents' },
 		{ href: '#demo', label: 'Demo' },
-		{ href: '#gate', label: 'The gate' }
+		{ href: '#gate', label: 'Security' }
 	];
 
 	// Shown in the stats strip, which is commented out in the markup for now.
@@ -160,8 +160,8 @@
 
 		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="gate-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Enforced in the database, not in a prompt</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Everything an agent does passes the Red Team, the Advisor and the gate before it touches the ledger. The feeds can only add raw bank lines and invoices.</p>
+				<h2 id="gate-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Multi-layer agent security starts in the database</h2>
+				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">A worker agent proposes. The Red Team critiques, Grok first and then Gemini. The Advisor rules and writes down why. The CFO confirms anything at or above Materiality. Under all of it, SpacetimeDB reducers check every caller’s identity, so no prompt can talk its way into the ledger. The feeds can only add raw bank lines and invoices.</p>
 			</div>
 			<PaintedFrame seed={37} class="mt-14 p-2 sm:p-6">
 				<div class="relative rounded-2xl border border-line bg-surface p-4 sm:p-8">
