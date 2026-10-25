@@ -100,6 +100,29 @@ describe('Nessie through the ingest-only feeder', () => {
     second.stop();
   });
 
+  it('fetches the month again once everything is sent, so a transaction that completes later still arrives', async () => {
+    const rows = feederBooks();
+    const ingested: string[] = [];
+    const cast = { advisor: fakeConn(rows), feed: { reducers: {
+      ingestBankTransactions: async ({ txs }: { txs: { externalId: string }[] }) => {
+        for (const tx of txs) {
+          ingested.push(tx.externalId);
+          rows.feedEvent.push({ externalId: tx.externalId, ym: '2026-10', ingestedAt: ts('2026-10-05'), kind: { tag: 'BankTx' } });
+        }
+      },
+      ingestInvoices: async () => undefined,
+    } } } as unknown as Cast;
+    let deposits: unknown[] = [deposit, { _id: 'later', amount: 0, transaction_date: '2026-10-08', status: 'pending' }];
+    const live = vi.fn(async (input: string | URL | Request) => new Response(JSON.stringify(String(input).includes('/deposits') ? deposits : []), { status: 200 }));
+    const feeder = startFeeder(cast, { intervalMs: 0, autoStart: false, nessie: config, fetcher: live, nessieRefreshMs: 0 });
+    // The pending zero-amount row does not fail the month; it is simply not posted yet.
+    expect(await feeder.drain()).toBe(1);
+    deposits = [deposit, { _id: 'later', amount: 7, transaction_date: '2026-10-08', status: 'completed' }];
+    expect(await feeder.drain()).toBe(1);
+    expect(ingested).toEqual(['nessie:account-1:deposit:dep-1', 'nessie:account-1:deposit:later']);
+    feeder.stop();
+  });
+
   it('keeps the live source blocked after an HTTP error instead of substituting simulated lines', async () => {
     const rows = feederBooks();
     const ingest = vi.fn();

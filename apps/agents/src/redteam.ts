@@ -143,6 +143,8 @@ async function modelCritique(A: RoleConn, p: ProposalRow, materiality: bigint, c
 
 /** Watch for open proposals and critique each one once. Returns a stop function. */
 export function startCritic(cast: Cast): () => void {
+  // A bad REDTEAM_TIMEOUT_MS is a configuration error: refuse to start rather than log it as a model fallback per Proposal.
+  if (redTeamLive() || geminiLive()) redTeamTimeoutMs();
   const RT = cast.redteam;
   const A = cast.advisor;
   const seen = new Set<bigint>();

@@ -356,6 +356,21 @@ describe('what the live close does with work the Advisor leaves', () => {
     expect(fx.callsTo('requestPeriodLock')).toHaveLength(0);
   });
 
+  it('after the Advisor fails, hands the close to the scripted path to finish tasks, catch-up and the lock request', async () => {
+    scripts.push(async function* () { throw new Error('SDK unavailable'); });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).toHaveBeenCalledWith(fx.cast, '2026-09', { onStep });
+    expect(steps).toContain('the Advisor is unavailable, so the scripted close finishes this one: close tasks, revenue catch-up and the lock request');
+    // Only after the live critic stopped, so the two never critique side by side.
+    expect(vi.mocked(stopCritic).mock.invocationCallOrder[0]!).toBeLessThan(vi.mocked(runScriptedClose).mock.invocationCallOrder[0]!);
+  });
+
+  it('does not hand over a close the Advisor ran without failing', async () => {
+    scripts.push(async function* () { yield { type: 'result', subtype: 'success', total_cost_usd: 0 }; });
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(runScriptedClose).not.toHaveBeenCalled();
+  });
+
   it('waits for a late worker proposal after the Advisor fails before applying standard rulings', async () => {
     scripts.push(async function* () { throw new Error('SDK unavailable'); });
     const sleep = vi.mocked(stdbSleep);

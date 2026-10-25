@@ -103,7 +103,10 @@ async function listTransactions(
   } catch {
     throw new Error(`Nessie ${kind} response was not JSON.`);
   }
-  const result = z.array(rawTransaction).safeParse(body);
+  // Only completed rows post; a pending or cancelled row (often a zero amount) must not fail the whole month.
+  const rows = z.array(z.object({ status: z.string() }).passthrough()).safeParse(body);
+  if (!rows.success) throw new Error(`Nessie ${kind} response did not match the documented transaction fields.`);
+  const result = z.array(rawTransaction).safeParse(rows.data.filter(row => row.status.toLowerCase() === 'completed'));
   if (!result.success) throw new Error(`Nessie ${kind} response did not match the documented transaction fields.`);
   return result.data;
 }

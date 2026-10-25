@@ -245,3 +245,10 @@ describe('Red Team without Grok', () => {
     expect(critiques()[0]!.args).toEqual({ proposalId: 14n, ...scripted });
   });
 });
+
+describe('REDTEAM_TIMEOUT_MS', () => {
+  it('refuses to start the live critic on an invalid value instead of recording a provider fallback', () => {
+    vi.stubEnv('REDTEAM_TIMEOUT_MS', 'soon');
+    expect(() => startCritic(fx.cast)).toThrow('REDTEAM_TIMEOUT_MS must be a positive integer');
+  });
+});

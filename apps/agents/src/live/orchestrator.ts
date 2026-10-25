@@ -87,6 +87,8 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
   const allowedTools = [...new Set([advisorCharter.harness, ...WORKERS.map(r => activeCharter(A, r).harness)].flatMap(h => h.tools))];
   let total = 0;
   let advisorUnavailable = false;
+  /** Set when the Advisor failed and the close still needs finishing; runs after the critic stops (below). */
+  let finishScripted = false;
   /** The most the whole close may spend (CLOSE_BUDGET_USD, empty means the default); each run gets what is left. */
   const budget = Number(process.env.CLOSE_BUDGET_USD?.trim() || 15);
   /** One Advisor query over the same servers, subagents and gate. */
@@ -206,6 +208,10 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
         return { costUsd: total };
       }
     }
+    if (advisorUnavailable) {
+      finishScripted = true;
+      return { costUsd: total };
+    }
     const s = snapshot(A, periodYm);
     const due = catchUpAmounts(A, s);
     if (due.size) {
@@ -217,6 +223,14 @@ export async function runLiveClose(cast: Cast, periodYm: string, onStep: (m: str
     }
   } finally {
     stopCritic();
+    // The failed Advisor run was the one asked to finish the close: mark tasks done, catch up revenue and request the
+    // lock. Nothing else would, so the scripted close resumes this one (it rules only what is still open and never
+    // proposes twice) once the live critic has stopped. A close that waits on the CFO stays waiting, as above.
+    if (finishScripted && [...A.db.period.iter()].find(p => p.ym === periodYm)?.status.tag === 'Open') {
+      onStep('the Advisor is unavailable, so the scripted close finishes this one: close tasks, revenue catch-up and the lock request');
+      const { runScriptedClose } = await import('../scripted/close');
+      await runScriptedClose(cast, periodYm, { onStep });
+    }
   }
   return { costUsd: total };
 }

@@ -8,12 +8,44 @@ import { applyFx, dateLabel, formatMinor, LedgerError, ymEndMicros, ymFromString
 import { z } from 'zod';
 import { agentsLive, GATEWAY_PORT } from './env';
 import { snapshot } from './snapshot';
-import { closeHasWork } from './close-state';
+import { bankExceptionsOf, closeHasWork } from './close-state';
 import type { Cast } from './stdb';
 import { advisorReport } from './advisor-report';
 
 const money = (n: bigint) => formatMinor(n, 'USD', { trimZeroCents: true });
-const pendingEntry = z.object({ lines: z.array(z.object({ accountCode: z.string(), debitMinor: z.string().regex(/^\d+$/).default('0'), creditMinor: z.string().regex(/^\d+$/).default('0'), fxRateE6: z.string().regex(/^\d+$/).default('1000000') })) });
+/** Whole minor units as the module's parseLines reads them: a string or number of digits; absent or "" is the default. */
+const minor = (fallback: bigint) => z.union([z.string(), z.number()]).optional().transform((x, ctx) => {
+  const s = x === undefined ? '' : String(x).trim();
+  if (s === '') return fallback;
+  if (!/^-?\d+$/.test(s)) {
+    ctx.addIssue({ code: 'custom', message: 'not whole minor units' });
+    return z.NEVER;
+  }
+  return BigInt(s);
+});
+const pendingEntry = z.object({ lines: z.array(z.object({ accountCode: z.string(), debitMinor: minor(0n), creditMinor: minor(0n), fxRateE6: minor(1_000_000n) })) });
+/**
+ * Revenue a pending journal entry would post, in the functional currency, the way the module posts it: each side
+ * converted on its own, and a zero rate read as 1.0. A payload the module would refuse counts as nothing.
+ */
+function pendingRevenue(payloadJson: string, isRevenue: (code: string) => boolean): bigint {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(payloadJson);
+  } catch {
+    return 0n;
+  }
+  const parsed = pendingEntry.safeParse(raw);
+  if (!parsed.success) return 0n;
+  let total = 0n;
+  for (const l of parsed.data.lines) {
+    if (!isRevenue(l.accountCode)) continue;
+    const rate = l.fxRateE6 === 0n ? 1_000_000n : l.fxRateE6;
+    if (rate < 0n) return 0n;
+    total += applyFx(l.creditMinor, rate) - applyFx(l.debitMinor, rate);
+  }
+  return total;
+}
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_WORD = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
@@ -137,10 +169,12 @@ function lockOutlook(A: Cast['advisor'], ym: string, periodId: bigint): string {
   const blocked = [...A.db.closeTask.iter()].filter(t => t.periodId === periodId && t.status.tag === 'Blocked');
   const subscription = new Set([...A.db.contractItem.iter()].filter(i => i.kind.tag === 'Subscription').map(i => i.id));
   const unrecognized = [...A.db.revenueScheduleLine.iter()].filter(l => l.ym <= ym && !l.recognized && subscription.has(l.contractItemId)).reduce((a, l) => a + l.amountMinor, 0n);
+  const bank = bankExceptionsOf(A, ym);
   const left = [
     undecided ? `${undecided} item${undecided === 1 ? '' : 's'} still need${undecided === 1 ? 's' : ''} a decision` : '',
     blocked.length ? `${blocked.length === 1 ? 'one close task is' : `${blocked.length} close tasks are`} blocked (${blocked.map(t => `"${t.title}"`).join(', ')}) and need${blocked.length === 1 ? 's' : ''} a person` : '',
     unrecognized > 0n ? `${money(unrecognized)} of subscription revenue through ${monthLabel(ym)} is not recognized yet` : '',
+    bank.rows.length && !bank.accepted ? `${bank.rows.length} unmatched bank line${bank.rows.length === 1 ? '' : 's'} through ${monthLabel(ym)} need${bank.rows.length === 1 ? 's' : ''} reconciling or your explicit acceptance` : '',
   ].filter(Boolean);
   if (!left.length) return 'everything is decided, so I will ask to lock it.';
   return `${left.join('; ')}. I will ask to lock only once ${left.length === 1 ? 'that is' : 'those are'} resolved.`;
@@ -240,11 +274,11 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
 
   if (wantsBank) {
     const report = reportFor(closeYm);
-    const cutoff = asked && closeYm < ymOf(now) ? ymEndMicros(ymFromString(closeYm)) - 1n : BigInt(now.getTime()) * 1000n;
     let count = 0;
     yield `Current unmatched bank lines through ${monthLabel(closeYm)}. `;
     for (const company of report.companies) {
-      const unmatched = company.books.bankTxRows.filter(tx => !tx.matched && tx.ym <= closeYm && tx.bookedAt.microsSinceUnixEpoch <= cutoff);
+      // Every unmatched line of the month or earlier, dated or not yet: exactly what the lock gate counts.
+      const unmatched = company.books.bankTxRows.filter(tx => !tx.matched && tx.ym <= closeYm);
       count += unmatched.length;
       const totals = (rows: typeof unmatched) => {
         const byCcy = new Map<string, bigint>();
@@ -354,10 +388,7 @@ export async function* answerQuestion(cast: Cast, question: string, _history: { 
         const month = company.pnl.totalRevenueMinor;
         const undecided = [...A.db.proposal.iter()]
           .filter(p => p.periodId === period.id && ['Open', 'AwaitingCfo', 'SentBack'].includes(p.status.tag) && p.kind.tag === 'JournalEntry')
-          .map(p => {
-            const lines = pendingEntry.parse(JSON.parse(p.payloadJson)).lines;
-            return lines.filter(l => company.books.accountByCode.get(l.accountCode)?.type === 'revenue').reduce((a, l) => a + applyFx(BigInt(l.creditMinor) - BigInt(l.debitMinor), BigInt(l.fxRateE6)), 0n);
-          })
+          .map(p => pendingRevenue(p.payloadJson, code => company.books.accountByCode.get(code)?.type === 'revenue'))
           .filter(v => v !== 0n);
         yield `Revenue for ${monthLabel(closeYm)} is ${fmt(month)} on the books. `;
         if (undecided.length) yield `${undecided.length} revenue proposal${undecided.length > 1 ? 's' : ''} worth ${fmt(undecided.reduce((a, b) => a + b, 0n))} for that month ${undecided.length > 1 ? 'are' : 'is'} still waiting for a ruling or your OK, so the month is not final yet. `;

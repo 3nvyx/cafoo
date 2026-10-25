@@ -122,6 +122,17 @@ describe('month in a question', () => {
 });
 
 describe('answerQuestion', () => {
+  it('reads pending revenue payloads the way the module posts them, and never fails on one it would refuse', async () => {
+    const entry = (id: bigint, lines: unknown) => ({ id, periodId: 2n, kind: { tag: 'JournalEntry' }, status: { tag: 'AwaitingCfo' }, summaryPlain: 'x', amountMinor: 0n, payloadJson: JSON.stringify({ lines }) });
+    const text = await ask(books({ proposal: [
+      // "" is zero, numbers are whole minor units, and a zero rate is 1.0, as in the module's parseLines.
+      entry(7n, [{ accountCode: '2400', debitMinor: 120000, creditMinor: '' }, { accountCode: '4000', debitMinor: '', creditMinor: 120000, fxRateE6: '0' }]),
+      entry(8n, [{ accountCode: '4000', creditMinor: '12.5' }]),
+      { ...entry(9n, []), payloadJson: 'not json' },
+    ] }), 'What was revenue in September?');
+    expect(text).toMatch(/1 revenue proposal worth \$1,200 for that month is still waiting/);
+  });
+
   it("reports one month's revenue as that month's movement, with pending revenue proposals", async () => {
     const text = await ask(books(), 'What was revenue in September?');
     expect(text).toMatch(/Revenue for September 2026 is \$3,500 on the books/);

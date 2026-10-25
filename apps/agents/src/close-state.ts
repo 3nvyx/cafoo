@@ -4,6 +4,7 @@
  * feed during an open month, before anyone starts that month's close. Opening pauses the feed and the continuous
  * Bookkeeper for that month; a close only resumes when it has work of its own to resume.
  */
+import { bankExceptionAcceptance, currentBankExceptions } from '@cafoo/ledger-core';
 import type { RoleConn } from './stdb';
 
 /** The start of the Advisor's first message in close:<ym>; its presence marks that month's close as opened. */
@@ -94,4 +95,24 @@ export function citedBankTxIds(c: RoleConn, opts: { pendingOnly?: boolean; perio
     }
   }
   return ids;
+}
+
+const iso = (t: { microsSinceUnixEpoch: bigint }) => new Date(Number(t.microsSinceUnixEpoch / 1000n)).toISOString();
+
+/**
+ * Unmatched bank lines through `ym` and whether the CFO's acceptance of exactly these is current, computed from the
+ * same rows and the same ledger-core functions the module's lock gate uses, so chat and the lock never disagree.
+ */
+export function bankExceptionsOf(c: RoleConn, ym: string) {
+  const input = {
+    periodYm: ym,
+    bankRows: [...c.db.bankTransaction.iter()].map(row => ({
+      id: String(row.id), subsidiaryId: String(row.subsidiaryId), ym: row.ym, bookedAt: iso(row.bookedAt),
+      amountMinor: String(row.amountMinor), ccy: row.ccy, description: row.description, counterparty: row.counterparty, matched: row.matched,
+    })),
+    auditEvents: [...c.db.auditEvent.iter()].map(e => ({
+      id: String(e.id), actorRole: e.actorRole, action: e.action, targetTable: e.targetTable, targetId: String(e.targetId), detail: e.detail, at: iso(e.at),
+    })),
+  };
+  return { rows: currentBankExceptions(input), accepted: bankExceptionAcceptance(input).accepted };
 }

@@ -92,6 +92,8 @@ export interface FeederOptions {
   /** Explicit source for tests; undefined reads local configuration. Null forces the simulated bank source. */
   nessie?: NessieConfig | null;
   fetcher?: typeof fetch;
+  /** Nessie only: once every fetched line is sent, fetch the month again after this long (NESSIE_REFRESH_MS, default 5 minutes). */
+  nessieRefreshMs?: number;
 }
 
 export interface Feeder {
@@ -114,6 +116,9 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
   };
   const idleMs = opts.idleMs ?? Math.max(opts.intervalMs, 1000);
   const plans = new Map<string, FeedEvent[]>();
+  /** When each Nessie month was last fetched: transactions that complete later need a fresh fetch. */
+  const fetchedAt = new Map<string, number>();
+  const refreshMs = opts.nessieRefreshMs ?? Number(process.env.NESSIE_REFRESH_MS?.trim() || 5 * 60_000);
   const loading = new Map<string, Promise<FeedEvent[]>>();
   /** Events the module accepted in this process (an invoice whose number already exists leaves no feed_event row). */
   const sent = new Set<string>();
@@ -155,6 +160,7 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
       }, opts.fetcher));
       const p: FeedEvent[] = [...simulatedInvoices, ...bank].sort((a, b) => a.atMicros < b.atMicros ? -1 : a.atMicros > b.atMicros ? 1 : a.externalId.localeCompare(b.externalId));
       plans.set(ym, p);
+      fetchedAt.set(ym, Date.now());
       log(`planned ${bank.length} Nessie bank line(s) and ${simulatedInvoices.length} simulated billing event(s) for ${ym}`);
       return p;
     })();
@@ -196,7 +202,13 @@ export function startFeeder(cast: Cast, opts: FeederOptions): Feeder {
         return false;
       }
       const ready = state();
-      if ('blocked' in ready || !ready.next) return false;
+      if ('blocked' in ready) return false;
+      if (!ready.next) {
+        // Everything fetched is in the books. Nessie may post more this month, so the next tick past the refresh
+        // interval fetches again; lines already ingested are skipped by their external IDs.
+        if (nessie && Date.now() - (fetchedAt.get(ready.ym) ?? 0) >= refreshMs) plans.delete(ready.ym);
+        return false;
+      }
       const e = ready.next;
       try {
         if (e.kind === 'bank_tx') await cast.feed.reducers.ingestBankTransactions({ subsidiaryCode: e.subsidiaryCode, txs: [e.tx] });
