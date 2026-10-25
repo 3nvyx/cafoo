@@ -176,10 +176,13 @@
 			</div>
 		</section>
 
-		<!-- The gate and the sponsors' APIs behind Cafoo, as two rows of two cards that widen on hover. -->
+		<!-- The gate and the sponsors' APIs behind Cafoo, as two rows of two cards that widen on hover,
+		     set into the hero's painted sky. -->
 		<section id="gate" class="content scroll-mt-24 pt-32" aria-labelledby="gate-h">
 			<h2 id="gate-h" class="sr-only">Agent security, and the APIs behind Cafoo</h2>
-			<FeatureCards />
+			<PaintedFrame seed={23} class="p-3 sm:p-6 lg:p-8">
+				<FeatureCards />
+			</PaintedFrame>
 		</section>
 
 		<section id="growth" class="content scroll-mt-24 pt-32" aria-labelledby="growth-h">

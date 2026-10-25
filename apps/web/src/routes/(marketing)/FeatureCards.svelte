@@ -5,7 +5,8 @@
 	// then have widths set from the row, not the card, so nothing re-wraps and the row's height never
 	// changes (the page does not move under the pointer); widening a card only reveals the rest of its
 	// diagram, which fades out at the card's edge until then. Without hover (touch screens) and below lg,
-	// every diagram fits its card. A diagram animates only while its card is on screen.
+	// every diagram fits its card's width. A card is never taller than the screen: a tall diagram is cut
+	// off at the card's bottom edge. A diagram animates only while its card is on screen.
 	import GateStack from './GateStack.svelte';
 	import CreditCascade from './CreditCascade.svelte';
 	import AdvisorChat from './AdvisorChat.svelte';
@@ -130,6 +131,22 @@
 		flex: none;
 	}
 
+	/* Each card fits one screen, less room for the 68px nav and a margin. The words keep their
+	   height; the diagram's panel gives way, cut off by the card's bottom edge (as the hero's
+	   product is by its frame) and fading out as it goes. */
+	.card {
+		--fade-bottom: linear-gradient(to bottom, black calc(100% - 40px), transparent);
+		max-height: calc(100svh - 120px);
+	}
+	.copy {
+		flex: none;
+	}
+	.panel {
+		min-height: 0;
+		overflow: hidden;
+		mask-image: var(--fade-bottom);
+	}
+
 	/* From lg up: two cards side by side. The row is the size container for the widths below. */
 	@media (min-width: 1024px) {
 		.row {
@@ -156,23 +173,24 @@
 			width: calc(100cqw * 7 / 12 - 88px);
 		}
 		.panel {
-			overflow: hidden;
-			mask-image: linear-gradient(to right, black calc(100% - 48px), transparent);
+			mask-image: linear-gradient(to right, black calc(100% - 48px), transparent), var(--fade-bottom);
+			mask-composite: intersect;
 		}
 		.card:hover .panel {
-			mask-image: none;
+			mask-image: var(--fade-bottom);
 		}
 		.card {
 			transition:
 				flex-grow 400ms cubic-bezier(0.65, 0, 0.35, 1),
 				opacity 400ms cubic-bezier(0.65, 0, 0.35, 1);
 		}
-		.row:has(.card:hover) .card {
+		/* :not(:hover), not a later opacity: 1 on the hovered card: :has() carries the specificity of
+		   its argument, so this rule would outrank `.card:hover` and dim the hovered card too. */
+		.row:has(.card:hover) .card:not(:hover) {
 			opacity: 0.4;
 		}
 		.row .card:hover {
 			flex-grow: 1.4;
-			opacity: 1;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
