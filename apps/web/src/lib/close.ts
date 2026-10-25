@@ -2,7 +2,7 @@
 // Dashboard and the Close checklist so both screens agree.
 import type { DataSource } from './data/source';
 import type { AgentMessage, Period } from './data/types';
-import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions, isBankReconciliationTask } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, bankExceptionSnapshot, closeOrderRefusal, currentBankExceptions, isBankReconciliationTask } from '@cafoo/ledger-core';
 
 type CloseBooks = Pick<DataSource, 'periods' | 'connection' | 'closeTasks' | 'proposals' | 'agentMessages' | 'bankTransactions' | 'auditEvents'>;
 
@@ -70,16 +70,20 @@ export function lockGate(db: CloseBooks, periodId: string): LockGate {
 		period.status !== 'closed' &&
 		awaiting + sentBack + open === 0 &&
 		(period.status === 'closing' || (tasks.length > 0 && pendingTasks === 0));
-	const canLock = workflowReady && blockedTasks === 0 && (bankExceptions.rows.length === 0 || bankExceptions.acceptance.accepted);
+	// Months lock in order: an earlier month that is not locked holds this one back (the module refuses it too).
+	const order = closeOrderRefusal(db.periods().map((p) => ({ ym: p.id, status: p.status })), periodId, 'lock');
+	const canLock = workflowReady && !order && blockedTasks === 0 && (bankExceptions.rows.length === 0 || bankExceptions.acceptance.accepted);
 
 	let blocker = '';
 	if (period && !canLock && period.status !== 'closed') {
-		if (!started) blocker = 'Start the close first. The agents will work through the checklist.';
+		// A close cannot start out of order either, so a month not started yet names the earlier month instead.
+		if (!started) blocker = order ?? 'Start the close first. The agents will work through the checklist.';
 		else if (awaiting) blocker = `${awaiting} item${awaiting === 1 ? '' : 's'} still need${awaiting === 1 ? 's' : ''} your confirmation.`;
 		else if (sentBack) blocker = `${sentBack} item${sentBack === 1 ? ' you sent back is' : 's you sent back are'} waiting for the agent to resubmit.`;
 		else if (open) blocker = `${open} item${open === 1 ? ' is' : 's are'} still in debate.`;
 		else if (blockedTasks) blocker = `${blockedTasks} close task${blockedTasks === 1 ? ' is' : 's are'} blocked. Resolve them before locking.`;
 		else if (bankExceptions.rows.length && !bankExceptions.acceptance.accepted) blocker = `${bankExceptions.rows.length} unmatched bank line${bankExceptions.rows.length === 1 ? ' needs' : 's need'} your review and explicit acceptance before locking.`;
+		else if (order) blocker = order;
 		else if (pendingTasks) blocker = `${pendingTasks} task${pendingTasks === 1 ? ' is' : 's are'} not done yet.`;
 		else blocker = 'Waiting for the Advisor to request the lock.';
 	}

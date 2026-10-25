@@ -306,7 +306,15 @@ export class SpacetimeDataSource implements DataSource {
 		if (!res.ok) {
 			this.#conn.agents = 'online';
 			const text = await res.text().catch(() => '');
-			throw new Error(text || `The agent gateway could not start the close (${res.status}).`);
+			// The gateway answers a refusal (an earlier month not locked, a locked month) as { error: "<plain reason>" }.
+			let reason = text;
+			try {
+				const body = JSON.parse(text) as { error?: unknown };
+				if (typeof body?.error === 'string' && body.error.trim()) reason = body.error;
+			} catch {
+				/* not JSON: show the text as it came */
+			}
+			throw new Error(reason || `The agent gateway could not start the close (${res.status}).`);
 		}
 		this.#conn.agents = 'online';
 		void this.#pollStatus();

@@ -19,6 +19,7 @@ import { withEvidence } from './provider-calls';
 import { BadRequest, TooLarge, changesState, matchRoute, readJson, type Route } from './http';
 import { runScriptedClose } from './scripted/close';
 import type { Cast } from './stdb';
+import { closeStartRefusal } from './close-state';
 import { answerQuestion, type AnswerOptions, type CloseStart } from './advisor-chat';
 
 export { MAX_BODY_BYTES } from './http';
@@ -49,6 +50,11 @@ export interface GatewayOptions {
    * (it sees the month closing and files nothing more), so the close never proposes the same bank line twice.
    */
   beforeClose?: (periodYm: string) => Promise<void>;
+  /**
+   * Why a close of this month must not start (a locked month, an earlier month not locked yet), in words for the CFO;
+   * undefined when it may. Default: closeStartRefusal on the Advisor's view of the books.
+   */
+  refuseClose?: (periodYm: string) => string | undefined;
 }
 
 /** A loopback address: 127.0.0.0/8, ::1, or either written as an IPv4-mapped IPv6 address. */
@@ -110,11 +116,17 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   const apiKey = env.GATEWAY_API_KEY?.trim();
   const closes = opts.closes ?? new Map<string, CloseState>();
   const runClose: CloseRunner = opts.runClose ?? ((ym, onStep) => (agentsLive() && opts.liveClose ? opts.liveClose(ym, onStep) : runScriptedClose(cast, ym, { onStep })));
+  const refuseClose = opts.refuseClose ?? ((ym: string) => (cast.advisor ? closeStartRefusal(cast.advisor, ym) : undefined));
 
-  /** Start a close unless one is running for that month. `settled` resolves when the run ends, either way. */
-  const startClose = (periodYm: string): { started: boolean; state: CloseState; settled: Promise<void> } => {
+  /**
+   * Start a close unless one is running for that month or the books refuse it (`refused`, said for the CFO).
+   * `settled` resolves when the run ends, either way.
+   */
+  const startClose = (periodYm: string): { started: boolean; state?: CloseState; refused?: string; settled: Promise<void> } => {
     const existing = closes.get(periodYm);
     if (existing?.status === 'running') return { started: false, state: existing, settled: Promise.resolve() };
+    const refused = refuseClose(periodYm);
+    if (refused) return { started: false, refused, settled: Promise.resolve() };
     const state: CloseState = { periodYm, status: 'running', startedAt: new Date().toISOString(), steps: [] };
     closes.set(periodYm, state);
     const settled = Promise.resolve()
@@ -132,8 +144,9 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
   };
   /** From chat: start, then give a fast failure (already closed, not seeded, books refused) a moment to show. */
   const chatStartClose = async (periodYm: string): Promise<CloseStart> => {
-    const { started, state, settled } = startClose(periodYm);
-    if (!started) return { status: 'running' };
+    const { started, state, refused, settled } = startClose(periodYm);
+    if (refused) return { status: 'failed', error: refused };
+    if (!started || !state) return { status: 'running' };
     await Promise.race([settled, new Promise(r => setTimeout(r, grace))]);
     return state.status === 'error' ? { status: 'failed', error: state.error } : { status: 'started' };
   };
@@ -172,7 +185,8 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
         const body = await readJson(req);
         const periodYm = String(body.periodYm ?? '');
         if (!/^\d{4}-\d{2}$/.test(periodYm)) return json(400, { error: 'periodYm must be YYYY-MM' });
-        const { started, state } = startClose(periodYm);
+        const { started, state, refused } = startClose(periodYm);
+        if (refused) return json(409, { error: refused });
         return json(202, { ...state, started });
       }
       // With a key, /v1/* needs it from every caller; without one, only this machine may talk to the Advisor (it reads
@@ -247,7 +261,7 @@ export function createGateway(cast: Cast, opts: GatewayOptions = {}): Server {
  * the built-in ones (src/http.ts); `more.status` adds fields to GET /status; `more.closes` shares the map of closes by
  * month; `more.beforeClose` runs before each close starts.
  */
-export function startGateway(cast: Cast, liveClose?: CloseRunner, routes: readonly Route[] = [], more: Pick<GatewayOptions, 'status' | 'closes' | 'beforeClose'> = {}) {
+export function startGateway(cast: Cast, liveClose?: CloseRunner, routes: readonly Route[] = [], more: Pick<GatewayOptions, 'status' | 'closes' | 'beforeClose' | 'refuseClose'> = {}) {
   const server = createGateway(cast, { liveClose, routes, ...more });
   const host = gatewayHost();
   server.listen(GATEWAY_PORT, host, () => {

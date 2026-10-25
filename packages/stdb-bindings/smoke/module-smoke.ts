@@ -970,7 +970,8 @@ async function main() {
         const r2 = await waitFor(() => [...db.journalEntry.iter()].find(j => j.reversalOf === auto.id && j.source.tag === 'Manual'), 'reversal of its automatic reversal', 3000).catch(() => undefined);
         check(!!r1 && !!r2 && entryYm(r2.id) === NEXT, `reversing an elimination also reverses its ${NEXT} automatic reversal, as for an accrual`);
         const redo = await accepts('once reversed, the month can be eliminated again', () => ic(eliminationOf(elim, uk, 'balance', CLOSE)));
-        if (redo) await A.conn.reducers.rejectProposal({ proposalId: redo.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
+        // Posted, so the month is consolidated again when it locks below.
+        if (redo) await settle(redo);
       }
     }
     const a = await accepts('the exact activity elimination', () => ic(act));
@@ -1031,6 +1032,28 @@ async function main() {
       if (p.status.tag === 'AwaitingCfo') await X.conn.reducers.cfoSendBack({ proposalId: p.id, notePlain: 'smoke cleanup' });
       await A.conn.reducers.rejectProposal({ proposalId: p.id, rationale: 'smoke cleanup', summaryPlain: 'Rejected by the smoke test.' });
     }
+    // A group month locks only once consolidated, and a correction posted after the consolidation makes it stale.
+    const { uk, elim } = await ensureGroup();
+    const ofMonth = (p: { payloadJson: string }) => JSON.parse(p.payloadJson) as { periodYm?: string; basis?: string };
+    const fees = [...db.proposal.iter()].find(p => p.kind.tag === 'IcElimination' && ['Approved', 'Amended'].includes(p.status.tag) && ofMonth(p).periodYm === CLOSE && ofMonth(p).basis === 'activity');
+    if (fees) {
+      const feesJe = entriesOf(fees.id)[0]!;
+      await accepts(`the CFO reverses the ${CLOSE} activity elimination`, () => X.conn.reducers.cfoReverse({ jeId: feesJe.id, reasonPlain: 'smoke: undo the elimination' }));
+      await waitFor(() => [...db.journalEntry.iter()].some(j => j.reversalOf === feesJe.id), 'reversal of the activity elimination');
+      await refuses('advisor requests the lock of a group month not eliminated', () => A.conn.reducers.requestPeriodLock({ periodYm: CLOSE, rationale: 'smoke', summaryPlain: 'Smoke: ready to lock.' }), /^The Advisor cannot ask to lock \w+ \d{4} until its consolidation matches the books: the service fees pair in \w+ \d{4} \(\$[\d,]+\.\d\d\) is not eliminated, so eliminate it\./);
+      await refuses('CFO locks a group month not eliminated', () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke lock' }), /cannot be locked until its consolidation matches the books: the service fees pair/);
+      await settle(await propose(CN, 'ic_elimination', eliminationOf(elim, uk, 'activity', CLOSE), CLOSE));
+    } else fail('the consolidation lock guard', `no posted ${CLOSE} activity elimination to undo`);
+    const icFix = await je(B, CLOSE, [{ accountCode: '1900', debitMinor: '10000', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '10000' }]);
+    await settle(icFix);
+    await refuses('CFO locks after a correction on an intercompany account posted since the elimination', () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke lock' }), /the intercompany balance pair through \w+ \d{4} now shows \$[\d,]+\.\d\d but the elimination posted removed \$[\d,]+\.\d\d, so something posted after it: reverse that elimination and eliminate again/);
+    await accepts('the CFO reverses the intercompany correction, so the elimination stands again', () => X.conn.reducers.cfoReverse({ jeId: entriesOf(icFix.id)[0]!.id, reasonPlain: 'smoke: undo the intercompany correction' }));
+    // A dollar movement on Cafoo Ltd's loan, booked at the average rate after the revaluation, leaves it off the closing rate.
+    const loanLines = [{ accountCode: `2950-${uk.code}`, debitMinor: '10000', creditMinor: '0', ccy: 'USD', fxRateE6: '787402' }, { accountCode: `1000-${uk.code}`, debitMinor: '0', creditMinor: '7874', ccy: uk.functionalCcy, fxRateE6: '1000000' }];
+    const fxFix = await propose(B, 'journal_entry', { subsidiaryId: uk.id.toString(), periodYm: CLOSE, memo: 'smoke loan movement', lines: loanLines }, CLOSE);
+    await settle(fxFix);
+    await refuses('CFO locks after a foreign-currency balance moved since the revaluation', () => X.conn.reducers.lockPeriod({ periodYm: CLOSE, rationale: 'smoke lock' }), new RegExp(`${uk.name} was revalued for \\w+ \\d{4}, but its USD balance on 2950-${uk.code} is £[\\d,]+\\.\\d\\d off the closing rate, so something posted after it: revalue it again`));
+    await accepts('the CFO reverses that movement, so the revaluation stands again', () => X.conn.reducers.cfoReverse({ jeId: entriesOf(fxFix.id)[0]!.id, reasonPlain: 'smoke: undo the loan movement' }));
     // A blocked close task stops the lock, by name.
     const task = [...db.closeTask.iter()].find(t => db.period.id.find(t.periodId)!.ym === CLOSE && t.status.tag !== 'Done')!;
     await B.conn.reducers.updateCloseTask({ taskId: task.id, status: 'blocked', note: 'smoke: waiting on a person' });

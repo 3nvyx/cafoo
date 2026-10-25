@@ -14,3 +14,4 @@ export * from './consolidation.js';
 export * from './proposals.js';
 export * from './bank-exceptions.js';
 export * from './plain.js';
+export * from './close-order.js';

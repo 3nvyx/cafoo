@@ -31,7 +31,7 @@ import { monthLabel } from '../advisor-chat';
 import { catchUpAmounts } from '../revenue-catchup';
 import { Cast, propose, say, sleep, type RoleConn } from '../stdb';
 import { ruleOpen, type Refusal } from './rulings';
-import { citedBankTxIds, closeHasWork, closeOpenedAt, openingMarker, pendingBankTxIds } from '../close-state';
+import { citedBankTxIds, closeHasWork, closeOpenedAt, closeStartRefusal, openingMarker, pendingBankTxIds } from '../close-state';
 import { classifyOutflow, dayLabel, vendorLookup } from '../bookkeeping';
 import { activeCharter } from '../charter/active';
 import { CAPPED_KINDS } from '../charter/library';
@@ -84,6 +84,9 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
   };
   const thread = `close:${closeYm}`;
   const A = cast.advisor;
+  // A locked month, or an earlier month not locked yet (months close in order), is refused before anything is said.
+  const refusal = closeStartRefusal(A, closeYm);
+  if (refusal) throw new Error(refusal);
   const roleName: Record<string, string> = { bookkeeper: 'Bookkeeper', revenue: 'Revenue agent', credit: 'Credit & Risk agent', consolidation: 'Consolidation agent' };
   const month = monthLabel(closeYm);
   /** Proposals the module refused: their close task stays open and the month is not offered for locking. */
@@ -251,7 +254,6 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
     return ruleOpen(cast, open, { thread, snapshot: s, log, pause, refused });
   };
 
-  if (period.status.tag === 'Closed') throw new Error(`${closeYm} is already closed.`);
   const already = [...A.db.proposal.iter()].filter(p => p.periodId === period.id);
   // Resume only a close with work of its own (src/close-state.ts): the continuous Bookkeeper files Proposals from the
   // live bank feed during an open month, and a close that failed right after opening has nothing to resume.

@@ -216,6 +216,20 @@ describe('runLiveClose', () => {
     expect(runs[0]!.options.model).toBe('claude-test-advisor');
     expect(runs[0]!.options.agents.credit.model).toBe('claude-test-worker');
   });
+  it('opens a soft close: the month\'s close tasks leave todo once the Advisor opens it, so the feed stops', async () => {
+    await runLiveClose(fx.cast, '2026-09', onStep);
+    expect(fx.calls[0]).toMatchObject({ reducer: 'postAgentMessage' });
+    expect(fx.callsTo('updateCloseTask')).toEqual([{ role: 'advisor', reducer: 'updateCloseTask', args: { taskId: 5n, status: 'in_progress', note: 'Close started' } }]);
+  });
+
+  it('refuses to start while an earlier month is not locked, before anything runs or is said', async () => {
+    rows.period!.find(p => p.ym === '2026-08')!.status = { tag: 'Open' };
+    await expect(runLiveClose(fx.cast, '2026-09', onStep)).rejects.toThrow('The September 2026 close cannot start while August 2026 is not locked: months close in order. Lock August 2026 first.');
+    expect(runs).toEqual([]);
+    expect(fx.calls).toEqual([]);
+    expect(startCritic).not.toHaveBeenCalled();
+  });
+
 });
 
 describe('the PreToolUse role gate in the live close', () => {
