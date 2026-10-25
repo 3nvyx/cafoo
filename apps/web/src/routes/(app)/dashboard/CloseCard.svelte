@@ -11,7 +11,6 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import LiveActivity from '#lib/components/LiveActivity.svelte';
 	import { attempt } from '#lib/toast.svelte.js';
-	import { ui } from '#lib/ui.svelte.js';
 
 	let { period }: { period: Period } = $props();
 
@@ -52,7 +51,7 @@
 		<p class="text-body-sm text-ink-2">Month-end close · {periodLabel(period)}</p>
 		<h2 id="close-h" class="text-title">{headline}</h2>
 		{#if gate.canLock && gate.request}
-			<p class="max-w-prose text-body-sm text-ink-2"><span class="font-medium text-ink">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</p>
+			<p class="max-w-prose text-body-sm text-ink-2"><span class="font-medium text-ink">Advisor:</span> {gate.request.summaryPlain}</p>
 		{/if}
 		<LiveActivity periodId={period.id} />
 	</div>

@@ -46,7 +46,7 @@ Mapping in `ALLOWANCE_CODE`: `synthetic_identity` -> `identity_mismatch`; `fraud
 Register with the Agent SDK as `mcpServers: { crs: createCrsMcpServer() }`; pass `{ client, asOf }` to override.
 Tools, all `readOnlyHint: true`: `crs_personas`, `crs_credit_report {personaId, bureau}`, `crs_identity_verify {personaId}`, `crs_fraud_score {personaId}`, `crs_public_records {personaId}`, `crs_cascade {personaId, subjectKind}`.
 Results are `{ content: [{ type: 'text', text: JSON }], structuredContent }`; errors come back with `isError: true`, never thrown.
-Pass `raw: true` to the single-product tools to include raw bodies (Expert mode).
+Pass `raw: true` to the single-product tools to include raw bodies.
 The tools never write to the ledger; the agent turns a cascade result into a Proposal.
 
 ## Cascade order

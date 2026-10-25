@@ -9,7 +9,6 @@
 	import { dateTime, shortDate } from '#lib/labels.js';
 	import { attempt } from '#lib/toast.svelte.js';
 	import { tick } from 'svelte';
-	import { ui } from '#lib/ui.svelte.js';
 	import ConfirmDialog from './ConfirmDialog.svelte';
 	import Notice from './Notice.svelte';
 	import Pill from './Pill.svelte';
@@ -91,7 +90,6 @@
 		const bits = [shortDate(r.bookedAt)];
 		if (r.description.trim() && r.description.trim() !== main(r)) bits.push(r.description.trim());
 		if (showCompany) bits.push(companyName.get(r.subsidiaryId) ?? r.subsidiaryId);
-		if (ui.expert) bits.push(r.id);
 		return bits.join(' · ');
 	}
 

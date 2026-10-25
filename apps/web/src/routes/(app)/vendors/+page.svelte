@@ -6,7 +6,6 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { STATUS, VERIFICATION, drill } from '#lib/labels.js';
-	import { ui } from '#lib/ui.svelte.js';
 
 	const ORDER = { blocked: 0, unverified: 1, verified: 2 } as const;
 	/** The vendor a vendor_block or vendor_verify Proposal names ("05" and "5" are the same id), or undefined. */
@@ -40,7 +39,7 @@
 						{#if v.verification === 'blocked'}<Icon name="alert" size={18} class="shrink-0 text-neg" />{/if}
 						<a class="drill -my-2.5 truncate py-2.5" href="/vendors/{v.id}">{v.name}</a>
 					</p>
-					<p class="text-sm text-ink-3">{v.category}{#if ui.expert}<span class="num"> · {v.id}</span>{/if}</p>
+					<p class="text-sm text-ink-3">{v.category}</p>
 					<FootprintChip kind="vendor" id={v.id} class="max-w-full" />
 				</div>
 				<span class="justify-self-end md:justify-self-start"><Pill tone={VERIFICATION[v.verification].tone}>{VERIFICATION[v.verification].label}</Pill></span>

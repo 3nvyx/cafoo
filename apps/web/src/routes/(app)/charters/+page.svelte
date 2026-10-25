@@ -12,7 +12,6 @@
 	import { CHARTER_ROLES, editorProblems, latestEval, parseCharterLines, parseMapping, publishable, remap, scenariosFor, shippedTargets, showParam, templatesFor, templateTarget } from '#lib/charter.js';
 	import { dateTime, roleName, type Tone } from '#lib/labels.js';
 	import { attempt } from '#lib/toast.svelte.js';
-	import { ui } from '#lib/ui.svelte.js';
 
 	// The catalog (templates, scenarios, Built-in Charters) comes from the agent gateway.
 	let catalog = $state<CharterCatalog | null>(null);
@@ -264,17 +263,17 @@
 							</div>
 							<p class="text-[15px]">{e.text}</p>
 							{#if sh?.kind === 'scenario'}
-								<p class="text-sm text-ink-2">Checked by its shipped eval scenario{#if ui.expert}: <span class="num">{sh.scenario}</span>{/if}.</p>
+								<p class="text-sm text-ink-2">Checked by its shipped eval scenario.</p>
 							{:else}
 								<label class="flex flex-col gap-1 text-sm text-ink-2">
 									<span class="sr-only">Check for {e.label}</span>
 									<select class="field text-ink" aria-label="Check for {e.label}" value={targetKey(e.target)} onchange={(ev) => setTarget(i, (ev.currentTarget as HTMLSelectElement).value)}>
 										{#each tpls as t (t.id)}
-											<option value="rule:{t.id}">{t.id.startsWith('builtin:') ? 'As shipped' : t.titlePlain}{ui.expert ? ` (${t.id})` : ''}</option>
+											<option value="rule:{t.id}">{t.id.startsWith('builtin:') ? 'As shipped' : t.titlePlain}</option>
 										{/each}
 										{#if !isShipped}
 											{#each scenariosFor(catalog, role) as s (s.id)}
-												<option value="scenario:{s.id}">Eval scenario: {s.charterLine}{ui.expert ? ` (${s.id})` : ''}</option>
+												<option value="scenario:{s.id}">Eval scenario: {s.charterLine}</option>
 											{/each}
 											{#if e.target.kind === 'custom_scenario'}<option value="custom">Custom eval scenario</option>{/if}
 										{/if}
@@ -418,8 +417,8 @@
 								{#if rep.probes?.length}
 									<p><span class="font-medium">Gate probes:</span> {rep.probes.filter((p) => p.pass).length} of {rep.probes.length} got the expected verdict</p>
 									<ul class="flex flex-col gap-1">
-										{#each rep.probes.filter((p) => ui.expert || !p.pass) as p (p.label)}
-											<li class={p.pass ? 'text-ink-2' : 'text-neg'}>{p.pass ? 'Held' : 'Failed'}: {p.label}{ui.expert ? ` (${p.detail})` : ''}</li>
+										{#each rep.probes.filter((p) => !p.pass) as p (p.label)}
+											<li class={p.pass ? 'text-ink-2' : 'text-neg'}>{p.pass ? 'Held' : 'Failed'}: {p.label}</li>
 										{/each}
 									</ul>
 								{/if}
@@ -427,8 +426,8 @@
 									{@const bad = rep.scenarios.filter((s) => s.status === 'FAIL' || s.status === 'ERROR')}
 									<p><span class="font-medium">Eval scenarios:</span> {rep.scenarios.filter((s) => s.status === 'PASS').length} passed, {bad.length} failed, {rep.scenarios.filter((s) => s.status !== 'PASS' && s.status !== 'FAIL' && s.status !== 'ERROR').length} skipped or not applicable</p>
 									<ul class="flex flex-col gap-1">
-										{#each rep.scenarios.filter((s) => ui.expert || s.status === 'FAIL' || s.status === 'ERROR') as s (s.id + s.label)}
-											<li class={s.status === 'FAIL' || s.status === 'ERROR' ? 'text-neg' : 'text-ink-2'}><span class="num">{s.status}</span> {s.label}{ui.expert ? `: ${s.id}, ${s.detail}` : `: ${s.detail}`}</li>
+										{#each rep.scenarios.filter((s) => s.status === 'FAIL' || s.status === 'ERROR') as s (s.id + s.label)}
+											<li class={s.status === 'FAIL' || s.status === 'ERROR' ? 'text-neg' : 'text-ink-2'}><span class="num">{s.status}</span> {s.label}: {s.detail}</li>
 										{/each}
 									</ul>
 								{/if}

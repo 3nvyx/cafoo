@@ -111,7 +111,7 @@ export interface BoardPack {
 		/** The currency translation adjustment of the view, never posted (zero for one company in its own currency). */
 		ctaMinor: Minor;
 	};
-	/** Rates the translation used, for Expert mode (empty for one company in its own currency). */
+	/** Rates the translation used (empty for one company in its own currency). */
 	rates: RateUsed[];
 }
 

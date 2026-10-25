@@ -50,7 +50,7 @@
 	<div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 		<div>
 			<h1 class="text-[34px] sm:text-[42px]">{c.name}</h1>
-			<p class="mt-1 text-ink-2">{c.domain} · owner {c.guarantorName}{#if ui.expert}<span class="num text-ink-3"> · {c.id} · {c.guarantorPersonaId}</span>{/if}</p>
+			<p class="mt-1 text-ink-2">{c.domain} · owner {c.guarantorName}</p>
 		</div>
 		{#if c.creditTier}<Pill tone={TIER[c.creditTier].tone}>{TIER[c.creditTier].label} · {TIER[c.creditTier].plain}</Pill>{/if}
 	</div>
@@ -81,10 +81,6 @@
 						{/if}
 					{/each}
 				</dl>
-				{#if ui.expert}
-					<p class="num mt-3 text-xs text-ink-3">request {latest.requestId} · persona {latest.personaId} · tier {latest.tier}</p>
-					<pre class="mt-2 overflow-x-auto rounded-btn bg-subtle p-3 font-mono text-xs leading-5">{JSON.stringify(summary, null, 2)}</pre>
-				{/if}
 				{#if checks.length > 1}<p class="mt-3 text-sm text-ink-3">{checks.length - 1} earlier check{checks.length > 2 ? 's' : ''} on file.</p>{/if}
 			{:else}
 				<p class="mt-3 text-ink-2">No Credit Check yet. Credit & Risk runs one on the owner before extending terms.</p>

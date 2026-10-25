@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
 	import { formatMoney, toNumber } from '#lib/data/money.js';
-	import ModeToggle from '#lib/components/ModeToggle.svelte';
 	import ThemeToggle from '#lib/components/ThemeToggle.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Pill from '#lib/components/Pill.svelte';
@@ -143,15 +142,6 @@
 			{#if feed?.blockedReason}<p class="text-sm text-ink-3">{feed.blockedReason}</p>{/if}
 			{#if readOnly}<p class="text-sm text-ink-3">Only the browser holding the CFO seat can switch the feed.</p>{/if}
 		</div>
-	</section>
-
-	<section aria-labelledby="mode-h" class="flex flex-col gap-3">
-		<h2 id="mode-h" class="text-2xl">View</h2>
-		<p class="text-ink-2">
-			<strong class="font-medium text-ink">Simple</strong> shows plain summaries and two buttons. <strong class="font-medium text-ink">Expert</strong> adds journal lines with account
-			codes, Red Team critiques verbatim, raw payloads, agent transcripts and keyboard shortcuts. Press <kbd class="kbd">E</kbd> anywhere to switch.
-		</p>
-		<div><ModeToggle /></div>
 	</section>
 
 	<section aria-labelledby="theme-h" class="flex flex-col gap-3">

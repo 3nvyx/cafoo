@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import CommandPalette from '#lib/components/CommandPalette.svelte';
 	import Nav from '#lib/components/Nav.svelte';
-	import TopBar from '#lib/components/TopBar.svelte';
+	import Icon from '#lib/components/Icon.svelte';
 	import { appear } from '#lib/motion.js';
 	import { isTyping, ui } from '#lib/ui.svelte.js';
 	import { fly } from 'svelte/transition';
@@ -21,10 +21,6 @@
 			return;
 		}
 		if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey || ui.paletteOpen) return;
-		if (e.key.toLowerCase() === 'e') {
-			e.preventDefault();
-			ui.toggleMode();
-		}
 		if (e.key === 'Escape') ui.navOpenMobile = false;
 	}
 
@@ -59,11 +55,21 @@
 	{/if}
 
 	<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-		<TopBar mobileOnly={page.url.pathname === '/dashboard'} />
-		<main id="main" class={bleed ? 'flex min-h-0 w-full flex-1 flex-col' : 'mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:py-8 lg:px-8'}>
+		<main id="main" class={bleed ? 'flex min-h-0 w-full flex-1 flex-col pb-20 lg:pb-0' : 'mx-auto w-full max-w-[1200px] flex-1 px-4 pt-6 pb-24 sm:pt-8 lg:px-8 lg:pb-8'}>
 			{@render children()}
 		</main>
 	</div>
 </div>
+
+<!-- Phones have no sidebar, so this opens the drawer. Bottom corner: in thumb reach and clear of page headings; main's bottom padding (on every page, the Dash bar too) keeps it off the last row. -->
+<!-- Stays mounted under the drawer's backdrop, so focus has somewhere to be while the drawer is open. -->
+<button
+	class="btn fixed right-4 bottom-4 z-30 mb-[env(safe-area-inset-bottom)] size-12 rounded-full border-line px-0 shadow-lg lg:hidden"
+	aria-label="Open navigation"
+	aria-expanded={ui.navOpenMobile}
+	onclick={() => (ui.navOpenMobile = true)}
+>
+	<Icon name="menu" />
+</button>
 
 <CommandPalette />

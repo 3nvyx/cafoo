@@ -17,6 +17,7 @@
 		chevronRight: 'M9 5l7 7-7 7',
 		chevronDown: 'M5 9l7 7 7-7',
 		lock: 'M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3',
+		calendar: 'M4 6h16v14H4zM4 10.5h16M8.5 3.5V8M15.5 3.5V8',
 		play: 'M7 5v14l12-7z',
 		pause: 'M8 5v14M16 5v14',
 		arrowRight: 'M5 12h14M13 6l6 6-6 6',

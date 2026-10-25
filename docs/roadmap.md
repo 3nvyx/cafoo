@@ -19,7 +19,7 @@ The demo group is Cafoo Inc (USD), its UK subsidiary Cafoo Ltd (GBP), and an Eli
 - A credit cascade (identity, fraud, three bureaus, public records) on every guarantor behind open receivables, with Risk Tiers A to D or BLOCK and Allowances from 1% to 100%. One customer's $48,000 is fully reserved because its guarantor is in an active bankruptcy plan.
 - Two vendors blocked before their first payment because their owners fail identity and fraud checks: one is a synthetic identity, one is deceased.
 - One vendor verified through a Vendor check after its owner passes the identity and fraud checks.
-- **Consolidation.** The Consolidation agent revalues Cafoo Ltd's dollar loan and payable at September's closing rate: a £4,404.78 gain, $5,638.12 in the Reporting currency, so the Advisor posts it. It eliminates the $245,000 the two companies owe each other (reversed in October, because October's close eliminates the balance again) and the month's $15,000 of intercompany service fees; both wait for the CFO. The service-fee pair differs by $0.01 of rounding, under the $1 tolerance, so it shows only in Expert mode. Every figure is recomputed by the module from the books before it posts.
+- **Consolidation.** The Consolidation agent revalues Cafoo Ltd's dollar loan and payable at September's closing rate: a £4,404.78 gain, $5,638.12 in the Reporting currency, so the Advisor posts it. It eliminates the $245,000 the two companies owe each other (reversed in October, because October's close eliminates the balance again) and the month's $15,000 of intercompany service fees; both wait for the CFO. The service-fee pair differs by $0.01 of rounding, under the $1 tolerance, so it is not flagged. Every figure is recomputed by the module from the books before it posts.
 
 The Board Pack (P&L, Balance Sheet, ARR waterfall, NRR) renders after the lock, consolidated for the group or for one company in its own currency. The consolidated view shows each company's column, an Eliminations column, and the CTA (−$239.56 for September after the entries post), which is computed and never posted. Every figure drills down to its journal lines.
 
@@ -29,7 +29,7 @@ The Board Pack (P&L, Balance Sheet, ARR waterfall, NRR) renders after the lock, 
 
 **The CFO seat.** No connection can register itself as CFO. Setting up a database arms a one-time Bootstrap secret, and the claim link seats the browser that opens it.
 
-Every Proposal and ruling carries a Plain summary and a technical rationale. Simple mode shows the sentence; Expert mode shows journal lines, codes, critiques, and raw payloads.
+Every Proposal and ruling carries a Plain summary and a technical rationale. The app shows the sentence; the rationale stays on the record.
 
 Demo mode runs all of it with zero API keys. Live mode switches on one provider at a time as keys are added. Money is stored as 64-bit integer minor units, and every currency conversion rounds half away from zero in both the module and the engine. The ledger engine has 142 unit tests, and the credit cascade reproduces all 20 expected decisions in the sandbox dataset.
 

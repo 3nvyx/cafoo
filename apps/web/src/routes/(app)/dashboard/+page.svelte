@@ -22,7 +22,7 @@
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
 	const bounds = $derived<DateRange | null>(months.length ? { from: monthRange(months[0]).from, to: monthRange(months.at(-1)!).to } : null);
 
-	// The range: one month (the app-wide Period, shared with the top bar), or any two days.
+	// The range: one month (the app-wide Period, shared with the sidebar), or any two days.
 	let mode = $state<'month' | 'range'>('month');
 	let from = $state('');
 	let to = $state('');
@@ -144,8 +144,7 @@
 				<button class="chip" aria-pressed={mode === 'range'} onclick={pickRange}>Date range</button>
 			</div>
 			{#if mode === 'month'}
-				<!-- Phones keep the top bar, which has the same month picker. -->
-				<label class="hidden flex-col gap-1 text-caption text-ink-2 lg:flex">
+				<label class="flex flex-col gap-1 text-caption text-ink-2">
 					Month
 					<select class="field num text-body-sm" bind:value={ui.periodId}>
 						{#each db.periods() as p (p.id)}

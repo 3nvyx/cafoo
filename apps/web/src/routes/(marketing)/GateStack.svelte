@@ -15,7 +15,7 @@
 	}
 
 	const layers: Layer[] = [
-		{ name: 'CFO APP', title: 'CFO app', lines: ['Simple and Expert mode, live from the ledger.', 'The CFO seat is claimed once, with a one-time secret.'], tone: 'plain', dots: ['cfo'] },
+		{ name: 'CFO APP', title: 'CFO app', lines: ['Plain summaries, live from the ledger.', 'The CFO seat is claimed once, with a one-time secret.'], tone: 'plain', dots: ['cfo'] },
 		{ name: 'ADVISOR', title: 'Advisor', lines: ['Rules on every Proposal and writes down why.', 'Anything material goes to the CFO.'], tone: 'plain', dots: ['advisor'] },
 		{ name: 'RED TEAM', title: 'Red Team', lines: ['A second model attacks each Proposal', 'before anyone rules on it.'], tone: 'plain', dots: ['redteam'] },
 		{ name: 'AGENTS', title: 'Worker agents', lines: ['Bookkeeper, Revenue, Credit & Risk. Each signs in', 'as its own role. They propose, never post.'], tone: 'plain', dots: ['bookkeeper', 'revenue', 'credit'] },

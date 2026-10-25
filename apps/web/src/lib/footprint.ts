@@ -85,11 +85,6 @@ export function parseFacts(json: string): Record<string, unknown> | null {
 	}
 }
 
-export function prettyFacts(json: string): string {
-	const v = parseFacts(json);
-	return v ? JSON.stringify(v, null, 2) : json || '{}';
-}
-
 /** The earliest year reviews go back to: the recorded "reviews since at least" date, else the year established. */
 export function reviewsSinceYear(r: PublicFootprint): number | undefined {
 	const since = parseFacts(r.factsJson)?.reviewsSinceAtLeast;

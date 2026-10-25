@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
 	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, nrrBp, periodEnd, periodLabel } from '#lib/data/derive.js';
-	import { boardPack, rateText, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
+	import { boardPack, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
@@ -107,14 +107,14 @@
 		return db.now();
 	});
 
-	/** Whole units in Simple mode; Expert mode shows the cents. */
-	const fmt = (m: string | undefined, currency = ccy) => formatMoney(m ?? '0', { whole: !ui.expert, currency });
+	/** Whole units: the Board Pack reads at a glance; the ledger keeps the cents. */
+	const fmt = (m: string | undefined, currency = ccy) => formatMoney(m ?? '0', { whole: true, currency });
 	const pid = $derived(period?.id ?? '');
 
 	// Every ledger figure drills to exactly the lines it sums, in the company it belongs to: the month, the year to date,
 	// or the books through this month. ARR (from contracts) and aging (from invoices) are not ledger sums: aging links to
 	// the customers whose invoices make it up, and ARR links nowhere. The CTA is computed and never posted, so it has no
-	// journal lines; Expert mode shows the rates behind it.
+	// journal lines.
 	const ytd = $derived<DrillPeriod>({ from: pack?.ytdFrom, to: pid });
 	const through = $derived<DrillPeriod>({ to: pid });
 	const PL: AccountType[] = ['revenue', 'expense'];
@@ -289,7 +289,7 @@
 
 			{#snippet pnlRow(r: PnlRow)}
 				<tr class="border-b border-line">
-					<td class="py-2 pr-2">{#if ui.expert}<span class="num mr-2 whitespace-nowrap text-ink-3">{consolidated ? r.groupCode : r.key}</span>{/if}{r.label}</td>
+					<td class="py-2 pr-2">{r.label}</td>
 					{#if consolidated}
 						{@render pnlCells(r[measure], r.codes, null, measure === 'month' ? pid : ytd)}
 					{:else}
@@ -302,7 +302,7 @@
 			{#snippet bsRow(r: BsRow)}
 				<tr class="border-b border-line">
 					<td class="py-2 pr-2">
-						{#if ui.expert && r.groupCode}<span class="num mr-2 whitespace-nowrap text-ink-3">{consolidated ? r.groupCode : r.key}</span>{/if}{r.label}
+						{r.label}
 						{#if r.computed}<span class="block text-xs text-ink-3">Computed when the books are translated, never posted</span>{/if}
 					</td>
 					{#each consolidated ? pack!.columns : pack!.columns.filter((c) => c.key === tk) as col (col.key)}
@@ -320,8 +320,11 @@
 			<section aria-labelledby="bs-h" class="min-w-0">
 				<div class="flex flex-wrap items-baseline justify-between gap-2">
 					<h2 id="bs-h" class="text-2xl">Balance sheet</h2>
-					<p class="text-sm text-ink-3">as of {asOf}{#if ui.expert} · {pack.bs.balanced ? 'balances' : 'DOES NOT BALANCE'}{/if}</p>
+					<p class="text-sm text-ink-3">as of {asOf}</p>
 				</div>
+				{#if !pack.bs.balanced}
+					<Notice class="mt-3" tone="neg" title="This balance sheet does not balance">Assets do not equal liabilities plus equity. Check the ledger before using these figures.</Notice>
+				{/if}
 				<div class="mt-4 overflow-x-auto">
 					<table class="w-full text-[15px] {consolidated ? 'min-w-[620px]' : ''}">
 						{#if consolidated}
@@ -352,27 +355,6 @@
 					<p class="mt-3 text-sm text-ink-3">
 						The currency translation adjustment ({fmt(pack.bs.ctaMinor)}) is what makes the translated balance sheet balance: {root?.name ?? 'the parent'} reports in {reportingCcy}, and pound balances move with the rate. It is computed each time, never posted.
 					</p>
-				{/if}
-				{#if ui.expert && pack.rates.length}
-					<h3 class="mt-6 text-lg">Rates used</h3>
-					<div class="mt-2 overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="text-left text-ink-3">
-								<tr class="border-b border-line"><th class="py-2 font-medium">Company</th><th class="py-2 font-medium">Rate</th><th class="py-2 font-medium">Month</th><th class="py-2 text-right font-medium">1 {pack.rates[0]!.fromCcy} =</th><th class="py-2 pl-3 font-medium">Translates</th></tr>
-							</thead>
-							<tbody>
-								{#each pack.rates as r (`${r.subsidiary.id}-${r.kind}-${r.ym}`)}
-									<tr class="border-b border-line">
-										<td class="py-2 pr-2">{r.subsidiary.name}</td>
-										<td class="py-2 pr-2">{r.kind === 'closing' ? 'Closing' : 'Average'}</td>
-										<td class="num py-2 pr-2">{r.ym}</td>
-										<td class="num py-2 text-right whitespace-nowrap">{rateText(r.rateE6)} {r.toCcy}</td>
-										<td class="py-2 pl-3 text-ink-2">{r.usedFor}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
 				{/if}
 			</section>
 

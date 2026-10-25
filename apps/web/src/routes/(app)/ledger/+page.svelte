@@ -82,7 +82,7 @@
 	const drillLabel = $derived.by(() => {
 		const at = company ? ` at ${company.name}` : '';
 		const multi = new Set(drillAccounts.map((a) => a.subsidiaryId)).size > 1;
-		const accountName = (a: (typeof drillAccounts)[number]) => (ui.expert ? `${a.code} ${a.name}` : multi ? `${a.name} (${subById.get(a.subsidiaryId)?.name ?? a.subsidiaryId})` : a.name);
+		const accountName = (a: (typeof drillAccounts)[number]) => (multi ? `${a.name} (${subById.get(a.subsidiaryId)?.name ?? a.subsidiaryId})` : a.name);
 		if (drillKind === 'account') {
 			if (!drillAccounts.length) return parsed.values.join(', ');
 			return names(drillAccounts.map(accountName)) + at;
@@ -291,7 +291,6 @@
 					<span class="num order-3 text-sm text-ink-3 md:order-none" title="Posted {dateTime(j.postedAt)}">{entryDate(j)}</span>
 					<span class="order-1 min-w-0 md:order-none">
 						<span class="block truncate">{j.memo}</span>
-						{#if ui.expert}<span class="num block truncate text-xs text-ink-3">{j.id} · posted {dateTime(j.postedAt)}</span>{/if}
 					</span>
 					<span class="order-4 justify-self-end md:order-none md:justify-self-start">
 						<Pill tone={j.source === 'agent' ? 'accent' : j.source === 'manual' ? 'warn' : 'muted'}>{SOURCE[j.source]}</Pill>
@@ -304,7 +303,7 @@
 				{#if open[j.id]}
 					{@const r = reversal(j)}
 					<div id="je-lines-{j.id}" class="flex flex-col gap-3 pb-4 md:pl-[104px]" transition:reveal>
-						<JournalLines lines={view(j)} showCodes={ui.expert} periodId={j.periodId} />
+						<JournalLines lines={view(j)} periodId={j.periodId} />
 						<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-2">
 							<span>{j.source === 'seed' ? 'Imported' : `Posted by ${roleName(j.postedByRole)}`}</span>
 							{#if j.proposalId}<a class="drill" href="/proposals?status=all#proposal-{j.proposalId}">From a Proposal</a>{/if}

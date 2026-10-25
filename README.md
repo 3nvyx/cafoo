@@ -16,7 +16,7 @@ An amendment (the Advisor rewriting a worker's Proposal) always waits for the CF
 A credit tier is computed in the module from the recorded cascade facts, and a credit decision must cite the customer's latest check at that tier, with payment terms no longer than the tier allows.
 A vendor block whose owner is on file needs that owner's latest recorded check to derive BLOCK; a vendor with no owner on file can be blocked on its stated reason.
 
-The gate is enforced in the database, not in prompts. SpacetimeDB reducers check the caller's identity, so a worker agent that ignores its instructions still cannot write to the ledger. The live feed has its own identity that can only add raw bank lines and invoices, and nobody becomes CFO by asking: the seat is claimed with a one-time secret. Every Proposal and ruling carries a Plain summary (one sentence, no jargon) and a technical rationale. Simple mode shows the sentence. Expert mode shows the journal lines, account codes, critiques, and raw payloads.
+The gate is enforced in the database, not in prompts. SpacetimeDB reducers check the caller's identity, so a worker agent that ignores its instructions still cannot write to the ledger. The live feed has its own identity that can only add raw bank lines and invoices, and nobody becomes CFO by asking: the seat is claimed with a one-time secret. Every Proposal and ruling carries a Plain summary (one sentence, no jargon) and a technical rationale. The app shows the sentence; the rationale stays on the record.
 
 ## Architecture
 
@@ -118,7 +118,7 @@ It runs next to this stack as a mailbox agent; see [apps/asi-advisor/README.md](
 
 **The Consolidation agent.** After Credit & Risk, the close runs a Consolidation step. It proposes a Revaluation of Cafoo Ltd's dollar balances at the month's closing rate and two Eliminations: the balances the companies owe each other (reversed the next month) and the month's intercompany service fees. Each goes through the Red Team, the Advisor and, when material, the CFO like any other Proposal, and the module recomputes every figure from the books before it posts.
 
-**The consolidated Board Pack.** The Board Pack has a company switcher: Consolidated (in the Reporting currency, USD) or one company in its own currency. The consolidated view shows each company's column, an Eliminations column, and the currency translation adjustment (CTA), which is computed when the pound balances are translated and never posted. Expert mode adds the rates used, and every figure drills down per company to its journal lines.
+**The consolidated Board Pack.** The Board Pack has a company switcher: Consolidated (in the Reporting currency, USD) or one company in its own currency. The consolidated view shows each company's column, an Eliminations column, and the currency translation adjustment (CTA), which is computed when the pound balances are translated and never posted. Every figure drills down per company to its journal lines.
 
 **The October feed.** Lock September, then switch the feed on (the Live feed section in Settings; only the CFO can switch it). Bank lines and new invoices for October then arrive every few seconds, and the continuous Bookkeeper proposes matches as they land; material ones still wait for the CFO. The feed only books into the month after one the CFO locked (the locks that come with the seed data do not count, so it never touches the month being closed), and it stops once that month's close opens.
 

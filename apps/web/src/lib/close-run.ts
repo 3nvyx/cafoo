@@ -1,6 +1,6 @@
 // What the agent gateway's live-close log means for the CFO. The gateway reports each close as a list of step
 // strings (apps/agents/src/live/orchestrator.ts); a few of them change what the CFO should do next, so they are
-// turned into notices here. Everything else stays in the expert "Close log".
+// turned into notices here. The rest are for the gateway's own log, not the CFO.
 
 export interface CloseRun {
 	status: 'running' | 'done' | 'error';

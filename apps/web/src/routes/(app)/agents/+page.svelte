@@ -81,7 +81,7 @@
 				<div class="min-w-0 flex-1">
 					{#if t.proposal}
 						<p class="text-sm text-ink-3">
-							{KIND[t.proposal.kind]} by {roleName(t.proposal.proposerRole)}{#if ui.expert}<span class="num"> · {t.proposal.id}</span>{/if}
+							{KIND[t.proposal.kind]} by {roleName(t.proposal.proposerRole)}
 						</p>
 						<p class="mt-0.5 text-[17px] leading-snug font-medium">{t.proposal.summaryPlain}</p>
 					{:else}

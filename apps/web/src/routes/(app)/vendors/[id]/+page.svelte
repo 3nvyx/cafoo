@@ -7,7 +7,6 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import Pill from '#lib/components/Pill.svelte';
 	import { STATUS, TIER, VERIFICATION, dateTime, drill, shortDate } from '#lib/labels.js';
-	import { ui } from '#lib/ui.svelte.js';
 
 	const v = $derived(db.vendors().find((x) => x.id === page.params.id));
 	const bills = $derived(v ? db.bills().filter((b) => b.vendorId === v.id).sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)) : []);
@@ -39,7 +38,7 @@
 			<h1 class="flex items-center gap-2 text-[32px]">
 				{#if v.verification === 'blocked'}<Icon name="alert" size={24} class="shrink-0 text-neg" />{/if}{v.name}
 			</h1>
-			<p class="mt-1 text-ink-2">{v.category}{#if ui.expert}<span class="num text-ink-3"> · {v.id}</span>{/if}</p>
+			<p class="mt-1 text-ink-2">{v.category}</p>
 		</div>
 		<Pill tone={VERIFICATION[v.verification].tone}>{VERIFICATION[v.verification].label}</Pill>
 	</div>

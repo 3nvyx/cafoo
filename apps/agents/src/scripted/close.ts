@@ -141,7 +141,7 @@ export async function runScriptedClose(cast: Cast, closeYm: string, events: Clos
 
   /**
    * With any proposal refused, the month must not be offered for locking: say in the close thread what was refused and
-   * why (the full reason, which the CFO otherwise sees only in Expert mode) and leave it for a person.
+   * why (the full reason, which the CFO's screens do not show) and leave it for a person.
    */
   const reportRefusals = async (): Promise<boolean> => {
     if (!refused.length) return false;

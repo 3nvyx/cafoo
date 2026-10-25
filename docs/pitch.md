@@ -4,7 +4,7 @@ A three-minute spoken script, a demo cue list, and the ten slides for the in-app
 
 ## Before you start
 
-Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Dashboard (`/dashboard`) in Simple mode. Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
+Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Dashboard (`/dashboard`). Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
 
 ## Script
 
@@ -34,7 +34,7 @@ Let me close September for a SaaS group: a US company with twenty customers and 
 | 10 | Red Team rejects the two weak matches and questions the largest reserve. | "The second model pushes back. It wins on the weak matches." |
 | 11 | Consolidation agent restates Cafoo Ltd's dollar loan at September's closing rate (a £4,404.78 gain, $5,638.12) and proposes removing the $245,000 the companies owe each other and the $15,000 of service fees. | "Two companies, two currencies. The loan between them is restated and taken out of the group's books, to the cent." |
 | 12 | Advisor rules on 52 Proposals. The revaluation posts; the eliminations and the other material items move to Needs your OK. | "Small items post. Big ones wait for me." |
-| 13 | Open one item. Toggle Expert mode. Journal lines, codes, the critique, the raw payload. Toggle back. Confirm. | "One sentence for me. Every line for my controller." |
+| 13 | Open one item. One sentence, the amount, the Advisor's ruling. Confirm. | "One sentence for me. The journal lines are a click away once it posts." |
 | 14 | Advisor requests the lock. Click Lock September. Board Pack renders; switch it to Consolidated: a column per company, an Eliminations column, and the currency translation adjustment. | "I lock the month. Not the agent. And here is the group as one company." |
 | 15 | Click revenue in the Board Pack. Land on the journal lines, then the Proposal, then the Debate. | "Every number drills down to who proposed it and why." |
 | 16 | In Settings, switch the live feed on. October's bank lines and invoices arrive one by one; exact receipts match as they land, a partial payment stays open, the $48,600 payroll run waits for the CFO. | "September is locked, so the books keep moving. October matches itself as the money arrives, and the big one still waits for me." |

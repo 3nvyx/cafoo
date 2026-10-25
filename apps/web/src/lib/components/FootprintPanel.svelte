@@ -13,14 +13,12 @@
 		fmtRating,
 		hasListing,
 		listingCount,
-		prettyFacts,
 		relTime,
 		reviewsSinceYear,
 		rowsFor
 	} from '#lib/footprint.js';
 	import { dateTime, shortDate } from '#lib/labels.js';
 	import { attempt, toasts } from '#lib/toast.svelte.js';
-	import { ui } from '#lib/ui.svelte.js';
 	import Icon from './Icon.svelte';
 	import Pill from './Pill.svelte';
 
@@ -82,7 +80,7 @@
 		}
 	}
 
-	// Expert mode: where this business is listed publicly.
+	// Where this business is listed publicly.
 	let yelp = $state('');
 	let jobs = $state('');
 	let linkedin = $state('');
@@ -224,15 +222,6 @@
 						{#if v.runs > 1}<span aria-hidden="true">·</span><span>{v.runs} runs on file</span>{/if}
 					</p>
 
-					{#if ui.expert}
-						<details class="group mt-3">
-							<summary class="inline-flex min-h-[44px] cursor-pointer list-none items-center gap-1 text-sm text-ink-2 hover:text-ink [&::-webkit-details-marker]:hidden">
-								<Icon name="chevronRight" size={16} class="transition-transform duration-150 group-open:rotate-90" />Facts
-								<span class="num text-ink-3">· {shown.id}</span>
-							</summary>
-							<pre class="mt-1 max-h-[320px] overflow-auto rounded-btn bg-subtle p-3 font-mono text-xs leading-5">{prettyFacts(shown.factsJson)}</pre>
-						</details>
-					{/if}
 				</div>
 				{/key}
 				</li>
@@ -244,35 +233,33 @@
 		<div class="mt-4 border-y border-line py-5">
 			<p class="font-medium">No public listing on file</p>
 			<p class="mt-1 max-w-[60ch] text-[15px] text-ink-2">
-				{#if ui.expert}Add a Yelp page, a job board or a LinkedIn page below, then collect.{:else}Switch to Expert mode to add a Yelp page, a job board or a LinkedIn page.{/if}
+				Add a Yelp page, a job board or a LinkedIn page below, then collect.
 			</p>
 		</div>
 	{/if}
 
-	{#if ui.expert}
-		<form class="mt-6" onsubmit={save} novalidate>
-			<h3 class="text-lg">Public listings</h3>
-			<p class="mt-1 text-sm text-ink-3">Where a visitor would look this business up. Leave a field blank to remove it.</p>
-			<div class="mt-3 grid gap-3">
-				<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('yelp')}>
-					Yelp page
-					<input id={fieldId('yelp')} class="field text-[15px] text-ink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.yelp.com/biz/…" bind:value={yelp} aria-invalid={!!yelpErr} aria-describedby={yelpErr ? fieldId('yelp-err') : undefined} />
-					{#if yelpErr}<span id={fieldId('yelp-err')} class="text-neg">{yelpErr}</span>{/if}
-				</label>
-				<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('jobs')}>
-					Job board
-					<input id={fieldId('jobs')} class="field num text-[15px] text-ink" type="text" autocomplete="off" spellcheck="false" placeholder="greenhouse:company or ashby:company" bind:value={jobs} aria-invalid={!!jobsErr} aria-describedby={jobsErr ? fieldId('jobs-err') : undefined} />
-					{#if jobsErr}<span id={fieldId('jobs-err')} class="text-neg">{jobsErr}</span>{/if}
-				</label>
-				<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('linkedin')}>
-					LinkedIn page
-					<input id={fieldId('linkedin')} class="field text-[15px] text-ink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.linkedin.com/company/…" bind:value={linkedin} aria-invalid={!!linkedinErr} aria-describedby={linkedinErr ? fieldId('linkedin-err') : undefined} />
-					{#if linkedinErr}<span id={fieldId('linkedin-err')} class="text-neg">{linkedinErr}</span>{/if}
-				</label>
-			</div>
-			<button class="btn mt-3" type="submit" disabled={saving || !dirty || !!(yelpErr || jobsErr || linkedinErr)}>{saving ? 'Saving…' : 'Save listings'}</button>
-		</form>
-	{/if}
+	<form class="mt-6" onsubmit={save} novalidate>
+		<h3 class="text-lg">Public listings</h3>
+		<p class="mt-1 text-sm text-ink-3">Where a visitor would look this business up. Leave a field blank to remove it.</p>
+		<div class="mt-3 grid gap-3">
+			<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('yelp')}>
+				Yelp page
+				<input id={fieldId('yelp')} class="field text-[15px] text-ink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.yelp.com/biz/…" bind:value={yelp} aria-invalid={!!yelpErr} aria-describedby={yelpErr ? fieldId('yelp-err') : undefined} />
+				{#if yelpErr}<span id={fieldId('yelp-err')} class="text-neg">{yelpErr}</span>{/if}
+			</label>
+			<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('jobs')}>
+				Job board
+				<input id={fieldId('jobs')} class="field num text-[15px] text-ink" type="text" autocomplete="off" spellcheck="false" placeholder="greenhouse:company or ashby:company" bind:value={jobs} aria-invalid={!!jobsErr} aria-describedby={jobsErr ? fieldId('jobs-err') : undefined} />
+				{#if jobsErr}<span id={fieldId('jobs-err')} class="text-neg">{jobsErr}</span>{/if}
+			</label>
+			<label class="flex flex-col gap-1 text-sm text-ink-2" for={fieldId('linkedin')}>
+				LinkedIn page
+				<input id={fieldId('linkedin')} class="field text-[15px] text-ink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.linkedin.com/company/…" bind:value={linkedin} aria-invalid={!!linkedinErr} aria-describedby={linkedinErr ? fieldId('linkedin-err') : undefined} />
+				{#if linkedinErr}<span id={fieldId('linkedin-err')} class="text-neg">{linkedinErr}</span>{/if}
+			</label>
+		</div>
+		<button class="btn mt-3" type="submit" disabled={saving || !dirty || !!(yelpErr || jobsErr || linkedinErr)}>{saving ? 'Saving…' : 'Save listings'}</button>
+	</form>
 </section>
 
 <style>

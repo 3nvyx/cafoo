@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { AgentMessage } from '#lib/data/types.js';
 	import { MESSAGE_KIND, criticOf, roleName, timeOnly } from '#lib/labels.js';
-	import { ui } from '#lib/ui.svelte.js';
 	import RoleAvatar from './RoleAvatar.svelte';
 
 	let { m, pinned = false }: { m: AgentMessage; pinned?: boolean } = $props();
@@ -34,11 +33,6 @@
 			{/if}
 			<time class="num text-xs text-ink-3" datetime={m.createdAt}>{timeOnly(m.createdAt)}</time>
 		</div>
-		{#if ui.expert}
-			<p class="mt-1 font-mono text-[13px] leading-5 break-words whitespace-pre-wrap text-ink">{m.body}</p>
-			<p class="mt-1 text-sm text-ink-3">{m.summaryPlain}</p>
-		{:else}
-			<p class="mt-0.5 text-[15px] text-ink">{m.summaryPlain}</p>
-		{/if}
+		<p class="mt-0.5 text-[15px] text-ink">{m.summaryPlain}</p>
 	</div>
 </div>

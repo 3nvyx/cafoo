@@ -89,7 +89,7 @@ export interface DataSet {
  * arrive. Call them; never mutate what they return. `subscribe` is for side effects
  * that need to know a row arrived (toasts, counters), not for rendering.
  *
- * Actions are the CFO's only levers. Simple and Expert mode call the same ones.
+ * Actions are the CFO's only levers.
  */
 export interface DataSource {
 	/** 'mock' replays the scripted demo; 'live' talks to the ledger database. */

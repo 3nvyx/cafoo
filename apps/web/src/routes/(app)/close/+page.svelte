@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { db } from '#lib/data/index.js';
 	import { monthName, periodLabel } from '#lib/data/derive.js';
-	import type { CloseTaskStatus } from '#lib/data/types.js';
 	import CloseProgress from '#lib/components/CloseProgress.svelte';
 	import ConfirmDialog from '#lib/components/ConfirmDialog.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -61,8 +60,6 @@
 	let unlockOpen = $state(false);
 	let expanded = $state<Record<string, boolean>>({});
 	const SHOW = 4;
-
-	const STATUSES: CloseTaskStatus[] = ['todo', 'in_progress', 'blocked', 'done'];
 </script>
 
 <svelte:head><title>Close · Cafoo</title></svelte:head>
@@ -77,19 +74,11 @@
 		<div class="w-full lg:w-[320px]"><CloseProgress periodId={period.id} /></div>
 	</div>
 
-	{#if notes.length || (ui.expert && run?.steps?.length)}
+	{#if notes.length}
 		<div class="mt-6 flex flex-col gap-3">
 			{#each notes as n (n.title)}
 				<Notice tone={n.tone} title={n.title} href={n.href} action={n.action}>{n.body}</Notice>
 			{/each}
-			{#if ui.expert && run?.steps?.length}
-				<details class="rounded-md border border-line px-4 py-2">
-					<summary class="flex min-h-11 cursor-pointer items-center text-body-sm font-medium text-ink-2">Close log · {run.steps.length} step{run.steps.length === 1 ? '' : 's'}</summary>
-					<ol class="flex flex-col gap-1 pb-2 font-mono text-caption break-words text-ink-3">
-						{#each run.steps as step, i (i)}<li>{step}</li>{/each}
-					</ol>
-				</details>
-			{/if}
 		</div>
 	{/if}
 
@@ -137,26 +126,9 @@
 						{/if}
 					</div>
 					<div class="flex items-center gap-2 sm:justify-end">
-						{#if ui.expert && t.ownerRole !== 'cfo'}
-							<label class="sr-only" for="st-{t.id}">Status of {t.title}</label>
-							<select
-								id="st-{t.id}"
-								class="field text-sm"
-								value={t.status}
-								onchange={async (e) => {
-									// The books may keep a different status (the bank task cannot be done while lines are unmatched), so show theirs.
-									const el = e.currentTarget as HTMLSelectElement;
-									await attempt(() => db.setCloseTaskStatus(t.id, el.value as CloseTaskStatus));
-									el.value = t.status;
-								}}
-							>
-								{#each STATUSES as s (s)}<option value={s}>{TASK_STATUS[s].label}</option>{/each}
-							</select>
-						{:else}
-							{#key t.status}
-								<span in:arrive={{ y: -6 }}><Pill tone={TASK_STATUS[t.status].tone}>{TASK_STATUS[t.status].label}</Pill></span>
-							{/key}
-						{/if}
+						{#key t.status}
+							<span in:arrive={{ y: -6 }}><Pill tone={TASK_STATUS[t.status].tone}>{TASK_STATUS[t.status].label}</Pill></span>
+						{/key}
 					</div>
 				</li>
 			{/each}
@@ -174,7 +146,7 @@
 					{#if period.status === 'closed'}
 						Locked {period.lockedAt ? dateTime(period.lockedAt) : ''}{bankN ? ` with ${bankLines} on record` : ''}. Nothing can post to {month} anymore. The Board Pack is final. {reversalNote}
 					{:else if canLock}
-						{#if gate.request}<span class="mb-1 block text-ink"><span class="font-medium">Advisor:</span> {ui.expert ? gate.request.body : gate.request.summaryPlain}</span>{/if}
+						{#if gate.request}<span class="mb-1 block text-ink"><span class="font-medium">Advisor:</span> {gate.request.summaryPlain}</span>{/if}
 						Locking stops anyone, including the agents, from posting to {month}.
 						{#if bankN && bank.acceptance.accepted}{bankHeldNote}{:else}Any tasks still open are marked done.{/if}
 					{:else}

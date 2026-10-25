@@ -79,10 +79,6 @@ _Avoid_: invite code, admin password
 
 **Plain summary**: The one-sentence, jargon-free explanation every Proposal, critique, and ruling carries for the CFO.
 
-**Simple mode**: The default view: plain summaries, two buttons, no account codes.
-
-**Expert mode**: The same screens with journal lines, account codes, raw payloads, agent transcripts, a SQL console, shortcuts, and edit-before-approve.
-
 **Worker agent**: Bookkeeper, Revenue, Credit & Risk, Consolidation. May propose, never commit.
 
 **Red Team**: The agent that critiques Proposals before the Advisor rules. Cannot propose or commit.
@@ -154,8 +150,6 @@ _Avoid_: scrape, enrichment, score
 
 > **Dev:** "When the Bookkeeper finds a duplicate payment, does it post the reversal?"
 > **Domain expert:** "No. It creates a **Proposal**. The **Red Team** may critique it, the **Advisor** rules, and because a reversal that size is above the **Materiality threshold**, the **CFO** sees a **Plain summary** and clicks Approve before any **Journal Entry** exists."
-> **Dev:** "And in **Expert mode**?"
-> **Domain expert:** "Same rows, same reducers. The CFO just also sees the journal lines and can edit them, which records an amend."
 
 ## Flagged ambiguities
 

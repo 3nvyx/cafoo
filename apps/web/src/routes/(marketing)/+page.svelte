@@ -8,7 +8,6 @@
 	import AgentWorkflows from './AgentWorkflows.svelte';
 	import GateStack from './GateStack.svelte';
 	import LogoWall from './LogoWall.svelte';
-	import ModeDemo from './ModeDemo.svelte';
 	import PaintedFrame from './PaintedFrame.svelte';
 	import River from './River.svelte';
 
@@ -151,11 +150,10 @@
 
 		<section id="demo" class="content scroll-mt-24 pt-32" aria-labelledby="demo-h">
 			<div class="calm relative isolate flex flex-col items-center text-center">
-				<h2 id="demo-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">One sentence for you. Every line for your controller.</h2>
-				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">Both run on sample numbers. Switch the view, then follow a Board Pack figure down to its entries.</p>
+				<h2 id="demo-h" class="max-w-[20ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Every figure, down to its entries</h2>
+				<p class="mt-5 max-w-[56ch] text-lg text-ink-2">On sample numbers: follow a Board Pack figure down to the journal lines and the agent that wrote them.</p>
 			</div>
-			<div class="mt-14 grid gap-4 lg:grid-cols-[400px_minmax(0,1fr)]">
-				<ModeDemo />
+			<div class="mt-14">
 				<DrillDemo />
 			</div>
 		</section>

@@ -20,7 +20,7 @@ const personaId = z
   .regex(/^[Pp](0[1-9]|1\d|20)$/, 'persona id P01..P20')
   .transform((s) => s.toUpperCase())
   .describe('Sandbox persona id, P01..P20');
-const raw = z.boolean().optional().describe('Include the raw CRS response bodies (Expert mode). Default false.');
+const raw = z.boolean().optional().describe('Include the raw CRS response bodies. Default false.');
 const readOnly = { annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true } };
 
 function result(structured: Record<string, unknown>) {

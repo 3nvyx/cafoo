@@ -24,10 +24,10 @@ Cafoo fits best when the company sells to small businesses. Those customers are 
 | Payables | Vendors, bills, duplicate-payment detection, accruals for bills dated after month end that reverse next month, vendor verification and block | Bill pay, approval routing for spend, 1099s |
 | Bank reconciliation | Integer-scored matching on amount, date, counterparty, and reference; one-to-one; auto bucket at 75% and above, review bucket below; a simulated live Feed of bank lines and invoices with a continuous Bookkeeper; each bank line explained by at most one waiting Proposal | Connections to real bank and billing providers, multi-currency bank accounts |
 | Close management | Close Tasks with owner role, status, and evidence Proposals, including Consolidate subsidiaries for the Consolidation agent; the Advisor requests the lock, the CFO confirms it | Custom close templates, recurring task calendars |
-| Reporting & Board Pack | P&L, Balance Sheet, ARR waterfall, NRR, AR aging; consolidated for the group (per-company columns, Eliminations column, CTA, rates used in Expert mode) or for one Subsidiary in its own currency; deterministic; every figure drills down to journal lines | Custom report builder, budget versus actual |
+| Reporting & Board Pack | P&L, Balance Sheet, ARR waterfall, NRR, AR aging; consolidated for the group (per-company columns, Eliminations column, CTA) or for one Subsidiary in its own currency; deterministic; every figure drills down to journal lines | Custom report builder, budget versus actual |
 | Credit & Risk | Credit cascade on every guarantor behind open AR and every unverified vendor owner: identity, fraud, three bureaus, public records; Risk Tier A, B, C, D, or BLOCK; Allowance from 1% to 100%; Public footprint per customer and vendor (Yelp, job board, LinkedIn) stored per run | Business credit bureaus, ongoing monitoring alerts, weekly footprint refresh |
 | Agents & governance | Bookkeeper, Revenue, Credit & Risk, Consolidation, Red Team, Advisor, and the ingest-only Feed; role identities; two-tier gate in reducers; Materiality threshold in the Reporting currency; Debate threads; audit trail; CFO seat claimed with a Bootstrap secret; Charter versions the finance team edits, stricter only, published after a passing full eval | A separate evaluator identity, charters that loosen a shipped rule |
-| CFO experience (Simple / Expert) | Simple mode with Plain summaries and two buttons; Expert mode with journal lines, codes, critiques, raw payloads, transcripts | Mobile app |
+| CFO experience | Plain summaries, amounts and two buttons on every screen; figures drill down to journal lines | Mobile app |
 | Multi-entity & FX | A group of Subsidiaries with parent links and Functional currencies; Intercompany accounts; month-end Revaluation at the closing rate; balance and activity Eliminations posted to the Elimination subsidiary; Translation and CTA computed for reports | Partly owned subsidiaries and minority interests, more than one Elimination subsidiary, a Reporting currency other than USD in the demo |
 
 ## Entity model
@@ -101,9 +101,7 @@ Every number drills down. Any figure in the Board Pack, the ledger, or a Proposa
 
 Nothing posts without a ruling. The UI never offers a path that writes to the ledger around the Advisor and the CFO.
 
-Plain language first. Simple mode is the default. It shows Plain summaries, amounts, and two buttons. Account codes stay out of sight.
-
-One toggle to expert depth. Expert mode shows the same screens with journal lines, account codes, critiques, raw payloads, agent transcripts, and edit-before-approve. Nothing moves; detail is added.
+Plain language only. There is one view: Plain summaries, amounts, and two buttons. Account codes, raw payloads and transcripts stay out of sight.
 
 Live data motion only. Rows appear, statuses change, and totals count when the underlying data changes. Nothing animates for decoration.
 
