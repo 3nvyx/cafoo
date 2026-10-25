@@ -141,7 +141,7 @@
 					width="2400"
 					height="1500"
 					fetchpriority="high"
-					alt="The Luyten Dashboard for September 2026: cash, income and spend, two items waiting for the CFO's OK, the KPIs, and proposals by status."
+					alt="The Luyten Dashboard for September 2026: cash, income and spend, the locked September close, the KPIs, and proposals by status."
 					class="block w-full rounded-t-xl border border-line shadow-[0_24px_64px_rgb(0_0_0/0.35)]"
 				/>
 				</div>
