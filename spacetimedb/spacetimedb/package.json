@@ -4,6 +4,7 @@
   "description": "",
   "scripts": {
     "build": "spacetime build",
+    "check": "tsc --noEmit -p tsconfig.json",
     "publish": "spacetime publish"
   },
   "keywords": [],
