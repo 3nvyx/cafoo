@@ -39,5 +39,5 @@ and selection only, never for status; status colours always travel as a pair (`b
 
 Commands: `pnpm -F @cafoo/design-tokens build` regenerates the CSS (commit it), `pnpm -F @cafoo/design-tokens check`
 validates the token files, `pnpm -F @cafoo/design-tokens test` runs the checks (CSS drift, contrast, usage-note format,
-raw values in `apps/web/src` against `scripts/raw-values-baseline.json`, which may only go down; tighten it with
+raw values in `apps/web/src` against `scripts/raw-values-baseline.json`, whose total may only go down; tighten it with
 `pnpm -F @cafoo/design-tokens baseline`). Design decisions are recorded in `docs/adr/0012-design-tokens-as-data.md`.

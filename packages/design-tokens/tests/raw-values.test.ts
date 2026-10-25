@@ -60,9 +60,10 @@ describe('raw values in apps/web/src', () => {
 	it('ignores Svelte blocks, anchors, prose, issue numbers and SVG attributes', () => {
 		const names = new Set(['ink', 'text:caption']);
 		const { counts } = scan(
-			`{#each items as item}{#if x}{/if}{/each} <a href="#features"> <a href="#add-row"> Invoice #1042, a to-do list built from-scratch. <path fill="currentColor" /> <path stroke-width="2" stroke-linejoin="round" text-anchor="middle" fill-rule="evenodd" /> <p class="text-right text-caption text-pretty divide-y border-t-2 border-b-ink ring-offset-ink ring-offset-2 shadow-lg outline-none fill-current bg-transparent">`,
+			`{#each items as item}{#if x}{/if}{/each} <a href="#features"> <a href="#add-row"> <a href="#add"> <rect fill="url(#bad)" /> {document.querySelector('#fade')} Invoice #1042, a to-do list built from-scratch. <path fill="currentColor" /> <td class="border-spacing-2 bg-linear-45 rounded-r-[12px] rounded-[var(--x)]"> <path stroke-width="2" stroke-linejoin="round" text-anchor="middle" fill-rule="evenodd" /> <p class="text-right text-caption text-pretty divide-y border-t-2 border-b-ink ring-offset-ink ring-offset-2 shadow-lg outline-none fill-current bg-transparent">`,
 			names,
 		);
-		expect(counts).toEqual({ 'raw-colour': 0, 'bracket-size': 0, 'palette-class': 0, 'unknown-class': 0 });
+		// the one bracket-size is rounded-r-[12px]; it must not also count as an unknown class
+		expect(counts).toEqual({ 'raw-colour': 0, 'bracket-size': 1, 'palette-class': 0, 'unknown-class': 0 });
 	});
 });

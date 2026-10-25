@@ -19,7 +19,7 @@
 	},
 	"lib/components/DebateMessage.svelte": {
 		"bracket-size": 6,
-		"unknown-class": 8
+		"unknown-class": 7
 	},
 	"lib/components/FootprintChip.svelte": {
 		"unknown-class": 1

@@ -44,8 +44,10 @@ const PALETTE_NAMES =
 const RE_COLOUR_FN = /\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/.source;
 const RE_NAMED =
 	/\b(?:fill|stroke|color|background(?:-color)?)\s*[:=]\s*["']?(?:white|black|red|green|blue|gr[ae]y|yellow|orange|purple|pink|silver|navy|teal)\b/.source;
-const RE_RAW_COLOUR = new RegExp(`(?<=[:=(,\\["'\`]\\s?)#[0-9a-fA-F]{3,8}(?![\\w-])|${RE_COLOUR_FN}|${RE_NAMED}`, 'g');
-const RE_RAW_COLOUR_CSS = new RegExp(`#[0-9a-fA-F]{3,8}(?![\\w-])|${RE_COLOUR_FN}|${RE_NAMED}`, 'g');
+const RE_RAW_COLOUR = new RegExp(`(?<=[:=(,\\["'\`]\\s?)#[0-9a-fA-F]{3,8}(?![\\w-])|${RE_COLOUR_FN}|${RE_NAMED}`, 'gi');
+const RE_RAW_COLOUR_CSS = new RegExp(`#[0-9a-fA-F]{3,8}(?![\\w-])|${RE_COLOUR_FN}|${RE_NAMED}`, 'gi');
+// Fragment references are not colours: url(#clip), href="#section", querySelector('#id').
+const RE_FRAGMENT_REF = /url\(\s*#[^)]*\)|href\s*=\s*["']#[^"']*["']|querySelector(?:All)?\(\s*["'`]#[^"'`]*["'`]\s*\)/g;
 const RE_BRACKET_SIZE = /(?<![\w])-?\[[^\]\n]*\d(?:\.\d+)?(?:px|rem|em)\b[^\]\n]*\]/g;
 const RE_PALETTE = new RegExp(
 	`(?<![\\w-])${VARIANT}(?:${COLOUR_PREFIXES.join('|')})-${PALETTE_NAMES}(?:-\\d{2,3})?(?:/\\d{1,3})?(?![\\w-])`,
@@ -57,7 +59,7 @@ const CLASS_PREFIXES = [...COLOUR_PREFIXES.filter((p) => !['from', 'via', 'to'].
 	(a, b) => b.length - a.length,
 );
 const RE_COLOUR_CLASS = new RegExp(
-	`(?<![\\w-])${VARIANT}(${CLASS_PREFIXES.join('|')})-([a-z0-9][a-z0-9-]*)(?:/\\d{1,3})?(?![\\w-])`,
+	`(?<![\\w-])${VARIANT}(${CLASS_PREFIXES.join('|')})-([a-z0-9]+(?:-[a-z0-9]+)*)(?:/\\d{1,3})?(?![\\w-])`,
 	'g',
 );
 const RE_STYLE_BLOCK = /<style\b[^>]*>[\s\S]*?<\/style>/g;
@@ -138,7 +140,9 @@ function isNonColourValue(prefix, value) {
 	if (NON_COLOUR_VALUES.common.has(value)) return true;
 	if (NON_COLOUR_VALUES[base]?.has(value)) return true;
 	if (NUMERIC_OR_FRACTION.test(value)) return true;
-	if (base === 'border' && /^(?:[xystrbl]|[xy]-reverse)-\d+$/.test(value)) return true;
+	if (base === 'border' && /^(?:[xystrbl]|[xy]-reverse|spacing(?:-[xy])?)-\d+$/.test(value)) return true;
+	if (base === 'bg' && /^(?:linear|conic|radial)-/.test(value)) return true;
+	if (base === 'text' && /^decoration-/.test(value)) return true; // CSS property names quoted in scripts
 	if (base === 'divide' && /^[xy]-\d+$/.test(value)) return true;
 	if ((base === 'ring' || base === 'outline') && /^offset-\d+$/.test(value)) return true;
 	return false;
@@ -160,7 +164,7 @@ export function scan(source, tokenNames, kind = 'markup') {
 	const styles = [...source.matchAll(RE_STYLE_BLOCK), ...source.matchAll(RE_STYLE_ATTR)].map((m) => m[0]).join('\n');
 	for (const m of styles.matchAll(RE_RAW_COLOUR_CSS)) hit('raw-colour', m[0]);
 	const markup = source.replace(RE_STYLE_BLOCK, ' ').replace(RE_STYLE_ATTR, ' ');
-	for (const m of markup.matchAll(RE_RAW_COLOUR)) hit('raw-colour', m[0]);
+	for (const m of markup.replace(RE_FRAGMENT_REF, ' ').matchAll(RE_RAW_COLOUR)) hit('raw-colour', m[0]);
 	for (const m of markup.matchAll(RE_BRACKET_SIZE)) hit('bracket-size', m[0]);
 	for (const m of markup.matchAll(RE_PALETTE)) hit('palette-class', m[0]);
 	for (const m of markup.matchAll(RE_COLOUR_CLASS)) {
@@ -173,7 +177,6 @@ export function scan(source, tokenNames, kind = 'markup') {
 		if (prefix === 'rounded') {
 			const radius = value.replace(RADIUS_SIDE, '');
 			if (tokenNames.has(`rounded:${radius}`) || isNonColourValue('rounded', radius)) continue;
-			if (whole.includes('[')) continue;
 			hit('unknown-class', whole);
 			continue;
 		}
@@ -181,7 +184,6 @@ export function scan(source, tokenNames, kind = 'markup') {
 		// Tailwind's type scale (text-caption etc.) is a token too: --text-* in the theme.
 		if (prefix === 'text' && tokenNames.has(`text:${value}`)) continue;
 		if (isNonColourValue(prefix, value)) continue;
-		if (whole.includes('[')) continue;
 		hit('unknown-class', whole);
 	}
 	return { counts, samples };
@@ -189,7 +191,9 @@ export function scan(source, tokenNames, kind = 'markup') {
 
 /** Token names the scan accepts: colour names, "text:<step>" for the type scale and "rounded:<name>" for radii. */
 export function acceptedNames(css = readFileSync(CSS_FILE, 'utf8')) {
-	const theme = css.slice(css.indexOf('@theme inline {'));
+	const at = css.indexOf('@theme inline {');
+	if (at === -1) throw new Error(`${CSS_FILE} has no @theme block; run: pnpm -F @cafoo/design-tokens build`);
+	const theme = css.slice(at);
 	const names = tokenColourNames(theme);
 	for (const m of theme.matchAll(/--text-([a-z0-9-]+?)(?:--[a-z-]+)?\s*:/g)) names.add(`text:${m[1]}`);
 	for (const m of theme.matchAll(/--radius-([a-z0-9-]+)\s*:/g)) names.add(`rounded:${m[1]}`);
