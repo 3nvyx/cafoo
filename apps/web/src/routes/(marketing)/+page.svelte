@@ -71,7 +71,7 @@
 		onfocusin={() => (navFocused = true)}
 		onfocusout={() => (navFocused = false)}
 	>
-		<div class="content flex h-14 items-center justify-between gap-3 rounded-full bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
+		<div class="content flex h-14 items-center justify-between gap-3 rounded-lg bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
@@ -198,7 +198,6 @@
 		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
 			<div class="flex flex-col items-center rounded-xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
 				<h2 id="cta-h" class="max-w-[16ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Close your next month with us</h2>
-				<p class="mt-5 max-w-[46ch] text-lg opacity-80">Close September on sample data, confirm what matters, and lock the month yourself.</p>
 				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
 					<a href="/dashboard" {...newTab} class="pill pill-lg bg-on-accent text-accent hover:opacity-90">Get started{@render tabNote()} <Icon name="arrowRight" size={16} /></a>
 					<a href="/pitch" class="pill pill-lg border border-on-accent/30 text-on-accent hover:bg-on-accent/10">Watch the pitch</a>
