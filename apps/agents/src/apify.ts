@@ -42,7 +42,8 @@ export function validDomain(domain: string): boolean {
   return /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(domain);
 }
 
-const item = z.object({ url: z.string(), text: z.string().optional(), markdown: z.string().optional(), metadata: z.object({ title: z.string().nullish() }).partial().optional() });
+// The crawler sends null (not a missing field) for whatever it did not save, e.g. markdown when saveMarkdown is false.
+const item = z.object({ url: z.string(), text: z.string().nullish(), markdown: z.string().nullish(), metadata: z.object({ title: z.string().nullish() }).partial().nullish() });
 
 /** Run the crawler and wait for its dataset (one request; the run is bounded by maxCrawlPages and a timeout). */
 export async function crawlLive(domain: string, env: NodeJS.ProcessEnv = process.env, fetcher: typeof fetch = fetch): Promise<SiteSnapshot> {
@@ -67,6 +68,8 @@ export async function crawlLive(domain: string, env: NodeJS.ProcessEnv = process
     .slice(0, MAX_PAGES)
     .map(i => ({ url: i.url, title: i.metadata?.title ?? '', text: (i.text ?? i.markdown ?? '').slice(0, MAX_PAGE_CHARS) }))
     .filter(p => p.text.trim());
+  // A crawl with no readable page is a failure (the caller falls back and says so), never "crawled 0 pages".
+  if (!pages.length) throw new Error('Apify crawl returned no page text.');
   return { domain, source: 'apify', crawledAt: new Date().toISOString(), pages };
 }
 
