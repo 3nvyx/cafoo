@@ -4,7 +4,7 @@ A three-minute spoken script, a demo cue list, and the ten slides for the in-app
 
 ## Before you start
 
-Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Launchpad in Simple mode. Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
+Run the quickstart in the [README](../README.md) with September 2026 as the close month (`pnpm demo:fresh`), and open the claim link it prints so your browser holds the CFO seat. Open the Launchpad (`/dashboard`) in Simple mode. Keep the Proposals tab and the Board Pack one click away. Leave the Materiality threshold at $10,000 and the feed off.
 
 ## Script
 

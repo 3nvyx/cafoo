@@ -9,15 +9,11 @@
 	const conn = $derived(db.connection());
 	const statusWord = { open: 'Open', closing: 'Closing', closed: 'Locked' } as const;
 	const current = $derived(periods.find((p) => p.id === ui.periodId));
-	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 </script>
 
 <header class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-line bg-canvas/95 px-4 backdrop-blur sm:gap-3 lg:px-6">
 	<button class="btn btn-quiet -ml-2 w-11 px-0 lg:hidden" aria-label="Open navigation" onclick={() => (ui.navOpenMobile = true)}>
 		<Icon name="menu" />
-	</button>
-	<button class="btn btn-quiet -ml-2 hidden w-11 px-0 lg:inline-flex" aria-label={ui.navCollapsed ? 'Expand navigation' : 'Collapse navigation'} onclick={() => ui.toggleNav()}>
-		<Icon name="panel" />
 	</button>
 
 	<label class="relative flex items-center">
@@ -50,10 +46,5 @@
 
 	<div class="flex-1"></div>
 
-	<button class="btn btn-quiet hidden px-3 text-ink-3 sm:inline-flex" onclick={() => (ui.paletteOpen = true)} aria-label="Search (Command K)">
-		<Icon name="search" size={18} />
-		<span class="hidden text-sm sm:inline">Search</span>
-		<kbd class="hidden rounded border border-line px-1.5 font-mono text-xs md:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
-	</button>
 	<ModeToggle />
 </header>

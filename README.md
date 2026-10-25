@@ -144,7 +144,7 @@ Money is stored as 64-bit integer minor units, and every currency conversion rou
 ## Repo layout
 
 ```
-apps/web/                 SvelteKit CFO app: Launchpad, Proposals, Agents, Close, Ledger, Board Pack, Charters, Customers, Vendors, Settings, /claim, /pitch
+apps/web/                 SvelteKit CFO app: landing page (/), Launchpad (/dashboard), Proposals, Agents, Close, Ledger, Board Pack, Charters, Customers, Vendors, Settings, /claim, /pitch
 apps/agents/              Orchestrator, gateway (:8787), agent charters, scripted Demo mode close
   src/scripted/           The scripted close, including the Consolidation step (consolidate.ts) and the Advisor's rulings
   src/feed/               The simulated bank and invoice feed (feeder.ts)

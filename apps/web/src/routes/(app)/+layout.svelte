@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import CommandPalette from '#lib/components/CommandPalette.svelte';
-	import Icon from '#lib/components/Icon.svelte';
 	import Nav from '#lib/components/Nav.svelte';
 	import TopBar from '#lib/components/TopBar.svelte';
 	import { appear } from '#lib/motion.js';
@@ -38,7 +37,7 @@
 
 <div class="flex min-h-dvh">
 	<aside
-		class="sticky top-0 hidden h-dvh shrink-0 border-r border-line bg-canvas transition-[width] duration-200 lg:block {ui.navCollapsed ? 'w-[72px]' : 'w-[232px]'}"
+		class="sticky top-0 hidden h-dvh shrink-0 border-r border-line bg-canvas transition-[width] duration-200 lg:block {ui.navCollapsed ? 'w-[72px]' : 'w-[248px]'}"
 	>
 		<Nav compact={ui.navCollapsed} />
 	</aside>
@@ -51,10 +50,7 @@
 				transition:fly={{ x: -280, duration: prefersReducedMotion.current ? 0 : 200 }}
 				aria-label="Navigation"
 			>
-				<button class="btn btn-quiet absolute top-3 right-3 w-11 px-0" aria-label="Close navigation" onclick={() => (ui.navOpenMobile = false)}>
-					<Icon name="x" />
-				</button>
-				<Nav />
+				<Nav drawer />
 			</aside>
 		</div>
 	{/if}
