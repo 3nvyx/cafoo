@@ -1,0 +1,146 @@
+{
+	"app.css": {
+		"raw-colour": 81
+	},
+	"lib/components/BottomNav.svelte": {
+		"bracket-size": 7,
+		"unknown-class": 7
+	},
+	"lib/components/CloseProgress.svelte": {
+		"unknown-class": 1
+	},
+	"lib/components/CommandPalette.svelte": {
+		"bracket-size": 3,
+		"unknown-class": 6
+	},
+	"lib/components/ConfirmDialog.svelte": {
+		"bracket-size": 1
+	},
+	"lib/components/DebateMessage.svelte": {
+		"bracket-size": 6,
+		"unknown-class": 7
+	},
+	"lib/components/FootprintChip.svelte": {
+		"unknown-class": 1
+	},
+	"lib/components/FootprintPanel.svelte": {
+		"bracket-size": 9,
+		"unknown-class": 17
+	},
+	"lib/components/JournalLines.svelte": {
+		"bracket-size": 1,
+		"unknown-class": 2
+	},
+	"lib/components/MatchTable.svelte": {
+		"bracket-size": 2,
+		"unknown-class": 6
+	},
+	"lib/components/Nav.svelte": {
+		"bracket-size": 3,
+		"unknown-class": 4
+	},
+	"lib/components/ProfileMenu.svelte": {
+		"bracket-size": 2,
+		"unknown-class": 8
+	},
+	"lib/components/ProposalCard.svelte": {
+		"bracket-size": 9,
+		"unknown-class": 13
+	},
+	"lib/components/ProposalList.svelte": {
+		"unknown-class": 1
+	},
+	"lib/components/ScheduleTable.svelte": {
+		"unknown-class": 4
+	},
+	"lib/components/SeatBanner.svelte": {
+		"bracket-size": 2,
+		"unknown-class": 2
+	},
+	"lib/components/Toaster.svelte": {
+		"bracket-size": 2
+	},
+	"lib/components/TopBar.svelte": {
+		"unknown-class": 6
+	},
+	"routes/(app)/+layout.svelte": {
+		"bracket-size": 4,
+		"palette-class": 1,
+		"unknown-class": 1
+	},
+	"routes/(app)/agents/+page.svelte": {
+		"bracket-size": 5,
+		"unknown-class": 5
+	},
+	"routes/(app)/charters/+page.svelte": {
+		"bracket-size": 11,
+		"unknown-class": 36
+	},
+	"routes/(app)/close/+page.svelte": {
+		"bracket-size": 4,
+		"unknown-class": 5
+	},
+	"routes/(app)/customers/+page.svelte": {
+		"bracket-size": 10,
+		"unknown-class": 6
+	},
+	"routes/(app)/customers/[id]/+page.svelte": {
+		"bracket-size": 5,
+		"unknown-class": 15
+	},
+	"routes/(app)/dashboard/+page.svelte": {
+		"bracket-size": 6,
+		"unknown-class": 5
+	},
+	"routes/(app)/ledger/+page.svelte": {
+		"bracket-size": 6,
+		"unknown-class": 12
+	},
+	"routes/(app)/proposals/+page.svelte": {
+		"bracket-size": 5,
+		"unknown-class": 1
+	},
+	"routes/(app)/reports/+page.svelte": {
+		"bracket-size": 11,
+		"unknown-class": 20
+	},
+	"routes/(app)/settings/+page.svelte": {
+		"bracket-size": 3,
+		"unknown-class": 13
+	},
+	"routes/(app)/vendors/+page.svelte": {
+		"bracket-size": 6,
+		"unknown-class": 3
+	},
+	"routes/(app)/vendors/[id]/+page.svelte": {
+		"bracket-size": 4,
+		"unknown-class": 8
+	},
+	"routes/(marketing)/+page.svelte": {
+		"bracket-size": 17,
+		"unknown-class": 15
+	},
+	"routes/(marketing)/DrillDemo.svelte": {
+		"bracket-size": 5,
+		"unknown-class": 7
+	},
+	"routes/(marketing)/FlowDiagram.svelte": {
+		"bracket-size": 10
+	},
+	"routes/(marketing)/GateStack.svelte": {
+		"bracket-size": 10,
+		"unknown-class": 2
+	},
+	"routes/(marketing)/ModeDemo.svelte": {
+		"bracket-size": 4,
+		"unknown-class": 5
+	},
+	"routes/(marketing)/pitch/+page.svelte": {
+		"bracket-size": 7,
+		"unknown-class": 10
+	},
+	"routes/claim/+page.svelte": {
+		"bracket-size": 6,
+		"unknown-class": 1
+	}
+}

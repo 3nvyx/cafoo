@@ -2,6 +2,8 @@
 // Every table is mirrored into `$state` arrays of UI rows; reducer calls are
 // the CFO's actions. Starting a close goes to the agent gateway over HTTP.
 import { DbConnection } from '../../module_bindings';
+import type { DataSet } from '../source';
+import { byLabel, tableLabel } from '../data-sets';
 import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
 import type * as U from '../types';
 import * as M from './map';
@@ -121,6 +123,18 @@ function plain(err: unknown, fallback: string): Error {
 	return new Error(fallback);
 }
 
+/** A table handle in the SDK's db view (a dotted accessor would be a namespace object instead). */
+type TableHandle = {
+	count(): number | bigint;
+	iter(): Iterable<unknown>;
+	onInsert?(cb: () => void): void;
+	onDelete?(cb: () => void): void;
+	onUpdate?(cb: () => void): void;
+};
+function isTable(t: unknown): t is TableHandle {
+	return !!t && typeof (t as { count?: unknown }).count === 'function' && typeof (t as { iter?: unknown }).iter === 'function';
+}
+
 export class SpacetimeDataSource implements DataSource {
 	readonly kind = 'live' as const;
 
@@ -134,6 +148,12 @@ export class SpacetimeDataSource implements DataSource {
 	#cfg: SpacetimeConfig;
 	#subs = new Map<U.TableName, Set<(e: ChangeEvent) => void>>();
 	#dirty = new Set<Accessor>();
+	/** The Dash bar's raw reads: one version per table, so a change to one table redraws only that table, plus one
+	 * for the list of tables and their counts. Changes are gathered for up to 150 ms, so a busy feed redraws calmly. */
+	#rawVersions: Record<string, number> = $state({});
+	#listVersion = $state(0);
+	#rawPending = new Set<string>();
+	#rawTimer: ReturnType<typeof setTimeout> | null = null;
 	#flushQueued = false;
 
 	constructor(cfg: SpacetimeConfig) {
@@ -172,6 +192,40 @@ export class SpacetimeDataSource implements DataSource {
 	now = () => new Date().toISOString();
 	connection = () => this.#conn;
 	cfoSeat = () => this.#seat;
+	// Every table the connection subscribed to (subscribeToAllTables), read straight from the SpacetimeDB client cache,
+	// including the ones the screens never map (contract items, revenue schedule lines, the agent roster, feed events).
+	// A short disconnect keeps the last rows on screen (the client cache outlives the socket); the page says it is offline.
+	dataSets = (): DataSet[] => {
+		void this.#listVersion;
+		const view = this.#tableView();
+		if (!view) return [];
+		return Object.keys(view)
+			.filter((id) => isTable(view[id]))
+			.map((id) => ({ id, label: tableLabel(id), count: Number(view[id].count()) }))
+			.sort(byLabel);
+	};
+	dataSetRows = (id: string): Record<string, unknown>[] => {
+		void this.#rawVersions[id];
+		const view = this.#tableView();
+		if (!view || !Object.hasOwn(view, id) || !isTable(view[id])) return [];
+		return Array.from(view[id].iter() as Iterable<Record<string, unknown>>);
+	};
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	#tableView(): Record<string, any> | null {
+		if (!this.#db || this.#conn.ledger === 'connecting') return null;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		return this.#db.db as any;
+	}
+	#rawChanged(id: string) {
+		this.#rawPending.add(id);
+		this.#rawTimer ??= setTimeout(() => {
+			this.#rawTimer = null;
+			for (const t of this.#rawPending) this.#rawVersions[t] = (this.#rawVersions[t] ?? 0) + 1;
+			this.#rawPending.clear();
+			this.#listVersion++;
+		}, 150);
+	}
+
 	providers = (): U.ProviderStatus[] => [
 		{ id: 'ledger', name: 'Ledger database', purpose: 'Books, Proposals and the agent message bus', mode: 'live', detail: `${this.#cfg.uri} / ${this.#cfg.database} (${this.#conn.ledger})` },
 		{ id: 'agents', name: 'Agent gateway', purpose: 'Starts the close; runs the worker agents, Red Team and Advisor', mode: 'live', detail: `${this.#cfg.gateway} (${this.#conn.agents})` },
@@ -367,7 +421,7 @@ export class SpacetimeDataSource implements DataSource {
 			const res = await fetch(`${this.#cfg.gateway}/status`);
 			if (!res.ok) throw new Error(String(res.status));
 			const body = (await res.json()) as {
-				closes?: { periodYm: string; status: string }[];
+				closes?: { periodYm: string; status: string; steps?: unknown; error?: unknown }[];
 				providers?: { name: string; mode: string; detail?: string }[];
 				feed?: { enabled?: boolean; ym?: string | null; planned?: number; ingested?: number; blockedReason?: string | null };
 			};
@@ -376,7 +430,12 @@ export class SpacetimeDataSource implements DataSource {
 				this.#conn.feed = { enabled: !!f.enabled, ym: f.ym ?? undefined, planned: f.planned ?? 0, ingested: f.ingested ?? 0, blockedReason: f.blockedReason ?? undefined };
 			}
 			this.#conn.agents = 'online';
-			this.#conn.closes = (body.closes ?? []).map((c) => ({ periodYm: c.periodYm, status: c.status === 'running' ? 'running' : 'done' }));
+			this.#conn.closes = (body.closes ?? []).map((c) => ({
+				periodYm: c.periodYm,
+				status: c.status === 'error' ? 'error' : c.status === 'running' ? 'running' : 'done',
+				steps: Array.isArray(c.steps) ? c.steps.filter((s): s is string => typeof s === 'string') : undefined,
+				error: typeof c.error === 'string' ? c.error : undefined
+			}));
 			this.#gatewayProviders = (body.providers ?? [])
 				.filter((p) => !/spacetime/i.test(p.name))
 				.map((p, i) => ({ id: `gw-${i}`, name: p.name, purpose: 'Reported by the agent gateway', mode: p.mode === 'live' ? 'live' : 'demo', detail: p.detail ?? '' }));
@@ -401,6 +460,8 @@ export class SpacetimeDataSource implements DataSource {
 					.onApplied(() => {
 						for (const a of Object.keys(ACCESSORS) as Accessor[]) this.#dirty.add(a);
 						this.#flush();
+						this.#listVersion++;
+						for (const id of Object.keys(conn.db)) this.#rawVersions[id] = (this.#rawVersions[id] ?? 0) + 1;
 						this.#conn.ledger = 'live';
 						this.#seatFrom(conn);
 					})
@@ -433,6 +494,16 @@ export class SpacetimeDataSource implements DataSource {
 			table.onInsert?.(mark('insert'));
 			table.onDelete?.(mark('delete'));
 			table.onUpdate?.(mark('update'));
+		}
+		// Any table, mapped or not, keeps the Dash bar's raw view current.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const view = conn.db as any;
+		for (const id of Object.keys(view)) {
+			if (!isTable(view[id])) continue;
+			const bump = () => this.#rawChanged(id);
+			view[id].onInsert?.(bump);
+			view[id].onDelete?.(bump);
+			view[id].onUpdate?.(bump);
 		}
 		// This connection's own role and the roster decide what the UI shows about the CFO seat.
 		const seat = () => this.#queueSeat();

@@ -23,7 +23,7 @@
 	}
 </script>
 
-<div use:whenNear class="relative isolate overflow-hidden rounded-3xl border border-line {cls}">
+<div use:whenNear class="relative isolate overflow-hidden rounded-3xl {cls}">
 	{#if near}<div class="absolute inset-0 -z-10"><PaintedSky {seed} /></div>{/if}
 	{@render children()}
 </div>

@@ -4,19 +4,19 @@
 	import { db } from '#lib/data/index.js';
 	import { AGING_BUCKETS, AGING_LABEL, aging, arrWaterfall, nrrBp, periodEnd, periodLabel } from '#lib/data/derive.js';
 	import { boardPack, rateText, rootOf, type BsRow, type Cells, type PackColumn, type PnlRow } from '#lib/data/group.js';
-	import { inReportScope } from '#lib/data/report-scope.js';
 	import type { AccountType, Contract, Invoice } from '#lib/data/types.js';
 	import { formatMoney, toBig } from '#lib/data/money.js';
 	import CountUp from '#lib/components/CountUp.svelte';
+	import Notice from '#lib/components/Notice.svelte';
 	import Pill from '#lib/components/Pill.svelte';
+	import { bankExceptionState } from '#lib/close.js';
+	import { inReportScope } from '#lib/data/report-scope.js';
 	import { dateTime, drill } from '#lib/labels.js';
 	import type { DrillPeriod } from '#lib/drill.js';
 	import { ui } from '#lib/ui.svelte.js';
-	import { bankExceptionState } from '#lib/close.js';
 	import ArrWaterfall from './ArrWaterfall.svelte';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId));
-	const bankExceptions = $derived(period ? bankExceptionState(db, period.id) : null);
 	const subsidiaries = $derived(db.subsidiaries());
 	const root = $derived(rootOf(subsidiaries));
 	const isGroup = $derived(subsidiaries.length > 1);
@@ -53,8 +53,10 @@
 
 	// Receivables and ARR come from invoices and contracts, not the ledger. One company: its own customers in its own
 	// currency. The group: every company's, translated at the month's closing rate.
-	const customerSub = $derived(new Map(db.customers().map((c) => [c.id, c.subsidiaryId ?? root?.id ?? ''])));
+	// A customer with no company (and no root company to fall back on) is left out, so the report stops with a plain error.
+	const customerSub = $derived(new Map(db.customers().flatMap((c): [string, string][] => ((c.subsidiaryId ?? root?.id) ? [[c.id, (c.subsidiaryId ?? root?.id) as string]] : []))));
 	const subCcy = $derived(new Map(subsidiaries.map((s) => [s.id, s.baseCurrency])));
+	// A customer with no company, or a company with no currency or rate, stops these tables rather than dropping rows.
 	type Supplemental = { kind: 'ready'; invoices: Invoice[]; contracts: Contract[] } | { kind: 'error'; message: string };
 	const supplemental = $derived.by((): Supplemental => {
 		if (!period) return { kind: 'ready', invoices: [], contracts: [] };
@@ -63,11 +65,12 @@
 			return {
 				kind: 'ready',
 				invoices: inReportScope(db.invoices(), input, (invoice) => invoice.customerId, (invoice, convert) => ({ ...invoice, amountMinor: convert(invoice.amountMinor) })),
-				contracts: inReportScope(db.contracts(), input, (contract) => contract.customerId, (contract, convert) => ({
-					...contract,
-					arrMinor: convert(contract.arrMinor),
-					priorArrMinor: contract.priorArrMinor ? convert(contract.priorArrMinor) : contract.priorArrMinor
-				}))
+				contracts: inReportScope(
+					db.contracts(),
+					input,
+					(contract) => contract.customerId,
+					(contract, convert) => ({ ...contract, arrMinor: convert(contract.arrMinor), priorArrMinor: contract.priorArrMinor ? convert(contract.priorArrMinor) : contract.priorArrMinor })
+				)
 			};
 		} catch (error) {
 			return { kind: 'error', message: error instanceof Error ? error.message : String(error) };
@@ -75,6 +78,10 @@
 	});
 	const invoices = $derived(supplemental.kind === 'ready' ? supplemental.invoices : []);
 	const contracts = $derived(supplemental.kind === 'ready' ? supplemental.contracts : []);
+
+	/** Unmatched bank lines through this month, and whether the CFO accepted exactly this set. */
+	const bankExceptions = $derived(period ? bankExceptionState(db, period.id) : null);
+	const unmatched = $derived(bankExceptions?.rows.length ?? 0);
 
 	const asOf = $derived(period ? periodEnd(period) : '');
 	const quarterStart = $derived.by(() => {
@@ -149,21 +156,25 @@
 			<h1 class="text-[34px] sm:text-[42px]">{periodLabel(period)}</h1>
 			<p class="mt-1 text-sm text-ink-3">Rendered {dateTime(renderedAt)} from {db.journalEntries().length} Journal Entries</p>
 		</div>
-		{#if period.status === 'closed'}
-			<Pill tone={bankExceptions?.rows.length ? 'warn' : 'pos'}>Final{bankExceptions?.rows.length ? ' · bank exceptions' : ''} · locked {period.lockedAt ? dateTime(period.lockedAt) : ''}</Pill>
-		{:else}
-			<Pill tone="warn">Draft · {period.status === 'closing' ? 'close in progress' : 'period open'}</Pill>
-		{/if}
-	</div>
-	{#if bankExceptions?.rows.length}
-		<div class="mt-5 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">
-			<p class="font-medium">{bankExceptions.rows.length} bank line{bankExceptions.rows.length === 1 ? ' remains' : 's remain'} unmatched.</p>
-			{#if bankExceptions.acceptance.accepted}
-				<p class="mt-1">The CFO accepted this exact exception set on {dateTime(bankExceptions.acceptance.at)}. Reason: {bankExceptions.acceptance.reasonPlain}. Acceptance does not reconcile the bank.</p>
+		<div class="flex flex-wrap gap-2">
+			{#if period.status === 'closed'}
+				<Pill tone="pos">Final · locked {period.lockedAt ? dateTime(period.lockedAt) : ''}</Pill>
+				{#if unmatched}<Pill tone="warn">{unmatched} bank line{unmatched === 1 ? '' : 's'} unmatched</Pill>{/if}
 			{:else}
-				<p class="mt-1">No current CFO exception acceptance is recorded. Review the lines on the <a class="drill" href="/close#bank-exceptions">close checklist</a> before treating this pack as reconciled.</p>
+				<Pill tone="warn">Draft · {period.status === 'closing' ? 'close in progress' : 'period open'}</Pill>
 			{/if}
 		</div>
+	</div>
+
+	{#if bankExceptions && unmatched}
+		{@const acceptance = bankExceptions.acceptance}
+		<Notice class="mt-5" tone="warn" title="{unmatched} bank line{unmatched === 1 ? '' : 's'} remain{unmatched === 1 ? 's' : ''} unmatched" href="/close#bank-exceptions" action="Review the bank lines">
+			{#if acceptance.accepted}
+				The CFO accepted this exact set on {dateTime(acceptance.at)}: “{acceptance.reasonPlain}”. Acceptance records the decision; it does not reconcile the bank.
+			{:else}
+				No current acceptance is recorded for this exact set. Match these lines or accept them as open exceptions on the close page; either way this pack is not reconciled.
+			{/if}
+		</Notice>
 	{/if}
 
 	{#if isGroup}
@@ -173,9 +184,9 @@
 				<button type="button" class="chip" aria-pressed={scope === s.id} onclick={() => choose(s.code)}>{s.isElimination ? 'Eliminations' : s.name} · {s.baseCurrency}</button>
 			{/each}
 		</div>
-		<p class="mt-2 text-sm text-ink-3">
+		<p class="mt-2 text-body-sm text-ink-3">
 			{#if consolidated}
-				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. The Eliminations column shows entries posted so far. Draft totals may still include intercompany activity.
+				Every company translated into {reportingCcy}: balances at the month's closing rate, income and expenses at each month's average rate. The Eliminations column shows the entries posted so far.
 			{:else if selected?.isElimination}
 				The bookkeeping-only company that holds every Elimination, in {selected.baseCurrency}.
 			{:else}
@@ -183,24 +194,22 @@
 			{/if}
 		</p>
 	{/if}
-	{#if consolidated && period.status !== 'closed'}
-		<p class="mt-4 rounded-card bg-warning-container px-4 py-3 text-sm text-on-warning-container" role="status">Draft group totals may include intercompany charges until the elimination entries post. Review the Eliminations column before using these figures.</p>
-	{/if}
 
-	{#if result && 'error' in result}
-		<div class="mt-6 rounded-card bg-error-container px-4 py-3 text-on-error-container" role="alert">
-			<p class="font-medium">This Board Pack cannot be drawn yet.</p>
-			<p class="mt-1 text-[15px]">{result.error}</p>
-		</div>
-	{/if}
-	{#if supplemental.kind === 'error'}
-		<div class="mt-6 rounded-card bg-error-container px-4 py-3 text-on-error-container" role="alert">
-			<p class="font-medium">This Board Pack cannot be drawn yet.</p>
-			<p class="mt-1 text-[15px]">{supplemental.message} The invoice and contract totals are withheld until the source data is complete.</p>
+	<!-- At most three notices stack here: the draft note, and one of the two failures (the second needs a pack). -->
+	{#if (consolidated && period.status !== 'closed') || (result && 'error' in result) || (pack && supplemental.kind === 'error')}
+		<div class="mt-5 flex flex-col gap-3">
+			{#if consolidated && period.status !== 'closed'}
+				<Notice tone="info">Draft group totals may still include intercompany charges until the elimination entries post. Check the Eliminations column before using these figures.</Notice>
+			{/if}
+			{#if result && 'error' in result}
+				<Notice tone="neg" title="This Board Pack cannot be drawn yet">{result.error}</Notice>
+			{:else if pack && supplemental.kind === 'error'}
+				<Notice tone="neg" title="The receivables and ARR tables cannot be drawn yet">{supplemental.message} The invoice and contract totals are withheld until the source data is complete.</Notice>
+			{/if}
 		</div>
 	{/if}
 
-	{#if pack && arr}
+	{#if pack}
 		{@const totalCol = pack.columns.find((c) => c.key === tk)!}
 		<section class="mt-6 grid grid-cols-1 divide-y divide-line border-b border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0" aria-label="Headline numbers">
 			<a href={typeHref(['revenue'], totalCol, pid)} class="group flex flex-col gap-1 py-5 sm:pr-6">
@@ -214,8 +223,13 @@
 			<!-- ARR comes from the contracts, not the ledger, so there are no journal lines to drill to. -->
 			<div class="flex flex-col gap-1 py-5 sm:pl-6">
 				<span class="eyebrow">ARR at month end</span>
-				<span class="text-[28px] font-medium"><CountUp minor={arr.end} currency={ccy} /></span>
-				<span class="text-sm text-ink-3">from the active contracts</span>
+				{#if arr}
+					<span class="text-[28px] font-medium"><CountUp minor={arr.end} currency={ccy} /></span>
+					<span class="text-sm text-ink-3">from the active contracts</span>
+				{:else}
+					<span class="text-title font-medium text-ink-3">Withheld</span>
+					<span class="text-body-sm text-ink-3">until the contract data is complete</span>
+				{/if}
 			</div>
 		</section>
 
@@ -367,49 +381,57 @@
 				<p class="mt-1 text-sm text-ink-3">
 					From {quarterStart} to {asOf}, from the active contracts{consolidated ? ` of every company, at the month's closing rate` : ''}. ARR is not a ledger figure, so it has no journal lines.
 				</p>
-				<div class="mt-4"><ArrWaterfall w={arr} currency={ccy} /></div>
-				<p class="mt-3 text-sm text-ink-2">
-					Net revenue retention:
-					<span class="num font-medium text-ink">{nrr === null ? 'n/a (no customer had ARR at the start).' : `${(nrr / 100).toFixed(1)}%.`}</span>
-					<span class="text-ink-3">The customers we had on {quarterStart}, at what they are worth now; new customers are left out.</span>
-				</p>
+				{#if arr}
+					<div class="mt-4"><ArrWaterfall w={arr} currency={ccy} /></div>
+					<p class="mt-3 text-sm text-ink-2">
+						Net revenue retention:
+						<span class="num font-medium text-ink">{nrr === null ? 'n/a (no customer had ARR at the start).' : `${(nrr / 100).toFixed(1)}%.`}</span>
+						<span class="text-ink-3">The customers we had on {quarterStart}, at what they are worth now; new customers are left out.</span>
+					</p>
+				{:else}
+					<p class="mt-4 text-body-sm text-ink-3">Withheld until the contract data is complete.</p>
+				{/if}
 			</section>
 
 			<section aria-labelledby="aging-h" class="min-w-0">
 				<h2 id="aging-h" class="text-2xl">Receivables aging</h2>
-				<p class="mt-1 text-sm text-ink-3">
-					Unpaid invoices as of {asOf}, {fmt(ag.total.toString())} in total{consolidated ? `, every company's at the month's closing rate` : ''}. Each customer's page lists the invoices behind their amounts.
-				</p>
-				<ul class="mt-4 flex flex-col gap-3">
-					{#each AGING_BUCKETS as b (b)}
-						<li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1">
-							<span class="text-[15px]">{AGING_LABEL[b]}</span>
-							<span class="num text-right">{fmt(ag.totals[b].toString())}</span>
-							<span class="col-span-2 h-2 overflow-hidden rounded-full bg-subtle">
-								<span
-									class="block h-full rounded-full transition-[width] duration-500"
-									style="width:{Number((ag.totals[b] * 1000n) / maxBucket) / 10}%; background:{b === 'current' ? 'var(--accent)' : b === '1-30' ? 'var(--warn)' : 'var(--neg)'}"
-								></span>
-							</span>
-						</li>
-					{/each}
-				</ul>
-				{#if agingRows.length}
-					<h3 class="mt-8 text-lg">Most overdue customers</h3>
-					<table class="mt-2 w-full text-[15px]">
-						<thead class="text-left text-sm text-ink-3">
-							<tr class="border-b border-line"><th class="py-2 font-medium">Customer</th><th class="py-2 text-right font-medium">Late</th><th class="py-2 text-right font-medium">Total</th></tr>
-						</thead>
-						<tbody>
-							{#each agingRows as r (r.id)}
-								<tr class="border-b border-line">
-									<td class="py-2 pr-2"><a class="drill" href="/customers/{r.id}">{r.name}</a></td>
-									<td class="num py-2 text-right {r.late > 0n ? 'text-neg' : 'text-ink-3'}"><a class="drill" href="/customers/{r.id}">{fmt(r.late.toString())}</a></td>
-									<td class="num py-2 text-right"><a class="drill" href="/customers/{r.id}">{fmt(r.total.toString())}</a></td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
+				{#if supplemental.kind === 'ready'}
+					<p class="mt-1 text-sm text-ink-3">
+						Unpaid invoices as of {asOf}, {fmt(ag.total.toString())} in total{consolidated ? `, every company's at the month's closing rate` : ''}. Each customer's page lists the invoices behind their amounts.
+					</p>
+					<ul class="mt-4 flex flex-col gap-3">
+						{#each AGING_BUCKETS as b (b)}
+							<li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1">
+								<span class="text-[15px]">{AGING_LABEL[b]}</span>
+								<span class="num text-right">{fmt(ag.totals[b].toString())}</span>
+								<span class="col-span-2 h-2 overflow-hidden rounded-full bg-subtle">
+									<span
+										class="block h-full rounded-full transition-[width] duration-500"
+										style="width:{Number((ag.totals[b] * 1000n) / maxBucket) / 10}%; background:{b === 'current' ? 'var(--accent)' : b === '1-30' ? 'var(--warn)' : 'var(--neg)'}"
+									></span>
+								</span>
+							</li>
+						{/each}
+					</ul>
+					{#if agingRows.length}
+						<h3 class="mt-8 text-lg">Most overdue customers</h3>
+						<table class="mt-2 w-full text-[15px]">
+							<thead class="text-left text-sm text-ink-3">
+								<tr class="border-b border-line"><th class="py-2 font-medium">Customer</th><th class="py-2 text-right font-medium">Late</th><th class="py-2 text-right font-medium">Total</th></tr>
+							</thead>
+							<tbody>
+								{#each agingRows as r (r.id)}
+									<tr class="border-b border-line">
+										<td class="py-2 pr-2"><a class="drill" href="/customers/{r.id}">{r.name}</a></td>
+										<td class="num py-2 text-right {r.late > 0n ? 'text-neg' : 'text-ink-3'}"><a class="drill" href="/customers/{r.id}">{fmt(r.late.toString())}</a></td>
+										<td class="num py-2 text-right"><a class="drill" href="/customers/{r.id}">{fmt(r.total.toString())}</a></td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					{/if}
+				{:else}
+					<p class="mt-1 text-body-sm text-ink-3">Withheld until the invoice data is complete.</p>
 				{/if}
 			</section>
 		</div>

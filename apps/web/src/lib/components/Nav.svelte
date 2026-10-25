@@ -1,6 +1,6 @@
 <script lang="ts">
-	// The dashboard sidebar: brand and collapse toggle on top, Search as the primary row,
-	// grouped destinations that can fold away, and the CFO profile pinned to the bottom.
+	// The dashboard sidebar: brand, Search and the collapse toggle on top, grouped destinations that can fold away,
+	// and the CFO profile pinned to the bottom. Collapsed to icons, the top holds one button, so Search becomes a row.
 	import { page } from '$app/state';
 	import { db } from '#lib/data/index.js';
 	import { ui } from '#lib/ui.svelte.js';
@@ -8,10 +8,12 @@
 	import ProfileMenu from './ProfileMenu.svelte';
 	import Wordmark from './Wordmark.svelte';
 
+	// A row either navigates (href) or runs an action (onclick); both render through the same snippet.
 	interface Item {
-		href: string;
 		label: string;
 		icon: IconName;
+		href?: string;
+		onclick?: () => void;
 	}
 
 	const primary: Item[] = [
@@ -38,6 +40,10 @@
 		{
 			title: 'Governance',
 			items: [{ href: '/charters', label: 'Charters', icon: 'shield' }]
+		},
+		{
+			title: 'Data',
+			items: [{ href: '/dash-bar', label: 'Dash bar', icon: 'database' }]
 		}
 	];
 
@@ -47,18 +53,36 @@
 	const isActive = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(href + '/');
 	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
+	const shortcut = `${isMac ? '⌘' : 'Ctrl'} K`;
+	const search: Item = { label: 'Search', icon: 'search', onclick: () => (ui.paletteOpen = true) };
+	function openSearch() {
+		ui.navOpenMobile = false;
+		ui.paletteOpen = true;
+	}
+
 	let folded = $state<Record<string, boolean>>({});
-	// 44px rows on touch screens, the denser 36px on desktop.
-	const row = 'relative flex min-h-11 items-center gap-3 rounded-card px-2.5 text-[15px] transition-colors duration-150 lg:min-h-9';
+	// 44px rows on touch screens, the denser 36px on desktop. No focus ring: a focused row takes the
+	// hover fill instead, so keyboard users still see where they are.
+	const row =
+		'relative flex min-h-11 items-center gap-3 rounded-card px-2.5 text-left text-[15px] transition-colors duration-150 outline-none focus-visible:bg-subtle focus-visible:text-ink lg:min-h-9';
 </script>
 
 {#snippet link(it: Item)}
-	<a
+	{@const active = it.href ? isActive(it.href) : false}
+	<!-- Always an <a> or a <button>, both interactive; the checker cannot see through `this`. -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<svelte:element
+		this={it.href ? 'a' : 'button'}
 		href={it.href}
-		onclick={() => (ui.navOpenMobile = false)}
-		aria-current={isActive(it.href) ? 'page' : undefined}
+		type={it.href ? undefined : 'button'}
+		onclick={() => {
+			ui.navOpenMobile = false;
+			it.onclick?.();
+		}}
+		aria-current={active ? 'page' : undefined}
+		aria-label={compact ? it.label : undefined}
 		title={compact ? it.label : undefined}
-		class="{row} {compact ? 'justify-center' : ''} {isActive(it.href) ? 'bg-subtle font-medium text-ink' : 'text-ink-2 hover:bg-subtle hover:text-ink'}"
+		class="{row} {compact ? 'justify-center' : ''} {active ? 'bg-subtle font-medium text-ink' : 'text-ink-2 hover:bg-subtle hover:text-ink'}"
 	>
 		<Icon name={it.icon} size={18} />
 		{#if !compact}<span class="flex-1 truncate">{it.label}</span>{/if}
@@ -68,7 +92,7 @@
 				aria-label="{waiting} need your OK">{waiting}</span
 			>
 		{/if}
-	</a>
+	</svelte:element>
 {/snippet}
 
 <nav aria-label="Main" class="flex h-full flex-col">
@@ -76,33 +100,31 @@
 		{#if !compact}
 			<a href="/dashboard" class="flex min-h-[44px] items-center rounded-card px-2" aria-label="Cafoo Launchpad"><Wordmark size={22} /></a>
 		{/if}
-		{#if drawer}
-			<button class="btn btn-quiet w-11 px-0" aria-label="Close navigation" onclick={() => (ui.navOpenMobile = false)}><Icon name="x" /></button>
-		{:else}
-			<button class="btn btn-quiet w-10 px-0 text-ink-3" aria-label={compact ? 'Expand navigation' : 'Collapse navigation'} onclick={() => ui.toggleNav()}>
-				<Icon name="panel" size={18} />
-			</button>
-		{/if}
+		<div class="flex items-center gap-0.5">
+			{#if !compact}
+				<button
+					class="btn btn-quiet {drawer ? 'w-11' : 'w-10'} px-0 text-ink-3 hover:text-ink"
+					aria-label="Search"
+					aria-keyshortcuts={isMac ? 'Meta+K' : 'Control+K'}
+					title="Search ({shortcut})"
+					onclick={openSearch}
+				>
+					<Icon name="search" size={18} />
+				</button>
+			{/if}
+			{#if drawer}
+				<button class="btn btn-quiet w-11 px-0" aria-label="Close navigation" onclick={() => (ui.navOpenMobile = false)}><Icon name="x" /></button>
+			{:else}
+				<button class="btn btn-quiet w-10 px-0 text-ink-3 hover:text-ink" aria-label={compact ? 'Expand navigation' : 'Collapse navigation'} onclick={() => ui.toggleNav()}>
+					<Icon name="panel" size={18} />
+				</button>
+			{/if}
+		</div>
 	</div>
 
 	<div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-3">
 		<div class="flex flex-col gap-px">
-			<button
-				type="button"
-				class="{row} {compact ? 'justify-center' : ''} text-ink-2 hover:bg-subtle hover:text-ink"
-				title={compact ? 'Search' : undefined}
-				aria-label={compact ? 'Search' : undefined}
-				onclick={() => {
-					ui.navOpenMobile = false;
-					ui.paletteOpen = true;
-				}}
-			>
-				<Icon name="search" size={18} />
-				{#if !compact}
-					<span class="flex-1 text-left">Search</span>
-					<kbd class="hidden rounded border border-line px-1.5 font-mono text-xs text-ink-3 lg:inline">{isMac ? '⌘' : 'Ctrl'} K</kbd>
-				{/if}
-			</button>
+			{#if compact}{@render link(search)}{/if}
 			{#each primary as it (it.href)}{@render link(it)}{/each}
 		</div>
 

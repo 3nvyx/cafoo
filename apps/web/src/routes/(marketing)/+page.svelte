@@ -71,7 +71,7 @@
 		onfocusin={() => (navFocused = true)}
 		onfocusout={() => (navFocused = false)}
 	>
-		<div class="wide flex h-14 items-center justify-between gap-3 rounded-full border border-line bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
+		<div class="content flex h-14 items-center justify-between gap-3 rounded-full bg-canvas/85 pr-1.5 pl-4 backdrop-blur">
 			<a href="/" class="flex min-h-11 items-center px-1" aria-label="Cafoo home"><Wordmark size={24} /></a>
 			<nav aria-label="Page" class="hidden items-center md:flex">
 				{#each anchors as a (a.href)}
@@ -191,9 +191,9 @@
 			</ul>
 		</section>
 
-		<!-- A flat, full-width band closes the page; the river runs down to its top edge. -->
-		<section id="cta" class="mt-32 bg-accent text-on-accent" aria-labelledby="cta-h">
-			<div class="content flex flex-col items-center py-24 text-center sm:py-32">
+		<!-- A rounded accent block inside the page width closes the page; the river runs down to its top edge. -->
+		<section id="cta" class="content mt-32" aria-labelledby="cta-h">
+			<div class="flex flex-col items-center rounded-xl bg-accent px-6 py-20 text-center text-on-accent sm:py-24">
 				<h2 id="cta-h" class="max-w-[16ch] text-[36px] leading-[1.02] sm:text-[56px]" style="letter-spacing:-0.03em">Close your next month with us</h2>
 				<p class="mt-5 max-w-[46ch] text-lg opacity-80">Close September on sample data, confirm what matters, and lock the month yourself.</p>
 				<div class="mt-10 flex flex-col gap-3 sm:flex-row">
@@ -216,8 +216,8 @@
 <style>
 	/* Blur the river behind headings, or across the whole workflow section, with feathered edges. */
 	/* One 12-column grid, after Harvey's: a frame padded 28 / 32 / 36 / 40px (by breakpoint) with
-	   14 / 16 / 18 / 20px gaps. Wide things (the header, the painted hero panel) use the whole
-	   frame; copy and sections sit on columns 2–11 from lg up, so they line up with the hero. */
+	   14 / 16 / 18 / 20px gaps. Wide things (the painted hero panel) use the whole
+	   frame; the header, copy and sections sit on columns 2–11 from lg up, so they line up with the hero. */
 	.page {
 		--pad: 28px;
 		--gap: 14px;

@@ -2,7 +2,7 @@
 // Launchpad and the Close checklist so both screens agree.
 import type { DataSource } from './data/source';
 import type { AgentMessage, Period } from './data/types';
-import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions, isBankReconciliationTask } from '@cafoo/ledger-core';
+import { bankExceptionAcceptance, bankExceptionSnapshot, currentBankExceptions } from '@cafoo/ledger-core';
 
 type CloseBooks = Pick<DataSource, 'periods' | 'connection' | 'closeTasks' | 'proposals' | 'agentMessages' | 'bankTransactions' | 'auditEvents'>;
 
@@ -45,15 +45,10 @@ export function lockGate(db: CloseBooks, periodId: string): LockGate {
 	const awaiting = props.filter((p) => p.status === 'awaiting_cfo').length;
 	const sentBack = props.filter((p) => p.status === 'sent_back').length;
 	const open = props.filter((p) => p.status === 'open').length;
-	const bankExceptions = bankExceptionState(db, periodId);
-	const exceptionsAccepted = bankExceptions.rows.length > 0 && bankExceptions.acceptance.accepted;
-	// Advisor-owned tasks (and the CFO's own lock task) finish when the lock lands. The bank task stays open on purpose
-	// after the CFO accepts exceptions (the lines are still unreconciled), so the current acceptance stands in for it,
-	// exactly as the module's lockPeriod treats it.
-	const pendingTasks = tasks.filter(
-		(t) => t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done' && !(exceptionsAccepted && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title }))
-	).length;
+	// Advisor-owned tasks (and the CFO's own lock task) finish when the lock lands.
+	const pendingTasks = tasks.filter((t) => t.ownerRole !== 'advisor' && t.ownerRole !== 'cfo' && t.status !== 'done').length;
 	const blockedTasks = tasks.filter((t) => t.status === 'blocked').length;
+	const bankExceptions = bankExceptionState(db, periodId);
 	const thread = `close:${periodId}`;
 	// The Advisor's lock request stands only while the month is waiting for the lock: once the CFO locks it, or
 	// unlocks it again, that request is history.

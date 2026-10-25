@@ -58,12 +58,13 @@
 	<dl class="mt-6 grid grid-cols-2 divide-line border-y border-line sm:grid-cols-4 sm:divide-x">
 		<div class="py-4 sm:pr-4"><dt class="eyebrow">Payment terms</dt><dd class="num mt-1 text-xl">{c.paymentTermsDays === 0 ? 'Prepay' : `${c.paymentTermsDays} days`}</dd></div>
 		<div class="py-4 sm:px-4"><dt class="eyebrow">ARR</dt><dd class="num mt-1 text-xl">{formatMoney(arr, { whole: true })}</dd></div>
+		<!-- Neither number is a posted balance: both come from the open invoices listed below, so they link there. -->
 		<div class="py-4 sm:px-4"><dt class="eyebrow">Owed to us</dt><dd class="num mt-1 text-xl"><a class="drill" href="#inv-h">{formatMoney(ar, { whole: true })}</a></dd></div>
 		<div class="py-4 sm:pl-4">
 			<dt class="eyebrow">Target allowance</dt>
 			<dd class="num mt-1 text-xl"><a class="drill" href="#inv-h">{formatMoney(allowance, { whole: true })}</a></dd>
-			<dd class="text-sm text-ink-3">Tier-based estimate on these open invoices, not a posted entry.</dd>
-			{#if c.creditTier}<dd class="text-sm text-ink-3">{ALLOWANCE_RATE_BP[c.creditTier] / 100}% of what they owe, from {TIER[c.creditTier].label}</dd>{/if}
+			<dd class="text-caption text-ink-3">Tier-based estimate on these open invoices, not a posted entry.</dd>
+			{#if c.creditTier}<dd class="text-caption text-ink-3">{ALLOWANCE_RATE_BP[c.creditTier] / 100}% of what they owe, from {TIER[c.creditTier].label}</dd>{/if}
 		</div>
 	</dl>
 
@@ -109,7 +110,7 @@
 		</div>
 
 		<section aria-labelledby="inv-h">
-			<h2 id="inv-h" class="text-2xl">Invoices</h2>
+			<h2 id="inv-h" class="scroll-mt-6 text-2xl">Invoices</h2>
 			<ul class="mt-4 divide-y divide-line border-y border-line">
 				{#each invoices as i (i.id)}
 					<li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 py-3">
