@@ -20,6 +20,7 @@ import {
   ymToString,
   type RiskTier,
 } from '@cafoo/ledger-core';
+import { answerSendBack, type ReserveFacts } from './sendback';
 import { tracked } from '../provider-calls';
 import { CrsClient, creditCheckSummaryJson, runCascade, type CascadeResult } from '@cafoo/crs-mcp';
 import { collectFootprint, subjectsWithListings } from '../footprint';
@@ -691,10 +692,23 @@ async function waitForCfo(A: RoleConn, periodId: bigint, timeoutMs = 45 * 60_000
     // Only the CFO's queue: a proposal left Open (a ruling the books refused) is a refusal for a person, not a wait.
     const pending = [...A.db.proposal.iter()].filter(p => p.periodId === periodId && (p.status.tag === 'AwaitingCfo' || p.status.tag === 'SentBack'));
     if (pending.length === 0) return;
-    // Re-propose anything the CFO sent back: the Advisor re-approves with the CFO's note acknowledged.
-    for (const p of pending.filter(x => x.status.tag === 'SentBack')) {
-      const note = [...A.db.agentMessage.iter()].filter(m => m.proposalId === p.id && m.senderRole === 'cfo').pop();
-      await A.reducers.approveProposal({ proposalId: p.id, rationale: `The CFO sent this back: "${note?.body ?? ''}". Re-reviewed the evidence; the proposal stands as written, resubmitting for confirmation.`, summaryPlain: `Resubmitting after the CFO's note: ${note?.summaryPlain ?? 'please take another look.'}`, amendedPayloadJson: undefined });
+    // Answer anything the CFO sent back: apply the note as an amendment (which returns to the CFO) or reject the
+    // proposal with the reason, never resubmit it unchanged (sendback.ts).
+    const sentBack = pending.filter(x => x.status.tag === 'SentBack');
+    if (sentBack.length) {
+      const ym = A.db.period.id.find(periodId)?.ym;
+      const s = ym ? snapshot(A, ym) : undefined;
+      const facts: ReserveFacts = {
+        openArMinor: id => (s?.invoices ?? []).filter(i => i.customerId === id && i.status !== 'paid').reduce((a, i) => a + i.amountMinor, 0n),
+        allowanceMinor: id => (s ? existingAllowance(s, id) : 0n),
+        customerName: id => s?.customerName.get(id) ?? `customer ${id}`,
+      };
+      for (const p of sentBack) {
+        const note = [...A.db.agentMessage.iter()].filter(m => m.proposalId === p.id && m.senderRole === 'cfo').pop()?.body ?? '';
+        const a = answerSendBack(p, note, facts);
+        if (a.action === 'amend') await A.reducers.approveProposal({ proposalId: p.id, rationale: a.rationale, summaryPlain: a.summaryPlain, amendedPayloadJson: a.payloadJson });
+        else await A.reducers.rejectProposal({ proposalId: p.id, rationale: a.rationale, summaryPlain: a.summaryPlain });
+      }
     }
     await sleep(1000);
   }

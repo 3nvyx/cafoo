@@ -1745,7 +1745,10 @@ export const approveProposal = spacetimedb.reducer(
     // Checked before the materiality split, so the Advisor cannot send an unusable proposal to the CFO.
     validateProposal(ctx, p.kind.tag, payloadJson, p.id);
     const computed = computedAmount(ctx, p.kind.tag, payloadJson);
-    const amountMinor = computed > p.amountMinor ? computed : p.amountMinor;
+    // An approval keeps the larger of the stated and computed amounts, so understating a proposal cannot dodge the
+    // materiality split. An amendment always waits for the CFO, so it shows exactly what it would post (a reserve the
+    // CFO asked to lower reads as the lower amount).
+    const amountMinor = decision === 'amend' ? computed : computed > p.amountMinor ? computed : p.amountMinor;
     // An amendment is the Advisor's own text replacing a worker's, so it never posts on the Advisor's word alone: like
     // anything material, it waits for the CFO, whatever its amount.
     const material = amountMinor >= materiality(ctx);
