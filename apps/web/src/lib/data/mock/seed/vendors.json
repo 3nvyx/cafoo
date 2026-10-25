@@ -7,7 +7,7 @@
 		{ "id": "v05", "name": "Meadowlark Insurance Group", "category": "Insurance", "verification": "verified" },
 		{ "id": "v06", "name": "Larkspur Coworking", "category": "Rent", "verification": "verified" },
 		{ "id": "v07", "name": "Signal Path Ads", "category": "Marketing", "verification": "verified" },
-		{ "id": "v08", "name": "Tidewater Payroll Services", "category": "Payroll", "verification": "verified" },
+		{ "id": "v08", "name": "Gusto", "category": "Payroll", "verification": "verified" },
 		{ "id": "v09", "name": "Halvorsen Freight Co", "category": "Shipping", "verification": "unverified", "notePlain": "Bank details changed twice in ten days. Payments on hold while Credit & Risk checks." },
 		{ "id": "v10", "name": "Quillfeather Design Studio", "category": "Design", "verification": "verified" },
 		{ "id": "v11", "name": "Apex Kinetic Supplies", "category": "Hardware", "verification": "blocked", "notePlain": "No registered business matches this vendor. Blocked on September 2." },

@@ -296,9 +296,12 @@ export interface Breakage {
 	amountMinor: Minor;
 }
 
-/** Credit packs that expired in month `ym` with credits left, and the breakage revenue they leave behind. */
-export function breakage(batches: Batch[], ym: string): Breakage {
-	const packs = batches.filter((b) => b.kind === 'credit_pack' && b.remaining > 0 && !!b.expiresAt && b.expiresAt.slice(0, 7) === ym);
+/**
+ * Credit packs that expired in month `ym`, by `asOf`, with credits left, and the breakage revenue they leave behind.
+ * A pack that expires later in the month is not breakage yet.
+ */
+export function breakage(batches: Batch[], ym: string, asOf: string): Breakage {
+	const packs = batches.filter((b) => b.kind === 'credit_pack' && b.remaining > 0 && !!b.expiresAt && b.expiresAt.slice(0, 7) === ym && Date.parse(b.expiresAt) <= Date.parse(asOf));
 	return { ym, packs, amountMinor: s(sum(packs.map((b) => toBig(unusedValue(b))))) };
 }
 
@@ -311,7 +314,10 @@ export function expiringSoon(batches: Batch[], now: string, days = 30): Batch[] 
 
 export interface CreditTotals {
 	soldMinor: Minor;
-	/** Unused credits the company still owes as usage (2450 Customer credits). */
+	/**
+	 * Unused credits on packs that have not expired: usage the company still owes. Live usage is not booked as it
+	 * happens, so 2450 Customer credits matches this only after usage is recognized at month end.
+	 */
 	unusedMinor: Minor;
 	usedMinor: Minor;
 	/** Unused value of packs that expire within 30 days. */

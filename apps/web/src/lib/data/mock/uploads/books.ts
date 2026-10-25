@@ -15,8 +15,12 @@ const money = (minor: string | bigint) => {
 	return formatMoney(m.toString(), { whole: m % 100n === 0n });
 };
 const L = (account: string, debitMinor: string, creditMinor: string, extra: Partial<ScriptLine> = {}): ScriptLine => ({ account, debitMinor, creditMinor, ...extra });
-/** October if it is still open, otherwise wherever new data goes now. */
-const periodFor = (ctx: MockContext) => (ctx.t.period.some((p) => p.id === MONTH && p.status !== 'closed') ? MONTH : ctx.openPeriodId());
+/** October if it is still open, otherwise wherever new data goes now. Refuses before any row lands when every month is locked. */
+function periodFor(ctx: MockContext): string {
+	const id = ctx.t.period.some((p) => p.id === MONTH && p.status !== 'closed') ? MONTH : ctx.openPeriodId();
+	if (!id) throw new Error('Every month is locked; unlock one to post.');
+	return id;
+}
 /** "Bluefin Logistics'" and "Bansho Ramen's". */
 const owner = (name: string) => (name.endsWith('s') ? `${name}'` : `${name}'s`);
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
@@ -261,6 +265,7 @@ const invoices: UploadHandler = {
 	apply(ctx) {
 		const fresh = USAGE_INVOICES.filter((i) => !ctx.t.invoice.some((x) => x.id === i.id));
 		if (!fresh.length) return [];
+		const periodId = periodFor(ctx);
 		for (const inv of fresh) ctx.insert('invoice', { ...inv });
 		const total = fresh.reduce((s, i) => s + toBig(i.amountMinor), 0n).toString();
 		const name = (id: string) => ctx.t.customer.find((c) => c.id === id)?.name ?? id;
@@ -269,7 +274,7 @@ const invoices: UploadHandler = {
 				kind: 'journal_entry',
 				proposerRole: 'revenue',
 				amountMinor: total,
-				periodId: periodFor(ctx),
+				periodId,
 				summaryPlain: `Book ${money(total)} of usage that three customers were billed for on October 1 as revenue they owe us.`,
 				rationale: `Usage above plan, billed in arrears per contract; invoices ${fresh.map((i) => i.number).join(', ')}.`,
 				payload: {
@@ -391,6 +396,7 @@ const contracts: UploadHandler = {
 	},
 	apply(ctx) {
 		if (ctx.t.contract.some((k) => k.id === CONTRACT.id)) return [];
+		const periodId = periodFor(ctx);
 		if (!ctx.t.customer.some((c) => c.id === NEW_CUSTOMER.id)) ctx.insert('customer', { ...NEW_CUSTOMER });
 		ctx.insert('contract', { ...CONTRACT });
 		if (!ctx.t.invoice.some((i) => i.id === CONTRACT_INVOICE.id)) ctx.insert('invoice', { ...CONTRACT_INVOICE });
@@ -402,7 +408,7 @@ const contracts: UploadHandler = {
 				kind: 'revenue_schedule',
 				proposerRole: 'revenue',
 				amountMinor: fee,
-				periodId: periodFor(ctx),
+				periodId,
 				summaryPlain: `${NEW_CUSTOMER.name} prepaid ${money(fee)} for a year: count ${money(earned)} as October revenue and the rest as revenue still to be earned.`,
 				rationale: `Contract ${CONTRACT.id}, 12 months from 2026-10-01, satisfied ratably; invoice ${CONTRACT_INVOICE.number} billed upfront. Full-month convention (start on the 1st).`,
 				payload: {

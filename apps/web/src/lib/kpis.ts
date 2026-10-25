@@ -3,7 +3,9 @@
 import type { Summary } from './data/dashboard';
 import { arrAt, arrWaterfall, nrrBp } from './data/derive';
 import { formatMoney, toBig } from './data/money';
-import type { Contract, Employee, Minor } from './data/types';
+import type { Batch, CloudCost, Contract, Deal, Employee, FxRate, Invoice, Minor, SupportTicket } from './data/types';
+import { breakage, costOfService, costPerMTokens, creditPricePerM, creditTotals, grossMarginAfterInference, type RateE6 } from './costs';
+import { repeatRateBp, supportSummary, weightedPipeline } from './crm';
 
 const big = (m: Minor | bigint): bigint => (typeof m === 'bigint' ? m : toBig(m));
 
@@ -14,14 +16,16 @@ export type Health = 'good' | 'watch' | 'poor' | null;
 export function fte(employees: Employee[], at: string): number {
 	let n = 0;
 	for (const e of employees) {
-		if (e.startAt.slice(0, 10) > at || (e.endAt && e.endAt.slice(0, 10) < at) || e.status === 'terminated') continue;
+		// Someone who has left still counted on the days they worked; a termination with no end date counts as gone.
+		if (e.startAt.slice(0, 10) > at || (e.endAt ? e.endAt.slice(0, 10) < at : e.status === 'terminated')) continue;
 		n += e.type === 'full_time' ? 1 : e.type === 'contractor' ? 0 : 0.5;
 	}
 	return n;
 }
 
-/** Cash that went out net over the range, a positive amount; 0 when cash grew. */
-export const netBurn = (s: Pick<Summary, 'cashChange'>): bigint => (toBig(s.cashChange) < 0n ? -toBig(s.cashChange) : 0n);
+/** Cash running the business used over the range, a positive amount; 0 when operations added cash. Money raised does
+ * not count: a funding round does not lower burn. */
+export const netBurn = (s: Pick<Summary, 'operatingCashChange'>): bigint => (toBig(s.operatingCashChange) < 0n ? -toBig(s.operatingCashChange) : 0n);
 
 /** ARR added over (from, to]: new and expansion less contraction and churn. */
 export function netNewArr(contracts: Contract[], from: string, to: string): bigint {
@@ -142,15 +146,15 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			value: multiple === null ? (burn > 0n ? 'No ARR added' : '–') : `${multiple.toFixed(1)}×`,
 			health: burnMultipleHealth(multiple, burn),
 			inputs: `${money(burn)} burned · ${money(added)} net new ARR`,
-			yardstick: 'Cash burned per dollar of new ARR. Under 1× is excellent, over 2× means growth is expensive.'
+			yardstick: 'Dollars of cash burned to add $1 of recurring revenue. Under 1× is great; over 2× means growth costs too much.'
 		},
 		{
 			key: 'runway',
 			label: 'Runway',
 			value: runway === null ? 'Cash not falling' : runway > 36 ? 'Over 3 years' : `${Math.round(runway)} months`,
 			health: runwayHealth(runway),
-			inputs: `${money(s.cash)} book cash`,
-			yardstick: '18 months or more is comfortable between rounds; under 9, raise now.',
+			inputs: `${money(burn)} a month of operating burn · ${money(s.cash)} cash`,
+			yardstick: 'Months your cash lasts at this rate of burn. 18 or more is comfortable; under 9 means start raising now.',
 			href: '/dashboard'
 		},
 		{
@@ -159,7 +163,7 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			value: perFte === null ? '–' : money(perFte),
 			health: arrPerFteHealth(perFte),
 			inputs: `${money(s.arr)} ARR · ${heads} full-time equivalents`,
-			yardstick: 'Early AI companies are often read against $150k to $250k.',
+			yardstick: 'Recurring revenue per full-time person; higher is better. Early AI startups aim for $150k to $250k.',
 			href: '/people'
 		},
 		{
@@ -168,7 +172,7 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			value: r40 ? `${r40.score.toFixed(0)}` : '–',
 			health: ruleOf40Health(r40?.score ?? null),
 			inputs: r40 ? `${r40.growthPct.toFixed(0)}% ARR growth, annualized · ${r40.marginPct.toFixed(0)}% net margin` : 'Needs ARR and revenue',
-			yardstick: 'ARR growth over the quarter, annualized, plus net margin. 40 or more is healthy.'
+			yardstick: 'Yearly growth rate plus profit margin, which weighs speed against burn. 40 or more is healthy.'
 		},
 		{
 			key: 'ndr',
@@ -176,8 +180,134 @@ export function efficiencyTiles(input: { month: Summary; from: string; to: strin
 			value: ndr === null ? '–' : `${(ndr / 100).toFixed(1)}%`,
 			health: ndrHealth(ndr),
 			inputs: "Existing customers' ARR, start of quarter to now",
-			yardstick: 'Over 110% means customers grow faster than they churn.',
+			yardstick: 'Recurring revenue kept from existing customers, upgrades and cancellations included. Over 100% means upgrades beat churn; 110% is strong.',
 			href: '/reports'
 		}
 	];
+}
+
+// AI unit economics, credits and go-to-market: the readings particular to an AI startup, from Cost of service, Batches
+// and the connected CRM, support and billing tools.
+
+/** Converts a currency to USD with the month's average rate (USD passes through), as the Cost of service page does. */
+export function usdRate(fxRates: FxRate[]): RateE6 {
+	return (ccy, ym) => {
+		if (ccy === 'USD') return 1_000_000n;
+		const r = fxRates.find((x) => x.fromCcy === ccy && x.toCcy === 'USD' && x.ym === ym && x.kind === 'average') ?? fxRates.filter((x) => x.fromCcy === ccy && x.toCcy === 'USD').at(-1);
+		return r ? BigInt(r.rateE6) : 1_000_000n;
+	};
+}
+
+/** Price over cost per million tokens, as a margin in basis points; 6000 or more leaves room for everything else. */
+export const tokenMarginHealth = (bp: number | null): Health => (bp === null ? null : bp >= 6000 ? 'good' : bp >= 4000 ? 'watch' : 'poor');
+export const slaHealth = (bp: number | null): Health => (bp === null ? null : bp >= 9000 ? 'good' : bp >= 7500 ? 'watch' : 'poor');
+
+export function aiTiles(input: {
+	ym: string;
+	/** Revenue for the month, from the books. */
+	revenueMinor: Minor;
+	now: string;
+	cloudCosts: CloudCost[];
+	employees: Employee[];
+	batches: Batch[];
+	deals: Deal[];
+	tickets: SupportTicket[];
+	invoices: Invoice[];
+	contracts: Contract[];
+	rate: RateE6;
+}): { unit: Tile[]; credits: Tile[]; market: Tile[] } {
+	const { ym, revenueMinor, now, rate } = input;
+	const money = (m: bigint | string) => formatMoney(m.toString(), { whole: true });
+	const pct = (bp: number | null) => (bp === null ? '–' : `${(bp / 100).toFixed(1)}%`);
+	const inProgress = now.slice(0, 7) === ym;
+	const cos = costOfService(input.cloudCosts, input.employees, ym, rate, inProgress ? now : undefined);
+	const gm = grossMarginAfterInference(revenueMinor, cos);
+	const tokens = costPerMTokens(input.cloudCosts, ym);
+	const price = creditPricePerM(input.batches);
+	const tokenMarginBp = tokens.perMMinor && price && toBig(price) > 0n ? Number(((toBig(price) - toBig(tokens.perMMinor)) * 10000n) / toBig(price)) : null;
+	const credits = creditTotals(input.batches, now);
+	const broke = breakage(input.batches, ym, now);
+	const pipe = weightedPipeline(input.deals);
+	const repeat = repeatRateBp(input.invoices, input.contracts, input.batches);
+	const support = supportSummary(input.tickets, now);
+	return {
+		unit: [
+			{
+				key: 'gm-after-inference',
+				label: 'Gross margin after inference',
+				value: pct(gm.afterInferenceBp),
+				health: aiGrossMarginHealth(gm.afterInferenceBp),
+				inputs: `${pct(gm.beforeInferenceBp)} before model costs · ${money(cos.costOfRevenueMinor)} to run the product${inProgress ? ' so far' : ''}`,
+				yardstick: 'Share of revenue left after model, hosting and on-call costs. AI startups usually keep 50% to 65%; classic software 75% to 80%.',
+				href: '/costs'
+			},
+			{
+				key: 'inference-share',
+				label: 'Inference as a share of revenue',
+				value: pct(gm.inferenceShareBp),
+				health: inferenceShareHealth(gm.inferenceShareBp),
+				inputs: `${money(cos.inferenceMinor)} of model calls in production`,
+				yardstick: 'Share of revenue spent running AI models. Under 15% is comfortable; above 25% leaves little room for profit.',
+				href: '/costs'
+			},
+			{
+				key: 'token-margin',
+				label: 'Margin per million tokens',
+				value: pct(tokenMarginBp),
+				health: tokenMarginHealth(tokenMarginBp),
+				inputs: tokens.perMMinor && price ? `We pay ${formatMoney(tokens.perMMinor)} · customers pay ${formatMoney(price)} on credit packs` : 'Needs model usage and credit packs',
+				yardstick: 'What customers pay for AI usage above what the model provider charges us. 60% or more covers hosting, support and the team.',
+				href: '/batches'
+			}
+		],
+		credits: [
+			{
+				key: 'unused-credits',
+				label: 'Unused customer credits',
+				value: money(credits.unusedMinor),
+				health: null,
+				inputs: `${money(credits.expiringMinor)} expires in the next 30 days`,
+				yardstick: 'Owed to customers as usage until it is used or expires.',
+				href: '/batches'
+			},
+			{
+				key: 'breakage',
+				label: 'Breakage this month',
+				value: money(broke.amountMinor),
+				health: null,
+				inputs: `${broke.packs.length} pack${broke.packs.length === 1 ? '' : 's'} expired with credits left`,
+				yardstick: 'Revenue from credits that expired unused. Rising breakage can mean customers bought more than they need.',
+				href: '/batches'
+			}
+		],
+		market: [
+			{
+				key: 'pipeline',
+				label: 'Weighted pipeline',
+				value: money(pipe.weightedMinor),
+				health: null,
+				inputs: `${money(pipe.openMinor)} open in ${pipe.openCount} deals · ${pct(pipe.winRateBp)} win rate`,
+				yardstick: 'Open deals times their chance of closing, from the connected CRM.',
+				href: '/customers'
+			},
+			{
+				key: 'repeat',
+				label: 'Repeat customers',
+				value: pct(repeat),
+				health: repeat === null ? null : repeat >= 3000 ? 'good' : repeat >= 1500 ? 'watch' : 'poor',
+				inputs: 'Paid in several months, expanded, signed again or bought credits again',
+				yardstick: 'A rising share means customers come back on their own.',
+				href: '/customers'
+			},
+			{
+				key: 'support-sla',
+				label: 'Support replies on time',
+				value: pct(support.metRateBp),
+				health: slaHealth(support.metRateBp),
+				inputs: `${support.open} open · ${support.breached} past due${support.medianFirstResponseMin === null ? '' : ` · ${support.medianFirstResponseMin} min median first reply`}`,
+				yardstick: '90% or more answered within the promised time.',
+				href: '/customers'
+			}
+		]
+	};
 }

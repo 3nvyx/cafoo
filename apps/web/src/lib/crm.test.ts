@@ -99,6 +99,13 @@ describe('repeat customers', () => {
 		expect([...repeatCustomers(t.invoice, t.contract, t.batch).keys()].sort()).toEqual(['c01', 'c04', 'c07']);
 		expect(repeatRateBp(t.invoice, t.contract, t.batch)).toBe(1500);
 	});
+
+	it('counts credit-pack buyers in the denominator too, so the rate never passes 100%', () => {
+		const p = (id: string, customerId: string) => ({ id, subsidiaryId: 's', kind: 'credit_pack' as const, sku: 'x', name: 'x', customerId, quantity: 1, remaining: 1, unit: 'M tokens', amountMinor: '1', ccy: 'USD', acquiredAt: '', status: 'active' as const });
+		// Only pack buyers: g bought twice (repeat), h once.
+		expect(repeatRateBp([], [], [p('1', 'g'), p('2', 'g'), p('3', 'h')])).toBe(5000);
+		expect(repeatRateBp([], [], [p('1', 'g'), p('2', 'g')])).toBe(10000);
+	});
 });
 
 describe('promotions', () => {

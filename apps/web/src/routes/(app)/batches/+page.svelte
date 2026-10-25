@@ -27,7 +27,7 @@
 	const lots = $derived(batches.filter((b) => b.kind === 'stock_lot'));
 	const totals = $derived(creditTotals(batches, now));
 	const month = $derived(now.slice(0, 7));
-	const thisBreakage = $derived(breakage(batches, month));
+	const thisBreakage = $derived(breakage(batches, month, now));
 	const soon = $derived(expiringSoon(batches, now));
 	const onHand = $derived(lots.filter((b) => batchStatus(b, now) !== 'expired').reduce((t, b) => t + toBig(unusedValue(b)), 0n));
 
@@ -99,9 +99,9 @@
 	</header>
 
 	<section aria-label="Batch figures" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-		<KpiCard label="Unused credits" value={money(totals.unusedMinor)} hint="Owed to customers as usage (2450)" />
+		<KpiCard label="Unused credits" value={money(totals.unusedMinor)} hint="Left to use; usage is booked to 2450 at month end" />
 		<KpiCard label="Expiring in 30 days" value={money(totals.expiringMinor)} hint="{soon.filter((b) => b.kind === 'credit_pack').length} credit packs" />
-		<KpiCard label="Breakage, {ymShort(month)}" value={money(thisBreakage.amountMinor)} hint="{thisBreakage.packs.length} packs expiring this month with credits left" />
+		<KpiCard label="Breakage, {ymShort(month)}" value={money(thisBreakage.amountMinor)} hint="{thisBreakage.packs.length} {thisBreakage.packs.length === 1 ? 'pack' : 'packs'} expired this month with credits left" />
 		<KpiCard label="Stock on hand" value={money(onHand)} hint="At cost (1300)" />
 	</section>
 

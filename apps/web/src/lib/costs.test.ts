@@ -169,9 +169,15 @@ describe('batches', () => {
 		const b = pack({ expiresAt: '2026-10-15T00:00:00Z' });
 		expect(unusedValue(b)).toBe('65000');
 		expect(usedValue(b)).toBe('195000');
-		const br = breakage([b, pack({ id: 'gone', remaining: 0, expiresAt: '2026-10-10T00:00:00Z' }), pack({ id: 'sep', expiresAt: '2026-09-30T00:00:00Z' })], '2026-10');
+		const br = breakage([b, pack({ id: 'gone', remaining: 0, expiresAt: '2026-10-10T00:00:00Z' }), pack({ id: 'sep', expiresAt: '2026-09-30T00:00:00Z' })], '2026-10', '2026-10-31T00:00:00Z');
 		expect(br.packs.map((x) => x.id)).toEqual(['b']);
 		expect(br.amountMinor).toBe('65000');
+	});
+
+	it('does not count a pack as breakage before it has expired', () => {
+		const b = pack({ expiresAt: '2026-10-15T00:00:00Z' });
+		expect(breakage([b], '2026-10', '2026-10-02T11:00:00Z').packs).toEqual([]);
+		expect(breakage([b], '2026-10', '2026-10-15T00:00:00Z').amountMinor).toBe('65000');
 	});
 
 	it('lists what expires soon and totals the credits', () => {
@@ -185,7 +191,10 @@ describe('batches', () => {
 
 	it('seeds packs with October expiries and one already lapsed in September', () => {
 		const t = loadSeed();
-		expect(breakage(t.batch, '2026-09').amountMinor).toBe('102000');
-		expect(breakage(t.batch, '2026-10').packs.map((b) => b.customerId).sort()).toEqual(['c04', 'c07']);
+		expect(breakage(t.batch, '2026-09', '2026-10-02T11:00:00Z').amountMinor).toBe('102000');
+		// On the demo's first morning neither October pack has expired; Willow Street Vet's lapses at 11:02.
+		expect(breakage(t.batch, '2026-10', '2026-10-02T11:00:00Z').packs).toEqual([]);
+		expect(breakage(t.batch, '2026-10', '2026-10-02T11:03:00Z').packs.map((b) => b.customerId)).toEqual(['c07']);
+		expect(breakage(t.batch, '2026-10', '2026-11-01T00:00:00Z').packs.map((b) => b.customerId).sort()).toEqual(['c04', 'c07']);
 	});
 });

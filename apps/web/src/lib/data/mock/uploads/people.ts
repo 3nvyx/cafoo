@@ -26,18 +26,26 @@ export interface PayrollEntry {
 	grossMinor: string;
 	/** Employer taxes and benefits to 6010. */
 	employerMinor: string;
-	/** Net pay leaving the bank through the provider, from 1000. */
+	/** Net pay to employees' bank accounts. */
 	netMinor: string;
-	/** Withheld taxes and deductions plus employer taxes and benefits, owed to the agencies and plans: 2200. */
+	/** Withheld taxes and deductions plus employer taxes and benefits, owed to the agencies and plans until Gusto remits them. */
 	liabilitiesMinor: string;
+	/** What Gusto pulls from operating cash on the debit date: net pay plus everything it remits. Equals totalMinor. */
+	debitMinor: string;
 	/** What the run costs the company: gross plus employer cost. */
 	totalMinor: string;
 	lines: ScriptLine[];
 }
 
-/** The journal entry a pay run posts: Dr 6000 gross, Dr 6010 employer cost / Cr 1000 net, Cr 2200 what is owed on. */
+/**
+ * The journal entry a pay run posts. Gusto debits the whole run on the debit date: net pay, the taxes it withheld,
+ * employer taxes, and the 401(k) and health amounts it remits for us. So the entry books the cost and the amounts owed
+ * (Dr 6000 gross, Dr 6010 employer cost / Cr 1000 net, Cr 2200 owed on), then clears 2200 with the remittance in the
+ * same debit (Dr 2200 / Cr 1000). Cash falls by the full run, as the seeded months show; 2200 nets to zero.
+ */
 export function payrollEntry(run: Pick<PayRun, 'grossMinor' | 'employeeTaxMinor' | 'deductionsMinor' | 'employerTaxMinor' | 'employerBenefitsMinor' | 'netMinor' | 'subsidiaryId'>): PayrollEntry {
 	const uk = run.subsidiaryId === 'sub-uk';
+	const code = (c: string) => (uk ? `${c === '6000' ? '5300' : c}-UK` : c);
 	const gross = toBig(run.grossMinor);
 	const employer = toBig(run.employerTaxMinor) + toBig(run.employerBenefitsMinor);
 	const net = toBig(run.netMinor);
@@ -48,8 +56,16 @@ export function payrollEntry(run: Pick<PayRun, 'grossMinor' | 'employeeTaxMinor'
 		employerMinor: s(employer),
 		netMinor: s(net),
 		liabilitiesMinor: s(liabilities),
+		debitMinor: s(net + liabilities),
 		totalMinor: s(gross + employer),
-		lines: [L(uk ? '5300-UK' : '6000', s(gross), '0'), L(uk ? '6010-UK' : '6010', s(employer), '0'), L(uk ? '1000-UK' : '1000', '0', s(net)), L(uk ? '2200-UK' : '2200', '0', s(liabilities))]
+		lines: [
+			L(code('6000'), s(gross), '0'),
+			L(code('6010'), s(employer), '0'),
+			L(code('1000'), '0', s(net)),
+			L(code('2200'), '0', s(liabilities)),
+			L(code('2200'), s(liabilities), '0'),
+			L(code('1000'), '0', s(liabilities))
+		]
 	};
 }
 
@@ -84,7 +100,7 @@ const payrollRegister: UploadHandler = {
 		const starters = ctx.t.employee.filter((x) => x.subsidiaryId === run.subsidiaryId && day(x.startAt) >= day(run.periodStart) && day(x.startAt) <= day(run.periodEnd) && x.type !== 'contractor');
 		return {
 			extracted,
-			summaryPlain: `Gusto's register for Cafoo Inc's October 15 pay run: ${run.employeeCount} people, ${money(run.grossMinor)} of gross pay and ${money(e.employerMinor)} of employer taxes and benefits. ${money(run.netMinor)} leaves the bank on ${longDay(run.debitDate)}.${starters.length ? ` First paycheck for ${starters.map((x) => x.name).join(' and ')}.` : ''}`
+			summaryPlain: `Gusto's register for Cafoo Inc's October 15 pay run: ${run.employeeCount} people, ${money(run.grossMinor)} of gross pay and ${money(e.employerMinor)} of employer taxes and benefits. Gusto draws ${money(e.debitMinor)} from the bank on ${longDay(run.debitDate)}.${starters.length ? ` First paycheck for ${starters.map((x) => x.name).join(' and ')}.` : ''}`
 		};
 	},
 	apply(ctx) {
@@ -98,8 +114,8 @@ const payrollRegister: UploadHandler = {
 			proposerRole: 'bookkeeper',
 			amountMinor: e.totalMinor,
 			periodId: ctx.openPeriodId(),
-			summaryPlain: `Book Cafoo Inc's October 15 payroll: ${money(e.grossMinor)} of pay for ${run.employeeCount} people and ${money(e.employerMinor)} of employer taxes and benefits. ${money(e.netMinor)} goes to their bank accounts; ${money(e.liabilitiesMinor)} is owed on to the tax agencies and benefit plans.`,
-			rationale: `Gusto register for ${day(run.periodStart)} to ${day(run.periodEnd)}, pay date ${day(run.payDate)}. Gross splits to 6000, employer FICA, FUTA, SUTA, 401(k) match and health premiums to 6010; net pay from operating cash; withholdings and employer amounts to 2200 until remitted.`,
+			summaryPlain: `Book Cafoo Inc's October 15 payroll: ${money(e.grossMinor)} of pay for ${run.employeeCount} people and ${money(e.employerMinor)} of employer taxes and benefits. Gusto draws ${money(e.debitMinor)} on ${longDay(run.debitDate)}: ${money(e.netMinor)} of take-home pay and ${money(e.liabilitiesMinor)} it pays on to the tax agencies and benefit plans.`,
+			rationale: `Gusto register for ${day(run.periodStart)} to ${day(run.periodEnd)}, pay date ${day(run.payDate)}. Gross splits to 6000, employer FICA, FUTA, SUTA, 401(k) match and health premiums to 6010; Gusto debits the full run on ${day(run.debitDate)} (net pay plus withholdings, employer taxes, 401(k) and health it remits for us), so cash is credited ${money(e.debitMinor)}, matching how Jul to Sep were booked. Withholdings and employer amounts pass through 2200 and are cleared by that same debit, so 2200 nets to zero for the run.`,
 			payload: {
 				payRunId: run.id,
 				subsidiaryId: run.subsidiaryId,
@@ -107,15 +123,17 @@ const payrollRegister: UploadHandler = {
 				memo: `Payroll ${day(run.periodStart)} to ${day(run.periodEnd)}, Gusto, paid ${day(run.payDate)}`,
 				lines: e.lines
 			},
-			body: `${run.id} Gusto register, ${rows.length} payslips, gross ${money(e.grossMinor).slice(1)} (payslips sum ${money(sumRows).slice(1)}). EE tax ${money(run.employeeTaxMinor).slice(1)}, deductions ${money(run.deductionsMinor).slice(1)}, ER tax ${money(run.employerTaxMinor).slice(1)}, ER benefits ${money(run.employerBenefitsMinor).slice(1)}, net ${money(run.netMinor).slice(1)}. Dr 6000 ${money(e.grossMinor).slice(1)}, Dr 6010 ${money(e.employerMinor).slice(1)} / Cr 1000 ${money(e.netMinor).slice(1)}, Cr 2200 ${money(e.liabilitiesMinor).slice(1)}.`,
+			body: `${run.id} Gusto register, ${rows.length} payslips, gross ${money(e.grossMinor).slice(1)} (payslips sum ${money(sumRows).slice(1)}). EE tax ${money(run.employeeTaxMinor).slice(1)}, deductions ${money(run.deductionsMinor).slice(1)}, ER tax ${money(run.employerTaxMinor).slice(1)}, ER benefits ${money(run.employerBenefitsMinor).slice(1)}, net ${money(run.netMinor).slice(1)}. Dr 6000 ${money(e.grossMinor).slice(1)}, Dr 6010 ${money(e.employerMinor).slice(1)} / Cr 1000 ${money(e.netMinor).slice(1)}, Cr 2200 ${money(e.liabilitiesMinor).slice(1)}; remittance Dr 2200 / Cr 1000 ${money(e.liabilitiesMinor).slice(1)}. Cash out ${money(e.debitMinor).slice(1)} = Gusto debit.`,
 			critique: {
-				body: `Ties: payslips sum to the register gross, and gross = net + EE tax + deductions. Two things to know. First, Jul to Sep booked the whole cost to 6000; from this run employer cost sits in 6010, so 6000 alone drops about 12% month over month while total payroll rises with two new hires. Second, Gusto debits net pay on ${day(run.debitDate)}, before payday; the cash credit is right, but the bank line will land then, not on the 15th.`,
+				body: `Ties: payslips sum to the register gross, and gross = net + EE tax + deductions. Two things to know. First, Jul to Sep booked the whole cost to 6000; from this run employer cost sits in 6010, so 6000 alone drops about 12% month over month while total payroll rises with two new hires. Second, Gusto pulls the whole ${money(e.debitMinor).slice(1)} on ${day(run.debitDate)}, before payday, so the bank line lands then, not on the 15th; 2200 clears inside the entry.`,
 				summary: 'Red Team checked the register adds up and noted payroll now splits across two expense lines, so the pay line alone looks lower than September.'
 			},
-			onApproved(c) {
+			// A send-back resubmits under a new id: link whichever Proposal was finally approved.
+			onApproved(c, approved) {
 				const r = c.t.pay_run.find((x) => x.id === REGISTER_RUN_ID);
 				if (!r) return;
-				const je = c.t.journal_entry.find((j) => j.proposalId === id);
+				r.proposalId = approved.id;
+				const je = c.t.journal_entry.find((j) => j.proposalId === approved.id);
 				if (je) r.jeId = je.id;
 				c.update('pay_run', r);
 			}

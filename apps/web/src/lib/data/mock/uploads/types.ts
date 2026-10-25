@@ -1,7 +1,7 @@
 // The seam between the mock data source and each area's demo behaviour (Books, Financing, People, Cost of service, CRM).
 // An area hands the mock its upload handlers (what a sample file says and what follows from it) and its live tickers
 // (records that keep arriving from connected tools). The mock owns timing, the Red Team and Advisor, and posting.
-import type { AgentRole, DocumentKind, MessageKind, Minor, ProposalKind, UploadedDocument } from '../../types';
+import type { AgentRole, DocumentKind, MessageKind, Minor, Proposal, ProposalKind, UploadedDocument } from '../../types';
 import type { ScriptLine } from '../script';
 import type { Tables } from '../seed';
 
@@ -25,8 +25,12 @@ export interface ProposeInput {
 	body: string;
 	/** Optional Red Team critique before the Advisor rules. */
 	critique?: { body: string; summary: string };
-	/** Runs once the Proposal is approved (by the Advisor below materiality, or by the CFO above it), after posting. */
-	onApproved?: (ctx: MockContext) => void;
+	/**
+	 * Runs once the Proposal is approved (by the Advisor below materiality, or by the CFO above it), after posting.
+	 * `approved` is the Proposal that was approved: after a send-back that is the resubmission, not the original, so
+	 * read its id (and its journal entry via `journal_entry.proposalId`) from here, never from a closed-over id.
+	 */
+	onApproved?: (ctx: MockContext, approved: Proposal) => void;
 }
 
 export interface MockContext {
@@ -44,8 +48,11 @@ export interface MockContext {
 	/** Raises a Proposal; the Red Team and Advisor follow on the usual timing. Returns its id. */
 	propose(p: ProposeInput): string;
 	later(ms: number, fn: () => void): void;
-	/** The month the demo clock is in while it is open, otherwise the earliest month not locked ("2026-10"). */
-	openPeriodId(): string;
+	/**
+	 * The month the demo clock is in while it is open, otherwise the earliest month not locked ("2026-10"); undefined
+	 * when every month is locked, and then nothing may be proposed (propose() throws a plain error).
+	 */
+	openPeriodId(): string | undefined;
 	/** Marks an integration as just synced (lastSyncAt = now, recordsSynced += n). */
 	synced(integrationId: string, n?: number): void;
 }

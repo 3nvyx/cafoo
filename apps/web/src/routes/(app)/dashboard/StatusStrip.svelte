@@ -5,7 +5,7 @@
 	import { db } from '#lib/data/index.js';
 	import { addDays, monthRange, type Summary } from '#lib/data/dashboard.js';
 	import { monthName } from '#lib/data/derive.js';
-	import { formatMoney } from '#lib/data/money.js';
+	import { formatMoney, toBig } from '#lib/data/money.js';
 	import type { Period } from '#lib/data/types.js';
 	import { lockGate } from '#lib/close.js';
 	import { drill } from '#lib/labels.js';
@@ -49,8 +49,15 @@
 	type Item = { label: string; value: string; note: string; href: string; tone: Tone; num?: boolean };
 	const cash = $derived<Item[]>([
 		{ label: 'Opening balance', value: money(month.openingCash), note: `Book cash on ${mon} 1`, href: drill({ account: '1000' }, { to: before }), tone: null },
-		{ label: 'Income', value: money(month.cashIn), note: `Cash received in ${mon}`, href: drill({ account: '1000' }, period.id), tone: null },
-		{ label: 'Expenditure', value: money(month.cashOut), note: `Cash paid out · ${money(month.cash)} at month end`, href: drill({ account: '1000' }, period.id), tone: null }
+		// Money raised is not income: SAFEs, notes and shares show beside the closing balance, never in Income.
+		{ label: 'Income', value: money(month.cashIn), note: `Cash from customers and operations in ${mon}`, href: drill({ account: '1000' }, period.id), tone: null },
+		{
+			label: 'Expenditure',
+			value: money(month.cashOut),
+			note: `Cash paid out${toBig(month.financingCash) !== 0n ? ` · ${money(month.financingCash)} raised` : ''} · ${money(month.cash)} at month end`,
+			href: drill({ account: '1000' }, period.id),
+			tone: null
+		}
 	]);
 	// The queue below and the sidebar badge count every month, so these two do as well.
 	const work = $derived<Item[]>([

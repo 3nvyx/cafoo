@@ -7,6 +7,7 @@
 	import { lockGate } from '#lib/close.js';
 	import Icon, { type IconName } from '#lib/components/Icon.svelte';
 	import { shortDate } from '#lib/labels.js';
+	import { usdRate } from '#lib/kpis.js';
 
 	let { period }: { period: Period } = $props();
 
@@ -22,7 +23,11 @@
 	const unmatched = $derived(db.bankTransactions().filter((b) => !b.matched).length);
 
 	const round = $derived(db.fundingRounds().find((r) => r.status === 'open'));
-	const raised = $derived(round ? db.commitments().filter((c) => c.roundId === round.id).reduce((t, c) => t + toBig(c.receivedMinor), 0n) : 0n);
+	// Commitments can be in pounds (an investor wiring into Cafoo Ltd); convert each to dollars before adding them up.
+	const toUsd = $derived(usdRate(db.fxRates()));
+	const raised = $derived(
+		round ? db.commitments().filter((c) => c.roundId === round.id).reduce((t, c) => t + (toBig(c.receivedMinor) * toUsd(c.ccy, today.slice(0, 7))) / 1_000_000n, 0n) : 0n
+	);
 	const shortWires = $derived(round ? db.commitments().filter((c) => c.roundId === round.id && (c.status === 'short' || c.status === 'overdue')).length : 0);
 
 	const nextRun = $derived(

@@ -187,6 +187,9 @@ export function rollForward(
 
 /** The convertible a SAFE or note becomes at a priced round: SAFEs at their purchase amount, notes with interest. */
 export function toConvertible(ins: Instrument, holderName: string, fundedAt: string | undefined, conversionDate: string): Convertible {
+	// A pre-money SAFE's cap excludes the other convertibles, so it cannot share the post-money capitalization below.
+	if (ins.kind === 'safe_pre_money') throw new Error(`Pre-money SAFEs are not supported yet (${holderName}); a person must work out its conversion.`);
+	if (ins.kind !== 'safe_post_money' && ins.kind !== 'convertible_note') throw new Error(`Only SAFEs and notes convert in a priced round, not ${ins.kind.replace(/_/g, ' ')}.`);
 	const principal = big(ins.principalMinor);
 	const interest = ins.kind === 'convertible_note' && fundedAt ? accruedInterestMinor(principal, ins.interestBp ?? 0, fundedAt, conversionDate) : 0n;
 	return { id: ins.id, holderName, amountMinor: principal + interest, capMinor: ins.valuationCapMinor ? big(ins.valuationCapMinor) : undefined, discountBp: ins.discountBp };

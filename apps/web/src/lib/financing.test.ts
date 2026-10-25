@@ -16,7 +16,8 @@ import {
 	priceE4,
 	pricedRound,
 	rollForward,
-	safeOwnershipPpm
+	safeOwnershipPpm,
+	toConvertible
 } from './financing';
 
 const M = (dollars: number) => BigInt(dollars) * 100n;
@@ -118,5 +119,9 @@ describe('cap table', () => {
 		expect(classify('convertible_note').plain).toMatch(/not income/);
 		expect(classify('preferred_shares').classification).toBe('equity');
 		expect(classify('safe_post_money', 'converted').classification).toBe('equity');
+	});
+	it('refuses to price a pre-money SAFE rather than treat it as post-money', () => {
+		const pre = { id: 'x', roundId: 'r', investorId: 'i', kind: 'safe_pre_money', principalMinor: '100', ccy: 'USD', mfn: false, proRata: false, classification: 'liability', classificationPlain: '', status: 'outstanding', documentIds: [] } as const;
+		expect(() => toConvertible({ ...pre, documentIds: [] }, 'X', undefined, '2026-12-15')).toThrow(/Pre-money SAFEs are not supported yet/);
 	});
 });

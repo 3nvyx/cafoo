@@ -136,9 +136,10 @@ export function repeatCustomers(invoices: Invoice[], contracts: Contract[], batc
 	return out;
 }
 
-/** Repeat customers over customers who have bought anything (an invoice or a contract), basis points. */
+/** Repeat customers over customers who have bought anything (an invoice, a contract or a credit pack), basis points. */
 export function repeatRateBp(invoices: Invoice[], contracts: Contract[], batches: Batch[] = []): number | null {
-	const buyers = new Set([...invoices.map((i) => i.customerId), ...contracts.map((k) => k.customerId)]);
+	const packBuyers = batches.filter((b) => b.kind === 'credit_pack' && b.customerId).map((b) => b.customerId!);
+	const buyers = new Set([...invoices.map((i) => i.customerId), ...contracts.map((k) => k.customerId), ...packBuyers]);
 	return buyers.size ? Math.round((repeatCustomers(invoices, contracts, batches).size / buyers.size) * 10000) : null;
 }
 

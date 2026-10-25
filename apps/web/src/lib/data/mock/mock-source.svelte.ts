@@ -38,7 +38,7 @@ import { formatMoney, toBig } from '../money';
 import { journalLinesOf, parsePayload } from '../payload';
 import { accountIdFor, loadSeed, SUBSIDIARY_ID, type Tables } from './seed';
 import { CLOSE_SCRIPT, type ScriptLine, type Step } from './script';
-import { currentOpenPeriodId, monthEnded } from './periods';
+import { currentOpenPeriodId, entryProblem, monthEnded } from './periods';
 import { HANDLERS, TICKERS } from './uploads';
 import type { ArrayTable, MockContext, ProposeInput, RowOf } from './uploads/types';
 
@@ -75,7 +75,7 @@ export class MockDataSource implements DataSource {
 	#evalRuns = new Map<string, CharterEvalRun>();
 	#collecting = new Set<string>();
 	/** What runs once a Proposal raised through the context is approved, by Proposal id. */
-	#onApproved = new Map<string, (ctx: MockContext) => void>();
+	#onApproved = new Map<string, NonNullable<ProposeInput['onApproved']>>();
 	/** The live-ticker loop (browser only) and when each ticker last ran (wall-clock ms). */
 	#loop: ReturnType<typeof setInterval> | null = null;
 	#tickedAt = new Map<string, number>();
@@ -926,7 +926,7 @@ export class MockDataSource implements DataSource {
 				if (i >= 0 && rows[i] !== changed) rows[i] = changed;
 				this.#emit(table, 'update', i >= 0 ? rows[i] : row);
 			},
-			message: (m) => this.#message({ ...m, threadId: m.proposalId ? undefined : `live:${this.#openPeriodId()}` }),
+			message: (m) => this.#message({ ...m, threadId: m.proposalId ? undefined : `live:${this.#openPeriodId() ?? 'locked'}` }),
 			activity: (role, label) => {
 				this.#activity = role ? { role, labelPlain: label ?? '' } : null;
 			},
@@ -943,8 +943,21 @@ export class MockDataSource implements DataSource {
 		};
 	}
 
-	#openPeriodId(): string {
-		return currentOpenPeriodId(this.#t.period, this.#now()) ?? this.#now().slice(0, 7);
+	/** Undefined when every month is locked: then nothing may be proposed. */
+	#openPeriodId(): string | undefined {
+		return currentOpenPeriodId(this.#t.period, this.#now());
+	}
+
+	/** Refuses, in plain words, a Proposal that could never post: no open month, or lines that do not make one entry. */
+	#checkProposal(input: ProposeInput): string {
+		const periodId = input.periodId ?? this.#openPeriodId();
+		if (!periodId) throw new Error('Every month is locked; unlock one to post.');
+		const period = this.#t.period.find((p) => p.id === periodId);
+		if (!period) throw new Error(`There is no month ${periodId} in the books to post to.`);
+		if (period.status === 'closed') throw new Error(`${monthName(period.year, period.month)} is locked; unlock it to post to it.`);
+		const problem = entryProblem(input.payload.lines ?? [], this.#t.account, this.#t.subsidiary);
+		if (problem) throw new Error(problem);
+		return periodId;
 	}
 
 	/**
@@ -953,10 +966,11 @@ export class MockDataSource implements DataSource {
 	 * CFO at or above it).
 	 */
 	#propose(input: ProposeInput): string {
+		const periodId = this.#checkProposal(input);
 		const id = this.#id('pr');
 		const row = this.#addProposal({
 			id,
-			periodId: input.periodId ?? this.#openPeriodId(),
+			periodId,
 			kind: input.kind,
 			payloadJson: JSON.stringify(input.payload),
 			rationale: input.rationale,
@@ -995,7 +1009,7 @@ export class MockDataSource implements DataSource {
 		if (hook) {
 			this.#onApproved.delete(p.id);
 			try {
-				hook(this.#ctx);
+				hook(this.#ctx, p);
 			} catch (err) {
 				console.error(err);
 			}

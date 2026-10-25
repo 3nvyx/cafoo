@@ -28,9 +28,10 @@
 	const companies = $derived(subs.filter((s) => !s.isElimination && people.some((e) => e.subsidiaryId === s.id)).sort((a, b) => Number(!!a.parentId) - Number(!!b.parentId)));
 	const monthlyBy = $derived(
 		companies.map((c) => {
-			const list = onBooks.filter((e) => e.subsidiaryId === c.id);
+			// Contractors are paid on invoice, not through payroll.
+			const list = staff.filter((e) => e.subsidiaryId === c.id);
 			const own = list.reduce((t, e) => t + toBig(monthlyLoadedCost(e)), 0n).toString();
-			return { c, own, ccy: c.baseCurrency, reporting: toReporting(own, c.baseCurrency), headcount: list.filter((e) => e.type !== 'contractor').length };
+			return { c, own, ccy: c.baseCurrency, reporting: toReporting(own, c.baseCurrency), headcount: list.length };
 		})
 	);
 	const monthlyTotal = $derived(monthlyBy.reduce((t, m) => t + toBig(m.reporting), 0n).toString());
@@ -95,7 +96,7 @@
 		<p class="text-body-sm text-ink-2">Payroll a month, fully loaded</p>
 		<p class="num text-display-sm">{money(monthlyTotal, reporting)}</p>
 		<p class="text-caption text-ink-3">
-			{monthlyBy.map((m) => `${m.c.name} ${money(m.own, m.ccy)}`).join(' · ')}. Pay, employer taxes, retirement and health, at today's team.
+			{monthlyBy.map((m) => `${m.c.name} ${money(m.own, m.ccy)}`).join(' · ')}. Pay, employer taxes, retirement and health for today's team; contractors are paid on invoice and left out.
 		</p>
 	</div>
 	<div class="card flex flex-col gap-1 p-5">
@@ -140,26 +141,35 @@
 		</div>
 
 		<div class="card">
-			<div class="hidden gap-4 border-b border-line px-5 py-2 text-caption text-ink-3 md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]" aria-hidden="true">
+			<div class="hidden gap-4 border-b border-line px-5 py-2 text-caption text-ink-3 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]" aria-hidden="true">
 				<span>Name</span><span>Department</span><span>Type</span><span class="text-right">Time off</span><span class="text-right">Pay</span>
 			</div>
 			<ul class="flex flex-col divide-y divide-line">
 				{#each roster as e (e.id)}
 					{@const future = e.startAt.slice(0, 10) > now.slice(0, 10)}
-					<li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] md:items-center">
+					{@const badge = future ? { tone: 'neutral' as const, label: `Starts ${fmtDay(e.startAt)}` } : e.status !== 'active' ? EMPLOYEE_STATUS[e.status] : null}
+					<li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] xl:items-center">
 						<div class="min-w-0">
 							<a class="drill font-medium" href="/people/{e.id}">{e.name}</a>
 							<p class="truncate text-body-sm text-ink-2">{e.title}</p>
+							<!-- Narrow screens: one line of facts instead of columns. -->
+							<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-ink-3 xl:hidden">
+								<span>{DEPARTMENT[e.department]} · {companyName(subs, e.subsidiaryId)} · {EMPLOYMENT[e.type]} · {e.type === 'contractor' ? 'no paid time off' : e.pto.unlimited ? 'flexible time off' : `${ptoText(e)} off left`}</span>
+								{#if badge}<Pill tone={badge.tone}>{badge.label}</Pill>{/if}
+							</p>
 						</div>
-						<p class="num text-right text-body-sm md:order-last">{payText(e)}</p>
-						<p class="col-span-2 text-body-sm text-ink-2 md:col-span-1">
-							{DEPARTMENT[e.department]}<span class="text-ink-3"> · {companyName(subs, e.subsidiaryId)}</span>
+						<p class="flex flex-col text-right xl:order-last">
+							<span class="num text-body-sm">{payText(e).replace(/ (a year|an hour)$/, '')}</span>
+							<span class="text-caption text-ink-3">{payText(e).endsWith('an hour') ? 'an hour' : 'a year'}</span>
 						</p>
-						<p class="col-span-2 flex flex-wrap items-center gap-2 text-body-sm text-ink-2 md:col-span-1">
+						<p class="hidden text-body-sm text-ink-2 xl:block">
+							{DEPARTMENT[e.department]} <span class="text-ink-3">· {companyName(subs, e.subsidiaryId)}</span>
+						</p>
+						<p class="hidden flex-wrap items-center gap-2 text-body-sm text-ink-2 xl:flex">
 							{EMPLOYMENT[e.type]}
-							{#if future}<Pill tone="neutral">Starts {fmtDay(e.startAt)}</Pill>{:else if e.status !== 'active'}<Pill tone={EMPLOYEE_STATUS[e.status].tone}>{EMPLOYEE_STATUS[e.status].label}</Pill>{/if}
+							{#if badge}<Pill tone={badge.tone}>{badge.label}</Pill>{/if}
 						</p>
-						<p class="col-span-2 text-body-sm text-ink-2 md:col-span-1 md:text-right"><span class="md:hidden">Time off: </span>{ptoText(e)}</p>
+						<p class="hidden text-right text-body-sm text-ink-2 xl:block">{ptoText(e)}</p>
 					</li>
 				{:else}
 					<li class="px-5 py-6 text-body-sm text-ink-3">Nobody matches these filters.</li>

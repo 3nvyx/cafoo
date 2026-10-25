@@ -6,6 +6,7 @@
 	import type { CapTableEntry, SecurityClass } from '#lib/data/types.js';
 	import { formatPpm, formatPriceE4, fullyDilutedPpm, fullyDilutedShares, fundedDates, rollForward, roundPlan } from '#lib/financing.js';
 	import { shortDate } from '#lib/labels.js';
+	import Notice from '#lib/components/Notice.svelte';
 
 	const SECURITY: Record<SecurityClass, string> = {
 		common: 'Common',
@@ -40,15 +41,20 @@
 		const toConvert = instruments.filter((i) => i.roundId !== next.id && (i.kind === 'safe_post_money' || i.kind === 'safe_pre_money' || i.kind === 'convertible_note') && (i.status === 'outstanding' || i.status === 'draft'));
 		const funded = fundedDates(db.proposals());
 		const name = (id: string) => investors.get(id) ?? id;
-		const plan = roundPlan({
-			capTable: entries,
-			converting: toConvert,
-			holderName: name,
-			fundedAt: (id) => funded.get(id),
-			preMoneyMinor: toBig(next.preMoneyMinor),
-			newMoneyMinor: toBig(next.targetMinor),
-			closeAt
-		});
+		let plan: ReturnType<typeof roundPlan>;
+		try {
+			plan = roundPlan({
+				capTable: entries,
+				converting: toConvert,
+				holderName: name,
+				fundedAt: (id) => funded.get(id),
+				preMoneyMinor: toBig(next.preMoneyMinor),
+				newMoneyMinor: toBig(next.targetMinor),
+				closeAt
+			});
+		} catch (err) {
+			return { next, error: err instanceof Error ? err.message : String(err) };
+		}
 		const byId = new Map(toConvert.map((i) => [i.id, i]));
 		const after = rollForward(
 			entries,
@@ -107,7 +113,9 @@
 	</div>
 </section>
 
-{#if projection}
+{#if projection && 'error' in projection}
+	<div class="mt-10"><Notice tone="warn" title="After the {projection.next.name}">Cafoo can't project this round: {projection.error}</Notice></div>
+{:else if projection}
 	{@const p = projection}
 	<section aria-labelledby="after-h" class="mt-10 flex flex-col gap-3">
 		<div class="flex flex-col gap-1">

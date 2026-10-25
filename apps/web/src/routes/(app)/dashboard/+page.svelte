@@ -17,7 +17,7 @@
 	import StatusStrip from './StatusStrip.svelte';
 	import Workflows from './Workflows.svelte';
 	import MetricTile from '../metrics/MetricTile.svelte';
-	import { efficiencyTiles, quarterStart } from '#lib/kpis.js';
+	import { aiTiles, efficiencyTiles, quarterStart, usdRate } from '#lib/kpis.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
@@ -108,8 +108,23 @@
 	const health = $derived.by(() => {
 		if (!period || !monthSummary || !firstMonth) return [];
 		const r = monthRange(period.id);
-		const all = efficiencyTiles({ month: monthSummary, from: r.from, to: r.to, quarterFrom: quarterStart(r.from, monthRange(firstMonth).from), contracts, employees: db.employees() });
-		return ['runway', 'burn-multiple', 'ndr', 'arr-per-employee'].flatMap((k) => all.filter((t) => t.key === k));
+		const all = [
+			...efficiencyTiles({ month: monthSummary, from: r.from, to: r.to, quarterFrom: quarterStart(r.from, monthRange(firstMonth).from), contracts, employees: db.employees() }),
+			...aiTiles({
+				ym: period.id,
+				revenueMinor: monthSummary.revenue,
+				now: db.now(),
+				cloudCosts: db.cloudCosts(),
+				employees: db.employees(),
+				batches: db.batches(),
+				deals: db.deals(),
+				tickets: db.supportTickets(),
+				invoices: db.invoices(),
+				contracts,
+				rate: usdRate(db.fxRates())
+			}).unit
+		];
+		return ['runway', 'burn-multiple', 'gm-after-inference', 'ndr'].flatMap((k) => all.filter((t) => t.key === k));
 	});
 </script>
 

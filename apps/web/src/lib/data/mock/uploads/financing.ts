@@ -17,8 +17,6 @@ const FIRST_CLOSE = '2026-10-01T00:00:00Z';
 const SERIES_A_CLOSE = '2026-12-15T00:00:00Z';
 const SERIES_A_PRE_MONEY = 6_000_000_000n;
 const SERIES_A_NEW_MONEY = 1_200_000_000n;
-/** Halyard's legal fees the company pays at closing (capped in the term sheet): an equity issuance cost. */
-const SERIES_A_LEGAL_CAP = 4_000_000n;
 /** The fair value report's SAFE value as a share of the purchase amount, 106.2%. */
 const SAFE_FV_BP = 10_620n;
 
@@ -26,6 +24,7 @@ const money = (minor: string | bigint, ccy = 'USD') => {
 	const m = toBig(String(minor));
 	return formatMoney(m.toString(), { whole: m % 100n === 0n, currency: ccy });
 };
+const day = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
 const L = (account: string, debitMinor: string | bigint, creditMinor: string | bigint): ScriptLine => ({ account, debitMinor: String(debitMinor), creditMinor: String(creditMinor) });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -46,7 +45,7 @@ function balance(ctx: MockContext, code: string, creditNormal = true): bigint {
 
 /** GBP to USD at the open month's closing rate (1.28 in the demo). */
 function gbpToUsd(ctx: MockContext, minor: bigint): bigint {
-	const ym = ctx.openPeriodId();
+	const ym = ctx.openPeriodId() ?? ctx.now().slice(0, 7);
 	const r = ctx.t.fx_rate.find((x) => x.fromCcy === 'GBP' && x.toCcy === 'USD' && x.ym === ym && x.kind === 'closing') ?? ctx.t.fx_rate.findLast((x) => x.fromCcy === 'GBP' && x.toCcy === 'USD');
 	return (minor * toBig(r?.rateE6 ?? '1280000')) / 1_000_000n;
 }
@@ -54,6 +53,57 @@ function gbpToUsd(ctx: MockContext, minor: bigint): bigint {
 /** Proposals already raised for a key (so a second upload of the same file proposes nothing twice). */
 const alreadyProposed = (ctx: MockContext, kind: string, key: string) =>
 	ctx.t.proposal.some((p) => p.kind === kind && !['rejected', 'superseded', 'sent_back'].includes(p.status) && p.payloadJson.includes(`"key":"${key}"`));
+
+/** Statuses in which a Proposal still counts: in debate, waiting for the CFO, or approved. */
+const LIVE = ['open', 'awaiting_cfo', 'approved', 'amended'];
+const APPROVED = ['approved', 'amended'];
+type Payload = Record<string, unknown> & { instrumentId?: string; roundId?: string; to?: string; adjustments?: Record<string, string> };
+const payloadOf = (json: string): Payload => {
+	try {
+		return JSON.parse(json) as Payload;
+	} catch {
+		return {};
+	}
+};
+const proposalsOf = (ctx: MockContext, kind: string, statuses: string[]) => ctx.t.proposal.filter((p) => p.kind === kind && statuses.includes(p.status)).map((p) => ({ p, payload: payloadOf(p.payloadJson) }));
+
+/** The day after the demo clock's date: an accrual booked today runs through today. */
+const bookingEnd = (ctx: MockContext) => {
+	const d = new Date(`${ctx.now().slice(0, 10)}T00:00:00Z`);
+	d.setUTCDate(d.getUTCDate() + 1);
+	return d.toISOString().slice(0, 10);
+};
+
+/** Interest approved on a note so far, and the date it runs to (exclusive). */
+function bookedInterest(ctx: MockContext, instrumentId: string): { total: bigint; to?: string } {
+	let total = 0n;
+	let to: string | undefined;
+	for (const { p, payload } of proposalsOf(ctx, 'interest_accrual', APPROVED)) {
+		if (payload.instrumentId !== instrumentId) continue;
+		total += toBig(p.amountMinor);
+		if (payload.to && (!to || payload.to > to)) to = payload.to;
+	}
+	return { total, to };
+}
+
+/** Fair-value changes on each SAFE from valuation-report Proposals in the given statuses. */
+function fairValueAdjustments(ctx: MockContext, statuses: string[]): Map<string, bigint> {
+	const out = new Map<string, bigint>();
+	for (const { payload } of proposalsOf(ctx, 'journal_entry', statuses)) {
+		for (const [id, minor] of Object.entries(payload.adjustments ?? {})) out.set(id, (out.get(id) ?? 0n) + toBig(minor));
+	}
+	return out;
+}
+
+/** Interest a note earns from where its booked interest stops (or its funding date) through today. */
+function interestDue(ctx: MockContext, note: { id: string; principalMinor: string; interestBp?: number }): { from: string; to: string; days: number; minor: bigint } | null {
+	const funded = fundedDates(ctx.t.proposal).get(note.id);
+	if (!funded) return null;
+	const from = bookedInterest(ctx, note.id).to ?? funded.slice(0, 10);
+	const to = bookingEnd(ctx);
+	const days = daysBetween(from, to);
+	return { from, to, days, minor: accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, from, to) };
+}
 
 function attach(ctx: MockContext, instrumentId: string, doc: UploadedDocument) {
 	const i = ins(ctx, instrumentId);
@@ -375,29 +425,22 @@ const convertibleNote: UploadHandler = {
 				})
 			);
 		}
+		// Interest accrues to the day it is booked, never ahead of it. Nothing new while an accrual is still in debate.
 		const note = ins(ctx, 'ins-orrin');
-		const period = ctx.openPeriodId();
-		if (note?.status === 'outstanding' && !alreadyProposed(ctx, 'interest_accrual', `interest-ins-orrin-${period}`)) {
-			const [y, m] = period.split('-').map(Number);
-			const monthStart = `${period}-01`;
-			const next = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-			const fundedAt = (fundedDates(ctx.t.proposal).get('ins-orrin') ?? FIRST_CLOSE).slice(0, 10);
-			const from = fundedAt > monthStart ? fundedAt : monthStart;
-			const days = daysBetween(from, next);
-			const interest = accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, from, next);
-			if (interest > 0n) {
-				ids.push(
-					ctx.propose({
-						kind: 'interest_accrual',
-						proposerRole: 'capital',
-						amountMinor: interest.toString(),
-						summaryPlain: `Book ${money(interest)} of interest on Orrin's note for ${days} days of ${new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' })}. It is owed, not yet paid, and is an expense.`,
-						rationale: `1,000,000.00 x 6% x ${days} / 365, from ${from} to ${next}. Simple interest, paid or converted at the end.`,
-						payload: { key: `interest-ins-orrin-${period}`, instrumentId: 'ins-orrin', from, to: next, days, memo: `Interest on the Orrin note, ${period}`, lines: [L('7200', interest, '0'), L('2660', '0', interest)] },
-						body: `Accrual ${period}: ${days}d x 600bp x 1,000,000.00 / 365 = ${money(interest).slice(1)}. Dr 7200 Interest expense / Cr 2660 Accrued interest on notes.`
-					})
-				);
-			}
+		const pending = proposalsOf(ctx, 'interest_accrual', ['open', 'awaiting_cfo']).some((x) => x.payload.instrumentId === 'ins-orrin');
+		const due = note?.status === 'outstanding' && !pending ? interestDue(ctx, note) : null;
+		if (due && due.minor > 0n && !alreadyProposed(ctx, 'interest_accrual', `interest-ins-orrin-${due.to}`)) {
+			ids.push(
+				ctx.propose({
+					kind: 'interest_accrual',
+					proposerRole: 'capital',
+					amountMinor: due.minor.toString(),
+					summaryPlain: `Book ${money(due.minor)} of interest Orrin's note has earned so far: ${due.days} day${due.days === 1 ? '' : 's'} since ${day(due.from)}. It is owed, not yet paid, and is an expense. The rest of the month is booked as it is earned.`,
+					rationale: `1,000,000.00 x 6% x ${due.days} / 365, from ${due.from} up to ${due.to} (through today). Simple interest, paid or converted at the end; no interest is booked ahead of the day it is earned.`,
+					payload: { key: `interest-ins-orrin-${due.to}`, instrumentId: 'ins-orrin', from: due.from, to: due.to, days: due.days, memo: `Interest on the Orrin note to ${due.to}`, lines: [L('7200', due.minor, '0'), L('2660', '0', due.minor)] },
+					body: `Accrual ${due.from}..${due.to}: ${due.days}d x 600bp x 1,000,000.00 / 365 = ${money(due.minor).slice(1)}. Dr 7200 Interest expense / Cr 2660 Accrued interest on notes.`
+				})
+			);
 		}
 		return ids;
 	}
@@ -465,21 +508,23 @@ const valuationReport: UploadHandler = {
 		};
 	},
 	apply(ctx, doc) {
-		const outstanding = ctx.t.instrument.filter((i) => i.roundId === SEED && i.kind === 'safe_post_money' && i.status === 'outstanding');
-		const principal = outstanding.reduce((t, i) => t + toBig(i.principalMinor), 0n);
-		const target = (principal * SAFE_FV_BP) / 10_000n;
-		const delta = target - balance(ctx, '2600');
-		const key = `fv-${outstanding.map((i) => i.id).join('+')}`;
+		// Only SAFEs on the books that this report has not already restated.
+		const done = fairValueAdjustments(ctx, LIVE);
+		const fresh = ctx.t.instrument.filter((i) => i.roundId === SEED && i.kind === 'safe_post_money' && i.status === 'outstanding' && !done.has(i.id));
+		const adjustments = Object.fromEntries(fresh.map((i) => [i.id, ((toBig(i.principalMinor) * (SAFE_FV_BP - 10_000n)) / 10_000n).toString()]));
+		const delta = Object.values(adjustments).reduce((t, v) => t + toBig(v), 0n);
+		const principal = fresh.reduce((t, i) => t + toBig(i.principalMinor), 0n);
+		const key = `fv-${fresh.map((i) => i.id).join('+')}`;
 		if (delta <= 0n || alreadyProposed(ctx, 'journal_entry', key)) return [];
 		return [
 			ctx.propose({
 				kind: 'journal_entry',
 				proposerRole: 'capital',
 				amountMinor: delta.toString(),
-				summaryPlain: `Restate the ${outstanding.length} SAFEs on the books at the valuer's fair value, ${money(target)}. The ${money(delta)} increase is a non-cash loss on the P&L; no money moves.`,
+				summaryPlain: `Restate ${fresh.length === 1 ? 'a SAFE' : `${fresh.length} SAFEs`} worth ${money(principal)} at the valuer's fair value, ${money(principal + delta)}. The ${money(delta)} increase is a non-cash loss on the P&L; no money moves.`,
 				rationale: `Fair value from ${doc.fileName} (Ashgrove, 106.2% of purchase amount). SAFEs are liabilities at fair value through earnings; the change goes to 7300. Cafoo does not estimate fair values itself.`,
-				payload: { key, documentId: doc.id, instrumentIds: outstanding.map((i) => i.id), fairValueMinor: target.toString(), memo: 'SAFEs restated to fair value per the valuation report', lines: [L('7300', delta, '0'), L('2600', '0', delta)] },
-				body: `2600 carrying ${money(balance(ctx, '2600')).slice(1)} -> fair value ${money(target).slice(1)} (${outstanding.map((i) => i.id).join(', ')} x 1.062). Dr 7300 Change in fair value of SAFEs / Cr 2600 ${money(delta).slice(1)}.`
+				payload: { key, documentId: doc.id, instrumentIds: fresh.map((i) => i.id), adjustments, memo: 'SAFEs restated to fair value per the valuation report', lines: [L('7300', delta, '0'), L('2600', '0', delta)] },
+				body: `${fresh.map((i) => `${i.id} ${money(i.principalMinor).slice(1)} x 1.062`).join('; ')}. Dr 7300 Change in fair value of SAFEs / Cr 2600 ${money(delta).slice(1)}.`
 			})
 		];
 	}
@@ -542,6 +587,9 @@ function seriesAPlan(ctx: MockContext) {
 	return { converting, plan, funded };
 }
 
+/** The round's conversion Proposal, if one is in debate, waiting for the CFO or approved. One per round. */
+const conversionFor = (ctx: MockContext) => proposalsOf(ctx, 'instrument_conversion', LIVE).find((x) => x.payload.roundId === SERIES_A)?.p;
+
 const termSheet: UploadHandler = {
 	kind: 'term_sheet',
 	fileName: 'Saltmarsh Partners Series A term sheet, Cafoo Inc.pdf',
@@ -551,16 +599,17 @@ const termSheet: UploadHandler = {
 		const { plan } = seriesAPlan(ctx);
 		return {
 			extracted: { lead: 'Saltmarsh Partners', security: 'Series A preferred', investment: '12,000,000.00 USD', preMoney: '60,000,000.00 USD, including converting SAFEs and notes and the unallocated pool', liquidationPreference: '1x, non-participating', optionPool: 'Top up to 10% of post-money, inside the pre-money', board: 'One seat for Saltmarsh', legalFees: 'Company pays investor counsel up to 40,000.00 USD', expectedClose: '2026-12-15', pricePerShare: formatPriceE4(plan.roundPriceE4) },
-			summaryPlain: `Saltmarsh Partners offers $12M at a $60M pre-money, about ${formatPriceE4(plan.roundPriceE4)} a share. The Seed SAFEs and note convert into Series A preferred at their $24M cap; the Capital accountant worked out the shares and proposes the conversion.`,
+			summaryPlain: `Saltmarsh Partners offers $12M at a $60M pre-money, about ${formatPriceE4(plan.roundPriceE4)} a share. The Seed SAFEs and note convert into Series A preferred at their $24M cap at the ${day(SERIES_A_CLOSE)} close. ${conversionFor(ctx) ? 'The conversion is already proposed; SAFEs funded since then convert at the close.' : 'The Capital accountant worked out the shares and proposes the conversion.'}`,
 			flagsPlain: [
 				'The term sheet tops the option pool up to 10% of the company after the round, counted inside the pre-money. That dilutes today’s holders, not Saltmarsh. Cafoo has not modelled the top-up; a person should agree its size.',
 				'Before the close the SAFEs must be valued again at the closing date. Cafoo will not invent that fair value; upload the valuer’s update.',
-				'Brightwater’s most-favoured-nation election on the note’s 20% discount is still open. The conversion assumes no discount for them.'
+				'Brightwater’s most-favoured-nation election on the note’s 20% discount is still open. The conversion assumes no discount for them.',
+				'The company pays Saltmarsh’s legal fees up to $40,000. That is a cost of issuing the shares, set against paid-in capital, but nothing is booked until a bill arrives; a person should watch for it.'
 			]
 		};
 	},
 	apply(ctx, doc) {
-		const { converting, plan, funded } = seriesAPlan(ctx);
+		const { converting, plan } = seriesAPlan(ctx);
 		let lead = inv(ctx, 'inv-saltmarsh');
 		if (!lead) lead = ctx.insert('investor', { id: 'inv-saltmarsh', name: 'Saltmarsh Partners', kind: 'fund', country: 'US', payerNames: ['Saltmarsh Partners Fund III LP'], contactName: 'Imogen Tate' });
 		let round = ctx.t.funding_round.find((r) => r.id === SERIES_A);
@@ -572,18 +621,32 @@ const termSheet: UploadHandler = {
 			ctx.update('funding_round', round);
 		}
 
-		// The conversion books what is on the ledger now: SAFEs and notes whose money has arrived.
+		// One conversion per round. It books what is on the ledger now: SAFEs and notes whose money has arrived, each at its
+		// own carrying amount (purchase amount plus approved fair-value changes; principal plus interest to today).
 		const ready = converting.filter((i) => i.status === 'outstanding');
-		if (!ready.length || alreadyProposed(ctx, 'instrument_conversion', `convert-${ready.map((i) => i.id).join('+')}`)) return [];
+		if (!ready.length || conversionFor(ctx)) return [];
+		const notesReady = ready.filter((i) => i.kind === 'convertible_note');
+		if (proposalsOf(ctx, 'interest_accrual', ['open', 'awaiting_cfo']).some((x) => notesReady.some((n) => n.id === x.payload.instrumentId))) {
+			ctx.message({ role: 'capital', kind: 'statement', body: 'Conversion held: an interest accrual on a converting note is still in debate.', summary: 'I will propose the conversion once the open interest accrual on the note is decided.' });
+			return [];
+		}
 		const rows = plan.rows.filter((r) => ready.some((i) => i.id === r.id));
 		const shares = rows.reduce((t, r) => t + r.shares, 0n);
-		const safes = balance(ctx, '2600');
-		const notes = balance(ctx, '2650');
-		const accrued = balance(ctx, '2660');
-		const note = ready.find((i) => i.kind === 'convertible_note');
-		const noteFrom = note && funded.get(note.id);
-		const interestToClose = note && noteFrom ? accruedInterestMinor(toBig(note.principalMinor), note.interestBp ?? 0, noteFrom, SERIES_A_CLOSE) : 0n;
-		const moreInterest = interestToClose > accrued ? interestToClose - accrued : 0n;
+		const fv = fairValueAdjustments(ctx, APPROVED);
+		let safes = 0n;
+		let notes = 0n;
+		let accrued = 0n;
+		let moreInterest = 0n;
+		for (const i of ready) {
+			if (i.kind === 'convertible_note') {
+				notes += toBig(i.principalMinor);
+				accrued += bookedInterest(ctx, i.id).total;
+				const due = interestDue(ctx, i);
+				if (due && due.minor > 0n) moreInterest += due.minor;
+			} else {
+				safes += toBig(i.principalMinor) + (fv.get(i.id) ?? 0n);
+			}
+		}
 		const carrying = safes + notes + accrued + moreInterest;
 		const par = parValueMinor(shares);
 		const lines = [
@@ -592,20 +655,20 @@ const termSheet: UploadHandler = {
 			...(accrued > 0n ? [L('2660', accrued, '0')] : []),
 			...(moreInterest > 0n ? [L('7200', moreInterest, '0')] : []),
 			L('3200', '0', par),
-			L('3300', '0', carrying - par),
-			L('3310', SERIES_A_LEGAL_CAP, '0'),
-			L('2100', '0', SERIES_A_LEGAL_CAP)
+			L('3300', '0', carrying - par)
 		];
 		const waiting = converting.filter((i) => i.status === 'draft').map((i) => nameOf(ctx, i.investorId));
+		const nSafes = ready.length - notesReady.length;
+		const what = [nSafes ? `${nSafes} SAFE${nSafes === 1 ? '' : 's'}` : '', notesReady.length ? `${notesReady.length === 1 ? 'the' : notesReady.length} note${notesReady.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
 		return [
 			ctx.propose({
 				kind: 'instrument_conversion',
 				proposerRole: 'capital',
 				amountMinor: carrying.toString(),
-				summaryPlain: `Convert ${ready.length} SAFE${ready.length === 1 ? '' : 's'} and notes worth ${money(carrying)} on the books into ${shares.toLocaleString('en-US')} Series A preferred shares at the close. What we owed becomes equity; nothing here is income.${waiting.length ? ` ${waiting.join(' and ')} convert once their money arrives.` : ''}`,
-				rationale: `Term sheet ${doc.fileName}: $60M pre-money including converting securities, price ${formatPriceE4(plan.roundPriceE4)}. Each converts at min(cap price, discounted price) = cap. Demo books it now; in practice it posts on the closing date, ${SERIES_A_CLOSE.slice(0, 10)}. Saltmarsh's legal fees (capped at $40,000) reduce paid-in capital as an issuance cost.`,
+				summaryPlain: `Convert ${what}, worth ${money(carrying)} on the books, into ${shares.toLocaleString('en-US')} Series A preferred shares. This would post at the ${day(SERIES_A_CLOSE)} close; what we owed becomes equity, and nothing here is income.${waiting.length ? ` ${waiting.join(' and ')} will convert at the close once their money arrives.` : ''}`,
+				rationale: `Term sheet ${doc.fileName}: $60M pre-money including converting securities, price ${formatPriceE4(plan.roundPriceE4)}. Each converts at min(cap price, discounted price) = cap. Carrying amounts are as of today: interest only to today, fair values only as approved. In practice this posts on the closing date, ${SERIES_A_CLOSE.slice(0, 10)}; the demo books it when approved. Saltmarsh's legal fees are not booked until billed.`,
 				payload: {
-					key: `convert-${ready.map((i) => i.id).join('+')}`,
+					key: `convert-${SERIES_A}`,
 					roundId: SERIES_A,
 					documentId: doc.id,
 					priceE4: plan.roundPriceE4.toString(),
@@ -613,7 +676,7 @@ const termSheet: UploadHandler = {
 					memo: 'Seed SAFEs and note converted into Series A preferred',
 					lines
 				},
-				body: `Series A: V=60,000,000.00, C=${plan.capitalization.toLocaleString('en-US')} sh, P=${formatPriceE4(plan.roundPriceE4)}. ${rows.map((r) => `${r.id} ${money(r.amountMinor).slice(1)} @ ${formatPriceE4(r.priceE4)} (${r.basis}) = ${r.shares.toLocaleString('en-US')} sh`).join('; ')}. Dr 2600/2650/2660${moreInterest > 0n ? '/7200' : ''}, Cr 3200 par ${money(par).slice(1)}, Cr 3300 remainder; Dr 3310 / Cr 2100 40,000.00.`,
+				body: `Series A: V=60,000,000.00, C=${plan.capitalization.toLocaleString('en-US')} sh, P=${formatPriceE4(plan.roundPriceE4)}. ${rows.map((r) => `${r.id} ${money(r.amountMinor).slice(1)} @ ${formatPriceE4(r.priceE4)} (${r.basis}) = ${r.shares.toLocaleString('en-US')} sh`).join('; ')}. Carrying: SAFEs ${money(safes).slice(1)}, notes ${money(notes).slice(1)}, interest ${money(accrued + moreInterest).slice(1)}. Dr 2600/2650/2660${moreInterest > 0n ? '/7200' : ''}, Cr 3200 par ${money(par).slice(1)}, Cr 3300 remainder.`,
 				critique: { summary: 'The Red Team questioned converting before the round closes.', body: 'Conversion happens at the Series A close, not at the term sheet. Posting now overstates equity and understates liabilities until 2026-12-15, and the SAFEs are not remeasured to fair value at the conversion date.' },
 				onApproved: (c) => {
 					for (const r of rows) {
@@ -651,15 +714,22 @@ const unpaid = (ctx: MockContext, id: string) => {
 	const c = ctx.t.commitment.find((x) => x.id === id);
 	return !!c && toBig(c.receivedMinor) === 0n;
 };
-const MOVES: Move[] = [
-	{ when: (c) => c.t.commitment.find((x) => x.id === 'cm-fenwick')?.status === 'committed', apply: (c) => note(c, 'cm-fenwick', 'Signed in the cap table tool; pounds to follow into Cafoo Ltd.', 'signed') },
-	{ when: (c) => unpaid(c, 'cm-tidewater'), apply: (c) => note(c, 'cm-tidewater', 'SPV capital call is 29 of 31 angels paid; wire expected 7 October.') },
-	{ when: (c) => unpaid(c, 'cm-brightwater'), apply: (c) => note(c, 'cm-brightwater', "Brightwater's bank says the wire is queued for compliance review.", 'overdue') },
-	{ when: (c) => c.t.commitment.find((x) => x.id === 'cm-harrow')?.status === 'short', apply: (c) => note(c, 'cm-harrow', 'Harrow Lane will add the $35 fee to their next capital call.') },
-	{ when: (c) => c.t.commitment.some((x) => x.id === 'cm-saltmarsh'), apply: (c) => note(c, 'cm-saltmarsh', "Saltmarsh's counsel sent the first draft of the stock purchase agreement.", 'signed') },
-	{ when: (c) => unpaid(c, 'cm-tidewater'), apply: (c) => note(c, 'cm-tidewater', 'All 31 angels paid into the SPV; wire instructed from TWA Series 14 LLC.') }
+// Each move sets one commitment's note. A move is done once that note is showing, or once a later move for the same
+// commitment is; the next tick plays the first move not done. Progress lives in the tables, so a reset starts clean.
+type Step = Move & { id: string; notePlain: string };
+const step = (id: string, notePlain: string, when: (ctx: MockContext) => boolean, status?: Commitment['status']): Step => ({ id, notePlain, when, apply: (c) => note(c, id, notePlain, status) });
+const MOVES: Step[] = [
+	step('cm-fenwick', 'Signed in the cap table tool; pounds to follow into Cafoo Ltd.', (c) => c.t.commitment.find((x) => x.id === 'cm-fenwick')?.status === 'committed', 'signed'),
+	step('cm-tidewater', 'SPV capital call is 29 of 31 angels paid; wire expected 7 October.', (c) => unpaid(c, 'cm-tidewater')),
+	step('cm-brightwater', "Brightwater's bank says the wire is queued for compliance review.", (c) => unpaid(c, 'cm-brightwater'), 'overdue'),
+	step('cm-harrow', 'Harrow Lane will add the $35 fee to their next capital call.', (c) => c.t.commitment.find((x) => x.id === 'cm-harrow')?.status === 'short'),
+	step('cm-saltmarsh', "Saltmarsh's counsel sent the first draft of the stock purchase agreement.", (c) => c.t.commitment.some((x) => x.id === 'cm-saltmarsh'), 'signed'),
+	step('cm-tidewater', 'All 31 angels paid into the SPV; wire instructed from TWA Series 14 LLC.', (c) => unpaid(c, 'cm-tidewater'))
 ];
-let cursor = 0;
+const stepDone = (ctx: MockContext, k: number) => {
+	const showing = ctx.t.commitment.find((x) => x.id === MOVES[k].id)?.notePlain;
+	return MOVES.some((m, j) => j >= k && m.id === MOVES[k].id && m.notePlain === showing);
+};
 
 export const tickers: LiveTicker[] = [
 	{
@@ -667,15 +737,10 @@ export const tickers: LiveTicker[] = [
 		everyMs: 22_000,
 		integrationId: 'carta',
 		tick(ctx) {
-			for (let n = 0; n < MOVES.length; n++) {
-				const move = MOVES[cursor % MOVES.length];
-				cursor++;
-				if (move.when(ctx)) {
-					move.apply(ctx);
-					ctx.synced('carta', 1);
-					return;
-				}
-			}
+			const k = MOVES.findIndex((m, i) => !stepDone(ctx, i) && m.when(ctx));
+			if (k < 0) return;
+			MOVES[k].apply(ctx);
+			ctx.synced('carta', 1);
 		}
 	}
 ];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSeed, type Tables } from '../seed';
-import { currentOpenPeriodId, monthEnded } from '../periods';
+import { currentOpenPeriodId, entryProblem, monthEnded } from '../periods';
 import { handlers, matchStatementLine, samePayer, spreadEvenly, STATEMENT, type OpenBooks } from './books';
 import type { ArrayTable, MockContext, ProposeInput, RowOf } from './types';
 import type { UploadedDocument } from '../../types';
@@ -22,11 +22,13 @@ function fakeContext(): { ctx: MockContext; proposed: ProposeInput[] } {
 		message: () => {},
 		activity: () => {},
 		propose: (p) => {
+			const problem = entryProblem(p.payload.lines ?? [], t.account, t.subsidiary);
+			if (problem) throw new Error(problem);
 			proposed.push(p);
 			return `pr-live-${++seq}`;
 		},
 		later: () => {},
-		openPeriodId: () => currentOpenPeriodId(t.period, '2026-10-02T11:00:00Z')!,
+		openPeriodId: () => currentOpenPeriodId(t.period, '2026-10-02T11:00:00Z'),
 		synced: () => {}
 	};
 	return { ctx, proposed };
@@ -163,5 +165,40 @@ describe('Books uploads over the seed', () => {
 		for (const kind of ['bank_statement', 'invoices', 'bills', 'contracts']) handler(kind).apply(ctx, doc);
 		const codes = new Set(ctx.t.account.map((a) => a.code));
 		expect(proposed.flatMap((p) => p.payload.lines ?? []).filter((l) => !codes.has(l.account))).toEqual([]);
+	});
+});
+
+describe('entryProblem', () => {
+	const accounts = [
+		{ code: '1000', subsidiaryId: 'sub-us' },
+		{ code: '1100', subsidiaryId: 'sub-us' },
+		{ code: '1000-UK', subsidiaryId: 'sub-uk' }
+	];
+	const subs = [
+		{ id: 'sub-us', name: 'Cafoo Inc' },
+		{ id: 'sub-uk', name: 'Cafoo Ltd' }
+	];
+	const L = (account: string, debitMinor: string, creditMinor: string) => ({ account, debitMinor, creditMinor });
+	it('accepts a balanced entry in one company, and no lines at all', () => {
+		expect(entryProblem([L('1000', '500', '0'), L('1100', '0', '500')], accounts, subs)).toBeNull();
+		expect(entryProblem([], accounts, subs)).toBeNull();
+	});
+	it('refuses unbalanced, unknown, mixed-company, negative and empty entries in plain words', () => {
+		expect(entryProblem([L('1000', '500', '0'), L('1100', '0', '400')], accounts, subs)).toBe('The proposed entry does not balance: debits are $5.00 and credits are $4.00.');
+		expect(entryProblem([L('1000', '500', '0'), L('9999', '0', '500')], accounts, subs)).toContain('account 9999, which is not in the chart');
+		expect(entryProblem([L('1000', '500', '0'), L('1000-UK', '0', '500')], accounts, subs)).toContain('Cafoo Inc and Cafoo Ltd');
+		expect(entryProblem([L('1000', '-500', '0'), L('1100', '-500', '0')], accounts, subs)).toContain('not a whole, positive');
+		expect(entryProblem([L('1000', '0', '0'), L('1100', '0', '0')], accounts, subs)).toBe('The proposed entry has no amounts.');
+	});
+});
+
+describe('Books uploads with every month locked', () => {
+	it('refuses before any row lands', () => {
+		const { ctx, proposed } = fakeContext();
+		for (const p of ctx.t.period) p.status = 'closed';
+		const before = { bank: ctx.t.bank_transaction.length, invoices: ctx.t.invoice.length, bills: ctx.t.bill.length };
+		for (const kind of ['bank_statement', 'invoices', 'bills', 'contracts']) expect(() => handler(kind).apply(ctx, doc)).toThrow('Every month is locked; unlock one to post.');
+		expect({ bank: ctx.t.bank_transaction.length, invoices: ctx.t.invoice.length, bills: ctx.t.bill.length }).toEqual(before);
+		expect(proposed).toEqual([]);
 	});
 });

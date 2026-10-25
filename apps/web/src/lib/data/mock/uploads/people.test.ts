@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadSeed } from '../seed';
-import type { PayRun } from '../../types';
+import type { PayRun, Proposal, UploadedDocument } from '../../types';
+import type { MockContext, ProposeInput } from './types';
 import { loadedCost, payDates, splitDeposit } from '../../../payroll';
-import { INCOMING_PTO, PTO_REPORT, advanceRun, nextHours, overCap, payrollEntry, REGISTER_RUN_ID } from './people';
+import { INCOMING_PTO, PTO_REPORT, advanceRun, handlers, nextHours, overCap, payrollEntry, REGISTER_RUN_ID } from './people';
 
 const t = loadSeed();
 const debits = (jeId: string, code: string) =>
@@ -61,15 +62,51 @@ describe('people seed', () => {
 });
 
 describe('payroll entry', () => {
-	it('balances and splits gross, employer cost, net and liabilities', () => {
-		const run = t.pay_run.find((r) => r.id === REGISTER_RUN_ID)!;
+	const run = t.pay_run.find((r) => r.id === REGISTER_RUN_ID)!;
+	const net = (code: string, lines: { account: string; debitMinor: string; creditMinor: string }[]) =>
+		lines.filter((l) => l.account === code).reduce((s, l) => s + BigInt(l.debitMinor) - BigInt(l.creditMinor), 0n);
+
+	it('balances, credits cash with the whole Gusto debit, and clears 2200 inside the run', () => {
 		const e = payrollEntry(run);
 		const dr = e.lines.reduce((s, l) => s + BigInt(l.debitMinor), 0n);
 		const cr = e.lines.reduce((s, l) => s + BigInt(l.creditMinor), 0n);
 		expect(dr).toBe(cr);
-		expect(e.lines.map((l) => l.account)).toEqual(['6000', '6010', '1000', '2200']);
-		expect(e.totalMinor).toBe(loadedCost(run));
-		expect(payrollEntry({ ...run, subsidiaryId: 'sub-uk' }).lines.map((l) => l.account)).toEqual(['5300-UK', '6010-UK', '1000-UK', '2200-UK']);
+		expect(net('6000', e.lines)).toBe(BigInt(run.grossMinor));
+		expect(net('6010', e.lines)).toBe(BigInt(run.employerTaxMinor) + BigInt(run.employerBenefitsMinor));
+		expect(-net('1000', e.lines)).toBe(BigInt(loadedCost(run)));
+		expect(e.debitMinor).toBe(loadedCost(run));
+		expect(net('2200', e.lines)).toBe(0n);
+	});
+
+	it('uses Cafoo Ltd accounts for a UK run', () => {
+		const uk = payrollEntry({ ...run, subsidiaryId: 'sub-uk' });
+		expect([...new Set(uk.lines.map((l) => l.account))]).toEqual(['5300-UK', '6010-UK', '1000-UK', '2200-UK']);
+	});
+
+	it('links the pay run to whichever Proposal was finally approved, after a send-back too', () => {
+		const tables = loadSeed();
+		let input: ProposeInput | undefined;
+		const ctx = {
+			t: tables,
+			now: () => '2026-10-02T11:00:00Z',
+			id: (p: string) => `${p}-1`,
+			insert: () => undefined,
+			update: () => undefined,
+			message: () => undefined,
+			activity: () => undefined,
+			propose: (p: ProposeInput) => ((input = p), 'pr-first'),
+			later: () => undefined,
+			openPeriodId: () => '2026-10',
+			synced: () => undefined
+		} as unknown as MockContext;
+		const handler = handlers.find((h) => h.kind === 'payroll_register')!;
+		expect(handler.apply(ctx, {} as UploadedDocument)).toEqual(['pr-first']);
+		expect(tables.pay_run.find((r) => r.id === REGISTER_RUN_ID)!.proposalId).toBe('pr-first');
+		// The CFO sent it back; the resubmission 'pr-second' was approved and posted.
+		tables.journal_entry.push({ id: 'je-pay', periodId: '2026-10', postedAt: '2026-10-02T11:05:00Z', memo: 'Payroll', source: 'agent', proposalId: 'pr-second', postedByRole: 'advisor' });
+		input!.onApproved!(ctx, { id: 'pr-second' } as Proposal);
+		expect(tables.pay_run.find((r) => r.id === REGISTER_RUN_ID)).toMatchObject({ proposalId: 'pr-second', jeId: 'je-pay' });
+		expect(handler.apply(ctx, {} as UploadedDocument)).toEqual([]);
 	});
 });
 

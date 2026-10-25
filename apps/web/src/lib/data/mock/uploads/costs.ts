@@ -16,10 +16,13 @@ const L = (account: string, debitMinor: bigint | string, creditMinor: bigint | s
 	...extra
 });
 
-/** `ym` when that Period exists and is not locked, so a September item joins the September close; else the open month. */
+/**
+ * `ym` while that Period is still open (not closing, not locked), so a September bill joins the September close;
+ * otherwise undefined, which books into the open month.
+ */
 function periodFor(ctx: MockContext, ym: string): string | undefined {
 	const p = ctx.t.period.find((x) => x.id === ym);
-	return p && p.status !== 'closed' ? ym : undefined;
+	return p && p.status === 'open' ? ym : undefined;
 }
 
 /** Whether a live (not rejected or superseded) Proposal already carries this payload source. */
@@ -192,20 +195,15 @@ export const handlers: UploadHandler[] = [cloudBill, modelUsage];
 
 // ---------- Live tickers ----------
 
-/** A small, repeatable wobble so the meters do not tick by the same amount every time. */
-let step = 0;
-const wobble = (base: number) => {
-	step = (step + 1) % 7;
-	return base * (0.75 + step * 0.08);
-};
-
 /** Adds spend and usage to this month's row for a service, creating the row on the month's first tick. */
 function meter(ctx: MockContext, provider: CostProvider, service: string, dollars: number, usage: number, unit: string, product: string) {
 	const ym = ctx.now().slice(0, 7);
 	let row = ctx.t.cloud_cost.find((r) => r.ym === ym && r.provider === provider && r.service === service && r.environment === 'production');
 	if (!row) row = ctx.insert('cloud_cost', { id: ctx.id('cc'), subsidiaryId: 'sub-us', provider, service, ym, environment: 'production', category: 'cost_of_revenue', amountMinor: '0', ccy: 'USD', usageQuantity: 0, usageUnit: unit, product });
-	row.amountMinor = (toBig(row.amountMinor) + BigInt(Math.round(wobble(dollars) * 100))).toString();
-	row.usageQuantity = Math.round((row.usageQuantity + wobble(usage)) * 10) / 10;
+	// A small wobble taken from the row itself, so ticks differ without any state outside the tables.
+	const k = 0.75 + (Number(toBig(row.amountMinor) % 7n) * 0.08);
+	row.amountMinor = (toBig(row.amountMinor) + BigInt(Math.round(dollars * k * 100))).toString();
+	row.usageQuantity = Math.round((row.usageQuantity + usage * k) * 10) / 10;
 	ctx.update('cloud_cost', row);
 }
 
@@ -219,8 +217,11 @@ const spend = (name: string, integrationId: CostProvider, everyMs: number, lines
 	}
 });
 
-/** A customer's Copilot use draws down one of the live credit packs each tick. */
-let packTurn = 0;
+/**
+ * A customer's Copilot use draws down one of the live credit packs each tick: the one with the most left relative to
+ * its size, so use spreads across packs. This is the usage meter only; usage revenue (Dr 2450 / Cr 4000) is
+ * recognized at month end, so until then 2450 runs ahead of what the Batches page shows as unused.
+ */
 const creditConsumption: LiveTicker = {
 	name: 'credit-consumption',
 	integrationId: 'stripe',
@@ -229,7 +230,7 @@ const creditConsumption: LiveTicker = {
 		const now = Date.parse(ctx.now());
 		const live = ctx.t.batch.filter((b) => b.kind === 'credit_pack' && b.remaining > 0 && (!b.expiresAt || Date.parse(b.expiresAt) > now));
 		if (!live.length) return;
-		const b = live[packTurn++ % live.length];
+		const b = live.reduce((best, x) => (x.remaining / x.quantity > best.remaining / best.quantity ? x : best));
 		b.remaining = Math.max(0, Math.round((b.remaining - 1) * 10) / 10);
 		if (b.remaining === 0) b.status = 'depleted';
 		ctx.update('batch', b);
@@ -237,16 +238,25 @@ const creditConsumption: LiveTicker = {
 	}
 };
 
-/** Packs and lots past their expiry with something left: the pack's unused credits become breakage revenue, the lot is written off. */
+/**
+ * Packs and lots past their expiry with something left: the pack's unused credits become breakage revenue, the lot is
+ * written off. Raised once, into the open month (an expiry in a month that has ended books when it is found), never
+ * into a closing or locked one. With every month locked it waits.
+ */
 const expiryWatch: LiveTicker = {
 	name: 'batch-expiry',
 	everyMs: 5000,
 	tick(ctx) {
 		const now = ctx.now();
+		if (!ctx.openPeriodId()) return;
 		for (const b of ctx.t.batch) {
-			if (!b.expiresAt || b.expiresAt > now || b.remaining <= 0 || b.status === 'expired') continue;
-			b.status = 'expired';
-			ctx.update('batch', b);
+			if (!b.expiresAt || Date.parse(b.expiresAt) > Date.parse(now) || b.remaining <= 0) continue;
+			if (b.status !== 'expired') {
+				b.status = 'expired';
+				ctx.update('batch', b);
+			}
+			// Once per batch: the Proposal itself is the marker, so a seeded 'expired' pack is still raised once.
+			if (ctx.t.proposal.some((p) => p.payloadJson.includes(`"source":"expiry-${b.id}"`))) continue;
 			if (b.kind === 'credit_pack') proposeBreakage(ctx, b);
 			else proposeWriteoff(ctx, b);
 		}
@@ -262,10 +272,9 @@ function proposeBreakage(ctx: MockContext, b: Batch) {
 		kind: 'credit_breakage',
 		proposerRole: 'revenue',
 		amountMinor: amt.toString(),
-		periodId: periodFor(ctx, b.expiresAt!.slice(0, 7)),
 		summaryPlain: `${customer.endsWith('s') ? `${customer}'` : `${customer}'s`} credit pack expired with ${b.remaining}M of ${b.quantity}M tokens unused: recognize ${usd(amt)} as breakage revenue.`,
 		rationale: 'The pack terms say unused credits lapse at expiry and are not refundable, so the remaining customer-credit liability is earned now.',
-		payload: { batchId: b.id, customerId: b.customerId, remaining: b.remaining, quantity: b.quantity, memo: `Credit breakage: ${customer}, ${b.name}`, lines: [L('2450', amt, 0n, { customerId: b.customerId }), L('4300', 0n, amt, { customerId: b.customerId })] },
+		payload: { source: `expiry-${b.id}`, batchId: b.id, customerId: b.customerId, remaining: b.remaining, quantity: b.quantity, memo: `Credit breakage: ${customer}, ${b.name}`, lines: [L('2450', amt, 0n, { customerId: b.customerId }), L('4300', 0n, amt, { customerId: b.customerId })] },
 		body: `PROPOSE credit_breakage ${b.id}: expiresAt ${b.expiresAt}, remaining ${b.remaining}/${b.quantity} ${b.unit}, paid ${usd(b.amountMinor)}. Unused value ${usd(amt)}. Dr 2450 / Cr 4300.`,
 		critique: dispute
 			? {
@@ -284,10 +293,9 @@ function proposeWriteoff(ctx: MockContext, b: Batch) {
 		kind: 'inventory_writeoff',
 		proposerRole: 'bookkeeper',
 		amountMinor: amt.toString(),
-		periodId: periodFor(ctx, b.expiresAt!.slice(0, 7)),
 		summaryPlain: `${b.remaining} ${b.name.toLowerCase()} passed their shelf life unsold: write off their ${usd(amt)} cost.`,
 		rationale: 'Expired consumables cannot be sold or used; their cost leaves inventory as an expense.',
-		payload: { batchId: b.id, vendorId: b.vendorId, remaining: b.remaining, memo: `Inventory write-off: ${b.name}`, lines: [L('6900', amt, 0n), L('1300', 0n, amt, b.vendorId ? { vendorId: b.vendorId } : {})] },
+		payload: { source: `expiry-${b.id}`, batchId: b.id, vendorId: b.vendorId, remaining: b.remaining, memo: `Inventory write-off: ${b.name}`, lines: [L('6900', amt, 0n), L('1300', 0n, amt, b.vendorId ? { vendorId: b.vendorId } : {})] },
 		body: `PROPOSE inventory_writeoff ${b.id} (${b.sku}${vendor ? `, ${vendor}` : ''}): ${b.remaining}/${b.quantity} ${b.unit} left at expiry ${b.expiresAt}. Cost on hand ${usd(amt)}. Dr 6900 / Cr 1300.`
 	});
 }

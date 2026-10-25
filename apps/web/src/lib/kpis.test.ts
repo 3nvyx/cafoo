@@ -32,16 +32,19 @@ describe('fte', () => {
 		expect(fte(team, '2026-09-30')).toBe(2);
 		expect(fte(team, '2026-10-01')).toBe(3);
 	});
-	it('leaves out people who have left', () => {
-		expect(fte([person('a', 'full_time', '2026-01-01', { endAt: '2026-08-31' })], '2026-09-15')).toBe(0);
+	it('leaves out people who have left, but counts them while they worked', () => {
+		const left = person('a', 'full_time', '2026-01-01', { endAt: '2026-08-31', status: 'terminated' });
+		expect(fte([left], '2026-09-15')).toBe(0);
+		expect(fte([left], '2026-06-30')).toBe(1);
+		expect(fte([person('b', 'full_time', '2026-01-01', { status: 'terminated' })], '2026-06-30')).toBe(0);
 	});
 });
 
 describe('burn and growth', () => {
 	const contracts = [contract('c1', 12_000_000, '2026-01-01'), contract('c2', 6_000_000, '2026-09-10')];
-	it('reads net burn from the change in cash', () => {
-		expect(netBurn({ cashChange: '-500000' })).toBe(500000n);
-		expect(netBurn({ cashChange: '100' })).toBe(0n);
+	it('reads burn from operating cash, not money raised', () => {
+		expect(netBurn({ operatingCashChange: '-500000' })).toBe(500000n);
+		expect(netBurn({ operatingCashChange: '100' })).toBe(0n);
 	});
 	it('measures ARR added in the range', () => {
 		expect(netNewArr(contracts, '2026-08-31', '2026-09-30')).toBe(6_000_000n);
