@@ -523,6 +523,141 @@
 				}
 			},
 			"$description": "The focus ring. Tar in light mode, ocean in dark mode, always 3:1 against the page."
+		},
+		"tag-leave-soft": {
+			"$value": "{palette.teal.100}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.teal.100}",
+					"dark": "{palette.teal.900}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"calendar-tag",
+						"calendar-filter-chip"
+					],
+					"rules": "Only as a fill paired with on-tag-leave-soft. Never for status; a tag says what kind of day it is, not whether it is good news."
+				}
+			},
+			"$description": "Calendar tag container: vacation, parental and other planned leave."
+		},
+		"on-tag-leave-soft": {
+			"$value": "{palette.teal.800}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.teal.800}",
+					"dark": "{palette.teal.200}"
+				}
+			},
+			"$description": "Text and icons on tag-leave-soft."
+		},
+		"tag-sick-soft": {
+			"$value": "{palette.rose.100}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.rose.100}",
+					"dark": "{palette.rose.900}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"calendar-tag",
+						"calendar-filter-chip"
+					],
+					"rules": "Only as a fill paired with on-tag-sick-soft. Never for status; a tag says what kind of day it is, not whether it is good news."
+				}
+			},
+			"$description": "Calendar tag container: sick days."
+		},
+		"on-tag-sick-soft": {
+			"$value": "{palette.rose.800}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.rose.800}",
+					"dark": "{palette.rose.200}"
+				}
+			},
+			"$description": "Text and icons on tag-sick-soft."
+		},
+		"tag-pay-soft": {
+			"$value": "{palette.olive.100}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.olive.100}",
+					"dark": "{palette.olive.900}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"calendar-tag",
+						"calendar-filter-chip"
+					],
+					"rules": "Only as a fill paired with on-tag-pay-soft. Never for status; a tag says what kind of day it is, not whether it is good news."
+				}
+			},
+			"$description": "Calendar tag container: paydays and payroll debits."
+		},
+		"on-tag-pay-soft": {
+			"$value": "{palette.olive.800}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.olive.800}",
+					"dark": "{palette.olive.200}"
+				}
+			},
+			"$description": "Text and icons on tag-pay-soft."
+		},
+		"tag-due-soft": {
+			"$value": "{palette.copper.100}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.copper.100}",
+					"dark": "{palette.copper.900}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"calendar-tag",
+						"calendar-filter-chip"
+					],
+					"rules": "Only as a fill paired with on-tag-due-soft. Never for status; a tag says what kind of day it is, not whether it is good news."
+				}
+			},
+			"$description": "Calendar tag container: bill and invoice due dates."
+		},
+		"on-tag-due-soft": {
+			"$value": "{palette.copper.800}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.copper.800}",
+					"dark": "{palette.copper.200}"
+				}
+			},
+			"$description": "Text and icons on tag-due-soft."
+		},
+		"tag-holiday-soft": {
+			"$value": "{palette.neutral.150}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.150}",
+					"dark": "{palette.neutral.800}"
+				},
+				"com.cafoo": {
+					"usage": [
+						"calendar-tag",
+						"calendar-filter-chip"
+					],
+					"rules": "Only as a fill paired with on-tag-holiday-soft. Never for status; a tag says what kind of day it is, not whether it is good news."
+				}
+			},
+			"$description": "Calendar tag container: public and company holidays. Neutral on purpose, so a day off reads as quiet."
+		},
+		"on-tag-holiday-soft": {
+			"$value": "{palette.neutral.600}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.neutral.600}",
+					"dark": "{palette.neutral.300}"
+				}
+			},
+			"$description": "Text and icons on tag-holiday-soft."
 		}
 	},
 	"role": {

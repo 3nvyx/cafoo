@@ -60,6 +60,20 @@
 	   The token files hold the same results as palette.teal and palette.plum. */
 	--role-funding: color-mix(in srgb, var(--pos) 50%, var(--accent-deep));
 	--role-capital: color-mix(in srgb, var(--neg) 55%, var(--accent-deep));
+
+	/* Calendar tags: each tag's hue mixed 16% into the surface for the fill and 70% into ink for the text, so both
+	   follow light and dark on their own. The token files hold the same results as palette.teal, rose, olive and
+	   copper (100/800 light, 900/200 dark). Holidays reuse the quiet info neutrals. */
+	--tag-leave-soft: color-mix(in srgb, var(--role-funding) 16%, var(--surface));
+	--on-tag-leave-soft: color-mix(in srgb, var(--role-funding) 70%, var(--ink));
+	--tag-sick-soft: color-mix(in srgb, var(--role-redteam) 16%, var(--surface));
+	--on-tag-sick-soft: color-mix(in srgb, var(--role-redteam) 70%, var(--ink));
+	--tag-pay-soft: color-mix(in srgb, var(--role-bookkeeper) 16%, var(--surface));
+	--on-tag-pay-soft: color-mix(in srgb, var(--role-bookkeeper) 70%, var(--ink));
+	--tag-due-soft: color-mix(in srgb, var(--role-credit) 16%, var(--surface));
+	--on-tag-due-soft: color-mix(in srgb, var(--role-credit) 70%, var(--ink));
+	--tag-holiday-soft: var(--info-soft);
+	--on-tag-holiday-soft: var(--on-info-soft);
 	color-scheme: light;
 }
 
@@ -178,6 +192,16 @@
 	--color-inverse: var(--inverse);
 	--color-on-inverse: var(--on-inverse);
 	--color-scrim: var(--scrim);
+	--color-tag-leave-soft: var(--tag-leave-soft);
+	--color-on-tag-leave-soft: var(--on-tag-leave-soft);
+	--color-tag-sick-soft: var(--tag-sick-soft);
+	--color-on-tag-sick-soft: var(--on-tag-sick-soft);
+	--color-tag-pay-soft: var(--tag-pay-soft);
+	--color-on-tag-pay-soft: var(--on-tag-pay-soft);
+	--color-tag-due-soft: var(--tag-due-soft);
+	--color-on-tag-due-soft: var(--on-tag-due-soft);
+	--color-tag-holiday-soft: var(--tag-holiday-soft);
+	--color-on-tag-holiday-soft: var(--on-tag-holiday-soft);
 
 	--font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
 	--font-display: 'Space Grotesk', 'DM Sans', ui-sans-serif, system-ui, sans-serif;

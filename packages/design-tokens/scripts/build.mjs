@@ -6,16 +6,19 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { PACKAGE_ROOT, loadTokens } from './tokens.mjs';
 
 export const CSS_FILE = resolve(PACKAGE_ROOT, 'css/cafoo-tokens.css');
-const TZ = resolve(PACKAGE_ROOT, 'node_modules/.bin/tz');
+// On Windows the bin is a .cmd shim, which Node only runs through a shell.
+const WIN = process.platform === 'win32';
+const TZ = resolve(PACKAGE_ROOT, `node_modules/.bin/tz${WIN ? '.cmd' : ''}`);
 
 /** Run Terrazzo into a scratch directory and return the finished CSS. */
 export function generateCSS() {
 	const out = mkdtempSync(join(tmpdir(), 'cafoo-tokens-'));
 	try {
-		execFileSync(TZ, ['build'], { cwd: PACKAGE_ROOT, env: { ...process.env, CAFOO_TOKENS_OUT: out }, stdio: 'pipe' });
+		execFileSync(WIN ? `"${TZ}" build` : TZ, WIN ? [] : ['build'], { cwd: PACKAGE_ROOT, env: { ...process.env, CAFOO_TOKENS_OUT: `${pathToFileURL(out).href}/` }, stdio: 'pipe', shell: WIN });
 		const raw = readFileSync(join(out, 'cafoo-tokens.css'), 'utf8');
 		return `${header()}\n${reindent(withColorScheme(stripBanner(raw)))}\n${themeBlock(loadTokens())}`;
 	} finally {

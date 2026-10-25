@@ -8,6 +8,8 @@
 	import Pill from '#lib/components/Pill.svelte';
 	import UploadDemo from '#lib/components/UploadDemo.svelte';
 	import { costByDepartment, isEmployed, loadedCost, monthlyLoadedCost, payDates, type Region } from '#lib/payroll.js';
+	import Calendar from '#lib/components/Calendar.svelte';
+	import { calendarItems, payrollItems, shiftMonth } from '#lib/calendar.js';
 	import TimeOffList from './TimeOffList.svelte';
 	import { countryOf, headcountByMonth, monthsBetween, payrollByMonth } from './headcount';
 	import { DEPARTMENT, EMPLOYEE_STATUS, EMPLOYMENT, RUN_STATUS, companyName, convert, dayLabel, latestRate, money, payText, ptoText, range } from './people.js';
@@ -52,6 +54,64 @@
 			.filter((e) => (company === 'all' || e.subsidiaryId === company) && (department === 'all' || e.department === department))
 			.sort((a, b) => ORDER[a.type] - ORDER[b.type] || a.startAt.localeCompare(b.startAt) || a.name.localeCompare(b.name))
 	);
+
+	// The calendar leads the page, so the roster and the time-off queue open short and expand on request.
+	const ROSTER_ROWS = 6;
+	const PENDING_ROWS = 3;
+	let allPeople = $state(false);
+	let allPending = $state(false);
+
+	// Side by side (lg and up), the roster shows as many whole rows as fit beside the right-hand column: the floor,
+	// so its card ends at or just above the column's bottom and never with an empty strip. Below lg it shows
+	// ROSTER_ROWS. Every row stays rendered so each can be measured: the list is clipped at the last row that fits,
+	// and the rows past it are made inert.
+	let rosterList: HTMLUListElement | undefined = $state();
+	let sideColumn: HTMLDivElement | undefined = $state();
+	let rosterFit = $state<{ rows: number; clipPx: number | null }>({ rows: Infinity, clipPx: null });
+
+	function fitRoster() {
+		if (!rosterList) return;
+		if (allPeople) return void (rosterFit = { rows: Infinity, clipPx: null });
+		const top = rosterList.getBoundingClientRect().top;
+		// Each row's bottom, measured from the top of the list. A parent's clipping does not move its rows.
+		const bottoms = [...rosterList.children].map((r) => r.getBoundingClientRect().bottom - top);
+		const clipAt = (rows: number) => (rosterFit = { rows, clipPx: rows < bottoms.length ? bottoms[rows - 1] : null });
+		if (!sideColumn || !matchMedia('(min-width: 1024px)').matches) return void clipAt(Math.min(ROSTER_ROWS, bottoms.length));
+		const target = sideColumn.getBoundingClientRect().bottom;
+		const BORDER = 1;
+		// The "Show all" row: 12px padding top and bottom, a 20px line and its top border.
+		const MORE = 45;
+		// Everything fits with no "Show all" row.
+		if (top + (bottoms.at(-1) ?? 0) + BORDER <= target) return void clipAt(bottoms.length);
+		const room = target - top - MORE - BORDER;
+		clipAt(Math.max(3, bottoms.filter((b) => b <= room + 0.5).length));
+	}
+
+	$effect(() => {
+		// Re-fit when the roster, the filters or the expansion change; the observer covers both columns resizing.
+		void roster.length;
+		void allPeople;
+		fitRoster();
+	});
+	$effect(() => {
+		if (!sideColumn || !rosterList) return;
+		const watch = new ResizeObserver(() => fitRoster());
+		watch.observe(sideColumn);
+		watch.observe(rosterList);
+		return () => watch.disconnect();
+	});
+	const clipped = $derived(roster.length > rosterFit.rows);
+
+	// The shared calendar: holidays, time off and the pay calendar a year ahead, read live, so an approval below fills
+	// its bar in at once and a new Gusto run replaces its estimate.
+	const entries = $derived([
+		...calendarItems(db.calendarEvents(), db.ptoRequests(), people),
+		...payrollItems(
+			runs,
+			companies.map((c) => ({ id: c.id, name: c.name, region: (c.baseCurrency === 'GBP' ? 'UK' : 'US') as Region })),
+			shiftMonth(now.slice(0, 7), 12)
+		)
+	]);
 
 	// Pay calendar: the runs Gusto has, then the pay dates still to come this year.
 	const calendar = $derived(
@@ -270,11 +330,11 @@
 			<div class="hidden gap-4 border-b border-line px-5 py-2 text-caption text-ink-3 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)]" aria-hidden="true">
 				<span>Name</span><span>Department</span><span>Type</span><span class="text-right">Time off</span><span class="text-right">Pay</span>
 			</div>
-			<ul class="flex flex-col divide-y divide-line">
-				{#each roster as e (e.id)}
+			<ul bind:this={rosterList} class="flex flex-col divide-y divide-line overflow-hidden" style:max-height={rosterFit.clipPx === null ? undefined : `${rosterFit.clipPx}px`}>
+				{#each roster as e, i (e.id)}
 					{@const future = e.startAt.slice(0, 10) > now.slice(0, 10)}
 					{@const badge = future ? { tone: 'neutral' as const, label: `Starts ${fmtDay(e.startAt)}` } : e.status !== 'active' ? EMPLOYEE_STATUS[e.status] : null}
-					<li class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] xl:items-center">
+					<li inert={i >= rosterFit.rows} class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-5 py-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)] xl:items-center">
 						<div class="min-w-0">
 							<a class="drill font-medium" href="/people/{e.id}">{e.name}</a>
 							<p class="truncate text-body-sm text-ink-2">{e.title}</p>
@@ -301,16 +361,26 @@
 					<li class="px-5 py-6 text-body-sm text-ink-3">Nobody matches these filters.</li>
 				{/each}
 			</ul>
+			{#if clipped || (allPeople && roster.length > ROSTER_ROWS)}
+				<button type="button" class="w-full border-t border-line px-5 py-3 text-left text-body-sm text-ink-2 hover:bg-subtle hover:text-ink" aria-expanded={allPeople} onclick={() => (allPeople = !allPeople)}>
+					{allPeople ? 'Show fewer' : `Show all ${roster.length} people`}
+				</button>
+			{/if}
 		</div>
 	</section>
 
-	<div class="flex min-w-0 flex-col gap-8">
+	<div bind:this={sideColumn} class="flex min-w-0 flex-col gap-8">
 		<section aria-labelledby="pto-h" class="card flex flex-col gap-2 p-5">
 			<div class="flex items-baseline justify-between gap-3">
 				<h2 id="pto-h" class="text-subtitle">Time off waiting for you</h2>
 				{#if pending.length}<Pill tone="warn">{pending.length}</Pill>{/if}
 			</div>
-			<TimeOffList requests={pending} empty="Nothing waiting. New requests from Gusto show up here." />
+			<TimeOffList requests={allPending ? pending : pending.slice(0, PENDING_ROWS)} empty="Nothing waiting. New requests from Gusto show up here." />
+			{#if pending.length > PENDING_ROWS}
+				<button type="button" class="self-start text-body-sm text-ink-2 hover:text-ink" aria-expanded={allPending} onclick={() => (allPending = !allPending)}>
+					{allPending ? 'Show fewer' : `Show all ${pending.length}`}
+				</button>
+			{/if}
 		</section>
 
 		<section aria-labelledby="dept-h" class="card flex flex-col gap-3 p-5">

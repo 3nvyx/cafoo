@@ -453,6 +453,50 @@
 		},
 		"olive": {
 			"$description": "The Bookkeeper agent.",
+			"100": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.8667,
+						0.8667,
+						0.8039
+					],
+					"hex": "#ddddcd"
+				}
+			},
+			"200": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.7765,
+						0.8196,
+						0.5137
+					],
+					"hex": "#c6d183"
+				}
+			},
+			"800": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.2627,
+						0.2941,
+						0.0627
+					],
+					"hex": "#434b10"
+				}
+			},
+			"900": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.1882,
+						0.1961,
+						0.1216
+					],
+					"hex": "#30321f"
+				}
+			},
 			"300": {
 				"$value": {
 					"colorSpace": "srgb",
@@ -478,6 +522,50 @@
 		},
 		"rose": {
 			"$description": "The Red-team agent.",
+			"100": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.9333,
+						0.8196,
+						0.8275
+					],
+					"hex": "#eed1d3"
+				}
+			},
+			"200": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.9804,
+						0.5961,
+						0.6588
+					],
+					"hex": "#fa98a8"
+				}
+			},
+			"800": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.5451,
+						0.0745,
+						0.1882
+					],
+					"hex": "#8b1330"
+				}
+			},
+			"900": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.2353,
+						0.1451,
+						0.1569
+					],
+					"hex": "#3c2528"
+				}
+			},
 			"300": {
 				"$value": {
 					"colorSpace": "srgb",
@@ -503,6 +591,50 @@
 		},
 		"teal": {
 			"$description": "A quiet sea green, only for the Funding desk agent: money arriving.",
+			"100": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.8353,
+						0.8784,
+						0.8667
+					],
+					"hex": "#d5e0dd"
+				}
+			},
+			"200": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.3961,
+						0.7059,
+						0.6353
+					],
+					"hex": "#65b4a2"
+				}
+			},
+			"800": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.1137,
+						0.3412,
+						0.349
+					],
+					"hex": "#1d5759"
+				}
+			},
+			"900": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.102,
+						0.1725,
+						0.149
+					],
+					"hex": "#1a2c26"
+				}
+			},
 			"700": {
 				"$value": {
 					"colorSpace": "srgb",
@@ -548,6 +680,53 @@
 						0.7529
 					],
 					"hex": "#b0aac0"
+				}
+			}
+		},
+		"copper": {
+			"$description": "A burnt orange, only for calendar due dates. Mixed from the Credit agent's rust.",
+			"100": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.9255,
+						0.8588,
+						0.7961
+					],
+					"hex": "#ecdbcb"
+				}
+			},
+			"200": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.8941,
+						0.6549,
+						0.3882
+					],
+					"hex": "#e4a763"
+				}
+			},
+			"800": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.5176,
+						0.251,
+						0.0471
+					],
+					"hex": "#84400c"
+				}
+			},
+			"900": {
+				"$value": {
+					"colorSpace": "srgb",
+					"components": [
+						0.2157,
+						0.1608,
+						0.0941
+					],
+					"hex": "#372918"
 				}
 			}
 		}

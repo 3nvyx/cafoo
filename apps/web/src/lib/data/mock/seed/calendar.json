@@ -1,0 +1,10 @@
+{
+	"_note": "Entries put on the shared calendar by hand. Time off, paydays and due dates come from their own tables.",
+	"calendar_event": [
+		{ "id": "cal-01", "tag": "holiday", "title": "Indigenous Peoples' Day (US)", "startDay": "2026-10-12", "endDay": "2026-10-12" },
+		{ "id": "cal-02", "tag": "holiday", "title": "Veterans Day (US)", "startDay": "2026-11-11", "endDay": "2026-11-11" },
+		{ "id": "cal-03", "tag": "holiday", "title": "Thanksgiving (US)", "startDay": "2026-11-26", "endDay": "2026-11-27" },
+		{ "id": "cal-04", "tag": "holiday", "title": "Christmas Day", "startDay": "2026-12-25", "endDay": "2026-12-25" },
+		{ "id": "cal-05", "tag": "holiday", "title": "Boxing Day, observed (UK)", "startDay": "2026-12-28", "endDay": "2026-12-28" }
+	]
+}

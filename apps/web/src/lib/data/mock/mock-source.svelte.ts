@@ -144,6 +144,7 @@ export class MockDataSource implements DataSource {
 	capTable = () => this.#t.cap_table_entry;
 	employees = () => this.#t.employee;
 	ptoRequests = () => this.#t.pto_request;
+	calendarEvents = () => this.#t.calendar_event;
 	payRuns = () => this.#t.pay_run;
 	payslips = () => this.#t.payslip;
 	cloudCosts = () => this.#t.cloud_cost;

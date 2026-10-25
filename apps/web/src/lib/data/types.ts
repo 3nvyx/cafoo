@@ -393,6 +393,7 @@ export type TableName =
 	| 'cap_table_entry'
 	| 'employee'
 	| 'pto_request'
+	| 'calendar_event'
 	| 'pay_run'
 	| 'payslip'
 	| 'cloud_cost'
@@ -734,6 +735,23 @@ export interface PtoRequest {
 	endAt: Iso;
 	hours: number;
 	status: 'pending' | 'approved' | 'declined' | 'taken';
+	notePlain?: string;
+}
+
+/** What kind of day a calendar entry marks. Each has its own colour pair (bg-tag-*-soft text-on-tag-*-soft). */
+export type CalendarTag = 'leave' | 'sick' | 'pay' | 'due' | 'holiday';
+
+/**
+ * An entry put on the calendar by hand, such as a company holiday. Time off, paydays and due dates are not stored
+ * here; the calendar reads them from their own tables. Days are `YYYY-MM-DD`, both ends included.
+ */
+export interface CalendarEvent {
+	id: string;
+	tag: CalendarTag;
+	title: string;
+	startDay: string;
+	endDay: string;
+	employeeId?: string;
 	notePlain?: string;
 }
 

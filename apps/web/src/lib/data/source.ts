@@ -43,6 +43,7 @@ import type {
 	CapTableEntry,
 	Employee,
 	PtoRequest,
+	CalendarEvent,
 	PayRun,
 	Payslip,
 	CloudCost,
@@ -154,6 +155,8 @@ export interface DataSource {
 	capTable(): CapTableEntry[];
 	employees(): Employee[];
 	ptoRequests(): PtoRequest[];
+	/** Entries put on the shared calendar by hand (holidays, meetings). Time off and paydays come from their own tables. */
+	calendarEvents(): CalendarEvent[];
 	/** Past and scheduled pay runs, by pay date. */
 	payRuns(): PayRun[];
 	payslips(): Payslip[];
