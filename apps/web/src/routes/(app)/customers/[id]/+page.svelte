@@ -94,7 +94,7 @@
 				<a class="drill text-ink-2" href={drill({ customer: c.id }, 'all')}>Journal lines for this customer</a>
 			</p>
 		</div>
-		{#if c.creditTier}<Pill tone={TIER[c.creditTier].tone}>{TIER[c.creditTier].label} · {TIER[c.creditTier].plain}</Pill>{:else}<Pill tone="muted">Not checked</Pill>{/if}
+		<span class="self-start sm:self-auto">{#if c.creditTier}<Pill tone={TIER[c.creditTier].tone}>{TIER[c.creditTier].label} · {TIER[c.creditTier].plain}</Pill>{:else}<Pill tone="muted">Not checked</Pill>{/if}</span>
 	</div>
 
 	<dl class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
