@@ -19,7 +19,8 @@
 	import StatusStrip from './StatusStrip.svelte';
 	import Workflows from './Workflows.svelte';
 	import MetricTile from '../metrics/MetricTile.svelte';
-	import { aiTiles, efficiencyTiles, quarterStart, usdRate } from '#lib/kpis.js';
+	import { aiTiles, efficiencyTiles, usdRate } from '#lib/kpis.js';
+	import { burnReading, burnWindowLabel, shiftYm } from '#lib/saas-metrics.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
@@ -85,24 +86,30 @@
 	const link = (href: string) => (drillable ? href : undefined);
 	const company = $derived(root?.code);
 
+	// Runway is the Metrics page's: cash over the average monthly operating burn of the quarter ending with the range.
+	const firstMonth = $derived(db.periods()[0]?.id);
+	// A range ending mid-month reads the last whole month before it, so no posting after the range end counts.
+	const burnEnd = $derived.by(() => {
+		if (!range) return null;
+		const ym = range.to.slice(0, 7);
+		return range.to === monthRange(ym).to ? ym : shiftYm(ym, -1);
+	});
+	const burnAt = $derived(burnEnd && firstMonth ? burnReading(ps, burnEnd, firstMonth) : null);
 	const runway = $derived.by(() => {
-		if (!s) return '';
-		if (s.runwayMonths !== null) {
-			if (s.runwayMonths > 36) return 'Over 3 years of runway at this rate of spend';
-			if (s.runwayMonths < 1) return 'Less than a month of runway at this rate of spend';
-			const n = Math.round(s.runwayMonths);
-			return `About ${n} month${n === 1 ? '' : 's'} of runway at this rate of spend`;
-		}
-		return toBig(s.operatingCashChange) >= 0n ? 'Running the business did not use cash over this range' : 'Cash is gone at this rate of spend';
+		if (!burnAt || !burnAt.yms.length) return '';
+		const r = burnAt.runwayMonths;
+		if (r === null) return burnAt.cash > 0n ? `Running the business did not use cash ${burnWindowLabel(burnAt.yms)}` : 'Cash is gone at this rate of spend';
+		if (r > 36) return 'Over 3 years of runway at this rate of spend';
+		if (r < 1) return 'Less than a month of runway at this rate of spend';
+		const n = Math.round(r);
+		return `About ${n} month${n === 1 ? '' : 's'} of runway at this rate of spend`;
 	});
 
 	// The headline readings from the Metrics page, for the month the strip shows.
-	const firstMonth = $derived(db.periods()[0]?.id);
 	const health = $derived.by(() => {
 		if (!period || !monthSummary || !firstMonth) return [];
-		const r = monthRange(period.id);
 		const all = [
-			...efficiencyTiles({ month: monthSummary, from: r.from, to: r.to, quarterFrom: quarterStart(r.from, monthRange(firstMonth).from), contracts, employees: db.employees() }),
+			...efficiencyTiles({ ps, endYm: period.id, firstYm: firstMonth, contracts, employees: db.employees() }),
 			...aiTiles({
 				ym: period.id,
 				revenueMinor: monthSummary.revenue,

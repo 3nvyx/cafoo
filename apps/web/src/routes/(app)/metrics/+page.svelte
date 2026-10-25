@@ -12,8 +12,14 @@
 	import { costOfService, type CostOfService } from '#lib/costs.js';
 	import { aiTiles, burnMultiple, burnMultipleHealth, fte, ndrHealth, netBurn, ruleOf40, ruleOf40Health, runwayHealth, aiGrossMarginHealth, usdRate, type Health, type Tile } from '#lib/kpis.js';
 	import {
+		BURN_MONTHS,
 		WINDOWS,
 		arrMovement,
+		burnMultipleLabel,
+		burnReading,
+		burnWindowLabel,
+		runwayLabel,
+		type BurnReading,
 		cacPaybackHealth,
 		cacPaybackMonths,
 		grrBp,
@@ -73,6 +79,8 @@
 		heads: number;
 		rpe: bigint | null;
 		r40: ReturnType<typeof ruleOf40>;
+		/** Runway and its burn: always the last BURN_MONTHS, the Dashboard's definition. */
+		runway: BurnReading;
 	}
 
 	function readingAt(end: string): Reading | null {
@@ -100,7 +108,8 @@
 			cac: cacPaybackMonths(sm, toBig(w.added) + toBig(w.expansion), gm),
 			heads,
 			rpe: revenuePerEmployee(toBig(s.revenue), win.months, heads),
-			r40: ruleOf40(contracts, win.before, win.to, win.months, s.netMarginBp)
+			r40: ruleOf40(contracts, win.before, win.to, win.months, s.netMarginBp),
+			runway: burnReading(ps, end, first)
 		};
 	}
 
@@ -179,7 +188,7 @@
 			{
 				key: 'burn-multiple',
 				label: 'Burn multiple',
-				value: r.multiple === null ? (r.burn > 0n ? 'No ARR added' : '–') : `${r.multiple.toFixed(1)}×`,
+				value: r.multiple === null ? (r.burn > 0n ? 'No ARR added' : '–') : burnMultipleLabel(r.multiple),
 				health: burnMultipleHealth(r.multiple, r.burn),
 				inputs: `${money(r.burn)} burned · ${money(r.netNew)} net new ARR`,
 				yardstick: 'Under 1× is great, 1× to 2× good; over 2× means growth costs too much.',
@@ -200,12 +209,12 @@
 			{
 				key: 'runway',
 				label: 'Runway',
-				value: r.s.runwayMonths === null ? 'Cash not falling' : r.s.runwayMonths > 36 ? 'Over 3 years' : `${Math.round(r.s.runwayMonths)} months`,
-				health: runwayHealth(r.s.runwayMonths),
-				inputs: `${money(r.s.cash)} cash · ${money(r.burn)} operating burn over ${windowLabel}`,
+				value: runwayLabel(r.runway),
+				health: runwayHealth(r.runway.runwayMonths),
+				inputs: `${money(r.runway.cash)} cash · ${money(r.runway.monthlyBurn)} a month of operating burn, averaged ${burnWindowLabel(r.runway.yms)}`,
 				yardstick: '18 months or more is comfortable between rounds; under 9 means raise now.',
-				formula: 'Cash / average monthly operating burn over the window',
-				spark: line((x) => (x.s.runwayMonths === null ? null : Math.min(x.s.runwayMonths, 60)))
+				formula: `Cash / average monthly operating burn over the last ${BURN_MONTHS} months, whatever the window`,
+				spark: line((x) => (x.runway.runwayMonths === null ? null : Math.min(x.runway.runwayMonths, 60)))
 			},
 			{
 				key: 'rpe',

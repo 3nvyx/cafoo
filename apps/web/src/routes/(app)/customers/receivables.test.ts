@@ -39,8 +39,21 @@ describe('segmentOf', () => {
 	it('reads the segment from ARR', () => {
 		expect(segmentOf('0')).toBe('no_contract');
 		expect(segmentOf('1200000')).toBe('self_serve');
-		expect(segmentOf('2500000')).toBe('mid_market');
-		expect(segmentOf('25000000')).toBe('enterprise');
+		expect(segmentOf('1499999')).toBe('self_serve');
+		expect(segmentOf('1500000')).toBe('mid_market');
+		expect(segmentOf('7499999')).toBe('mid_market');
+		expect(segmentOf('7500000')).toBe('enterprise');
+	});
+
+	it("classifies Quillmesh's price bands and the fixture's contracts sensibly", () => {
+		const usd = (dollars: number) => String(dollars * 100);
+		// Quillmesh: mid-market $18k to $40k a year, enterprise $90k to $190k.
+		for (const d of [18_000, 18_240, 26_400, 39_876, 40_000]) expect(segmentOf(usd(d))).toBe('mid_market');
+		for (const d of [90_000, 94_476, 176_796, 190_000]) expect(segmentOf(usd(d))).toBe('enterprise');
+		// The fixture: usage plans under $1.5k a year are self-serve, $74.4k annual plans mid-market, $96k enterprise.
+		expect(segmentOf(usd(1_440))).toBe('self_serve');
+		expect(segmentOf(usd(74_400))).toBe('mid_market');
+		expect(segmentOf(usd(96_000))).toBe('enterprise');
 	});
 });
 

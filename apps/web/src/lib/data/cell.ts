@@ -1,8 +1,9 @@
 // How the Dash bar shows one stored value. Rows come straight from the source: in live mode they are SpacetimeDB
 // values (bigint, Timestamp, Identity, tagged enums, optional fields); in Demo mode they are the UI's own rows
 // (strings for money and ids, ISO strings for times). Both are read here, never changed.
-import { dateTime } from '../labels';
+import { dateTime, roleName } from '../labels';
 import { tableLabel } from './data-sets';
+import type { PostedByRole } from './types';
 
 export type CellKind = 'empty' | 'number' | 'money' | 'date' | 'bool' | 'id' | 'enum' | 'json' | 'text';
 
@@ -61,6 +62,24 @@ function currencyOf(row: Record<string, unknown> | undefined): string | undefine
 
 const textCell = (text: string): Cell => ({ kind: 'text', text, full: '', sort: text.toLowerCase() });
 
+/** Identity columns and the role column each table records beside them. A CFO confirmation is the CFO by definition. */
+const ROLE_COLUMN: Record<string, string> = {
+	proposedBy: 'proposerRole',
+	postedBy: 'postedByRole',
+	sender: 'senderRole',
+	actor: 'actorRole',
+	ranBy: 'ranByRole',
+	authoredBy: 'authoredByRole',
+	lockedBy: 'lockedByRole'
+};
+
+function identityRole(key: string, row: Record<string, unknown> | undefined): string | undefined {
+	if (key === 'cfoConfirmedBy') return roleName('cfo');
+	const column = ROLE_COLUMN[key];
+	const role = column ? row?.[column] : undefined;
+	return typeof role === 'string' && role ? roleName(role.toLowerCase() as PostedByRole) : undefined;
+}
+
 export function cell(value: unknown, key = '', row?: Record<string, unknown>): Cell {
 	if (value === null || value === undefined || value === '') return { kind: 'empty', text: '', full: '', sort: '' };
 	if (typeof value === 'boolean') return { kind: 'bool', text: value ? 'Yes' : 'No', full: '', sort: value ? '1' : '0' };
@@ -95,6 +114,9 @@ export function cell(value: unknown, key = '', row?: Record<string, unknown>): C
 	const p = plain(value);
 	if (p !== undefined) {
 		if (ISO.test(p)) return { kind: 'date', text: when(p), full: p, sort: p };
+		// An identity that acted ("proposedBy") reads as the role the row records beside it, with the hash kept in full.
+		const role = identityRole(key, row);
+		if (role) return { kind: 'text', text: role, full: p, sort: role.toLowerCase() };
 		const short = /^(0x)?[0-9a-f]{16,}$/i.test(p) ? `${p.slice(0, 8)}…${p.slice(-4)}` : p;
 		return { kind: 'id', text: short, full: p === short ? '' : p, sort: p };
 	}
@@ -102,7 +124,9 @@ export function cell(value: unknown, key = '', row?: Record<string, unknown>): C
 	// SpacetimeDB sum types arrive as { tag, value? }: the tag is the readable part.
 	if (typeof value === 'object' && !Array.isArray(value) && typeof (value as { tag?: unknown }).tag === 'string') {
 		const { tag, value: inner } = value as { tag: string; value?: unknown };
-		const extra = inner === undefined ? '' : cell(inner).text;
+		// A unit variant ("Asset") carries an empty object or nothing; only a payload adds to the label.
+		const unit = inner === undefined || inner === null || (typeof inner === 'object' && !Array.isArray(inner) && plain(inner) === undefined && Object.keys(inner).length === 0);
+		const extra = unit ? '' : cell(inner).text;
 		const text = extra ? `${tableLabel(tag)} · ${extra}` : tableLabel(tag);
 		return { kind: 'enum', text, full: '', sort: text.toLowerCase() };
 	}

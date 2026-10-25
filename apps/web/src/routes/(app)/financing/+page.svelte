@@ -12,6 +12,10 @@
 	import { KIND, STATUS, shortDate, type Tone } from '#lib/labels.js';
 	import CapTable from './CapTable.svelte';
 	import CapTableTools from './CapTableTools.svelte';
+	import { rootOf } from '#lib/data/group.js';
+
+	/** The company whose round and cap table these are: the books' root company. */
+	const company = $derived(rootOf(db.subsidiaries())?.name ?? 'The company');
 
 	const COMMITMENT: Record<Commitment['status'], { label: string; tone: Tone }> = {
 		committed: { label: 'Committed', tone: 'muted' },
@@ -157,7 +161,7 @@
 <svelte:head><title>Financing · Cafoo</title></svelte:head>
 
 <header class="flex flex-col gap-1 pb-6">
-	<p class="text-body-sm text-ink-2">Cafoo Inc · Funding desk and Capital accountant</p>
+	<p class="text-body-sm text-ink-2">{company} · Funding desk and Capital accountant</p>
 	<h1 class="text-display">Financing</h1>
 	<p class="max-w-prose text-body-sm text-ink-2">Each round's money matched to its investors, every SAFE and note with how it sits in the books, and who owns the company.</p>
 </header>
@@ -305,7 +309,7 @@
 <section aria-labelledby="tie-h" class="mt-10 flex flex-col gap-3">
 	<div class="flex flex-col gap-1">
 		<h2 id="tie-h" class="text-title">Tied to the ledger</h2>
-		<p class="max-w-prose text-body-sm text-ink-2">The register and cap table next to Cafoo Inc's books, every round together. A difference always has a reason.</p>
+		<p class="max-w-prose text-body-sm text-ink-2">The register and cap table next to {company}'s books, every round together. A difference always has a reason.</p>
 	</div>
 	<ul class="border-t border-line">
 		{#each ties as t (t.label)}
