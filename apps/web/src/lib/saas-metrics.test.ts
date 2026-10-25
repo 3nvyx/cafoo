@@ -53,6 +53,8 @@ describe('burn and runway', () => {
 		expect(runwayLabel(b)).toBe('Cash not falling');
 		expect(runwayLabel({ runwayMonths: 12.4, cash: 1n })).toBe('12 months');
 		expect(runwayLabel({ runwayMonths: 0.5, cash: 1n })).toBe('Under a month');
+		// A month before the books begin reads nothing rather than dividing by zero months.
+		expect(burnReading(ps, '2026-05', '2026-06')).toMatchObject({ yms: [], monthlyBurn: 0n, runwayMonths: null });
 	});
 
 	it("gives the Dashboard's health tiles the same burn and runway", () => {

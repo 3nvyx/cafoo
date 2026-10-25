@@ -149,7 +149,7 @@ export function checklistProgress(tasks: CloseTask[], periodId: string, exceptio
 	const own = tasks.filter((t) => t.periodId === periodId);
 	const done = own.filter((t) => t.status === 'done').length;
 	const accepted = exceptionsAccepted
-		? own.filter((t) => t.status !== 'done' && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })).length
+		? own.filter((t) => t.status !== 'done' && t.status !== 'blocked' && isBankReconciliationTask({ ownerRole: t.ownerRole, sortOrder: t.order, title: t.title })).length
 		: 0;
 	return { total: own.length, done, accepted, pct: own.length ? Math.round(((done + accepted) / own.length) * 100) : 0 };
 }

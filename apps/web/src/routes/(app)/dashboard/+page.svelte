@@ -20,7 +20,7 @@
 	import Workflows from './Workflows.svelte';
 	import MetricTile from '../metrics/MetricTile.svelte';
 	import { aiTiles, efficiencyTiles, usdRate } from '#lib/kpis.js';
-	import { burnReading } from '#lib/saas-metrics.js';
+	import { burnReading, burnWindowLabel, shiftYm } from '#lib/saas-metrics.js';
 
 	const period = $derived(db.periods().find((p) => p.id === ui.periodId) ?? db.periods().at(-1));
 	const months = $derived([...new Set(db.periods().map((p) => p.id))].sort());
@@ -88,11 +88,17 @@
 
 	// Runway is the Metrics page's: cash over the average monthly operating burn of the quarter ending with the range.
 	const firstMonth = $derived(db.periods()[0]?.id);
-	const burnAt = $derived(range && firstMonth ? burnReading(ps, range.to.slice(0, 7), firstMonth) : null);
+	// A range ending mid-month reads the last whole month before it, so no posting after the range end counts.
+	const burnEnd = $derived.by(() => {
+		if (!range) return null;
+		const ym = range.to.slice(0, 7);
+		return range.to === monthRange(ym).to ? ym : shiftYm(ym, -1);
+	});
+	const burnAt = $derived(burnEnd && firstMonth ? burnReading(ps, burnEnd, firstMonth) : null);
 	const runway = $derived.by(() => {
-		if (!burnAt) return '';
+		if (!burnAt || !burnAt.yms.length) return '';
 		const r = burnAt.runwayMonths;
-		if (r === null) return burnAt.cash > 0n ? 'Running the business did not use cash over the last three months' : 'Cash is gone at this rate of spend';
+		if (r === null) return burnAt.cash > 0n ? `Running the business did not use cash ${burnWindowLabel(burnAt.yms)}` : 'Cash is gone at this rate of spend';
 		if (r > 36) return 'Over 3 years of runway at this rate of spend';
 		if (r < 1) return 'Less than a month of runway at this rate of spend';
 		const n = Math.round(r);

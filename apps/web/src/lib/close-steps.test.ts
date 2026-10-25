@@ -22,6 +22,8 @@ describe('checklistProgress', () => {
 		expect(checklistProgress([bank, ...rest], '2026-09', false)).toEqual({ total: 7, done: 6, accepted: 0, pct: 86 });
 		const other = { ...task('ar', 'revenue', 'todo'), order: 9 };
 		expect(checklistProgress([other, ...rest], '2026-09', true)).toMatchObject({ accepted: 0, pct: 86 });
+		// A blocked bank task still blocks the lock, so it is not counted as settled.
+		expect(checklistProgress([{ ...bank, status: 'blocked' }, ...rest], '2026-09', true)).toMatchObject({ accepted: 0, pct: 86 });
 	});
 });
 

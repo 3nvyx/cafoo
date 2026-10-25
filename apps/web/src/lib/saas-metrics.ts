@@ -132,6 +132,8 @@ export interface BurnReading {
  */
 export function burnReading(ps: Posting[], endYm: string, firstYm: string): BurnReading {
 	const win = windowRange(endYm, BURN_MONTHS, firstYm);
+	// A month before the books begin has nothing to average.
+	if (win.months === 0) return { yms: [], totalBurn: 0n, monthlyBurn: 0n, cash: 0n, runwayMonths: null };
 	const s = summarize(ps, [], { from: win.from, to: win.to });
 	const change = toBig(s.operatingCashChange);
 	const totalBurn = change < 0n ? -change : 0n;
