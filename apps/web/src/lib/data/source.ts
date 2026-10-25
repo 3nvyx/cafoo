@@ -72,6 +72,15 @@ export interface ChangeEvent<T = unknown> {
 	row: T;
 }
 
+/** One table as the source stores it, for the Dash bar. Live mode: every public table in the ledger database. */
+export interface DataSet {
+	/** Stable id: the table's accessor in live mode, its table name in Demo mode. */
+	id: string;
+	/** The table's name in sentence case ("Journal line"). */
+	label: string;
+	count: number;
+}
+
 /**
  * The one seam between the UI and wherever the books live.
  *
@@ -115,6 +124,10 @@ export interface DataSource {
 	/** Every recorded Charter eval. */
 	charterEvals(): CharterEval[];
 	providers(): ProviderStatus[];
+	/** Every table the source holds, sorted by label. Live mode lists what the ledger database sends, mapped or not. */
+	dataSets(): DataSet[];
+	/** One table's rows exactly as stored (live: SpacetimeDB values such as bigint, Timestamp, tagged enums). */
+	dataSetRows(id: string): Record<string, unknown>[];
 	/** What an agent is doing right now, or null when idle. */
 	liveActivity(): LiveActivity | null;
 	/** The source's clock (Demo mode runs on a fixed demo date). ISO string. */

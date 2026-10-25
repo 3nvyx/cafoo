@@ -19,6 +19,7 @@ export const NAV: NavItem[] = [
 	{ href: '/charters', label: 'Charters', icon: 'shield' },
 	{ href: '/customers', label: 'Customers', icon: 'users' },
 	{ href: '/vendors', label: 'Vendors', icon: 'truck' },
+	{ href: '/dash-bar', label: 'Dash bar', icon: 'database' },
 	{ href: '/settings', label: 'Settings', icon: 'sliders' }
 ];
 

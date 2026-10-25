@@ -5,6 +5,10 @@
 	import Icon from './Icon.svelte';
 	import ModeToggle from './ModeToggle.svelte';
 
+	// mobileOnly: the Launchpad repeats the period and its status in its own header, so on wide screens the bar goes.
+	// Phones keep it, since it holds the only button that opens the navigation drawer.
+	let { mobileOnly = false }: { mobileOnly?: boolean } = $props();
+
 	const periods = $derived(db.periods());
 	const conn = $derived(db.connection());
 	const seat = $derived(db.cfoSeat());
@@ -12,7 +16,7 @@
 	const current = $derived(periods.find((p) => p.id === ui.periodId));
 </script>
 
-<header class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-line bg-canvas/95 px-4 backdrop-blur sm:gap-3 lg:px-6">
+<header class="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-line bg-canvas/95 px-4 backdrop-blur sm:gap-3 lg:px-6 {mobileOnly ? 'lg:hidden' : ''}">
 	<button class="btn btn-quiet -ml-2 w-11 px-0 lg:hidden" aria-label="Open navigation" onclick={() => (ui.navOpenMobile = true)}>
 		<Icon name="menu" />
 	</button>

@@ -11,6 +11,9 @@
 
 	let { children }: LayoutProps = $props();
 
+	// The Dash bar is a spreadsheet: it takes the whole pane and scrolls inside its own grid, so its header can stick.
+	const bleed = $derived(page.url.pathname === '/dash-bar' || page.url.pathname.startsWith('/dash-bar/'));
+
 	function onkey(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
 			e.preventDefault();
@@ -35,7 +38,7 @@
 
 <a href="#main" class="sr-only z-50 rounded-btn bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2">Skip to content</a>
 
-<div class="flex min-h-dvh">
+<div class="flex {bleed ? 'h-dvh' : 'min-h-dvh'}">
 	<aside
 		class="sticky top-0 z-20 hidden h-dvh shrink-0 border-r border-line bg-canvas transition-[width] duration-200 lg:block {ui.navCollapsed ? 'w-[72px]' : 'w-[248px]'}"
 	>
@@ -55,9 +58,9 @@
 		</div>
 	{/if}
 
-	<div class="flex min-w-0 flex-1 flex-col">
-		<TopBar />
-		<main id="main" class="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:py-8 lg:px-8">
+	<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+		<TopBar mobileOnly={page.url.pathname === '/dashboard'} />
+		<main id="main" class={bleed ? 'flex min-h-0 w-full flex-1 flex-col' : 'mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:py-8 lg:px-8'}>
 			{@render children()}
 		</main>
 	</div>

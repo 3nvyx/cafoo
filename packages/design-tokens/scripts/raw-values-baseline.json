@@ -37,7 +37,7 @@
 	},
 	"lib/components/Nav.svelte": {
 		"bracket-size": 3,
-		"unknown-class": 5
+		"unknown-class": 4
 	},
 	"lib/components/ProfileMenu.svelte": {
 		"bracket-size": 2,

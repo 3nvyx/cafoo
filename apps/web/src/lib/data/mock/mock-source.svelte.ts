@@ -4,7 +4,8 @@
 // Period status follows the live module: 'open' while agents work, 'closing' once
 // the Advisor has requested the lock (every Proposal resolved), 'closed' once the
 // CFO locks it.
-import type { CfoSeat, ChangeEvent, ConnectionState, DataSource } from '../source';
+import type { CfoSeat, ChangeEvent, ConnectionState, DataSet, DataSource } from '../source';
+import { byLabel, tableLabel } from '../data-sets';
 import type {
 	AgentMessage,
 	AgentRole,
@@ -94,6 +95,16 @@ export class MockDataSource implements DataSource {
 	charterVersions = () => this.#t.charter_version;
 	charterEvals = () => this.#t.charter_eval;
 	providers = () => PROVIDERS;
+	// Demo mode's in-browser tables, the same ones the screens read. Settings is one row.
+	dataSets = (): DataSet[] =>
+		(Object.keys(this.#t) as (keyof Tables)[])
+			.map((id) => ({ id, label: tableLabel(id), count: this.dataSetRows(id).length }))
+			.sort(byLabel);
+	dataSetRows = (id: string): Record<string, unknown>[] => {
+		if (!Object.hasOwn(this.#t, id)) return [];
+		const t = this.#t[id as keyof Tables] as unknown;
+		return (Array.isArray(t) ? t : [t]) as Record<string, unknown>[];
+	};
 	liveActivity = () => this.#activity;
 	now = () => this.#now();
 	connection = (): ConnectionState => ({
