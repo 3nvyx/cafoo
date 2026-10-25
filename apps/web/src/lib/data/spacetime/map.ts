@@ -279,3 +279,57 @@ export const publicFootprint = (r: B.PublicFootprint): U.PublicFootprint => ({
 	followers: r.followers,
 	live: r.live
 });
+
+/** Company records (people, financing, costs, CRM) by kind. Each row holds one record as JSON in the web's own shape. */
+export interface Company {
+	employee: U.Employee[];
+	pto_request: U.PtoRequest[];
+	pay_run: U.PayRun[];
+	payslip: U.Payslip[];
+	funding_round: U.FundingRound[];
+	investor: U.Investor[];
+	commitment: U.Commitment[];
+	instrument: U.Instrument[];
+	cap_table_entry: U.CapTableEntry[];
+	cloud_cost: U.CloudCost[];
+	batch: U.Batch[];
+	integration: U.Integration[];
+	deal: U.Deal[];
+	promotion: U.Promotion[];
+	support_ticket: U.SupportTicket[];
+}
+
+export const emptyCompany = (): Company => ({
+	employee: [],
+	pto_request: [],
+	pay_run: [],
+	payslip: [],
+	funding_round: [],
+	investor: [],
+	commitment: [],
+	instrument: [],
+	cap_table_entry: [],
+	cloud_cost: [],
+	batch: [],
+	integration: [],
+	deal: [],
+	promotion: [],
+	support_ticket: []
+});
+
+/** Group company_record rows by kind. Unknown kinds and rows that are not a JSON object are skipped, never thrown. */
+export function company(rows: Iterable<{ id: bigint; kind: string; json: string }>): Company {
+	const out = emptyCompany();
+	const sorted = Array.from(rows).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+	for (const r of sorted) {
+		if (!Object.hasOwn(out, r.kind)) continue;
+		let value: unknown;
+		try {
+			value = JSON.parse(r.json);
+		} catch {
+			continue;
+		}
+		if (value && typeof value === 'object' && !Array.isArray(value)) (out[r.kind as keyof Company] as unknown[]).push(value);
+	}
+	return out;
+}

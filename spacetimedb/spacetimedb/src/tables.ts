@@ -615,6 +615,20 @@ export const overdueSweep = table(
   }
 );
 
+/**
+ * Company records outside the ledger: people and payroll, funding and the cap table, cost of service and batches,
+ * the CRM and integrations. One row per record, the record itself as JSON in the shape the web app's types use, keyed
+ * by kind (employee, pay_run, funding_round, ...). Seeded during setup; nothing in the close reads or writes them.
+ */
+const companyRecord = table(
+  { name: 'company_record', public: true },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    kind: t.string().index('btree'),
+    json: t.string(),
+  }
+);
+
 const spacetimedb = schema({
   subsidiary,
   account,
@@ -647,6 +661,7 @@ const spacetimedb = schema({
   charterEval,
   feedEvent,
   cfoBootstrap,
+  companyRecord,
 });
 
 export default spacetimedb;
