@@ -1,11 +1,9 @@
 <script lang="ts">
-	// The Cafoo wordmark: the word set tight in Space Grotesk 600, finished as polished chrome. The
-	// base layer is a reflected-sky gradient (bright crown, dark steel bands, a hard horizon line, a
-	// bright ocean-tinted ground reflection), bevelled by an SVG filter that runs specular lighting
-	// over a blurred copy of the letter shapes. An aria-hidden copy sits on top, clipped to the
-	// letters and filled with a narrow diagonal band of light that crosses every few seconds. Under
-	// reduced motion the band never shows. Screen readers get the base text only. `size` is the font
-	// size in px.
+	// The Cafoo wordmark: the word set tight in Space Grotesk 600 in one ocean blue, bevelled by an
+	// SVG filter that runs specular lighting over a blurred copy of the letter shapes. An aria-hidden
+	// copy sits on top, clipped to the letters and filled with a narrow diagonal band of light that
+	// crosses every few seconds. Under reduced motion the band never shows. Screen readers get the
+	// base text only. `size` is the font size in px.
 	let { size = 20, class: cls = '' }: { size?: number; class?: string } = $props();
 	const id = $props.id();
 </script>
@@ -28,15 +26,9 @@
 </span>
 
 <style>
-	/* Light theme: dark steel on milk, so the letters keep their weight; the horizon is ocean blue. */
+	/* Light theme: ocean blue on milk. */
 	.wordmark {
-		--wm-crown: #868d93;
-		--wm-sky: #434b52;
-		--wm-steel: #1e2429;
-		--wm-line: #080b0e;
-		--wm-ground: #6aa9d6;
-		--wm-low: #2b3238;
-		--wm-base: #535c64;
+		--wm-blue: #6aa9d6;
 		--wm-band: rgb(255 255 255 / 0.9);
 		--wm-spec: #ffffff;
 		--wm-drop: rgb(0 0 0 / 0.22);
@@ -50,28 +42,16 @@
 		letter-spacing: -0.045em;
 		white-space: nowrap;
 	}
-	/* Dark theme: bright silver crown and ground, with grey steel bands between so the bevel shows. */
+	/* Dark theme: a paler blue so the letters hold up on tar. */
 	@media (prefers-color-scheme: dark) {
 		:global(:root:not([data-theme='light'])) .wordmark {
-			--wm-crown: #ffffff;
-			--wm-sky: #c9d2d9;
-			--wm-steel: #6c7985;
-			--wm-line: #2c3843;
-			--wm-ground: #c2eaff;
-			--wm-low: #8796a3;
-			--wm-base: #e4edf3;
+			--wm-blue: #c2eaff;
 			--wm-band: rgb(110 208 255 / 0.95);
 			--wm-drop: rgb(0 0 0 / 0.6);
 		}
 	}
 	:global(:root[data-theme='dark']) .wordmark {
-		--wm-crown: #ffffff;
-		--wm-sky: #c9d2d9;
-		--wm-steel: #6c7985;
-		--wm-line: #2c3843;
-		--wm-ground: #c2eaff;
-		--wm-low: #8796a3;
-		--wm-base: #e4edf3;
+		--wm-blue: #c2eaff;
 		--wm-band: rgb(110 208 255 / 0.95);
 		--wm-drop: rgb(0 0 0 / 0.6);
 	}
@@ -86,16 +66,7 @@
 		color: transparent;
 		-webkit-background-clip: text;
 		background-clip: text;
-		background-image: linear-gradient(
-			180deg,
-			var(--wm-crown) 8%,
-			var(--wm-sky) 32%,
-			var(--wm-steel) 50%,
-			var(--wm-line) 54%,
-			var(--wm-ground) 58%,
-			var(--wm-low) 80%,
-			var(--wm-base) 100%
-		);
+		background-color: var(--wm-blue);
 	}
 	/* The band lives in the middle third of a background three times the word's width, so at either
 	   end of the sweep it sits fully outside the letters and the overlay shows nothing. */
@@ -105,6 +76,8 @@
 		display: none;
 		pointer-events: none;
 		user-select: none;
+		/* Only the band paints here; the base layer underneath carries the blue. */
+		background-color: transparent;
 		background-image: linear-gradient(112deg, transparent 47.5%, var(--wm-band) 50%, transparent 52.5%);
 		background-size: 300% 100%;
 		background-repeat: no-repeat;

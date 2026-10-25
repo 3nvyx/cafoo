@@ -75,10 +75,10 @@
 	// Stage x positions leave room between stages for a chip to be seen in transit.
 	// Each step's text sits in a band above its column; the lanes start below the band.
 	const XS = [16, 196, 412, 628, 764, 916];
-	const WIDE_BAND = 100;
+	const WIDE_BAND = 112; // five caption lines of text, with one line to spare
 	const wide: Layout = {
 		w: 1070,
-		h: 364,
+		h: WIDE_BAND + 12 + 2 * 92 + 60 + 8,
 		nh: 60,
 		nodeW: (n) => (n.c === 0 ? 112 : 140),
 		pos: (n) => ({ x: XS[n.c], y: WIDE_BAND + 12 + n.r * 92 }),
@@ -98,7 +98,8 @@
 		}
 	};
 	// Each step's text sits in a band above its row of nodes; the wires pass behind the text.
-	const TALL_PITCH = 136;
+	// The drawing is scaled down on a phone, so the text here is a step larger (body-sm).
+	const TALL_PITCH = 140;
 	const TALL_TOP = 70;
 	const tall: Layout = {
 		w: 360,
@@ -106,7 +107,7 @@
 		nh: 52,
 		nodeW: () => 108,
 		pos: (n) => ({ x: 8 + n.r * 118, y: TALL_TOP + n.c * TALL_PITCH }),
-		band: (c) => ({ x: 8, y: TALL_TOP + c * TALL_PITCH - 66, w: 344, h: 60 }),
+		band: (c) => ({ x: 8, y: TALL_TOP + c * TALL_PITCH - 70, w: 344, h: 64 }),
 		edge(a, b) {
 			const p = this.pos(a), q = this.pos(b);
 			const x1 = p.x + 54, y1 = p.y + this.nh, x2 = q.x + 54, y2 = q.y, k = (y2 - y1) / 2;
@@ -167,9 +168,9 @@
 		{#each STEPS as s, c (s.name)}
 			{@const b = L.band(c)}
 			<foreignObject x={b.x} y={b.y} width={b.w} height={b.h}>
-				<div class="font-sans text-caption">
-					<p class="font-medium text-ink"><span class="box-decoration-clone bg-surface"><span class="text-ink-3">0{c + 1}</span> {s.name}</span></p>
-					<p class="text-ink-3"><span class="box-decoration-clone bg-surface">{s.blurb}</span></p>
+				<div class={vertical ? 'font-sans text-body-sm' : 'font-sans text-caption'}>
+					<p class="font-medium text-ink"><span class="box-decoration-clone bg-surface py-px"><span class="text-ink-3">0{c + 1}</span> {s.name}</span></p>
+					<p class="text-ink-3"><span class="box-decoration-clone bg-surface py-px">{s.blurb}</span></p>
 				</div>
 			</foreignObject>
 		{/each}
