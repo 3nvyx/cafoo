@@ -43,7 +43,8 @@
 	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
 	let folded = $state<Record<string, boolean>>({});
-	const row = 'relative flex min-h-10 items-center gap-3 rounded-card px-2.5 text-[15px] transition-colors duration-150 lg:min-h-9';
+	// 44px rows on touch screens, the denser 36px on desktop.
+	const row = 'relative flex min-h-11 items-center gap-3 rounded-card px-2.5 text-[15px] transition-colors duration-150 lg:min-h-9';
 </script>
 
 {#snippet link(it: Item)}
@@ -110,7 +111,7 @@
 				{:else}
 					<button
 						type="button"
-						class="flex min-h-8 items-center gap-1 rounded-card px-2.5 text-left text-[13px] font-medium text-ink-3 hover:text-ink-2"
+						class="flex min-h-11 items-center gap-1 rounded-card px-2.5 text-left text-[13px] font-medium text-ink-3 hover:text-ink-2 lg:min-h-8"
 						aria-expanded={!folded[s.title]}
 						onclick={() => (folded[s.title] = !folded[s.title])}
 					>
@@ -118,7 +119,7 @@
 						<Icon
 							name="chevronDown"
 							size={14}
-							class="opacity-0 transition-[opacity,transform] duration-150 group-hover:opacity-100 group-focus-within:opacity-100 {folded[s.title] ? '-rotate-90 opacity-100' : ''}"
+							class="opacity-0 transition-[opacity,transform] duration-150 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 {folded[s.title] ? '-rotate-90 opacity-100' : ''}"
 						/>
 					</button>
 				{/if}

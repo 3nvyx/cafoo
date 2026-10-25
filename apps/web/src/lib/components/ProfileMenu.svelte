@@ -23,37 +23,22 @@
 	}
 </script>
 
-<svelte:window
-	onclick={(e) => open && !root.contains(e.target as Node) && close()}
-	onkeydown={(e) => open && e.key === 'Escape' && (e.stopPropagation(), close(true))}
-/>
+<!-- Safari does not focus a clicked button, so focusout alone would miss some outside clicks. -->
+<svelte:window onclick={(e) => open && !root.contains(e.target as Node) && close()} />
 
-<div bind:this={root} class="relative">
-	{#if open}
-		<div id="profile-menu" class="card absolute bottom-full left-0 z-50 mb-2 w-[240px] p-1.5 shadow-lg">
-			<div class="px-2.5 pt-1.5 pb-2">
-				<p class="truncate text-sm font-medium">{PROFILE.name}</p>
-				<p class="truncate text-xs text-ink-3">{PROFILE.email}</p>
-			</div>
-			<ul class="flex flex-col gap-px border-t border-line pt-1.5">
-				{#each items as it (it.href)}
-					<li>
-						<a
-							href={it.href}
-							target={it.newTab ? '_blank' : undefined}
-							rel={it.newTab ? 'noopener' : undefined}
-							class="flex min-h-10 items-center gap-3 rounded-card px-2.5 text-sm text-ink-2 hover:bg-subtle hover:text-ink"
-							onclick={() => close()}
-						>
-							<Icon name={it.icon} size={18} />{it.label}{#if it.newTab}<span class="sr-only"> (opens in a new tab)</span>{/if}
-						</a>
-					</li>
-				{/each}
-			</ul>
-			<p class="mt-1.5 border-t border-line px-2.5 pt-2 pb-1 text-xs text-ink-3">Demo profile. Sign-in comes later.</p>
-		</div>
-	{/if}
-
+<!-- Escape is handled here, not on the window, so it never reaches the layout's handler that closes the mobile drawer. -->
+<div
+	bind:this={root}
+	class="relative"
+	role="presentation"
+	onkeydown={(e) => {
+		if (open && e.key === 'Escape') {
+			e.stopPropagation();
+			close(true);
+		}
+	}}
+	onfocusout={(e) => open && !root.contains(e.relatedTarget as Node | null) && close()}
+>
 	<button
 		bind:this={trigger}
 		type="button"
@@ -71,4 +56,30 @@
 			</span>
 		{/if}
 	</button>
+
+	<!-- After the button in the DOM so Tab moves into it; positioned above it on screen. -->
+	{#if open}
+		<div id="profile-menu" class="card absolute bottom-full left-0 z-50 mb-2 w-[240px] p-1.5 shadow-lg">
+			<div class="px-2.5 pt-1.5 pb-2">
+				<p class="truncate text-sm font-medium">{PROFILE.name}</p>
+				<p class="truncate text-xs text-ink-3">{PROFILE.email}</p>
+			</div>
+			<ul class="flex flex-col gap-px border-t border-line pt-1.5">
+				{#each items as it (it.href)}
+					<li>
+						<a
+							href={it.href}
+							target={it.newTab ? '_blank' : undefined}
+							rel={it.newTab ? 'noopener' : undefined}
+							class="flex min-h-11 items-center gap-3 rounded-card px-2.5 text-sm text-ink-2 hover:bg-subtle hover:text-ink lg:min-h-10"
+							onclick={() => close()}
+						>
+							<Icon name={it.icon} size={18} />{it.label}{#if it.newTab}<span class="sr-only"> (opens in a new tab)</span>{/if}
+						</a>
+					</li>
+				{/each}
+			</ul>
+			<p class="mt-1.5 border-t border-line px-2.5 pt-2 pb-1 text-xs text-ink-3">Demo profile. Sign-in comes later.</p>
+		</div>
+	{/if}
 </div>

@@ -3,6 +3,8 @@
 	// with a numbered part label. Feeds enter at the worker layer; only the gate writes to the
 	// ledger. Under reduced motion it renders fully exploded and nothing moves.
 	import { prefersReducedMotion } from 'svelte/motion';
+	import Icon from '#lib/components/Icon.svelte';
+	import { smil } from './smil';
 
 	interface Layer {
 		name: string;
@@ -31,6 +33,7 @@
 	const LABEL_X = 690;
 
 	let progress = $state(0);
+	let paused = $state(false);
 	const p = $derived(prefersReducedMotion.current ? 1 : progress);
 	const gap = $derived(GAP_MIN + (GAP_MAX - GAP_MIN) * p);
 	const cy = (i: number) => BOTTOM - (layers.length - 1 - i) * gap;
@@ -102,8 +105,15 @@
 {/snippet}
 
 <div use:scrub>
+	{#if !prefersReducedMotion.current}
+		<div class="mb-2 hidden justify-end lg:flex">
+			<button class="btn btn-quiet px-2 text-sm text-ink-3" onclick={() => (paused = !paused)}>
+				<Icon name={paused ? 'play' : 'pause'} size={16} />{paused ? 'Play animation' : 'Pause animation'}
+			</button>
+		</div>
+	{/if}
 	<!-- Wide screens: plates, feeds and the parts list in one drawing. -->
-	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" role="img" aria-labelledby="stack-title">
+	<svg viewBox="0 0 1040 640" class="hidden h-auto w-full lg:block" use:smil={paused} role="img" aria-labelledby="stack-title">
 		<title id="stack-title">Cafoo's layers: CFO app, Advisor, Red Team, worker agents, the approval gate and the ledger</title>
 
 		{#each feeds as fd, n (fd.label)}

@@ -3,6 +3,8 @@
 	// and the Advisor, and only then reaches the ledger, through the CFO when it is material.
 	// Pulses travel the connectors; under reduced motion the diagram is static.
 	import { prefersReducedMotion } from 'svelte/motion';
+	import Icon from '#lib/components/Icon.svelte';
+	import { smil } from './smil';
 
 	type Tone = 'system' | 'bookkeeper' | 'revenue' | 'credit' | 'redteam' | 'advisor' | 'cfo' | 'accent';
 	interface Node {
@@ -40,8 +42,8 @@
 		['rv', 'rt'],
 		['cr', 'rt'],
 		['rt', 'ad', undefined, 'critique'],
-		['ad', 'ledger', 'up to $10,000', 'post'],
-		['ad', 'cfo', 'over $10,000', 'awaiting_cfo', 'down'],
+		['ad', 'ledger', 'under $10,000', 'post'],
+		['ad', 'cfo', '$10,000 or more', 'awaiting_cfo', 'down'],
 		['cfo', 'ledger', undefined, 'confirm', 'up']
 	];
 
@@ -95,20 +97,21 @@
 	const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
 	const color = (t: Tone) => (t === 'accent' ? 'var(--accent)' : `var(--role-${t})`);
 	const still = $derived(prefersReducedMotion.current);
+	let paused = $state(false);
 </script>
 
 {#snippet diagram(L: Layout, vertical: boolean)}
-	<svg viewBox="0 0 {L.w} {L.h}" class="h-auto w-full" role="img" aria-labelledby="flow-title-{vertical ? 1 : 0} flow-desc-{vertical ? 1 : 0}">
+	<svg viewBox="0 0 {L.w} {L.h}" class="h-auto w-full" use:smil={paused} role="img" aria-labelledby="flow-title-{vertical ? 1 : 0} flow-desc-{vertical ? 1 : 0}">
 		<title id="flow-title-{vertical ? 1 : 0}">How a Proposal reaches the ledger</title>
 		<desc id="flow-desc-{vertical ? 1 : 0}">
-			Bank lines, billing and owner records feed the Bookkeeper, Revenue and Credit and Risk agents. Every Proposal goes to the Red Team, then the Advisor. Items up to $10,000 post to the ledger; larger ones go to the CFO first.
+			Bank lines, billing and owner records feed the Bookkeeper, Revenue and Credit and Risk agents. Every Proposal goes to the Red Team, then the Advisor. Items under $10,000 post to the ledger; items of $10,000 or more go to the CFO first.
 		</desc>
 
 		{#each STAGES as s, c (s)}
 			{#if vertical}
-				<text x="8" y={L.pos({ c, r: 0 } as Node).y - 10} class="fill-ink-3 font-mono text-[11px]">0{c + 1} {s.toUpperCase()}</text>
+				<text x="8" y={L.pos({ c, r: 0 } as Node).y - 10} class="fill-ink-3 font-mono text-[11px]" style="paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round">0{c + 1} {s.toUpperCase()}</text>
 			{:else}
-				<text x={L.pos({ c, r: 0 } as Node).x} y="22" class="fill-ink-3 font-mono text-[12px]">0{c + 1} {s.toUpperCase()}</text>
+				<text x={L.pos({ c, r: 0 } as Node).x} y="22" class="fill-ink-3 font-mono text-[12px]" style="paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round">0{c + 1} {s.toUpperCase()}</text>
 			{/if}
 		{/each}
 
@@ -116,7 +119,7 @@
 			{@const e = L.edge(byId[from], byId[to], bend)}
 			<path d={e.d} fill="none" class="stroke-ink-3" stroke-width="1" stroke-dasharray="3 4" />
 			{#if label}
-				<text x={e.lx} y={e.ly} text-anchor={e.anchor} class="fill-ink-2 font-mono text-[11px]">{label}</text>
+				<text x={e.lx} y={e.ly} text-anchor={e.anchor} class="fill-ink-2 font-mono text-[11px]" style="paint-order:stroke;stroke:var(--canvas);stroke-width:4px;stroke-linejoin:round">{label}</text>
 			{/if}
 		{/each}
 
@@ -129,7 +132,7 @@
 				{#if chip && !vertical}
 					<g opacity="0">
 						<rect x={-chip.length * 3 - 6} y="-9" width={chip.length * 6 + 12} height="18" rx="4" style="fill:{color(a.tone)}" />
-						<text text-anchor="middle" y="3.5" class="font-mono text-[10px]" style="fill:var(--on-accent)">{chip}</text>
+						<text text-anchor="middle" y="3.5" class="font-mono text-[10px]" style="fill:var(--canvas)">{chip}</text>
 						<animateMotion dur="1.8s" {begin} repeatCount="indefinite" path={e.d} />
 						<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.88;1" dur="1.8s" {begin} repeatCount="indefinite" />
 					</g>
@@ -157,8 +160,8 @@
 					stroke-dasharray={n.c === 0 ? '3 3' : undefined}
 				/>
 				{#if vertical}
-					<text x={p.x + w / 2} y={p.y + 23} text-anchor="middle" class="fill-ink text-[13px] font-medium">{n.short ?? n.title}</text>
-					<text x={p.x + w / 2} y={p.y + 39} text-anchor="middle" class="fill-ink-3 text-[10.5px]">{n.sub}</text>
+					<text x={p.x + w / 2} y={p.y + 22} text-anchor="middle" class="fill-ink text-[14px] font-medium">{n.short ?? n.title}</text>
+					<text x={p.x + w / 2} y={p.y + 40} text-anchor="middle" class="fill-ink-3 text-[12px]">{n.sub}</text>
 				{:else if n.c === 0}
 					<text x={p.x + 12} y={p.y + 26} class="fill-ink text-[14px] font-medium">{n.title}</text>
 					<text x={p.x + 12} y={p.y + 43} class="fill-ink-3 text-[11.5px]">{n.sub}</text>
@@ -173,5 +176,12 @@
 	</svg>
 {/snippet}
 
+{#if !still}
+	<div class="-mt-2 mb-2 flex justify-end">
+		<button class="btn btn-quiet px-2 text-sm text-ink-3" onclick={() => (paused = !paused)}>
+			<Icon name={paused ? 'play' : 'pause'} size={16} />{paused ? 'Play animation' : 'Pause animation'}
+		</button>
+	</div>
+{/if}
 <div class="hidden lg:block">{@render diagram(wide, false)}</div>
 <div class="mx-auto max-w-[420px] lg:hidden">{@render diagram(tall, true)}</div>

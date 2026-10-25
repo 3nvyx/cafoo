@@ -13,11 +13,11 @@
 	}
 
 	const entries: Entry[] = [
-		{ id: 'JE-0931', memo: 'Subscription, Acme Analytics', amount: 18400, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0932', memo: 'Subscription, Brightline Health', amount: 12250, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0933', memo: 'Revenue Schedule 1 of 12, Harbor & Pine', amount: 2200, debit: '2400 Deferred revenue', credit: '4000 Subscription revenue' },
-		{ id: 'JE-0934', memo: 'Usage, September', amount: 31600, debit: '1100 Accounts receivable', credit: '4100 Usage revenue' },
-		{ id: 'JE-0935', memo: 'Implementation fee, Northgate', amount: 6500, debit: '1100 Accounts receivable', credit: '4200 Services revenue' }
+		{ id: 'JE-0931', memo: 'Subscription, Acme Analytics', amount: 18400, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0932', memo: 'Subscription, Brightline Health', amount: 12250, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0933', memo: 'Revenue Schedule 1 of 12, Harbor & Pine', amount: 2200, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' },
+		{ id: 'JE-0934', memo: 'Usage, September', amount: 31600, debit: '1100 Accounts Receivable', credit: '4100 Usage Revenue' },
+		{ id: 'JE-0935', memo: 'Subscription, Northgate', amount: 6500, debit: '2400 Deferred Revenue', credit: '4000 Subscription Revenue' }
 	];
 	const revenue = entries.reduce((s, e) => s + e.amount, 0);
 	const pnl = [
@@ -94,8 +94,8 @@
 						<li class="flex items-center gap-2"><RoleAvatar role="revenue" size={24} />Proposed by the Revenue agent</li>
 						<li class="flex items-center gap-2"><RoleAvatar role="redteam" size={24} />Checked by the Red Team: no critique</li>
 						<li class="flex items-center gap-2">
-							{#if picked.amount > 10000}
-								<RoleAvatar role="cfo" size={24} />Above $10,000, so the CFO confirmed it
+							{#if picked.amount >= 10000}
+								<RoleAvatar role="cfo" size={24} />$10,000 or more, so the CFO confirmed it
 							{:else}
 								<RoleAvatar role="advisor" size={24} />Approved and posted by the Advisor
 							{/if}

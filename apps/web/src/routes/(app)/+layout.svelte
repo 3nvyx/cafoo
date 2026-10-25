@@ -37,7 +37,7 @@
 
 <div class="flex min-h-dvh">
 	<aside
-		class="sticky top-0 hidden h-dvh shrink-0 border-r border-line bg-canvas transition-[width] duration-200 lg:block {ui.navCollapsed ? 'w-[72px]' : 'w-[248px]'}"
+		class="sticky top-0 z-20 hidden h-dvh shrink-0 border-r border-line bg-canvas transition-[width] duration-200 lg:block {ui.navCollapsed ? 'w-[72px]' : 'w-[248px]'}"
 	>
 		<Nav compact={ui.navCollapsed} />
 	</aside>

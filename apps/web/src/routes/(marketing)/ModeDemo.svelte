@@ -7,8 +7,8 @@
 	let expert = $state(false);
 
 	const lines = [
-		{ code: '6150', name: 'Contractors', debit: '8,750.00', credit: '' },
-		{ code: '2100', name: 'Accrued expenses', debit: '', credit: '8,750.00' }
+		{ code: '5200', name: 'Contractors', debit: '8,750.00', credit: '' },
+		{ code: '2100', name: 'Accrued Liabilities', debit: '', credit: '8,750.00' }
 	];
 	const payload = `{ "kind": "accrual", "period": "2026-09", "invoice": "BRX-1182",
   "invoice_date": "2026-10-03", "service": ["2026-09-01", "2026-09-30"],

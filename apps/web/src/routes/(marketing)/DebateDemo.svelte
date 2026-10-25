@@ -1,33 +1,44 @@
 <script lang="ts">
 	// The September close in eight messages, replayed on a loop. It only plays while on
 	// screen, stops on request, and shows the whole thread at once under reduced motion.
+	// Rows are always in Simple mode: the app's own Simple/Expert setting does not reach here.
 	import { prefersReducedMotion } from 'svelte/motion';
-	import type { AgentMessage } from '#lib/data/types.js';
-	import DebateMessage from '#lib/components/DebateMessage.svelte';
+	import type { AgentRole, MessageKind } from '#lib/data/types.js';
 	import Icon from '#lib/components/Icon.svelte';
+	import RoleAvatar from '#lib/components/RoleAvatar.svelte';
+	import { MESSAGE_KIND, roleName, timeOnly } from '#lib/labels.js';
 	import { arrive } from '#lib/motion.js';
 
 	const STAGES = ['Propose', 'Critique', 'Rule', 'Confirm'] as const;
 	type Stage = (typeof STAGES)[number];
 
-	const at = (min: number) => new Date(Date.UTC(2026, 8, 30, 15, min)).toISOString();
-	const msg = (n: number, stage: Stage, m: Pick<AgentMessage, 'senderRole' | 'kind' | 'summaryPlain' | 'body'>) => ({
+	interface Line {
+		id: string;
+		stage: Stage;
+		role: AgentRole;
+		kind: MessageKind;
+		text: string;
+		at: string;
+	}
+
+	const line = (n: number, stage: Stage, role: AgentRole, kind: MessageKind, text: string): Line => ({
 		id: `demo-${n}`,
-		threadId: 'demo',
-		createdAt: at(2 + n * 3),
 		stage,
-		...m
+		role,
+		kind,
+		text,
+		at: new Date(Date.UTC(2026, 8, 30, 15, 2 + n * 3)).toISOString()
 	});
 
 	const script = [
-		msg(1, 'Propose', { senderRole: 'cfo', kind: 'statement', summaryPlain: 'Close September.', body: 'close.start period=2026-09 agents=6' }),
-		msg(2, 'Propose', { senderRole: 'bookkeeper', kind: 'statement', summaryPlain: 'I matched 9 vendor payments to their bills. Every match is at least 80% confident.', body: 'bank_match x9 · min_confidence=0.80' }),
-		msg(3, 'Propose', { senderRole: 'bookkeeper', kind: 'statement', summaryPlain: 'Northwind Cloud was paid twice for one bill. I booked the extra payment as a refund they owe us.', body: 'duplicate_payment vendor=northwind-cloud · DR 1250 Vendor refunds receivable / CR 1000 Cash' }),
-		msg(4, 'Propose', { senderRole: 'revenue', kind: 'statement', summaryPlain: 'A $26,400 contract was never on a revenue schedule. I built a 12-month one.', body: 'revenue_schedule 12 x 2,200.00 · DR 2400 Deferred revenue / CR 4000 Subscription revenue' }),
-		msg(5, 'Critique', { senderRole: 'redteam', kind: 'critique', summaryPlain: 'Two bank matches are under 75% confident and the amounts do not line up. They should not post.', body: 'critique bank_match confidence=0.71,0.68 · amount_delta>2%' }),
-		msg(6, 'Rule', { senderRole: 'advisor', kind: 'ruling', summaryPlain: 'The Red Team is right: both weak matches are rejected. Everything else is under $10,000 and posts now.', body: 'ruling reject=2 approve=31 · materiality=10,000.00' }),
-		msg(7, 'Rule', { senderRole: 'advisor', kind: 'statement', summaryPlain: 'Removing the $245,000 the two companies owe each other is above your threshold. It waits for you.', body: 'awaiting_cfo consolidation.elimination 245,000.00 > 10,000.00' }),
-		msg(8, 'Confirm', { senderRole: 'cfo', kind: 'statement', summaryPlain: 'Confirmed. September is locked and the Board Pack is final.', body: 'cfo.confirm · period.lock 2026-09' })
+		line(1, 'Propose', 'cfo', 'statement', 'Close September.'),
+		line(2, 'Propose', 'bookkeeper', 'statement', 'I matched 9 vendor payments to their bills in one Proposal. Each match is at least 80% confident.'),
+		line(3, 'Propose', 'bookkeeper', 'statement', 'Northwind Cloud was paid twice for one bill. I booked the extra payment as money they owe us back.'),
+		line(4, 'Propose', 'revenue', 'statement', 'A $26,400 contract was never on a revenue schedule. I built a 12-month one.'),
+		line(5, 'Critique', 'redteam', 'critique', 'Two other matches came in under 75% confident and the amounts do not line up. They should not post.'),
+		line(6, 'Rule', 'advisor', 'ruling', 'The Red Team is right: both weak matches are rejected. Everything else is under $10,000 and posts now.'),
+		line(7, 'Rule', 'advisor', 'statement', 'Removing the $245,000 the two companies owe each other is over your threshold. It waits for you.'),
+		line(8, 'Confirm', 'cfo', 'statement', 'Confirmed. September is locked and the Board Pack is final.')
 	];
 
 	let count = $state(1);
@@ -52,7 +63,7 @@
 	}
 </script>
 
-<div use:watch class="card flex flex-col overflow-hidden" aria-label="Example: agents closing September">
+<div use:watch class="card flex flex-col overflow-hidden" role="group" aria-label="Example: agents closing September">
 	<div class="flex items-center justify-between gap-3 border-b border-line py-1 pr-2 pl-4">
 		<div class="flex min-w-0 items-center gap-2 text-sm">
 			<span class="size-2 shrink-0 rounded-full bg-pos"></span>
@@ -77,7 +88,22 @@
 
 	<ul class="flex flex-col gap-4 p-4 {still ? '' : 'feed h-[420px] justify-end overflow-hidden'}">
 		{#each shown as m (m.id)}
-			<li in:arrive><DebateMessage {m} /></li>
+			<li in:arrive class="flex gap-3">
+				<RoleAvatar role={m.role} />
+				<div
+					class="min-w-0 flex-1 {m.kind === 'critique' ? 'border-l-4 bg-neg-soft/60 py-1 pl-3' : m.kind === 'ruling' ? 'rounded-btn bg-accent-soft px-3 py-2' : ''}"
+					style={m.kind === 'critique' ? `border-color: var(--role-${m.role})` : ''}
+				>
+					<div class="flex flex-wrap items-baseline gap-x-2 text-sm">
+						<span class="font-medium">{roleName(m.role)}</span>
+						{#if m.kind !== 'statement'}
+							<span class="text-[13px] font-semibold tracking-wider uppercase {m.kind === 'critique' ? 'text-neg' : 'text-accent-ink'}">{MESSAGE_KIND[m.kind]}</span>
+						{/if}
+						<time class="num text-xs text-ink-3" datetime={m.at}>{timeOnly(m.at)}</time>
+					</div>
+					<p class="mt-0.5 text-[15px] text-ink">{m.text}</p>
+				</div>
+			</li>
 		{/each}
 	</ul>
 </div>

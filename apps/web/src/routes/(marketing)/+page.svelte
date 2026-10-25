@@ -22,15 +22,15 @@
 	const stats = [
 		{ value: '10 days', label: 'a typical month-end close, mostly matching and chasing by hand' },
 		{ value: '52', label: 'Proposals in one sample September close, across two companies' },
-		{ value: '$10,000', label: 'default Materiality threshold: anything above it waits for the CFO' },
-		{ value: '0', label: 'ledger writes an agent can make without approval' }
+		{ value: '$10,000', label: 'default Materiality threshold: anything at or above it waits for the CFO' },
+		{ value: '0', label: 'ledger writes a worker agent can make. Only a ruling or your OK posts' }
 	];
 
 	const steps: { head: string; roles: PostedByRole[]; text: string }[] = [
 		{ head: 'Propose', roles: ['bookkeeper', 'revenue', 'credit'], text: 'Bookkeeper, Revenue and Credit & Risk agents match payments, accrue bills, build revenue schedules and set credit terms. They can only propose.' },
 		{ head: 'Critique', roles: ['redteam'], text: 'A Red Team on a second model attacks every Proposal before anyone rules on it, and says when a match is too weak to post.' },
 		{ head: 'Rule', roles: ['advisor'], text: 'The Advisor approves, rejects or amends each Proposal and writes down why, in one plain sentence and in full.' },
-		{ head: 'Confirm', roles: ['cfo'], text: 'Anything over your Materiality threshold waits for one click from you. You lock the month, not an agent.' }
+		{ head: 'Confirm', roles: ['cfo'], text: 'Anything at or above your Materiality threshold waits for one click from you. You lock the month, not an agent.' }
 	];
 
 	// The dashboard opens in its own tab so the landing page stays where the visitor left it.
@@ -73,7 +73,7 @@
 				<p class="font-mono text-xs tracking-[0.14em] text-accent-ink uppercase">The agentic finance ERP</p>
 				<h1 class="max-w-[14ch] text-[44px] sm:text-[64px]" style="letter-spacing:-0.035em">Agents close your books. You keep the last word.</h1>
 				<p class="max-w-[52ch] text-lg text-ink-2 sm:text-xl">
-					Cafoo's agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything over your threshold waits for your one click. Every number drills down to who proposed it and why.
+					Cafoo's agents do the month-end close. A Red Team on a second model attacks every Proposal, an Advisor rules on it, and anything at or above your threshold waits for your one click. Every number drills down to who proposed it and why.
 				</p>
 				<div class="flex flex-col gap-3 sm:flex-row">
 					<a href="/dashboard" {...newTab} class="btn btn-primary btn-lg">{live ? 'Open the dashboard' : 'Try the live demo'}{@render tabNote()} <Icon name="external" size={18} /></a>
@@ -88,9 +88,10 @@
 		</div>
 
 		<section aria-label="By the numbers" class="border-y border-line bg-subtle">
-			<ul class="mx-auto grid max-w-[1120px] grid-cols-1 divide-y divide-line px-4 sm:grid-cols-2 sm:px-8 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+			<ul class="mx-auto grid max-w-[1120px] grid-cols-1 px-4 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
 				{#each stats as s (s.value)}
-					<li class="flex flex-col gap-1 py-6 sm:pr-6 lg:px-6 lg:first:pl-0">
+					<!-- Borders per tile: a top rule between rows, a left rule between columns on wide screens. -->
+					<li class="flex flex-col gap-1 border-line py-6 not-first:border-t sm:pr-6 sm:nth-2:border-t-0 lg:border-t-0 lg:px-6 lg:first:pl-0 lg:not-first:border-l">
 						<span class="num text-[32px] leading-10 font-medium">{s.value}</span>
 						<span class="text-sm text-ink-2">{s.label}</span>
 					</li>
