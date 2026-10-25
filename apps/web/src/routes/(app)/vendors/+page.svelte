@@ -5,6 +5,7 @@
 	import FootprintChip from '#lib/components/FootprintChip.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Pill from '#lib/components/Pill.svelte';
+	import UploadDemo from '#lib/components/UploadDemo.svelte';
 	import { STATUS, VERIFICATION, drill } from '#lib/labels.js';
 
 	const ORDER = { blocked: 0, unverified: 1, verified: 2 } as const;
@@ -56,3 +57,5 @@
 		</li>
 	{/each}
 </ul>
+
+<div class="mt-8"><UploadDemo kinds={['bills']} title="Upload vendor bills" /></div>

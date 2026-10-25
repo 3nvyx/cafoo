@@ -9,6 +9,8 @@ import { byLabel, tableLabel } from '../data-sets';
 import type {
 	AgentMessage,
 	AgentRole,
+	DocumentKind,
+	UploadedDocument,
 	BankMatch,
 	CharterCatalog,
 	CharterEvalMode,
@@ -95,6 +97,22 @@ export class MockDataSource implements DataSource {
 	charterVersions = () => this.#t.charter_version;
 	charterEvals = () => this.#t.charter_eval;
 	providers = () => PROVIDERS;
+	documents = () => this.#t.document;
+	fundingRounds = () => this.#t.funding_round;
+	investors = () => this.#t.investor;
+	commitments = () => this.#t.commitment;
+	instruments = () => this.#t.instrument;
+	capTable = () => this.#t.cap_table_entry;
+	employees = () => this.#t.employee;
+	ptoRequests = () => this.#t.pto_request;
+	payRuns = () => this.#t.pay_run;
+	payslips = () => this.#t.payslip;
+	cloudCosts = () => this.#t.cloud_cost;
+	batches = () => this.#t.batch;
+	integrations = () => this.#t.integration;
+	deals = () => this.#t.deal;
+	promotions = () => this.#t.promotion;
+	supportTickets = () => this.#t.support_ticket;
 	// Demo mode's in-browser tables, the same ones the screens read. Settings is one row.
 	dataSets = (): DataSet[] =>
 		(Object.keys(this.#t) as (keyof Tables)[])
@@ -472,6 +490,23 @@ export class MockDataSource implements DataSource {
 	}
 
 	/** Demo only: put every table back to the seed. */
+	// TODO(ledger): run the upload handlers and live tickers from ./uploads (see ./uploads/types.ts).
+	async uploadDemoDocument(kind: DocumentKind): Promise<UploadedDocument> {
+		throw new Error(`Demo uploads are not wired yet (${kind}).`);
+	}
+
+	async connectIntegration(id: string): Promise<void> {
+		throw new Error(`Connecting ${id} is not wired yet.`);
+	}
+
+	async disconnectIntegration(id: string): Promise<void> {
+		throw new Error(`Disconnecting ${id} is not wired yet.`);
+	}
+
+	async decidePtoRequest(requestId: string, decision: 'approved' | 'declined'): Promise<void> {
+		throw new Error(`Deciding ${requestId} (${decision}) is not wired yet.`);
+	}
+
 	resetDemo(): void {
 		for (const t of this.#timers) clearTimeout(t);
 		this.#timers = [];

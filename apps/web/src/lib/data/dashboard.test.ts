@@ -65,6 +65,11 @@ describe('summarize', () => {
 		expect(aug.runwayMonths).toBeCloseTo(19.35, 1);
 		expect(aug.byExpense.map((e) => [e.account.code, e.minor])).toEqual([['6000', '11000'], ['5000', '5000']]);
 	});
+	it('splits the month’s cash into opening, money in and money out', () => {
+		expect([aug.openingCash, aug.cashIn, aug.cashOut]).toEqual(['100000', '0', '5000']);
+		const sep = summarize(ps, [], monthRange('2026-09'));
+		expect([sep.openingCash, sep.cashIn, sep.cashOut, sep.cash]).toEqual(['95000', '20000', '0', '115000']);
+	});
 	it('counts a part of a month by day', () => {
 		const s = summarize(ps, [], { from: '2026-08-15', to: '2026-09-30' });
 		expect(s.revenue).toBe('0');

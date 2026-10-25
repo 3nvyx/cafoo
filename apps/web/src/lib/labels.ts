@@ -1,5 +1,5 @@
 // Display words, straight from the CONTEXT.md glossary.
-import type { AgentRole, CloseTaskStatus, MessageKind, PostedByRole, ProposalKind, ProposalStatus, RiskTier, VendorVerification } from './data/types';
+import type { AgentRole, CloseTaskStatus, DocumentKind, MessageKind, PostedByRole, ProposalKind, ProposalStatus, RiskTier, VendorVerification } from './data/types';
 
 export const ROLE: Record<PostedByRole, { name: string; initials: string }> = {
 	advisor: { name: 'Advisor', initials: 'AD' },
@@ -7,6 +7,8 @@ export const ROLE: Record<PostedByRole, { name: string; initials: string }> = {
 	revenue: { name: 'Revenue', initials: 'RV' },
 	credit: { name: 'Credit & Risk', initials: 'CR' },
 	consolidation: { name: 'Consolidation', initials: 'CO' },
+	funding: { name: 'Funding desk', initials: 'FD' },
+	capital: { name: 'Capital accountant', initials: 'CA' },
 	feed: { name: 'Bank feed', initials: 'BF' },
 	redteam: { name: 'Red Team', initials: 'RT' },
 	cfo: { name: 'CFO', initials: 'You' },
@@ -34,7 +36,35 @@ export const KIND: Record<ProposalKind, string> = {
 	vendor_block: 'Vendor block',
 	vendor_verify: 'Vendor check',
 	fx_revaluation: 'Revaluation',
-	ic_elimination: 'Elimination'
+	ic_elimination: 'Elimination',
+	funding_receipt: 'Funding receipt',
+	instrument_record: 'Instrument',
+	interest_accrual: 'Interest accrual',
+	instrument_conversion: 'Conversion',
+	payroll_run: 'Pay run',
+	cost_allocation: 'Cost allocation',
+	credit_breakage: 'Credit breakage',
+	inventory_writeoff: 'Stock write-off'
+};
+
+/** Each uploadable file: its name, the format the sample comes in, and what Cafoo reads from it. */
+export const DOCUMENT: Record<DocumentKind, { label: string; format: string; readsPlain: string }> = {
+	bank_statement: { label: 'Bank statement', format: 'CSV', readsPlain: 'Every line, matched to invoices and bills' },
+	invoices: { label: 'Invoices', format: 'CSV', readsPlain: 'Customer invoices with due dates' },
+	bills: { label: 'Vendor bills', format: 'PDF', readsPlain: 'Bills with amounts, due dates and service periods' },
+	contracts: { label: 'Customer contract', format: 'PDF', readsPlain: 'Term, billing and ARR for revenue schedules' },
+	safe: { label: 'SAFE', format: 'PDF', readsPlain: 'Amount, valuation cap, discount, MFN and pro rata' },
+	convertible_note: { label: 'Convertible note', format: 'PDF', readsPlain: 'Principal, interest, maturity, cap and discount' },
+	term_sheet: { label: 'Term sheet', format: 'PDF', readsPlain: 'Price, pre-money, option pool and preferences' },
+	side_letter: { label: 'Side letter', format: 'PDF', readsPlain: 'Extra rights an investor was given' },
+	wire_confirmation: { label: 'Wire confirmation', format: 'PDF', readsPlain: 'Who sent money, how much, and the fee taken' },
+	closing_tracker: { label: 'Closing tracker', format: 'XLSX', readsPlain: 'Who committed to the round and how much' },
+	cap_table: { label: 'Cap table export', format: 'CSV', readsPlain: 'Every holder, class and share count' },
+	valuation_report: { label: 'Valuation report', format: 'PDF', readsPlain: 'Fair values for SAFEs, warrants and common stock' },
+	payroll_register: { label: 'Payroll register', format: 'CSV', readsPlain: 'Gross pay, taxes, deductions and net pay per person' },
+	pto_report: { label: 'Time-off report', format: 'CSV', readsPlain: 'Balances, accruals and time taken' },
+	cloud_bill: { label: 'Cloud bill', format: 'CSV', readsPlain: 'Spend by service, environment and product tag' },
+	model_usage: { label: 'Model usage export', format: 'CSV', readsPlain: 'Tokens and spend by model and product' }
 };
 
 export const STATUS: Record<ProposalStatus, { label: string; tone: Tone }> = {

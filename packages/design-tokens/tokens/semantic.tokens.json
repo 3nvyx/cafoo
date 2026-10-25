@@ -575,6 +575,26 @@
 			},
 			"$description": "The Credit agent."
 		},
+		"funding": {
+			"$value": "{palette.teal.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.teal.700}",
+					"dark": "{palette.teal.300}"
+				}
+			},
+			"$description": "The Funding desk agent, which matches investor money to the round."
+		},
+		"capital": {
+			"$value": "{palette.plum.700}",
+			"$extensions": {
+				"mode": {
+					"light": "{palette.plum.700}",
+					"dark": "{palette.plum.300}"
+				}
+			},
+			"$description": "The Capital accountant agent, which records SAFEs, notes and shares."
+		},
 		"redteam": {
 			"$value": "{palette.rose.700}",
 			"$extensions": {

@@ -4,7 +4,7 @@
 export type Minor = string;
 export type Iso = string;
 
-export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'consolidation' | 'redteam' | 'feed' | 'cfo';
+export type AgentRole = 'advisor' | 'bookkeeper' | 'revenue' | 'credit' | 'consolidation' | 'funding' | 'capital' | 'redteam' | 'feed' | 'cfo';
 /** Who posted or acted. 'seed' is opening data loaded by the seed scripts. */
 export type PostedByRole = AgentRole | 'system' | 'seed';
 
@@ -232,7 +232,23 @@ export type ProposalKind =
 	| 'vendor_block'
 	| 'vendor_verify'
 	| 'fx_revaluation'
-	| 'ic_elimination';
+	| 'ic_elimination'
+	/** Funding desk: an investor's wire matched to their commitment in a round. */
+	| 'funding_receipt'
+	/** Capital accountant: a SAFE, note or share issue recorded and classified from its documents. */
+	| 'instrument_record'
+	/** Capital accountant: interest accrued on convertible notes for a month. */
+	| 'interest_accrual'
+	/** Capital accountant: SAFEs and notes converted into shares at a priced round. */
+	| 'instrument_conversion'
+	/** Bookkeeper: one pay run posted from the payroll register. */
+	| 'payroll_run'
+	/** Bookkeeper: cloud, model-usage and engineering cost split between cost of revenue and R&D. */
+	| 'cost_allocation'
+	/** Revenue: prepaid credits that expired unused, recognized as revenue (breakage). */
+	| 'credit_breakage'
+	/** Bookkeeper: an expired or damaged stock lot written off. */
+	| 'inventory_writeoff';
 
 export type ProposalStatus =
 	| 'open'
@@ -368,7 +384,23 @@ export type TableName =
 	| 'fx_rate'
 	| 'charter_version'
 	| 'charter_eval'
-	| 'public_footprint';
+	| 'public_footprint'
+	| 'document'
+	| 'funding_round'
+	| 'investor'
+	| 'commitment'
+	| 'instrument'
+	| 'cap_table_entry'
+	| 'employee'
+	| 'pto_request'
+	| 'pay_run'
+	| 'payslip'
+	| 'cloud_cost'
+	| 'batch'
+	| 'integration'
+	| 'deal'
+	| 'promotion'
+	| 'support_ticket';
 
 // Charters. The shapes mirror the agent gateway's contracts (apps/agents/src/charter/types.ts and routes.ts).
 
@@ -464,6 +496,390 @@ export interface LiveActivity {
 	role: AgentRole;
 	labelPlain: string;
 	proposalId?: string;
+}
+
+// Uploaded documents. Demo mode loads a bundled sample per kind and replays a recorded parse; nothing leaves the browser.
+
+/** Every kind of file the CFO can hand Cafoo, grouped by where it is uploaded. */
+export type DocumentKind =
+	// Books
+	| 'bank_statement'
+	| 'invoices'
+	| 'bills'
+	| 'contracts'
+	// Financing
+	| 'safe'
+	| 'convertible_note'
+	| 'term_sheet'
+	| 'side_letter'
+	| 'wire_confirmation'
+	| 'closing_tracker'
+	| 'cap_table'
+	| 'valuation_report'
+	// People
+	| 'payroll_register'
+	| 'pto_report'
+	// Cost of service
+	| 'cloud_bill'
+	| 'model_usage';
+
+export type DocumentStatus = 'parsing' | 'parsed' | 'needs_review' | 'applied' | 'rejected';
+
+/** One uploaded file and what was read from it. */
+export interface UploadedDocument {
+	id: string;
+	kind: DocumentKind;
+	fileName: string;
+	/** Size in bytes, for display. */
+	sizeBytes: number;
+	uploadedAt: Iso;
+	status: DocumentStatus;
+	/** The fields read from the file (JSON text): terms of a SAFE, rows of a statement, lines of a cloud bill. */
+	extractedJson: string;
+	/** One sentence on what the file is and what happens next. */
+	summaryPlain: string;
+	/** Fields the second reader disagreed on, or that need a person (bespoke clauses). Empty when none. */
+	flagsPlain: string[];
+	/** The agent that read it. */
+	readByRole: AgentRole;
+	/** Proposals the file led to. */
+	proposalIds: string[];
+	subsidiaryId: string;
+}
+
+// Financing. Raising money is not income: SAFEs and notes are liabilities, shares are equity. Only interest, fair-value
+// changes and grants reach the P&L.
+
+export type InstrumentKind = 'safe_post_money' | 'safe_pre_money' | 'convertible_note' | 'preferred_shares' | 'common_shares' | 'warrant';
+/** How the instrument sits on the balance sheet. A person confirms it for anything non-standard. */
+export type InstrumentClass = 'liability' | 'equity' | 'temporary_equity';
+
+export interface FundingRound {
+	id: string;
+	subsidiaryId: string;
+	/** "Pre-seed 2025", "Seed 2026". */
+	name: string;
+	targetMinor: Minor;
+	ccy: string;
+	openedAt: Iso;
+	/** The last close, once the round is done. */
+	closedAt?: Iso;
+	status: 'planned' | 'open' | 'closed';
+	leadInvestorId?: string;
+	/** Priced rounds only: price per share in minor units times 10^4 (four decimal places of a cent). */
+	pricePerShareE4?: string;
+	preMoneyMinor?: Minor;
+}
+
+export type InvestorKind = 'fund' | 'angel' | 'spv' | 'family_office' | 'corporate' | 'accelerator';
+
+export interface Investor {
+	id: string;
+	name: string;
+	kind: InvestorKind;
+	country: string;
+	/** Names wires arrive under (the fund's bank, an SPV, a holding company), for matching. */
+	payerNames: string[];
+	contactName?: string;
+}
+
+export type CommitmentStatus = 'committed' | 'signed' | 'funded' | 'short' | 'overdue' | 'withdrawn';
+
+/** One investor's part of a round: what they agreed to send and what has arrived. */
+export interface Commitment {
+	id: string;
+	roundId: string;
+	investorId: string;
+	instrumentId?: string;
+	amountMinor: Minor;
+	ccy: string;
+	/** What has arrived so far, in the commitment's currency. */
+	receivedMinor: Minor;
+	status: CommitmentStatus;
+	expectedBy?: Iso;
+	/** Plain note on a difference ("$35 short: wire fee"). */
+	notePlain?: string;
+}
+
+export interface Instrument {
+	id: string;
+	roundId: string;
+	investorId: string;
+	kind: InstrumentKind;
+	principalMinor: Minor;
+	ccy: string;
+	signedAt?: Iso;
+	valuationCapMinor?: Minor;
+	/** 2000 = 20% discount. */
+	discountBp?: number;
+	mfn: boolean;
+	proRata: boolean;
+	/** Notes only: 600 = 6% simple interest a year. */
+	interestBp?: number;
+	maturityAt?: Iso;
+	/** Shares issued (priced shares) or received on conversion. */
+	shares?: number;
+	classification: InstrumentClass;
+	/** Plain reason for the classification, with the clause it rests on. */
+	classificationPlain: string;
+	status: 'draft' | 'outstanding' | 'converted' | 'repaid' | 'cancelled';
+	/** Uploaded documents the terms were read from. */
+	documentIds: string[];
+	/** Bespoke terms from a side letter, in plain words. */
+	sideTermsPlain?: string;
+}
+
+export type SecurityClass = 'common' | 'preferred' | 'options_granted' | 'option_pool' | 'safe' | 'note' | 'warrant';
+
+/** One line of the cap table: a holder's position in one class of security. */
+export interface CapTableEntry {
+	id: string;
+	holderName: string;
+	/** Set when the holder is an investor or an employee. */
+	investorId?: string;
+	employeeId?: string;
+	security: SecurityClass;
+	/** Shares or options; 0 for SAFEs and notes until they convert. */
+	shares: number;
+	/** What was paid, for SAFEs and notes the principal. */
+	investedMinor: Minor;
+	ccy: string;
+	asOf: Iso;
+}
+
+// People. A fictitious team; salaries in each company's own currency.
+
+export type Department = 'leadership' | 'engineering' | 'research' | 'product' | 'design' | 'sales' | 'marketing' | 'customer_success' | 'operations' | 'finance' | 'people';
+export type EmploymentType = 'full_time' | 'part_time' | 'contractor' | 'intern';
+/** US: 15th and last day; UK: last working day; contractors: on invoice. */
+export type PayFrequency = 'semi_monthly' | 'biweekly' | 'monthly';
+
+export interface DepositSplit {
+	bankName: string;
+	/** Last four digits only. */
+	accountLast4: string;
+	accountType: 'checking' | 'savings' | 'current';
+	/** Either a fixed amount per pay run or the remainder. */
+	amountMinor?: Minor;
+	remainder: boolean;
+}
+
+export interface Employee {
+	id: string;
+	subsidiaryId: string;
+	name: string;
+	title: string;
+	department: Department;
+	managerId?: string;
+	email: string;
+	location: string;
+	startAt: Iso;
+	endAt?: Iso;
+	type: EmploymentType;
+	status: 'active' | 'on_leave' | 'notice' | 'terminated';
+	/** Salaried: a year's pay. Hourly: rate per hour in `hourlyRateMinor`. */
+	annualSalaryMinor: Minor;
+	hourlyRateMinor?: Minor;
+	ccy: string;
+	payFrequency: PayFrequency;
+	/** Employer 401(k) match or UK pension contribution, in basis points of salary. */
+	retirementBp: number;
+	/** Monthly employer health premium (US) or private medical (UK). */
+	benefitsMonthlyMinor: Minor;
+	/** Share of this person's time spent running the live service (on-call, support, infrastructure), in basis points.
+	 * That share of their cost is cost of revenue; the rest is R&D or operating expense by department. */
+	serviceShareBp: number;
+	/** Stock options granted, if any. */
+	optionsGranted?: number;
+	deposit: DepositSplit[];
+	pto: PtoPolicy;
+}
+
+export interface PtoPolicy {
+	/** Hours accrued per pay run; 0 for unlimited policies. */
+	accrualHoursPerRun: number;
+	unlimited: boolean;
+	balanceHours: number;
+	usedHoursYtd: number;
+	carryoverCapHours?: number;
+	sickBalanceHours: number;
+}
+
+export type PtoKind = 'vacation' | 'sick' | 'parental' | 'bereavement' | 'jury_duty' | 'unpaid';
+
+export interface PtoRequest {
+	id: string;
+	employeeId: string;
+	kind: PtoKind;
+	startAt: Iso;
+	endAt: Iso;
+	hours: number;
+	status: 'pending' | 'approved' | 'declined' | 'taken';
+	notePlain?: string;
+}
+
+export type PayRunStatus = 'draft' | 'scheduled' | 'processing' | 'paid';
+
+/** One pay run for one company: its dates, totals and the entry it posted. */
+export interface PayRun {
+	id: string;
+	subsidiaryId: string;
+	periodStart: Iso;
+	periodEnd: Iso;
+	payDate: Iso;
+	/** When the provider debits the bank, usually two banking days before payDate. */
+	debitDate: Iso;
+	status: PayRunStatus;
+	ccy: string;
+	employeeCount: number;
+	grossMinor: Minor;
+	/** Taxes withheld from employees. */
+	employeeTaxMinor: Minor;
+	/** Employer payroll taxes (FICA, FUTA, SUTA; UK employer NI). */
+	employerTaxMinor: Minor;
+	/** Employee deductions: 401(k) or pension, health premiums. */
+	deductionsMinor: Minor;
+	/** Employer benefit and retirement contributions. */
+	employerBenefitsMinor: Minor;
+	netMinor: Minor;
+	provider: string;
+	proposalId?: string;
+	jeId?: string;
+}
+
+export interface Payslip {
+	id: string;
+	payRunId: string;
+	employeeId: string;
+	hours?: number;
+	grossMinor: Minor;
+	employeeTaxMinor: Minor;
+	deductionsMinor: Minor;
+	netMinor: Minor;
+	ptoHoursUsed: number;
+	ccy: string;
+}
+
+// Cost of service: what it takes to run the product for customers.
+
+export type CostProvider = 'aws' | 'gcp' | 'azure' | 'openai' | 'anthropic' | 'together' | 'vercel' | 'datadog' | 'snowflake' | 'github' | 'other';
+/** Cost of revenue runs the live product; R&D builds the next one; G&A is the company's own tooling. */
+export type CostCategory = 'cost_of_revenue' | 'r_and_d' | 'g_and_a';
+
+/** One line of a cloud or model-usage bill for one month. */
+export interface CloudCost {
+	id: string;
+	subsidiaryId: string;
+	provider: CostProvider;
+	/** "EC2", "S3", "GPU inference (H100)", "Claude API". */
+	service: string;
+	ym: string;
+	environment: 'production' | 'staging' | 'development' | 'shared';
+	category: CostCategory;
+	amountMinor: Minor;
+	ccy: string;
+	usageQuantity: number;
+	/** "GPU-hours", "M tokens", "GB-month". */
+	usageUnit: string;
+	/** Product or feature the cost serves, from the provider's tags. */
+	product?: string;
+	/** The bill line came from this uploaded document. */
+	documentId?: string;
+}
+
+// Batches: prepaid usage-credit packs a customer bought, and stock lots the company holds. Both can expire.
+
+export interface Batch {
+	id: string;
+	subsidiaryId: string;
+	kind: 'credit_pack' | 'stock_lot';
+	sku: string;
+	name: string;
+	/** Credit packs: the customer who bought it. */
+	customerId?: string;
+	/** Stock lots: the vendor it came from. */
+	vendorId?: string;
+	quantity: number;
+	remaining: number;
+	/** "M tokens", "GPU-hours", "units". */
+	unit: string;
+	/** Credit packs: what the customer paid. Stock lots: what the lot cost. */
+	amountMinor: Minor;
+	ccy: string;
+	acquiredAt: Iso;
+	expiresAt?: Iso;
+	status: 'active' | 'expiring' | 'expired' | 'depleted';
+}
+
+// Integrations: the tools Cafoo reads from instead of rebuilding them (CRM, support, billing, payroll, cloud, cap table).
+
+export type IntegrationCategory = 'crm' | 'support' | 'billing' | 'payroll' | 'cloud' | 'model_usage' | 'cap_table';
+
+export interface Integration {
+	/** "hubspot", "zendesk", "stripe", "gusto", "aws", "openai", "carta". */
+	id: string;
+	name: string;
+	category: IntegrationCategory;
+	status: 'available' | 'syncing' | 'connected' | 'error';
+	connectedAt?: Iso;
+	/** The last time a record arrived from it; drives "Updated 12s ago". */
+	lastSyncAt?: Iso;
+	recordsSynced: number;
+	/** What Cafoo reads from it, in plain words. */
+	readsPlain: string;
+	notePlain?: string;
+}
+
+// CRM, kept small: Cafoo reads these from the connected CRM, support and billing tools; it does not edit them.
+
+export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+
+export interface Deal {
+	id: string;
+	/** The integration it came from. */
+	source: string;
+	companyName: string;
+	customerId?: string;
+	stage: DealStage;
+	/** Annual contract value. */
+	amountMinor: Minor;
+	ccy: string;
+	probabilityBp: number;
+	expectedCloseAt: Iso;
+	ownerName: string;
+	updatedAt: Iso;
+}
+
+export interface Promotion {
+	id: string;
+	source: string;
+	code: string;
+	descriptionPlain: string;
+	/** Percentage off (2000 = 20%), or a fixed amount off. */
+	discountBp?: number;
+	amountOffMinor?: Minor;
+	ccy: string;
+	startsAt: Iso;
+	endsAt?: Iso;
+	redemptions: number;
+	/** Discount given so far, a positive amount. */
+	discountGivenMinor: Minor;
+	status: 'scheduled' | 'active' | 'ended';
+}
+
+export interface SupportTicket {
+	id: string;
+	source: string;
+	customerId?: string;
+	requesterName: string;
+	subject: string;
+	priority: 'low' | 'normal' | 'high' | 'urgent';
+	status: 'new' | 'open' | 'pending' | 'solved';
+	channel: 'email' | 'chat' | 'phone' | 'slack';
+	openedAt: Iso;
+	firstResponseAt?: Iso;
+	solvedAt?: Iso;
+	slaDueAt: Iso;
 }
 
 export { formatMoney, toNumber, sumMinor, negMinor } from './money';

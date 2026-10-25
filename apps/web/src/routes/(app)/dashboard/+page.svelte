@@ -47,6 +47,8 @@
 	const ps = $derived(root ? postings(db.accounts().filter((a) => a.subsidiaryId === root.id), db.journalEntries(), db.journalLines()) : []);
 	const contracts = $derived(db.contracts());
 	const s = $derived(range ? summarize(ps, contracts, range) : null);
+	// The strip at the top always shows the selected month, whatever range the figures below show.
+	const monthSummary = $derived(period ? summarize(ps, contracts, monthRange(period.id)) : null);
 	const prevRange = $derived(range ? previousRange(range) : null);
 	const prev = $derived(prevRange && bounds && prevRange.from >= bounds.from ? summarize(ps, contracts, prevRange) : null);
 	const against = $derived(!prevRange ? '' : mode === 'month' ? `vs ${ymShort(prevRange.from.slice(0, 7))}` : `vs the ${rangeDays(prevRange)} days before`);
@@ -112,7 +114,7 @@
 		<h1 class="text-display">Dashboard</h1>
 	</header>
 
-	<StatusStrip {period} />
+	{#if monthSummary}<StatusStrip {period} month={monthSummary} />{/if}
 
 	<!-- What needs the CFO comes first; how the business is doing comes after. -->
 	<div class="mt-8 grid gap-8 lg:grid-cols-3">

@@ -125,6 +125,11 @@ export interface Summary {
 	cash: Minor;
 	/** Cash at the end of the range minus cash the day before it began. */
 	cashChange: Minor;
+	/** Cash the day before the range began. */
+	openingCash: Minor;
+	/** Money into cash over the range, and money out of it (a positive amount): opening + in - out = cash. */
+	cashIn: Minor;
+	cashOut: Minor;
 	/** Receivables before the Allowance. */
 	receivables: Minor;
 	/** The Allowance for credit losses, as a positive amount. */
@@ -151,7 +156,10 @@ export function summarize(ps: Posting[], contracts: Contract[], range: DateRange
 	const intercompany = sum(flow, (p) => !!p.account.isIntercompany && p.account.type === 'revenue') - sum(flow, (p) => !!p.account.isIntercompany && p.account.type === 'expense');
 	const netIncome = revenue - expenses;
 	const cash = balanceAt(ps, CASH, range.to);
-	const cashChange = cash - balanceAt(ps, CASH, addDays(range.from, -1));
+	const openingCash = balanceAt(ps, CASH, addDays(range.from, -1));
+	const cashChange = cash - openingCash;
+	const cashIn = sum(flow, (p) => CASH.includes(p.account.code) && p.amount > 0n);
+	const cashOut = -sum(flow, (p) => CASH.includes(p.account.code) && p.amount < 0n);
 	const receivables = balanceAt(ps, RECEIVABLES, range.to);
 	const days = rangeDays(range);
 
@@ -175,6 +183,9 @@ export function summarize(ps: Posting[], contracts: Contract[], range: DateRange
 		netMarginBp: bp(netIncome, revenue),
 		cash: cash.toString(),
 		cashChange: cashChange.toString(),
+		openingCash: openingCash.toString(),
+		cashIn: cashIn.toString(),
+		cashOut: cashOut.toString(),
 		receivables: receivables.toString(),
 		allowance: (-balanceAt(ps, ALLOWANCE, range.to)).toString(),
 		payables: balanceAt(ps, PAYABLES, range.to).toString(),
