@@ -7,13 +7,11 @@
 	import type { Minor } from '#lib/data/types.js';
 	import { drill } from '#lib/labels.js';
 	import { ui } from '#lib/ui.svelte.js';
-	import AdvisorChat from './AdvisorChat.svelte';
 	import AgentsPanel from './AgentsPanel.svelte';
 	import CreditPanel from './CreditPanel.svelte';
 	import ProposalsPanel from './ProposalsPanel.svelte';
 	import CashChart from './CashChart.svelte';
 	import ClosePanel from './ClosePanel.svelte';
-	import CloseCard from './CloseCard.svelte';
 	import KpiCard, { type Delta } from './KpiCard.svelte';
 	import MonthlyChart from './MonthlyChart.svelte';
 	import StatusStrip from './StatusStrip.svelte';
@@ -131,12 +129,18 @@
 
 	{#if monthSummary}<StatusStrip {period} month={monthSummary} />{/if}
 
-	<!-- Where the close stands and its next step come first; how the business is doing comes after. -->
-	<div class="mt-8"><CloseCard {period} /></div>
-
-	<!-- Then a question box for the Advisor, and the Proposals by status. -->
+	<!-- The headline figures for the range below, beside the Proposals by status. -->
 	<div class="mt-8 grid gap-8 lg:grid-cols-3">
-		<div class="min-w-0 lg:col-span-2"><AdvisorChat /></div>
+		<div class="min-w-0 lg:col-span-2">
+			{#if s}
+				<div aria-label="Key figures for {label}" role="group" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<KpiCard label="Book cash" value={money(s.cash)} delta={moneyDelta('cash', true)} spark={spark((m) => m.cash)} href={link(drill({ account: '1000' }, through))} hint={runway} />
+					<KpiCard label="Revenue" value={money(s.revenue)} delta={moneyDelta('revenue', true)} spark={spark((m) => m.revenue)} href={link(drill({ type: ['revenue'], company }, span))} hint={toBig(s.intercompany) ? `From customers. ${money(s.intercompany)} of fees from other group companies left out` : 'From customers, deferrals applied'} />
+					<KpiCard label="Net income" value={money(s.netIncome)} delta={moneyDelta('netIncome', true)} spark={spark((m) => m.netIncome)} href={link(drill({ type: ['revenue', 'expense'], company }, span))} hint="{money(s.expenses)} of expenses · {pct(s.netMarginBp)} of revenue, before intercompany fees" />
+					<KpiCard label="ARR" value={money(s.arr)} delta={moneyDelta('arr', true)} spark={spark((m) => m.arr)} href="/reports" hint="Annual recurring revenue, from the contracts" />
+				</div>
+			{/if}
+		</div>
 		<div class="min-w-0"><ProposalsPanel /></div>
 	</div>
 
@@ -188,14 +192,7 @@
 		{#if !s}
 			<p class="card p-5 text-body-sm text-ink-2">Pick both a start and an end date to see the figures.</p>
 		{:else}
-			<div aria-label="Key figures for {label}" role="group" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-				<KpiCard label="Book cash" value={money(s.cash)} delta={moneyDelta('cash', true)} spark={spark((m) => m.cash)} href={link(drill({ account: '1000' }, through))} hint={runway} />
-				<KpiCard label="Revenue" value={money(s.revenue)} delta={moneyDelta('revenue', true)} spark={spark((m) => m.revenue)} href={link(drill({ type: ['revenue'], company }, span))} hint={toBig(s.intercompany) ? `From customers. ${money(s.intercompany)} of fees from other group companies left out` : 'From customers, deferrals applied'} />
-				<KpiCard label="Net income" value={money(s.netIncome)} delta={moneyDelta('netIncome', true)} spark={spark((m) => m.netIncome)} href={link(drill({ type: ['revenue', 'expense'], company }, span))} hint="{money(s.expenses)} of expenses · {pct(s.netMarginBp)} of revenue, before intercompany fees" />
-				<KpiCard label="ARR" value={money(s.arr)} delta={moneyDelta('arr', true)} spark={spark((m) => m.arr)} href="/reports" hint="Annual recurring revenue, from the contracts" />
-			</div>
-
-			<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<section aria-labelledby="trend-h" class="card flex flex-col gap-4 p-5">
 					<h3 id="trend-h" class="text-subtitle">Revenue and expenses by month</h3>
 					<MonthlyChart points={series} {selected} onpick={pickMonth} />

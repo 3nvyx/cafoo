@@ -63,7 +63,7 @@
 
 <!-- Two groups of three, money then work: stacked, then side by side only where six tiles have room for the amounts.
      On phones each group's third tile spans the row, so a row never mixes the two. -->
-<div class="grid gap-3 2xl:grid-cols-2 2xl:gap-6">
+<div class="grid gap-3 2xl:grid-cols-2">
 	{@render group(cash, `${monthName(period.month)} cash`)}
 	{@render group(work, `${monthName(period.month)} work`)}
 </div>

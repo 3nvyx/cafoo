@@ -85,8 +85,8 @@
 							<span aria-hidden="true">·</span>
 							{@render brand(f.brand)}
 						</div>
-						<h3 id="feature-{f.id}" class="max-w-[22ch] text-display-sm font-medium text-balance">{f.title}</h3>
-						<p class="max-w-[60ch] text-ink-2">{f.body}</p>
+						<h3 id="feature-{f.id}" class="title text-display-sm font-medium text-balance">{f.title}</h3>
+						<p class="body text-ink-2">{f.body}</p>
 					</div>
 					<div class="panel mt-auto ml-6 rounded-tl-lg border-t border-l border-line bg-subtle p-4 sm:ml-8 sm:p-6">
 						<div class="visual">
@@ -108,6 +108,14 @@
 </div>
 
 <style>
+	/* Reading measures for the title and the body. */
+	.title {
+		max-width: 22ch;
+	}
+	.body {
+		max-width: 60ch;
+	}
+
 	/* Wordmarks are masks filled with the text colour, as on the logo wall. */
 	.logo {
 		display: block;
