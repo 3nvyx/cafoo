@@ -89,6 +89,12 @@ function redTeamTimeoutMs(): number {
   return timeoutMs;
 }
 
+/** How many Proposals the Red Team critiques at once (REDTEAM_CONCURRENCY, default 4). */
+export function critiqueConcurrency(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.REDTEAM_CONCURRENCY?.trim() || 4);
+  return Number.isSafeInteger(n) && n >= 1 && n <= 32 ? n : 4;
+}
+
 async function grokCritique(A: RoleConn, p: ProposalRow, materiality: bigint, ctx: () => RuleContext): Promise<Critique | null> {
   const xai = createXai({ apiKey: process.env.XAI_API_KEY });
   const c = await modelCritique(A, p, materiality, ctx, xai.responses(modelFor(red(A).harness)));
@@ -157,9 +163,30 @@ export function startCritic(cast: Cast): () => void {
     await RT.reducers.critique({ proposalId: p.id, body: c.body, summaryPlain: c.summaryPlain });
   };
   const vendorName = (id: bigint) => A.db.vendor.id.find(id)?.name;
+  // A close files dozens of Proposals in seconds. One model call each, all at once, made Grok time out on most of
+  // them, so critiques queue for a few slots; a slot passes straight to the next waiter.
+  const slots = critiqueConcurrency();
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  const acquire = () => (active < slots ? (active++, Promise.resolve()) : new Promise<void>(r => waiting.push(r)));
+  const release = () => {
+    const next = waiting.shift();
+    if (next) next();
+    else active--;
+  };
   const critique = async (p: ProposalRow) => {
     if (seen.has(p.id) || p.status.tag !== 'Open') return;
     seen.add(p.id);
+    await acquire();
+    try {
+      // The Advisor may have ruled while this one waited for a slot.
+      if (stopped || A.db.proposal.id.find(p.id)?.status.tag !== 'Open') return;
+      await critiqueNow(p);
+    } finally {
+      release();
+    }
+  };
+  const critiqueNow = async (p: ProposalRow) => {
     const materiality = A.db.settings.key.find('materiality_threshold_minor')?.valueI64 ?? 1_000_000n;
     try {
       // Grok first when live; the scripted critique when Grok fails (outage, timeout, rate limit) or submits nothing
