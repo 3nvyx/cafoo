@@ -93,7 +93,12 @@ export class MockDataSource implements DataSource {
 	providers = () => PROVIDERS;
 	liveActivity = () => this.#activity;
 	now = () => this.#now();
-	connection = (): ConnectionState => ({ ledger: 'demo', agents: 'online', closes: this.#closes });
+	connection = (): ConnectionState => ({
+		ledger: 'demo',
+		agents: 'online',
+		closes: this.#closes,
+		feed: { enabled: this.#t.settings.feedEnabled, planned: 0, ingested: 0, blockedReason: 'Demo mode has no live feed; connect the ledger and the agent gateway to stream bank lines and invoices.' }
+	});
 	/** Demo mode has one viewer, and they are the CFO. */
 	cfoSeat = (): CfoSeat => ({ status: 'you', holderName: 'CFO' });
 
@@ -202,6 +207,12 @@ export class MockDataSource implements DataSource {
 				this.#emit(m.targetKind === 'invoice' ? 'invoice' : 'bill', 'update', doc);
 			}
 		}
+	}
+
+	async setFeedEnabled(enabled: boolean): Promise<void> {
+		this.#t.settings.feedEnabled = enabled;
+		this.#emit('settings', 'update', this.#t.settings);
+		this.#audit('cfo', 'set_feed_enabled', 'settings', 'feed_enabled', { enabled });
 	}
 
 	async setMateriality(minor: Minor): Promise<void> {

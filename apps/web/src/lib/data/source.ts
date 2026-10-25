@@ -32,7 +32,8 @@ import type {
 	Settings,
 	Subsidiary,
 	TableName,
-	Vendor
+	Vendor,
+	FeedStatus
 } from './types';
 
 export type ChangeKind = 'insert' | 'update' | 'delete';
@@ -44,6 +45,8 @@ export interface ConnectionState {
 	/** Closes the agents have started, per Period ("yyyy-mm"). 'running' while agents are working. */
 	closes: { periodYm: string; status: 'running' | 'done' }[];
 	message?: string;
+	/** The live feed, as the agent gateway last reported it (undefined until it has). */
+	feed?: FeedStatus;
 }
 
 /**
@@ -140,6 +143,8 @@ export interface DataSource {
 	 */
 	cfoReverse(jeId: string, reasonPlain: string): Promise<void>;
 	setMateriality(minor: Minor): Promise<void>;
+	/** CFO switches the live feed on or off. It books only into the open month after one the CFO locked. */
+	setFeedEnabled(enabled: boolean): Promise<void>;
 	setCloseTaskStatus(taskId: string, status: CloseTaskStatus): Promise<void>;
 	/** CFO locks the Period. The Board Pack becomes final. */
 	lockPeriod(periodId: string): Promise<void>;

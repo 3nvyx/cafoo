@@ -90,7 +90,7 @@ const empty = (): Mirror => ({
 	credit_check: [],
 	audit_event: [],
 	public_footprint: [],
-	settings: { materialityThresholdMinor: '1000000', reportingCcy: 'USD' },
+	settings: { materialityThresholdMinor: '1000000', reportingCcy: 'USD', feedEnabled: false },
 	fx_rate: [],
 	charter_version: [],
 	charter_eval: []
@@ -235,6 +235,12 @@ export class SpacetimeDataSource implements DataSource {
 		await this.#call('Could not reverse this Journal Entry.', (c) => c.reducers.cfoReverse({ jeId: BigInt(jeId), reasonPlain }));
 	}
 
+	async setFeedEnabled(enabled: boolean): Promise<void> {
+		await this.#call(enabled ? 'Could not switch the live feed on.' : 'Could not switch the live feed off.', (c) => c.reducers.setFeedEnabled({ enabled }));
+		// The gateway's feeder notices the setting on its own; ask it straight away so the status line follows.
+		void this.#pollStatus();
+	}
+
 	async setMateriality(minor: U.Minor): Promise<void> {
 		await this.#call('Could not change the Materiality threshold.', (c) => c.reducers.setMateriality({ thresholdMinor: BigInt(minor) }));
 	}
@@ -359,7 +365,12 @@ export class SpacetimeDataSource implements DataSource {
 			const body = (await res.json()) as {
 				closes?: { periodYm: string; status: string }[];
 				providers?: { name: string; mode: string; detail?: string }[];
+				feed?: { enabled?: boolean; ym?: string | null; planned?: number; ingested?: number; blockedReason?: string | null };
 			};
+			if (body.feed) {
+				const f = body.feed;
+				this.#conn.feed = { enabled: !!f.enabled, ym: f.ym ?? undefined, planned: f.planned ?? 0, ingested: f.ingested ?? 0, blockedReason: f.blockedReason ?? undefined };
+			}
 			this.#conn.agents = 'online';
 			this.#conn.closes = (body.closes ?? []).map((c) => ({ periodYm: c.periodYm, status: c.status === 'running' ? 'running' : 'done' }));
 			this.#gatewayProviders = (body.providers ?? [])
@@ -502,9 +513,11 @@ export class SpacetimeDataSource implements DataSource {
 			const rows = all(c.db.settings.iter());
 			const threshold = rows.find((s) => s.key === 'materiality_threshold_minor');
 			const reporting = rows.find((s) => s.key === 'reporting_ccy');
+			const feed = rows.find((s) => s.key === 'feed_enabled');
 			t.settings = {
 				materialityThresholdMinor: threshold ? threshold.valueI64.toString() : t.settings.materialityThresholdMinor,
-				reportingCcy: reporting?.valueText || t.settings.reportingCcy
+				reportingCcy: reporting?.valueText || t.settings.reportingCcy,
+				feedEnabled: feed ? feed.valueI64 === 1n : false
 			};
 		}
 		if (d.has('fxRate')) t.fx_rate = all(c.db.fxRate.iter()).map(M.fxRate);

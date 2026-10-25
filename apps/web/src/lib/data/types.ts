@@ -320,6 +320,19 @@ export interface Settings {
 	materialityThresholdMinor: Minor;
 	/** The one currency the group reports in (USD). */
 	reportingCcy: string;
+	/** Whether the CFO has switched the live feed on (the module's feed_enabled setting). */
+	feedEnabled: boolean;
+}
+
+/** What the live feed is doing, as the agent gateway reports it (GET /status, `feed`). */
+export interface FeedStatus {
+	enabled: boolean;
+	/** The month the feed books into (the open month after the latest one the CFO locked). */
+	ym?: string;
+	planned: number;
+	ingested: number;
+	/** Why nothing is arriving, in plain words, when nothing can. */
+	blockedReason?: string;
 }
 
 export interface ProviderStatus {

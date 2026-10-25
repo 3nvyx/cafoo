@@ -131,7 +131,7 @@ export function loadSeed(): Tables {
 		credit_check: customers.creditChecks as CreditCheck[],
 		audit_event: governance.auditEvents as AuditEvent[],
 		public_footprint: footprint.publicFootprints as PublicFootprint[],
-		settings: { ...reference.settings, reportingCcy: group.reportingCcy },
+		settings: { ...reference.settings, reportingCcy: group.reportingCcy, feedEnabled: false },
 		fx_rate: group.fxRates.map((r, i) => ({ id: `fx-${i + 1}`, ...r, kind: r.kind as FxRate['kind'] })),
 		charter_version: [],
 		charter_eval: []

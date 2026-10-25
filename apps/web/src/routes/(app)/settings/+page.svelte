@@ -14,6 +14,22 @@
 	const waiting = $derived(db.proposals().filter((p) => p.status === 'awaiting_cfo').length);
 	let resetOpen = $state(false);
 
+	const feedOn = $derived(db.settings().feedEnabled);
+	const feed = $derived(db.connection().feed);
+	const readOnly = $derived(db.cfoSeat().status !== 'you');
+	let feedBusy = $state(false);
+	async function toggleFeed() {
+		feedBusy = true;
+		try {
+			await db.setFeedEnabled(!feedOn);
+			toasts.push(feedOn ? 'The live feed is off.' : 'The live feed is on. New bank lines and invoices will arrive as they happen.', 'success');
+		} catch (err) {
+			toasts.error(err);
+		} finally {
+			feedBusy = false;
+		}
+	}
+
 	// Arrow keys fire `change` on every step, so the change is saved once: on release or blur, or after a pause.
 	const SETTLE_MS = 700;
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -99,6 +115,32 @@
 			/>
 			<div class="flex justify-between text-sm text-ink-3"><span class="num">$1,000</span><span class="num">$100,000</span></div>
 			<p class="text-sm text-ink-3">Changes apply to new rulings. {waiting ? `${waiting} item${waiting === 1 ? ' is' : 's are'} already waiting for you.` : ''}</p>
+		</div>
+	</section>
+
+	<section aria-labelledby="feed-h" class="flex flex-col gap-4">
+		<div>
+			<h2 id="feed-h" class="text-2xl">Live feed</h2>
+			<p class="mt-1 text-ink-2">
+				Once you lock a month, the feed streams the next month's bank lines and invoices as they happen, and the Bookkeeper proposes matches as they land. It
+				books only into the open month after one you locked.
+			</p>
+		</div>
+		<div class="card flex flex-col gap-3 p-5">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div class="flex items-center gap-2">
+					<Pill tone={feedOn ? 'pos' : 'neutral'}>{feedOn ? 'On' : 'Off'}</Pill>
+					{#if feed?.ym}<span class="text-sm text-ink-2">Books into {feed.ym}</span>{/if}
+				</div>
+				<button class="btn {feedOn ? '' : 'btn-primary'}" disabled={feedBusy || readOnly} onclick={toggleFeed}>
+					{feedOn ? 'Switch the feed off' : 'Switch the feed on'}
+				</button>
+			</div>
+			{#if feed && (feed.planned || feed.ingested)}
+				<p class="num text-sm text-ink-2">{feed.ingested} of {feed.planned} events received</p>
+			{/if}
+			{#if feed?.blockedReason}<p class="text-sm text-ink-3">{feed.blockedReason}</p>{/if}
+			{#if readOnly}<p class="text-sm text-ink-3">Only the browser holding the CFO seat can switch the feed.</p>{/if}
 		</div>
 	</section>
 
