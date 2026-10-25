@@ -1211,8 +1211,21 @@ function validateProposalShapeAndState(ctx: Ctx, kind: string, payloadJson: stri
     checkCreditDecision(ctx, parseJson<CreditDecisionPayload>(payloadJson, kind));
   } else if (kind === 'vendor_block') {
     const payload = parseJson<VendorBlockPayload>(payloadJson, kind);
-    if (!ctx.db.vendor.id.find(idOf(payload.vendorId, 'vendorId'))) throw new SenderError(`Unknown vendor ${payload.vendorId}`);
+    const v = ctx.db.vendor.id.find(idOf(payload.vendorId, 'vendorId'));
+    if (!v) throw new SenderError(`Unknown vendor ${payload.vendorId}`);
     if (typeof payload.reasonPlain !== 'string' || payload.reasonPlain.trim() === '') throw new SenderError('A vendor block needs a plain-English reason (reasonPlain).');
+    // When the vendor's owner is on file, a block rests on evidence: the owner's newest recorded check must derive BLOCK.
+    // A vendor with no owner on file cannot be checked, so its block stands on its reason (and the CFO, when material).
+    if (v.ownerPersonaId) {
+      const rows = checksOf(ctx, 'vendor', v.id);
+      if (rows.length === 0) {
+        throw new SenderError(`${v.name} has no recorded owner check: its owner (${v.ownerPersonaId}) is on file, so record the owner checks first; a block rests on a BLOCK result.`);
+      }
+      const latest = latestCheck(rows);
+      if (latest.tier !== 'BLOCK') {
+        throw new SenderError(`${v.name}'s latest owner check (request ${latest.requestId || 'n/a'}, ${latest.product}) derives tier ${latest.tier}, not BLOCK; a block rests on the newest evidence.`);
+      }
+    }
   } else if (kind === 'revenue_schedule') {
     // Each line names an existing subscription item of that customer's contract, a real month, and a month that item
     // has no schedule line for yet (here or already in the ledger), so no month's revenue can be planned twice.

@@ -640,7 +640,35 @@ async function main() {
     await refuses('L2: duplicate bankTxIds in a journal entry', () => je(B, CLOSE, [{ accountCode: '6000', debitMinor: '1', creditMinor: '0' }, { accountCode: '1000', debitMinor: '0', creditMinor: '1' }], { bankTxIds: [`0${free.id}`, Number(free.id)] }), /listed twice/);
   });
 
+  /** Record one owner check on a vendor with these facts (the module derives its tier). */
+  const ownerCheck = (v: { id: bigint; ownerPersonaId?: string }, requestId: string, facts: unknown) =>
+    C.conn.reducers.recordCreditCheck({
+      subjectKind: 'vendor',
+      subjectId: v.id,
+      personaId: v.ownerPersonaId!,
+      product: 'fraud_finder',
+      requestId,
+      summaryJson: JSON.stringify({ product: 'fraud_finder', requestId, summary: 'smoke evidence', status: 200, facts }),
+    });
+
+  await section('Vendor blocks rest on a BLOCK owner check whenever an owner is on file', async () => {
+    const pet = [...db.vendor.iter()].find(v => v.name === 'Pettigrew Consulting' && v.ownerPersonaId)!;
+    const block = () => propose(C, 'vendor_block', { vendorId: pet.id.toString(), reasonPlain: 'smoke: the owner failed its checks' }, CLOSE);
+    await refuses('blocking a vendor whose owner has no recorded check', block, /no recorded owner check/);
+    await accepts("a clean check on the vendor's owner", () => ownerCheck(pet, 'smk-pet-clean', CLEAN_FACTS));
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-pet-clean'), 'clean owner check');
+    await refuses("blocking a vendor whose owner's latest check is clean", block, /derives tier A, not BLOCK/);
+    await sleep(20);
+    await accepts("a newer check: the vendor's owner has died", () => ownerCheck(pet, 'smk-pet-dead', DECEASED_FACTS));
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-pet-dead'), 'BLOCK owner check');
+    const ok = await accepts("blocking once the owner's latest check derives BLOCK", block);
+    if (ok) await settle(ok);
+    check(db.vendor.id.find(pet.id)!.verification.tag === 'Blocked', 'Pettigrew is blocked');
+  });
+
   await section('L6 and finding 6: nothing pays a blocked vendor; voiding its bill is allowed', async () => {
+    await ownerCheck(bds, 'smk-bds-block', DECEASED_FACTS);
+    await waitFor(() => [...db.creditCheck.iter()].find(r => r.requestId === 'smk-bds-block'), 'BDS owner check');
     const block = await propose(C, 'vendor_block', { vendorId: bds.id.toString(), reasonPlain: 'the owner failed identity checks' }, CLOSE);
     await settle(block);
     check(db.vendor.id.find(bds.id)!.verification.tag === 'Blocked', 'BDS is blocked');
@@ -940,6 +968,7 @@ async function main() {
       await X.conn.reducers.seedVendors({ subsidiaryCode: root.code, vendors: [{ name: payroll.counterparty, domain: 'smoke.example', category: 'smoke', ownerPersonaId: undefined }] });
       payee = await waitFor(() => [...db.vendor.iter()].find(v => v.name === payroll.counterparty), 'payee vendor');
     }
+    // The payee has no owner on file, so no owner check is possible and the block stands on its reason alone.
     await settle(await propose(C, 'vendor_block', { vendorId: payee.id.toString(), reasonPlain: 'smoke: the payee failed its checks while the match waited' }, CLOSE));
     await refuses('CFO confirms the bank match after its payee was blocked', () => X.conn.reducers.cfoConfirm({ proposalId: bm.id, note: 'go' }), /is blocked/);
     await X.conn.reducers.cfoSendBack({ proposalId: bm.id, notePlain: 'smoke cleanup' });
